@@ -1,0 +1,360 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/gold_bg_base"
+    android:layoutDirection="rtl">
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/gold_primary">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="20dp">
+
+            <!-- Profile image wrapped in a modern circular Card -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="96dp"
+                android:layout_height="96dp"
+                app:cardCornerRadius="48dp"
+                app:cardElevation="2dp"
+                app:strokeColor="?attr/colorOnPrimary"
+                app:strokeWidth="1.5dp">
+
+                <ImageView
+                    android:id="@+id/imgProfile"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:src="@android:drawable/sym_def_app_icon"
+                    android:scaleType="centerInside"
+                    android:padding="12dp"
+                    app:tint="@color/gold_primary"/>
+            </com.google.android.material.card.MaterialCardView>
+
+            <TextView
+                android:id="@+id/tvProfileName"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="نام دانش‌آموز"
+                android:textColor="?attr/colorOnPrimary"
+                android:textAppearance="@style/TextAppearance.Kharazmi.PageTitle"
+                android:layout_marginTop="12dp"/>
+
+            <TextView
+                android:id="@+id/tvProfilePhone"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="..."
+                android:textColor="?attr/colorOnPrimary"
+                android:alpha="0.8"
+                android:textAppearance="@style/TextAppearance.Kharazmi.Caption"
+                android:fontFeatureSettings="tnum"
+                android:layout_marginTop="4dp"/>
+        </LinearLayout>
+
+        <!-- Dynamic TabLayout with clean styling -->
+        <com.google.android.material.tabs.TabLayout
+            android:id="@+id/tabLayoutProfile"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@color/gold_bg_elevated"
+            app:tabSelectedTextColor="@color/gold_primary"
+            app:tabIndicatorColor="@color/gold_primary"
+            app:tabMode="scrollable"
+            app:tabGravity="fill">
+
+            <com.google.android.material.tabs.TabItem
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="مشخصات"/>
+
+            <com.google.android.material.tabs.TabItem
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="مالی و شهریه"/>
+
+            <com.google.android.material.tabs.TabItem
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="کارنامه"/>
+
+            <com.google.android.material.tabs.TabItem
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="اقساط"/>
+
+            <com.google.android.material.tabs.TabItem
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="ارتباطات"/>
+
+        </com.google.android.material.tabs.TabLayout>
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior"
+        android:fillViewport="true"
+        android:padding="@dimen/spacing_normal">
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <LinearLayout
+                android:id="@+id/llStudentStandardContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+            <!-- Tab 2: Financial Wallet Summary Card -->
+            <!-- FIX: Use the declared Widget.Kharazmi.Card.Gold style; remove repeated suffixes. -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardFinancialStatus"
+                style="@style/Widget.Kharazmi.Card.Gold"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/spacing_normal"
+                app:cardCornerRadius="20dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="@dimen/spacing_normal">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+                        <ImageView
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
+                            android:src="@android:drawable/ic_menu_slideshow"
+                            app:tint="@color/gold_primary"
+                            android:padding="4dp"/>
+                        <TextView
+                            android:text="وضعیت مالی کیف پول"
+                            android:textAppearance="@style/TextAppearance.Kharazmi.SectionTitle"
+                            android:textColor="@color/text_primary"
+                            android:layout_marginRight="@dimen/spacing_small"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"/>
+                    </LinearLayout>
+
+                    <View android:layout_width="match_parent" android:layout_height="0.5dp" android:background="@color/gold_border_subtle" android:layout_marginTop="@dimen/spacing_normal" android:layout_marginBottom="@dimen/spacing_normal"/>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:paddingVertical="4dp">
+                        <TextView
+                            android:text="بدهی کل:"
+                            android:textAppearance="@style/TextAppearance.Kharazmi.Body"
+                            android:textColor="#555"
+                            android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"/>
+                        <TextView
+                            android:id="@+id/tvTotalDebt"
+                            android:text="---"
+                            android:textAppearance="@style/TextAppearance.Kharazmi.Body"
+                            android:textStyle="bold"
+                            android:textColor="?attr/colorError"
+                            android:fontFeatureSettings="tnum"
+                            android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:paddingVertical="4dp">
+                        <TextView
+                            android:text="↳ سهم معلم:"
+                            android:textAppearance="@style/TextAppearance.Kharazmi.Caption"
+                            android:textColor="#757575"
+                            android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"/>
+                        <TextView
+                            android:id="@+id/tvDebtTeacher"
+                            android:text="0"
+                            android:textAppearance="@style/TextAppearance.Kharazmi.Caption"
+                            android:textColor="@color/text_primary"
+                            android:fontFeatureSettings="tnum"
+                            android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:paddingVertical="4dp">
+                        <TextView
+                            android:text="↳ سهم آموزشگاه:"
+                            android:textAppearance="@style/TextAppearance.Kharazmi.Caption"
+                            android:textColor="#757575"
+                            android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"/>
+                        <TextView
+                            android:id="@+id/tvDebtInstitute"
+                            android:text="0"
+                            android:textAppearance="@style/TextAppearance.Kharazmi.Caption"
+                            android:textColor="@color/text_primary"
+                            android:fontFeatureSettings="tnum"
+                            android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                    </LinearLayout>
+
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Issue Invoice button styled using central style -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnIssueInvoice"
+                style="@style/Widget.Kharazmi.Button.Gold"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="صدور فیش و ثبت حواله"
+                android:layout_marginBottom="@dimen/spacing_normal"
+                app:icon="@android:drawable/ic_input_get"
+                app:iconGravity="textStart"
+                app:iconTint="?attr/colorOnPrimary"
+                app:elevation="@dimen/elevation_button"/>
+
+            <!-- Main dynamic text content styled in a flat card instead of raw bordered view -->
+            <!-- FIX: Use the declared Widget.Kharazmi.Card.Gold style; remove repeated suffixes. -->
+            <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.Kharazmi.Card.Gold"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/spacing_normal"
+                app:cardCornerRadius="20dp">
+
+                <TextView
+                    android:id="@+id/tvContent"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="در حال دریافت اطلاعات..."
+                    android:textAppearance="@style/TextAppearance.Kharazmi.Body"
+                    android:lineSpacingExtra="8dp"
+                    android:padding="@dimen/spacing_normal"/>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Suspend switch warning card (Warm & Day/Night compatible) -->
+            <!-- FIX: Use the declared Widget.Kharazmi.Card.Gold style; remove repeated suffixes. -->
+            <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.Kharazmi.Card.Gold"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/spacing_normal"
+                app:cardCornerRadius="20dp"
+                app:strokeColor="@color/gold_primary"
+                app:strokeWidth="1.5dp">
+                
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="@dimen/spacing_normal">
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/switchSuspend"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="تعلیق دانش‌آموز (غیرفعال موقت)"
+                        android:textAppearance="@style/TextAppearance.Kharazmi.SectionTitle"
+                        android:textColor="@color/text_primary"
+                        app:showText="false"
+                        android:textOn=""
+                        android:textOff="" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="در صورت تعلیق، دانش‌آموز در جستجوی کلاس‌بندی نمایش داده نمی‌شود اما سوابق او حفظ می‌گردد."
+                        android:textAppearance="@style/TextAppearance.Kharazmi.Caption"
+                        android:textColor="@color/gold_primary"
+                        android:layout_marginTop="@dimen/spacing_small"/>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Send Portal Link button styled -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnSendPortalLink"
+                style="@style/Widget.Kharazmi.Button.Gold"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="ارسال لینک پورتال به اولیا"
+                app:backgroundTint="#7E57C2"
+                android:textColor="@color/white"
+                app:icon="@android:drawable/sym_action_email"
+                app:iconTint="@color/white"
+                app:iconGravity="textStart"
+                android:layout_marginBottom="@dimen/spacing_normal"
+                app:elevation="@dimen/elevation_button"/>
+
+            <!-- Delete Student button styled -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnDeleteStudent"
+                style="@style/Widget.Kharazmi.Button.Gold"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="حذف کامل دانش‌آموز"
+                app:backgroundTint="?attr/colorError"
+                android:textColor="?attr/colorOnError"
+                app:icon="@android:drawable/ic_menu_delete"
+                app:iconTint="?attr/colorOnError"
+                app:iconGravity="textStart"
+                android:layout_marginBottom="40dp"
+                app:elevation="@dimen/elevation_button"/>
+
+            <android.widget.Space android:layout_width="match_parent" android:layout_height="80dp"/>
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/llStudentCommunicationContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/tvStudentCommunicationEmpty"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:padding="@dimen/spacing_large"
+                    android:text="در حال دریافت تاریخچه ارتباطات..."
+                    android:textAppearance="@style/TextAppearance.Kharazmi.Body"
+                    android:textColor="?android:attr/textColorSecondary" />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rvStudentCommunicationHistory"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:nestedScrollingEnabled="false"
+                    android:paddingBottom="80dp" />
+            </LinearLayout>
+        </FrameLayout>
+    </androidx.core.widget.NestedScrollView>
+
+    <!-- Floating Action Button -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabEditProfile"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="@dimen/spacing_large"
+        android:src="@android:drawable/ic_menu_edit"
+        app:tint="?attr/colorOnSecondary"
+        app:backgroundTint="@color/gold_primary"
+        app:elevation="6dp"/>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

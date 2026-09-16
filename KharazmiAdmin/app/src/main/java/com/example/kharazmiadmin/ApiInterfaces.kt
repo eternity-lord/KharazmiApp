@@ -1,0 +1,66 @@
+package com.example.kharazmiadmin
+
+import retrofit2.http.Body
+import retrofit2.http.DELETE
+import retrofit2.http.GET
+import retrofit2.http.POST
+import retrofit2.http.Path
+import retrofit2.http.Query
+
+// ==========================================
+// تمام رابط‌های API اینجا تعریف می‌شوند
+// تا با تغییر یک اکتیویتی، بقیه خراب نشوند.
+// ==========================================
+
+// 1. اینترفیس قدیمی (برای حضور و غیاب و تایید کلاس)
+interface InvoiceApi {
+    @GET("classes/{id}/details")
+    suspend fun getClassDetails(@Path("id") id: Int): ClassDetailsResponse
+
+    @DELETE("enrollments/{enrollment_id}")
+    suspend fun deleteEnrollment(@Path("enrollment_id") id: Int): SimpleResponse
+}
+
+// 2. اینترفیس جدید (برای ثبت حواله هوشمند)
+data class StudentClassStatus(
+    val total_amount: Long,
+    val paid_to_teacher: Long,
+    val paid_to_institute: Long,
+    val due_to_teacher: Long,
+    val due_to_institute: Long,
+    val course_id: Int? = null,
+    val enrollment_id: Int? = null
+)
+
+interface NewInvoiceApi {
+    @GET("finance/search_advanced")
+    suspend fun searchAdvanced(@Query("query") q: String): List<AdvancedSearchItem>
+
+    @POST("finance/pay")
+    suspend fun submitPayment(@Body data: FinanceSubmitData): FinanceResponse
+
+    @GET("admin/students/{id}/full_profile")
+    suspend fun getFullStudentProfile(@Path("id") id: Int): FullStudentProfile
+
+    @GET("finance/student_class_status")
+    suspend fun getStudentClassStatus(
+        @Query("student_id") studentId: Int,
+        @Query("course_id") courseId: Int?,
+        @Query("course_code") courseCode: String?
+    ): StudentClassStatus
+}
+
+// 3. اینترفیس‌های دیگر (اختیاری برای نظم بیشتر در آینده)
+interface ClassApi {
+    @GET("classes/list")
+    suspend fun getAllClasses(): List<ClassListItem>
+
+    @POST("classes/{id}/suspend")
+    suspend fun suspendClass(@Path("id") id: Int): SuspendResponse
+
+    @POST("admin/classes/{id}/suspend_s")
+    suspend fun suspendClassAdmin(@Path("id") id: Int): SuspendResponse
+
+    @POST("admin/classes/suspend_bulk")
+    suspend fun suspendBulkClasses(@Body req: BulkSuspendRequest): SimpleResponse
+}

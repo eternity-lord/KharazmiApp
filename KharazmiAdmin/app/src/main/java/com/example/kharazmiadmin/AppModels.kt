@@ -678,3 +678,29 @@ data class TimelineEvent(
     @SerializedName("icon_name") val iconName: String,
     @SerializedName("color_hex") val colorHex: String
 )
+
+// ==========================================
+// Smart Auto-Dunning - Human-in-the-Loop (Admin Only)
+// ==========================================
+data class DunningDraft(
+    @SerializedName("installment_id") val installmentId: Int,
+    @SerializedName("student_name") val studentName: String,
+    @SerializedName("parent_mobile") val parentMobile: String,
+    val amount: Long,
+    @SerializedName("due_date") val dueDate: String,
+    val category: String, // upcoming | overdue | critical
+    @SerializedName("suggested_message") val suggestedMessage: String
+)
+
+data class DunningSendRequest(
+    @SerializedName("installment_ids") val installmentIds: List<Int>
+)
+
+data class DunningSendResponse(
+    @SerializedName("sent_count") val sentCount: Int,
+    @SerializedName("skipped_count") val skippedCount: Int,
+    @SerializedName("sent_ids") val sentIds: List<Int>,
+    @SerializedName("skipped_ids") val skippedIds: List<Int>,
+    val message: String,
+    @SerializedName("skipped_reasons") val skippedReasons: Map<String, String>? = null
+)

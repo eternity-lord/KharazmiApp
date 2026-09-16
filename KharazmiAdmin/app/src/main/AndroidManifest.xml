@@ -187,6 +187,10 @@
             android:name=".AuditDashboardActivity"
             android:exported="false"
             android:label="رادار تقلب" />
+        <activity
+            android:name=".DunningActivity"
+            android:exported="false"
+            android:label="یادآوری اقساط" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

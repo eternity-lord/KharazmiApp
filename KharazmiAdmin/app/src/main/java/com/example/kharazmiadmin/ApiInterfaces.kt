@@ -101,3 +101,14 @@ interface TimelineApi {
     @GET("students/{id}/timeline")
     suspend fun getTimeline(@Path("id") id: Int): List<TimelineEvent>
 }
+
+// ==========================================
+// Smart Auto-Dunning - Human-in-the-Loop (Admin Only)
+// ==========================================
+interface DunningApi {
+    @GET("dunning/drafts")
+    suspend fun getDrafts(): List<DunningDraft>
+
+    @POST("dunning/send_batch")
+    suspend fun sendBatch(@Body req: DunningSendRequest): DunningSendResponse
+}

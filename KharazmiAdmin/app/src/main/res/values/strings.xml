@@ -1171,4 +1171,20 @@
     <string name="timeline_empty">هنوز فعالیت ثبت‌شده‌ای وجود ندارد</string>
     <string name="timeline_error">خطا در دریافت تایم‌لاین: %1$s</string>
     <string name="timeline_no_data">داده‌ای برای تایم‌لاین یافت نشد</string>
+    <!-- Dunning Human-in-the-Loop -->
+    <string name="dunning_title">یادآوری اقساط (Dunning)</string>
+    <string name="dunning_loading">در حال دریافت پیش‌نویس‌ها...</string>
+    <string name="dunning_empty">هیچ قسط معوق یا سررسید نزدیکی یافت نشد ✓</string>
+    <string name="dunning_error">خطا در دریافت: %1$s</string>
+    <string name="dunning_select_all">انتخاب همه</string>
+    <string name="dunning_deselect_all">لغو انتخاب همه</string>
+    <string name="dunning_send_selected">ارسال انتخاب‌شده‌ها</string>
+    <string name="dunning_sending">در حال ارسال...</string>
+    <string name="dunning_sent_ok">%1$d پیام ارسال شد</string>
+    <string name="dunning_filter_upcoming">سررسید ۱-۳ روز آینده</string>
+    <string name="dunning_filter_overdue">معوق ۱-۷ روز</string>
+    <string name="dunning_filter_critical">بحرانی &gt;۷ روز</string>
+    <string name="dunning_no_selection">هیچ موردی انتخاب نشده است</string>
+    <string name="dunning_nav">یادآوری اقساط</string>
+    <string name="main_menu_dunning">💸 یادآوری اقساط (Dunning)</string>
 </resources>

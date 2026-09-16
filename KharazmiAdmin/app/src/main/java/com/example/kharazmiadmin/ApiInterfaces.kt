@@ -6,6 +6,8 @@ import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
+import retrofit2.http.Streaming
+import okhttp3.ResponseBody
 
 // ==========================================
 // تمام رابط‌های API اینجا تعریف می‌شوند
@@ -119,4 +121,23 @@ interface DunningApi {
 interface DashboardApi {
     @GET("dashboard/kpis")
     suspend fun getKPIs(): DashboardKPIs
+}
+
+// ==========================================
+// Export to Excel/CSV — سه خروجی ادمین (routers/exports.py)
+// FIX Export: @Streaming برای دیتاست 10k+ (بدون نگه‌داشتن کل فایل در حافظه).
+// بدون پارامتر هدر: توکن Bearer به‌صورت سراسری توسط RetrofitClient تزریق می‌شود.
+// ==========================================
+interface ExportApi {
+    @Streaming
+    @GET("exports/debtors")
+    suspend fun exportDebtors(): ResponseBody
+
+    @Streaming
+    @GET("exports/overdue_installments")
+    suspend fun exportOverdueInstallments(): ResponseBody
+
+    @Streaming
+    @GET("exports/audit_alerts")
+    suspend fun exportAuditAlerts(): ResponseBody
 }

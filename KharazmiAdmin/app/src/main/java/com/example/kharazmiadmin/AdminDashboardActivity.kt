@@ -1,7 +1,9 @@
 package com.example.kharazmiadmin
 
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.graphics.Color
+import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -9,6 +11,7 @@ import android.view.ViewGroup
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -18,9 +21,13 @@ import com.google.android.material.card.MaterialCardView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import okhttp3.ResponseBody
 import retrofit2.HttpException
+import java.io.File
+import java.io.FileOutputStream
 
 class AdminDashboardActivity : BaseActivity() {
 
@@ -43,6 +50,9 @@ class AdminDashboardActivity : BaseActivity() {
     private lateinit var btnDunning: MaterialButton
     private lateinit var btnAudit: MaterialButton
     private lateinit var btnDebtors: MaterialButton
+    private lateinit var btnExportDebtors: MaterialButton
+    private lateinit var btnExportOverdue: MaterialButton
+    private lateinit var btnExportAlerts: MaterialButton
     private lateinit var btnRefresh: MaterialButton
     private lateinit var btnBack: MaterialButton
 
@@ -52,6 +62,10 @@ class AdminDashboardActivity : BaseActivity() {
 
     private lateinit var dashboardApi: DashboardApi
     private lateinit var dunningApi: DunningApi
+    private lateinit var exportApi: ExportApi
+
+    // FIX (L9-class): ضد دابل‌کلیک روی دکمه‌های خروجی
+    private var isExporting = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -81,6 +95,9 @@ class AdminDashboardActivity : BaseActivity() {
         btnDunning = findViewById(R.id.btnDashboardDunning)
         btnAudit = findViewById(R.id.btnDashboardAudit)
         btnDebtors = findViewById(R.id.btnDashboardDebtors)
+        btnExportDebtors = findViewById(R.id.btnExportDebtors)
+        btnExportOverdue = findViewById(R.id.btnExportOverdue)
+        btnExportAlerts = findViewById(R.id.btnExportAlerts)
         btnRefresh = findViewById(R.id.btnDashboardRefresh)
         btnBack = findViewById(R.id.btnDashboardBack)
 
@@ -100,6 +117,7 @@ class AdminDashboardActivity : BaseActivity() {
         val retrofit = RetrofitClient.getInstance(this)
         dashboardApi = retrofit.create(DashboardApi::class.java)
         dunningApi = retrofit.create(DunningApi::class.java)
+        exportApi = retrofit.create(ExportApi::class.java)
     }
 
     private fun setupListeners() {
@@ -118,6 +136,17 @@ class AdminDashboardActivity : BaseActivity() {
             Toast.makeText(this, getString(R.string.dashboard_debtors_coming_soon), Toast.LENGTH_LONG).show()
             // Optionally open ReportActivity with debtors tab if exists
             // startActivity(Intent(this, ReportActivity::class.java))
+        }
+
+        // ---- خروجی CSV (Admin only — /exports/*) ----
+        btnExportDebtors.setOnClickListener {
+            downloadExport("debtors.csv") { exportApi.exportDebtors() }
+        }
+        btnExportOverdue.setOnClickListener {
+            downloadExport("overdue_installments.csv") { exportApi.exportOverdueInstallments() }
+        }
+        btnExportAlerts.setOnClickListener {
+            downloadExport("audit_alerts.csv") { exportApi.exportAuditAlerts() }
         }
 
         // KPI cards click to navigate for quick access
@@ -150,6 +179,104 @@ class AdminDashboardActivity : BaseActivity() {
         btnRefresh.isEnabled = !isLoading
         btnDunning.isEnabled = !isLoading
         btnAudit.isEnabled = !isLoading
+    }
+
+    // ------------------------------------------------------------------
+    // FIX Export: دانلود استریمِ خروجی CSV و ذخیره در پوشه‌ی بیرونی اختصاصی اپ.
+    // چرا getExternalFilesDir و نه Downloads عمومی (انحراف آگاهانه از اسپک):
+    //   - targetSdk=34 ⇒ scoped storage: WRITE_EXTERNAL_STORAGE در API 29+ بی‌اثر است و
+    //     نوشتن مستقیم در Downloads عمومی شکست می‌خورد؛ Uri.fromFile هم روی API 24+ استثنا می‌دهد.
+    //   - این مسیر از قبل با FileProvider (provider_paths ⇒ external-files-path) در ReportExporter
+    //     اثبات شده و فایل با یک تپ در Excel/Sheets/ایمیل باز یا اشتراک‌گذاری می‌شود.
+    //   - بدون هیچ مجوز رانتایمی (به همین دلیل درخواست WRITE/READ_EXTERNAL_STORAGE اضافه نشد).
+    // ------------------------------------------------------------------
+    private fun downloadExport(fileName: String, fetch: suspend () -> ResponseBody) {
+        if (isExporting) return
+        isExporting = true
+        setExportButtonsEnabled(false)
+        Toast.makeText(this, getString(R.string.export_started), Toast.LENGTH_SHORT).show()
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val body = fetch()
+                val destination = File(getExternalFilesDir(null), fileName)
+
+                // استریم تدریجی با همکاری با CancellationException (الگوی ReportExporter/Bug 19)
+                body.use { b ->
+                    b.byteStream().use { input ->
+                        FileOutputStream(destination).use { output ->
+                            val buffer = ByteArray(4096)
+                            while (true) {
+                                coroutineContext.ensureActive()
+                                val read = input.read(buffer)
+                                if (read == -1) break
+                                output.write(buffer, 0, read)
+                            }
+                        }
+                    }
+                }
+
+                withContext(Dispatchers.Main) {
+                    isExporting = false
+                    setExportButtonsEnabled(true)
+                    Toast.makeText(
+                        this@AdminDashboardActivity,
+                        getString(R.string.export_saved, destination.absolutePath),
+                        Toast.LENGTH_LONG
+                    ).show()
+                    openSavedExport(destination)
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                withContext(Dispatchers.Main) {
+                    isExporting = false
+                    setExportButtonsEnabled(true)
+                    val message = when {
+                        e is HttpException && e.code() == 403 -> getString(R.string.export_forbidden)
+                        e is HttpException && e.code() == 401 -> getString(R.string.export_session_expired)
+                        e is HttpException -> getString(
+                            R.string.export_error,
+                            getString(R.string.export_server_code, e.code())
+                        )
+                        else -> getString(R.string.export_error, e.message ?: "")
+                    }
+                    Toast.makeText(this@AdminDashboardActivity, message, Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    private fun setExportButtonsEnabled(enabled: Boolean) {
+        btnExportDebtors.isEnabled = enabled
+        btnExportOverdue.isEnabled = enabled
+        btnExportAlerts.isEnabled = enabled
+    }
+
+    // فایل ذخیره‌شده را با FileProvider باز می‌کند؛ اگر بیننده‌ای نبود، دیالوگ اشتراک‌گذاری (Drive/ایمیل/Sheets)
+    private fun openSavedExport(file: File) {
+        try {
+            val uri: Uri = FileProvider.getUriForFile(this, "$packageName.provider", file)
+            val viewIntent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "text/csv")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            try {
+                startActivity(viewIntent)
+            } catch (_: ActivityNotFoundException) {
+                val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/csv"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                startActivity(Intent.createChooser(sendIntent, getString(R.string.export_share_title)))
+            }
+        } catch (_: Exception) {
+            Toast.makeText(
+                this,
+                getString(R.string.export_open_failed, file.absolutePath),
+                Toast.LENGTH_LONG
+            ).show()
+        }
     }
 
     private fun loadDashboard() {

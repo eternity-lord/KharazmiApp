@@ -1214,4 +1214,19 @@
     <string name="dashboard_alerts_sub">نیاز به بررسی</string>
     <string name="dashboard_coming_soon">به‌زودی</string>
     <string name="dashboard_debtors_coming_soon">گزارش بدهکاران — به‌زودی (از بخش گزارش‌گیری استفاده کنید)</string>
+
+    <!-- Export to Excel/CSV — سه خروجی ادمین (exports.py) -->
+    <string name="export_card_title">خروجی اکسل گزارش‌ها</string>
+    <string name="export_card_subtitle">فایل CSV با پشتیبانی کامل فارسی (UTF-8 + BOM)</string>
+    <string name="export_debtors">خروجی بدهکاران</string>
+    <string name="export_overdue">خروجی اقساط معوق</string>
+    <string name="export_alerts">خروجی هشدارها</string>
+    <string name="export_started">در حال دریافت خروجی…</string>
+    <string name="export_saved">فایل ذخیره شد:\n%1$s</string>
+    <string name="export_error">خطا در خروجی: %1$s</string>
+    <string name="export_server_code">خطای سرور %1$d</string>
+    <string name="export_forbidden">این خروجی فقط برای مدیر سیستم است</string>
+    <string name="export_session_expired">نشست منقضی شده — دوباره وارد شوید</string>
+    <string name="export_open_failed">برنامه‌ای برای باز کردن فایل پیدا نشد؛ فایل در این مسیر ذخیره شد: %1$s</string>
+    <string name="export_share_title">اشتراک‌گذاری فایل خروجی</string>
 </resources>

@@ -401,9 +401,11 @@ def add_enrollment(data: EnrollmentCreate, db: Session = Depends(get_db), _: str
         d_type = "none"
         d_val = 0
 
+    # FIX S3: Enrollment.branch_id همان منطق Transaction.branch_id (student.branch_id وگرنه course.branch_id) — قبلاً همیشه NULL می‌ماند
     new_enroll = Enrollment(
         student_id=data.student_id,
         course_id=data.course_id,
+        branch_id=student.branch_id if student.branch_id is not None else course.branch_id,
         register_date=data.register_date,
         shift=data.shift,
         total_tuition=data.total_tuition,

@@ -1187,4 +1187,31 @@
     <string name="dunning_no_selection">هیچ موردی انتخاب نشده است</string>
     <string name="dunning_nav">یادآوری اقساط</string>
     <string name="main_menu_dunning">💸 یادآوری اقساط (Dunning)</string>
+    <!-- Admin Command Center - Unified Dashboard -->
+    <string name="dashboard_title">داشبورد مدیریت</string>
+    <string name="dashboard_nav">داشبورد مدیریت</string>
+    <string name="main_menu_dashboard">📊 داشبورد مدیریت (Command Center)</string>
+    <string name="dashboard_today_revenue">درآمد امروز</string>
+    <string name="dashboard_overdue">اقساط معوق</string>
+    <string name="dashboard_overdue_amount">جمع معوقات</string>
+    <string name="dashboard_active_students">دانش‌آموزان فعال</string>
+    <string name="dashboard_radar_alerts">هشدارهای رادار</string>
+    <string name="dashboard_dunning_pending">یادآوری‌های در انتظار</string>
+    <string name="dashboard_quick_actions">اقدامات سریع</string>
+    <string name="dashboard_action_dunning">ارسال یادآوری اقساط</string>
+    <string name="dashboard_action_audit">مشاهده هشدارها</string>
+    <string name="dashboard_action_debtors">گزارش بدهکاران</string>
+    <string name="dashboard_critical_title">۵ قسط بحرانی برتر</string>
+    <string name="dashboard_critical_empty">هیچ قسط بحرانی یافت نشد ✓</string>
+    <string name="dashboard_critical_subtitle">نمایش ۵ مورد بحرانی از پیش‌نویس‌های Dunning</string>
+    <string name="dashboard_loading">در حال دریافت داشبورد...</string>
+    <string name="dashboard_error">خطا در دریافت داشبورد: %1$s</string>
+    <string name="dashboard_no_data">داده‌ای برای داشبورد یافت نشد</string>
+    <string name="dashboard_refresh">بروزرسانی داشبورد</string>
+    <string name="dashboard_today_revenue_sub">مجموع تراکنش‌های امروز</string>
+    <string name="dashboard_overdue_sub">%1$d قسط • %2$s تومان</string>
+    <string name="dashboard_students_sub">فعال در سیستم</string>
+    <string name="dashboard_alerts_sub">نیاز به بررسی</string>
+    <string name="dashboard_coming_soon">به‌زودی</string>
+    <string name="dashboard_debtors_coming_soon">گزارش بدهکاران — به‌زودی (از بخش گزارش‌گیری استفاده کنید)</string>
 </resources>

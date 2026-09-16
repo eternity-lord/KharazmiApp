@@ -704,3 +704,15 @@ data class DunningSendResponse(
     val message: String,
     @SerializedName("skipped_reasons") val skippedReasons: Map<String, String>? = null
 )
+
+// ==========================================
+// Admin Command Center - Unified Dashboard (Admin Only)
+// ==========================================
+data class DashboardKPIs(
+    @SerializedName("today_revenue") val todayRevenue: Long,
+    @SerializedName("total_overdue_amount") val totalOverdueAmount: Long,
+    @SerializedName("overdue_installments_count") val overdueInstallmentsCount: Int,
+    @SerializedName("active_students_count") val activeStudentsCount: Int,
+    @SerializedName("suspicious_alerts_count") val suspiciousAlertsCount: Int,
+    @SerializedName("dunning_pending_count") val dunningPendingCount: Int
+)

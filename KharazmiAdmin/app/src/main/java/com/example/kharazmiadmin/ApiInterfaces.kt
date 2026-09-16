@@ -112,3 +112,11 @@ interface DunningApi {
     @POST("dunning/send_batch")
     suspend fun sendBatch(@Body req: DunningSendRequest): DunningSendResponse
 }
+
+// ==========================================
+// Admin Command Center - Unified Dashboard (Admin Only)
+// ==========================================
+interface DashboardApi {
+    @GET("dashboard/kpis")
+    suspend fun getKPIs(): DashboardKPIs
+}

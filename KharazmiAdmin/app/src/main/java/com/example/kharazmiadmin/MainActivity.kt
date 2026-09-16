@@ -113,16 +113,19 @@ class MainActivity : BaseActivity() {
             menu.findItem(R.id.nav_deleted_classes)?.isVisible = false
             menu.findItem(R.id.nav_audit_radar)?.isVisible = false
             menu.findItem(R.id.nav_dunning)?.isVisible = false
+            menu.findItem(R.id.nav_admin_dashboard)?.isVisible = false
         } else {
             // Audit Radar is admin-only - hide for non-admin implicitly handled, but explicitly ensure visible for admin
             navView.menu.findItem(R.id.nav_audit_radar)?.isVisible = true
             navView.menu.findItem(R.id.nav_dunning)?.isVisible = true
+            navView.menu.findItem(R.id.nav_admin_dashboard)?.isVisible = true
         }
 
         // Audit Radar: ensure hidden for teachers (they don't have nav_view admin items but just in case)
         if (subRole == "teacher") {
             navView.menu.findItem(R.id.nav_audit_radar)?.isVisible = false
             navView.menu.findItem(R.id.nav_dunning)?.isVisible = false
+            navView.menu.findItem(R.id.nav_admin_dashboard)?.isVisible = false
         }
 
         // ۴. اتصال آیکون‌های ۱۲ گانه جدید داشبورد
@@ -177,6 +180,13 @@ class MainActivity : BaseActivity() {
                         startActivity(Intent(this, DunningActivity::class.java))
                     }
                 }
+                R.id.nav_admin_dashboard -> {
+                    if (dashboardSubRole != "admin") {
+                        Toast.makeText(this, getString(R.string.common_no_access), Toast.LENGTH_SHORT).show()
+                    } else {
+                        startActivity(Intent(this, AdminDashboardActivity::class.java))
+                    }
+                }
                 R.id.nav_havale -> {
                     val intent = Intent(this, InvoiceActivity::class.java).apply { putExtra("IS_ADMIN", true) }
                     startActivity(intent)
@@ -196,6 +206,9 @@ class MainActivity : BaseActivity() {
         }
         findViewById<View>(R.id.menu_15_dunning)?.let { dunningCard ->
             dunningCard.visibility = if (subRole == "admin") View.VISIBLE else View.GONE
+        }
+        findViewById<View>(R.id.menu_16_dashboard)?.let { dashboardCard ->
+            dashboardCard.visibility = if (subRole == "admin") View.VISIBLE else View.GONE
         }
         // ۱. پیشخوان
         findViewById<View>(R.id.menu_1_dashboard).setOnClickListener {
@@ -287,6 +300,14 @@ class MainActivity : BaseActivity() {
                 Toast.makeText(this, getString(R.string.common_no_access), Toast.LENGTH_SHORT).show()
             } else {
                 startActivity(Intent(this, DunningActivity::class.java))
+            }
+        }
+        // ۱۶. داشبورد مدیریت (Command Center) — فقط ادمین
+        findViewById<View>(R.id.menu_16_dashboard)?.setOnClickListener {
+            if (subRole != "admin") {
+                Toast.makeText(this, getString(R.string.common_no_access), Toast.LENGTH_SHORT).show()
+            } else {
+                startActivity(Intent(this, AdminDashboardActivity::class.java))
             }
         }
     }
@@ -524,7 +545,8 @@ class MainActivity : BaseActivity() {
                 getString(R.string.main_menu_trash),
                 getString(R.string.main_menu_crm),
                 getString(R.string.main_menu_audit_radar),
-                getString(R.string.main_menu_dunning)
+                getString(R.string.main_menu_dunning),
+                getString(R.string.main_menu_dashboard)
             )
         }
 
@@ -547,6 +569,7 @@ class MainActivity : BaseActivity() {
                         6 -> startActivity(Intent(this, CrmLeadsActivity::class.java))
                         7 -> startActivity(Intent(this, AuditDashboardActivity::class.java))
                         8 -> startActivity(Intent(this, DunningActivity::class.java))
+                        9 -> startActivity(Intent(this, AdminDashboardActivity::class.java))
                     }
                 }
             }
@@ -649,7 +672,7 @@ class MainActivity : BaseActivity() {
             R.id.menu_1_dashboard, R.id.menu_2_register, R.id.menu_3_students, R.id.menu_4_teachers,
             R.id.menu_5_management, R.id.menu_6_reports, R.id.menu_7_sms, R.id.menu_8_settings,
             R.id.menu_9_quick_invoice, R.id.menu_10_statement, R.id.menu_11_grades, R.id.menu_12_sessions,
-            R.id.menu_13_live, R.id.menu_14_audit, R.id.menu_15_dunning
+            R.id.menu_13_live, R.id.menu_14_audit, R.id.menu_15_dunning, R.id.menu_16_dashboard
         )
         menuIds.forEachIndexed { index, id ->
             val view = findViewById<View>(id) ?: return@forEachIndexed

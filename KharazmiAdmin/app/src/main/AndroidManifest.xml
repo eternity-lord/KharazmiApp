@@ -191,6 +191,10 @@
             android:name=".DunningActivity"
             android:exported="false"
             android:label="یادآوری اقساط" />
+        <activity
+            android:name=".AdminDashboardActivity"
+            android:exported="false"
+            android:label="داشبورد مدیریت" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

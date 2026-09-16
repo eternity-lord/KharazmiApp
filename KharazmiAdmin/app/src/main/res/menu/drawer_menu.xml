@@ -7,6 +7,10 @@
             android:icon="@android:drawable/ic_menu_rotate"
             android:title="پیشخوان" />
         <item
+            android:id="@+id/nav_admin_dashboard"
+            android:icon="@android:drawable/ic_menu_view"
+            android:title="@string/dashboard_nav" />
+        <item
             android:id="@+id/nav_share_config"
             android:icon="@android:drawable/ic_menu_manage"
             android:title="تنظیم سهم آموزشگاه" />

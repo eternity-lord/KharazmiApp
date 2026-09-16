@@ -183,6 +183,10 @@
             android:name=".LiveRosterActivity"
             android:exported="false"
             android:label="جزئیات زنده‌ی کلاس" />
+        <activity
+            android:name=".AuditDashboardActivity"
+            android:exported="false"
+            android:label="رادار تقلب" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

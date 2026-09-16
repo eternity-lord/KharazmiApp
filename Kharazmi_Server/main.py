@@ -9,7 +9,7 @@ import models
 from models import (
     Attendance, Course, Enrollment, Grade, InstituteShare, SessionLog, SmsLog, Student, Teacher, Transaction, User, UserSession, Settlement, Installment, ParentOTP, PricingTable
 )
-from routers import auth, students, teachers, classes, finance, reports, attendance, admin, parent, homework, calendar, messages, exams, crm, branches, automation, analytics, ai
+from routers import auth, students, teachers, classes, finance, reports, attendance, admin, parent, homework, calendar, messages, exams, crm, branches, automation, analytics, ai, audit
 
 # ساخت اپلیکیشن
 # FIX M2: مستندات تعاملی فقط در توسعه؛ در پروداکشن (ENV=production) خاموش.
@@ -634,3 +634,4 @@ app.include_router(branches.router)
 app.include_router(automation.router)
 app.include_router(analytics.router)
 app.include_router(ai.router)
+app.include_router(audit.router, prefix="/audit")

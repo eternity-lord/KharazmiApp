@@ -653,3 +653,16 @@ data class LiveRosterResponse(
     val undetermined: Int = 0,
     val students: List<LiveRosterStudent> = emptyList()
 )
+
+// ==========================================
+// Audit Radar - مدل هشدار تقلب (Read-Only)
+// ==========================================
+data class AuditAlert(
+    val type: String,
+    val severity: String, // "high", "medium", "low"
+    val title: String,
+    val description: String,
+    @SerializedName("entity_id") val entityId: Int,
+    @SerializedName("entity_name") val entityName: String,
+    @SerializedName("detected_at") val detectedAt: String
+)

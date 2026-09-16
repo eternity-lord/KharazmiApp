@@ -81,5 +81,10 @@
             android:icon="@android:drawable/ic_menu_delete"
             android:title="کلاس‌های حذفی (آرشیو)" />
 
+        <item
+            android:id="@+id/nav_audit_radar"
+            android:icon="@android:drawable/ic_menu_search"
+            android:title="@string/nav_audit_radar" />
+
     </group>
 </menu>

@@ -111,6 +111,15 @@ class MainActivity : BaseActivity() {
             menu.findItem(R.id.nav_havale)?.isVisible = false
             menu.findItem(R.id.nav_institute_settings)?.isVisible = false
             menu.findItem(R.id.nav_deleted_classes)?.isVisible = false
+            menu.findItem(R.id.nav_audit_radar)?.isVisible = false
+        } else {
+            // Audit Radar is admin-only - hide for non-admin implicitly handled, but explicitly ensure visible for admin
+            navView.menu.findItem(R.id.nav_audit_radar)?.isVisible = true
+        }
+
+        // Audit Radar: ensure hidden for teachers (they don't have nav_view admin items but just in case)
+        if (subRole == "teacher") {
+            navView.menu.findItem(R.id.nav_audit_radar)?.isVisible = false
         }
 
         // ۴. اتصال آیکون‌های ۱۲ گانه جدید داشبورد
@@ -151,6 +160,13 @@ class MainActivity : BaseActivity() {
                 R.id.nav_settings -> startActivity(Intent(this, SettingsActivity::class.java))
                 R.id.nav_institute_settings -> startActivity(Intent(this, InstituteSettingsActivity::class.java))
                 R.id.nav_deleted_classes -> showDeletedClassesDialog()
+                R.id.nav_audit_radar -> {
+                    if (dashboardSubRole != "admin") {
+                        Toast.makeText(this, getString(R.string.common_no_access), Toast.LENGTH_SHORT).show()
+                    } else {
+                        startActivity(Intent(this, AuditDashboardActivity::class.java))
+                    }
+                }
                 R.id.nav_havale -> {
                     val intent = Intent(this, InvoiceActivity::class.java).apply { putExtra("IS_ADMIN", true) }
                     startActivity(intent)
@@ -164,6 +180,10 @@ class MainActivity : BaseActivity() {
     }
 
     private fun setupMenuClickListeners(subRole: String) {
+        // Audit Radar grid card: admin-only visibility
+        findViewById<View>(R.id.menu_14_audit)?.let { auditCard ->
+            auditCard.visibility = if (subRole == "admin") View.VISIBLE else View.GONE
+        }
         // ۱. پیشخوان
         findViewById<View>(R.id.menu_1_dashboard).setOnClickListener {
             Toast.makeText(this, getString(R.string.main_already_home), Toast.LENGTH_SHORT).show()
@@ -238,6 +258,15 @@ class MainActivity : BaseActivity() {
         // ۱۳. کلاس‌های در حال برگزاری (زنده)
         findViewById<View>(R.id.menu_13_live).setOnClickListener {
             startActivity(Intent(this, LiveClassesActivity::class.java))
+        }
+
+        // ۱۴. رادار تقلب (Audit Radar) — فقط ادمین
+        findViewById<View>(R.id.menu_14_audit)?.setOnClickListener {
+            if (subRole != "admin") {
+                Toast.makeText(this, getString(R.string.common_no_access), Toast.LENGTH_SHORT).show()
+            } else {
+                startActivity(Intent(this, AuditDashboardActivity::class.java))
+            }
         }
     }
 
@@ -472,7 +501,8 @@ class MainActivity : BaseActivity() {
                 getString(R.string.main_menu_active),
                 getString(R.string.main_menu_pending),
                 getString(R.string.main_menu_trash),
-                getString(R.string.main_menu_crm)
+                getString(R.string.main_menu_crm),
+                getString(R.string.main_menu_audit_radar)
             )
         }
 
@@ -493,6 +523,7 @@ class MainActivity : BaseActivity() {
                         4 -> startActivity(Intent(this, PendingClassesActivity::class.java))
                         5 -> showDeletedClassesDialog()
                         6 -> startActivity(Intent(this, CrmLeadsActivity::class.java))
+                        7 -> startActivity(Intent(this, AuditDashboardActivity::class.java))
                     }
                 }
             }
@@ -594,7 +625,8 @@ class MainActivity : BaseActivity() {
         val menuIds = intArrayOf(
             R.id.menu_1_dashboard, R.id.menu_2_register, R.id.menu_3_students, R.id.menu_4_teachers,
             R.id.menu_5_management, R.id.menu_6_reports, R.id.menu_7_sms, R.id.menu_8_settings,
-            R.id.menu_9_quick_invoice, R.id.menu_10_statement, R.id.menu_11_grades, R.id.menu_12_sessions
+            R.id.menu_9_quick_invoice, R.id.menu_10_statement, R.id.menu_11_grades, R.id.menu_12_sessions,
+            R.id.menu_13_live, R.id.menu_14_audit
         )
         menuIds.forEachIndexed { index, id ->
             val view = findViewById<View>(id) ?: return@forEachIndexed

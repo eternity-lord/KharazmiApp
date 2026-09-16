@@ -85,3 +85,11 @@ interface FinanceDashboardApi {
     @GET("finance/student/{student_id}/dashboard")
     suspend fun getFinancialDashboard(@Path("student_id") studentId: Int): FinancialDashboardResponse
 }
+
+// ==========================================
+// Audit Radar - داشبورد تشخیص تقلب (Admin Only)
+// ==========================================
+interface AuditApi {
+    @GET("audit/suspicious_patterns")
+    suspend fun getSuspiciousPatterns(): List<AuditAlert>
+}

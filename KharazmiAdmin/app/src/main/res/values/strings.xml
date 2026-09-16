@@ -333,6 +333,8 @@
     <string name="main_menu_pending">⏳ مدیریت کلاس‌های جدید (تایید کلاس‌ها)</string>
     <string name="main_menu_trash">🗑️ مدیریت کلاس‌های حذفی / آرشیو</string>
     <string name="main_menu_crm">🎯 داشبورد جذب و مدیریت سرنخ‌ها (CRM)</string>
+    <string name="main_menu_audit_radar">🛡️ رادار تقلب (Audit Radar)</string>
+    <string name="nav_audit_radar">رادار تقلب</string>
     <string name="main_menu_title">منوی مدیریت آموزشگاه</string>
     <string name="main_reg_student">ثبت نام دانش‌آموز جدید</string>
     <string name="main_reg_teacher">ثبت نام مربی جدید</string>

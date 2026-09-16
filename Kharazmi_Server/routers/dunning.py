@@ -14,7 +14,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import or_
+from sqlalchemy import func, or_, and_
 
 from models import ActivityLog, Enrollment, Installment, SmsLog, Student, User
 from dependencies import get_db, check_admin_access, get_session_from_token
@@ -95,12 +95,26 @@ def _collect_recent_ids(db: Session, candidate_ids: List[int], today: datetime.d
     recent = set()
     # ActivityLog: action like %dunning% or %remind%
     try:
-        logs = (
-            db.query(ActivityLog)
-            .filter(ActivityLog.timestamp >= cutoff, ActivityLog.target_id.in_(candidate_ids))
-            .filter(or_(ActivityLog.action.like("%dunning%"), ActivityLog.action.like("%remind%"), ActivityLog.action.like("%Reminder%"), ActivityLog.action.like("%reminder%")))
-            .all()
-        )
+        # For large candidate sets, chunk IN queries to avoid SQLite variable limit
+        if len(candidate_ids) > 500:
+            logs = []
+            # Chunk size 500
+            for i in range(0, len(candidate_ids), 500):
+                chunk = candidate_ids[i:i+500]
+                chunk_logs = (
+                    db.query(ActivityLog)
+                    .filter(ActivityLog.timestamp >= cutoff, ActivityLog.target_id.in_(chunk))
+                    .filter(or_(ActivityLog.action.like("%dunning%"), ActivityLog.action.like("%remind%"), ActivityLog.action.like("%Reminder%"), ActivityLog.action.like("%reminder%")))
+                    .all()
+                )
+                logs.extend(chunk_logs)
+        else:
+            logs = (
+                db.query(ActivityLog)
+                .filter(ActivityLog.timestamp >= cutoff, ActivityLog.target_id.in_(candidate_ids))
+                .filter(or_(ActivityLog.action.like("%dunning%"), ActivityLog.action.like("%remind%"), ActivityLog.action.like("%Reminder%"), ActivityLog.action.like("%reminder%")))
+                .all()
+            )
         for lg in logs:
             if lg.target_id in candidate_ids:
                 recent.add(lg.target_id)
@@ -108,9 +122,19 @@ def _collect_recent_ids(db: Session, candidate_ids: List[int], today: datetime.d
         print(f"[Dunning] ActivityLog recent query failed: {e}")
 
     # SmsLog bulk: target_group contains candidate id, date within 48h via Jalali parsing
+    # Optimization: avoid huge OR for large candidate sets (e.g., 10k) which hits SQLite expression limit
     try:
-        sms_filters = [SmsLog.target_group.contains(str(cid)) for cid in candidate_ids]
-        sms_logs = db.query(SmsLog).filter(or_(*sms_filters)).all() if sms_filters else []
+        if len(candidate_ids) > 200:
+            # For large sets, fetch all SmsLogs and filter in Python (usually few SmsLogs)
+            # Alternatively, could chunk, but fetching all is simpler and avoids 10k OR
+            try:
+                sms_logs = db.query(SmsLog).all()
+            except Exception as e:
+                print(f"[Dunning] SmsLog fetch all failed: {e}")
+                sms_logs = []
+        else:
+            sms_filters = [SmsLog.target_group.contains(str(cid)) for cid in candidate_ids]
+            sms_logs = db.query(SmsLog).filter(or_(*sms_filters)).all() if sms_filters else []
         now_dt = datetime.datetime.now()
         for sms in sms_logs:
             # find matching candidate ids
@@ -358,3 +382,83 @@ def send_dunning_batch(
         "skipped_reasons": skipped_reasons,
         "message": f"{len(sent_ids)} پیام ارسال شد، {len(skipped_ids)} مورد رد شد (تکراری یا نامعتبر)",
     }
+
+def count_dunning_pending(db: Session) -> int:
+    """
+    Lightweight COUNT for dashboard — SQL-level counting via Jalali string comparison.
+    No full draft building, no _categorize Python loop for 10k, just COUNT.
+    """
+    today = datetime.date.today()
+    today_jalali = jalali_date_string(today)
+    # Compute jalali boundaries for buckets
+    up_start = jalali_date_string(today + datetime.timedelta(days=1))
+    up_end = jalali_date_string(today + datetime.timedelta(days=3))
+    over_start = jalali_date_string(today - datetime.timedelta(days=7))
+    over_end = jalali_date_string(today - datetime.timedelta(days=1))
+    # Critical is < over_start
+    try:
+        from sqlalchemy import and_
+        # Single COUNT query for all buckets via string comparison
+        base_query = (
+            db.query(func.count(Installment.id))
+            .join(Enrollment, Installment.enrollment_id == Enrollment.id)
+            .join(Student, Enrollment.student_id == Student.id)
+            .filter(
+                Installment.is_deleted == False,
+                Installment.is_paid == False,
+                Enrollment.is_deleted == False,
+                Student.is_deleted == False,
+                Student.parent_mobile.isnot(None),
+                Student.parent_mobile != "",
+                Installment.due_date.isnot(None),
+                or_(
+                    and_(Installment.due_date >= up_start, Installment.due_date <= up_end),
+                    and_(Installment.due_date >= over_start, Installment.due_date <= over_end),
+                    Installment.due_date < over_start,
+                ),
+            )
+        )
+        candidates_count = base_query.scalar() or 0
+        if candidates_count == 0:
+            return 0
+        # Fast path: if no recent logs at all, avoid expensive idempotency check
+        try:
+            has_recent_activity = db.query(ActivityLog).filter(ActivityLog.timestamp >= datetime.datetime.utcnow() - datetime.timedelta(hours=48)).first() is not None
+            has_sms = db.query(SmsLog).first() is not None
+            if not has_recent_activity and not has_sms:
+                return int(candidates_count)
+        except Exception:
+            pass
+        # For large sets with recent logs, we need to filter recent ids
+        # To avoid fetching all 10k ids, we can fetch candidate ids via SQL and then check recent
+        # Fetch candidate ids (only IDs, not full objects)
+        candidate_ids = [
+            row[0] for row in (
+                db.query(Installment.id)
+                .join(Enrollment, Installment.enrollment_id == Enrollment.id)
+                .join(Student, Enrollment.student_id == Student.id)
+                .filter(
+                    Installment.is_deleted == False,
+                    Installment.is_paid == False,
+                    Enrollment.is_deleted == False,
+                    Student.is_deleted == False,
+                    Student.parent_mobile.isnot(None),
+                    Student.parent_mobile != "",
+                    Installment.due_date.isnot(None),
+                    or_(
+                        and_(Installment.due_date >= up_start, Installment.due_date <= up_end),
+                        and_(Installment.due_date >= over_start, Installment.due_date <= over_end),
+                        Installment.due_date < over_start,
+                    ),
+                )
+                .all()
+            )
+        ]
+        if not candidate_ids:
+            return 0
+        recent_ids = _collect_recent_ids(db, candidate_ids, today)
+        return len([cid for cid in candidate_ids if cid not in recent_ids])
+    except Exception as e:
+        print(f"[Dunning] count pending failed: {e}")
+        return 0
+

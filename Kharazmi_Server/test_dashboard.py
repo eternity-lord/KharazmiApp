@@ -15,11 +15,23 @@ from models import Base, User, UserSession, Student, Teacher, Course, Enrollment
 from main import app
 from dependencies import get_db, hash_password
 from today_summary import jalali_date_string, parse_project_date
+try:
+    from routers.dashboard import _clear_dashboard_cache
+    _HAS_CLEAR = True
+except ImportError:
+    _HAS_CLEAR = False
+    def _clear_dashboard_cache():
+        pass
 
 
 class TestDashboardKPIs(unittest.TestCase):
 
     def setUp(self):
+        if '_clear_dashboard_cache' in globals():
+            try:
+                _clear_dashboard_cache()
+            except Exception:
+                pass
         self.engine = create_engine(
             "sqlite:///:memory:",
             connect_args={"check_same_thread": False},
@@ -69,6 +81,11 @@ class TestDashboardKPIs(unittest.TestCase):
         self.db.commit()
 
     def tearDown(self):
+        if '_clear_dashboard_cache' in globals():
+            try:
+                _clear_dashboard_cache()
+            except Exception:
+                pass
         app.dependency_overrides.clear()
         self.db.close()
         Base.metadata.drop_all(bind=self.engine)

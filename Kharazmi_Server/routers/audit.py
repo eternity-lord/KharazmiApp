@@ -325,3 +325,138 @@ def get_suspicious_patterns(
         print(f"[Audit] Pattern C failed: {e}")
 
     return alerts
+
+def count_suspicious_patterns(db: Session) -> int:
+    """
+    Lightweight COUNT for dashboard — reuses same optimized queries as get_suspicious_patterns
+    but returns integer count only (no Alert objects, no string building).
+    Used by dashboard to avoid full endpoint execution.
+    """
+    count = 0
+    # Pattern A: night or delayed >5 circular
+    try:
+        session_logs = db.query(SessionLog).options(joinedload(SessionLog.course)).filter(SessionLog.is_deleted == False).all()
+        for sl in session_logs:
+            suspicious = False
+            hour = _parse_hour(sl.time)
+            if hour is not None and 0 <= hour < 5:
+                suspicious = True
+            if not suspicious:
+                hour2 = _parse_hour(sl.start_time)
+                if hour2 is not None and 0 <= hour2 < 5:
+                    suspicious = True
+            if not suspicious and sl.course_id and sl.course and sl.course.class_time:
+                course_hour = _parse_hour(sl.course.class_time)
+                session_hour = hour if hour is not None else _parse_hour(sl.start_time)
+                if course_hour is not None and session_hour is not None:
+                    if _circular_hour_diff(session_hour, course_hour) > 5:
+                        suspicious = True
+            if suspicious:
+                count += 1
+    except Exception as e:
+        logger.error(f"[Audit] count Pattern A failed: {e}", exc_info=True)
+        print(f"[Audit] count Pattern A failed: {e}")
+
+    # Pattern B: rapid deletion <1h within 30 days via ActivityLog
+    try:
+        cutoff = datetime.datetime.utcnow() - datetime.timedelta(days=30)
+        deleted_txns = db.query(Transaction).options(joinedload(Transaction.student), joinedload(Transaction.course)).filter(Transaction.is_deleted == True).all()
+        if deleted_txns:
+            txn_ids = [t.id for t in deleted_txns]
+            txn_map = {t.id: t for t in deleted_txns}
+            logs_by_target = db.query(ActivityLog).filter(ActivityLog.target_id.in_(txn_ids), ActivityLog.timestamp >= cutoff).all()
+            recent_logs_with_details = db.query(ActivityLog).filter(ActivityLog.timestamp >= cutoff).all()
+            from collections import defaultdict
+            logs_by_txn = defaultdict(list)
+            for log in logs_by_target:
+                logs_by_txn[log.target_id].append(log)
+            for log in recent_logs_with_details:
+                if log.details:
+                    for tid in txn_ids:
+                        if f"#{tid}" in log.details or f"تراکنش #{tid}" in log.details or f"#{tid} " in log.details:
+                            if log not in logs_by_txn[tid]:
+                                logs_by_txn[tid].append(log)
+                        elif str(tid) in log.details and "تراکنش" in log.details:
+                            if log not in logs_by_txn[tid]:
+                                logs_by_txn[tid].append(log)
+            for tid, logs in logs_by_txn.items():
+                if not logs:
+                    continue
+                logs_sorted = sorted(logs, key=lambda x: x.timestamp or datetime.datetime.min)
+                creation_logs = [l for l in logs_sorted if any(k in (l.action or "").lower() for k in ["create", "payment_success", "pay", "deposit", "online_payment"])]
+                deletion_logs = [l for l in logs_sorted if any(k in (l.action or "").lower() for k in ["refund", "delete", "reversal", "reversed", "reversal"])]
+                if not creation_logs and len(logs_sorted) >= 2:
+                    creation_logs = [logs_sorted[0]]
+                    deletion_logs = [logs_sorted[-1]]
+                elif not deletion_logs and len(logs_sorted) >= 1:
+                    continue
+                is_rapid = False
+                for c_log in creation_logs:
+                    for d_log in deletion_logs:
+                        if not c_log.timestamp or not d_log.timestamp:
+                            continue
+                        if d_log.timestamp < c_log.timestamp:
+                            continue
+                        diff_seconds = (d_log.timestamp - c_log.timestamp).total_seconds()
+                        if 0 <= diff_seconds < 3600:
+                            is_rapid = True
+                            break
+                    if is_rapid:
+                        break
+                if not is_rapid and len(logs_sorted) >= 2:
+                    earliest = logs_sorted[0].timestamp
+                    latest = logs_sorted[-1].timestamp
+                    if earliest and latest and 0 <= (latest - earliest).total_seconds() < 3600:
+                        if any(any(k in (l.action or "").lower() for k in ["refund","delete","reversal"]) for l in logs_sorted):
+                            is_rapid = True
+                if is_rapid:
+                    count += 1
+    except Exception as e:
+        logger.error(f"[Audit] count Pattern B failed: {e}", exc_info=True)
+        print(f"[Audit] count Pattern B failed: {e}")
+
+    # Pattern C: perfect attendance last 10 sessions 0 absences
+    try:
+        courses = db.query(Course).filter(Course.is_deleted == False).all()
+        if courses:
+            course_ids = [c.id for c in courses]
+            all_sessions = db.query(SessionLog).filter(SessionLog.course_id.in_(course_ids), SessionLog.is_deleted == False).order_by(SessionLog.course_id, desc(SessionLog.id)).all()
+            from collections import defaultdict
+            sessions_by_course = defaultdict(list)
+            for s in all_sessions:
+                sessions_by_course[s.course_id].append(s)
+            relevant_sids = []
+            course_to_last10 = {}
+            for cid, sess_list in sessions_by_course.items():
+                last10 = sess_list[:10]
+                if len(last10) < 10:
+                    continue
+                course_to_last10[cid] = last10
+                relevant_sids.extend([s.id for s in last10])
+            if relevant_sids:
+                attendances = db.query(Attendance).filter(Attendance.session_id.in_(relevant_sids)).all()
+                from collections import defaultdict as _dd
+                absent_by_course = defaultdict(int)
+                total_by_course = defaultdict(int)
+                sid_to_cid = {}
+                for cid, sess_list in course_to_last10.items():
+                    for s in sess_list:
+                        sid_to_cid[s.id] = cid
+                for att in attendances:
+                    cid = sid_to_cid.get(att.session_id)
+                    if cid is None:
+                        continue
+                    total_by_course[cid] += 1
+                    if att.status == "Absent":
+                        absent_by_course[cid] += 1
+                for cid, last10 in course_to_last10.items():
+                    absent = absent_by_course.get(cid, 0)
+                    total = total_by_course.get(cid, 0)
+                    if absent == 0 and total > 0:
+                        count += 1
+    except Exception as e:
+        logger.error(f"[Audit] count Pattern C failed: {e}", exc_info=True)
+        print(f"[Audit] count Pattern C failed: {e}")
+
+    return count
+

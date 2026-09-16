@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- GOLD/DARK REDESIGN - Batch 1: Login -->
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/gold_bg_base"
+    android:layoutDirection="rtl"
+    android:padding="@dimen/spacing_large"
+>
+
+    <!-- Settings Button - gold tint -->
+    <ImageView
+        android:id="@+id/btnIpSettings"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginTop="@dimen/spacing_normal"
+        android:layout_marginEnd="@dimen/spacing_small"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="تنظیمات"
+        android:padding="12dp"
+        android:src="@android:drawable/ic_menu_preferences"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:tint="@color/text_secondary"
+    />
+
+    <!-- Logo Section - gold framing -->
+    <LinearLayout
+        android:id="@+id/logoSection"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="40dp"
+        android:gravity="center"
+        android:orientation="vertical"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+    >
+
+        <!-- Logo Container Card - gold elevated with subtle border -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="100dp"
+            android:layout_height="100dp"
+            app:cardBackgroundColor="@color/gold_bg_elevated"
+            app:cardCornerRadius="24dp"
+            app:cardElevation="2dp"
+            app:strokeColor="@color/gold_border_subtle"
+            app:strokeWidth="1dp"
+        >
+
+            <ImageView
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_calendar_24"
+                app:tint="@color/gold_primary"
+            />
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- App Name - text_primary 20sp Bold -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/spacing_normal"
+            android:text="آموزشگاه خوارزمی"
+            android:textAppearance="@style/TextAppearance.Kharazmi.Gold.PageTitle"
+            android:textColor="@color/text_primary"
+            android:textStyle="bold"
+            android:textSize="20sp"
+        />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="سیستم مدیریت آموزشی مدرن"
+            android:textAppearance="@style/TextAppearance.Kharazmi.Gold.Caption"
+            android:textColor="@color/text_secondary"
+        />
+    </LinearLayout>
+
+    <!-- Login Form Card - gold elevated, 16dp radius, subtle border -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/loginFormCard"
+        style="@style/Widget.Kharazmi.Card.Gold"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        app:cardCornerRadius="16dp"
+        app:cardBackgroundColor="@color/gold_bg_elevated"
+        app:strokeColor="@color/gold_border_subtle"
+        app:strokeWidth="1dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/logoSection"
+    >
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="@dimen/spacing_large"
+        >
+
+            <!-- Title - 16sp SemiBold text_primary -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginBottom="@dimen/spacing_large"
+                android:text="ورود به سیستم"
+                android:textAppearance="@style/TextAppearance.Kharazmi.Gold.SectionTitle"
+                android:textColor="@color/text_primary"
+            />
+
+            <!-- Mobile Input - gold input style -->
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.Kharazmi.Input.Gold"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/spacing_normal"
+                android:hint="شماره همراه"
+                app:startIconDrawable="@drawable/ic_call_24"
+                app:startIconTint="@color/text_secondary"
+                app:boxStrokeColor="@color/gold_primary"
+                app:hintTextColor="@color/text_secondary"
+            >
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etMobile"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="phone"
+                    android:maxLines="1"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_disabled"
+                    android:fontFeatureSettings="tnum"
+                    tools:text="09123456789"
+                />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Password Input - gold with focus animation -->
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.Kharazmi.Input.Gold"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="4dp"
+                android:hint="رمز عبور"
+                app:endIconMode="password_toggle"
+                app:endIconTint="@color/text_secondary"
+                app:startIconDrawable="@android:drawable/ic_lock_lock"
+                app:startIconTint="@color/text_secondary"
+                app:boxStrokeColor="@color/gold_primary"
+            >
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etPassword"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textPassword"
+                    android:maxLines="1"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_disabled"
+                />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Password Hint -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="start"
+                android:layout_marginBottom="@dimen/spacing_large"
+                android:text="(تنها برای معلمان دارای کلمه عبور)"
+                android:textAppearance="@style/TextAppearance.Kharazmi.Gold.Caption"
+                android:textColor="@color/text_secondary"
+            />
+
+            <!-- Login Button - GOLD GRADIENT with animations -->
+            <com.example.kharazmiadmin.GoldButton
+                android:id="@+id/btnLogin"
+                style="@style/Widget.Kharazmi.Button.Gold"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="ورود به سیستم"
+                app:icon="@android:drawable/ic_lock_lock"
+                app:iconGravity="textStart"
+                app:iconPadding="8dp"
+                app:iconTint="@color/text_on_gold"
+            />
+
+            <!-- FIX L10: remember-me صریح (پیش‌فرض: تیک‌نخورده) -->
+            <CheckBox
+                android:id="@+id/cbRememberMe"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="start"
+                android:layout_marginTop="@dimen/spacing_small"
+                android:text="مرا به خاطر بسپار"
+                android:textAppearance="@style/TextAppearance.Kharazmi.Gold.Caption"
+                android:textColor="@color/text_secondary"
+            />
+
+            <!-- FIX (F-D2): ProgressBar و tvError مرده حذف شدند — لودینگ روی GoldButton و خطا با Toast است -->
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- Parent Portal Entry Button - Gold Outline -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnParentPortal"
+        style="@style/Widget.Kharazmi.Button.Gold.Outline"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="ورود والدین و اولیا دانش‌آموز"
+        app:icon="@drawable/ic_group"
+        app:iconGravity="textStart"
+        app:iconTint="@color/gold_primary"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/loginFormCard"
+        app:layout_constraintWidth_percent="0.8" />
+
+    <!-- Student Portal Entry Button - Gold Outline -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnStudentPortal"
+        style="@style/Widget.Kharazmi.Button.Gold.Outline"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="ورود دانش‌آموزان به پورتال"
+        app:icon="@drawable/ic_group"
+        app:iconGravity="textStart"
+        app:iconTint="@color/gold_primary"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/btnParentPortal"
+        app:layout_constraintWidth_percent="0.8" />
+
+    <!-- Teacher Registration Link - gold -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:padding="@dimen/spacing_normal"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/btnStudentPortal"
+    >
+
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_marginEnd="@dimen/spacing_small"
+            android:src="@drawable/ic_add_24"
+            app:tint="@color/gold_primary"
+        />
+
+        <TextView
+            android:id="@+id/tvRegisterLink"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="معلم هستید؟ ثبت نام کنید"
+            android:textAppearance="@style/TextAppearance.Kharazmi.Gold.Body"
+            android:textColor="@color/gold_primary"
+            android:textStyle="bold"
+        />
+    </LinearLayout>
+
+    <!-- Version Info -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="@dimen/spacing_normal"
+        android:text="نسخه ۱.۰.۰ - Gold Edition"
+        android:textAppearance="@style/TextAppearance.Kharazmi.Gold.Caption"
+        android:textColor="@color/text_disabled"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+    />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

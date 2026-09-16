@@ -1,0 +1,131 @@
+<resources>
+    <color name="black">#121212</color>
+    <color name="white">#FFFFFFFF</color>
+
+    <!-- Primary Colors - OLD (kept as fallback) -->
+    <color name="gaj_primary">#00695C</color>
+    <color name="gaj_primary_dark">#004D40</color>
+    <color name="gaj_primary_light">#4DB6AC</color>
+    <color name="gaj_primary_variant">#00796B</color>
+
+    <!-- Secondary/Accent Colors -->
+    <color name="gaj_accent">#FFC107</color>
+    <color name="gaj_accent_dark">#FF8F00</color>
+    <color name="gaj_accent_light">#FFECB3</color>
+
+    <!-- Surface Colors -->
+    <color name="gaj_background">#F8F9FA</color>
+    <color name="gaj_surface">#FFFFFF</color>
+    <color name="gaj_surface_variant">#F5F5F5</color>
+    <color name="gaj_surface_dark">#E0E0E0</color>
+
+    <!-- Text Colors -->
+    <color name="gaj_text_primary">#212121</color>
+    <color name="gaj_text_secondary">#757575</color>
+    <color name="gaj_text_hint">#9E9E9E</color>
+    <color name="gaj_text_on_primary">#FFFFFF</color>
+    <color name="gaj_text_on_accent">#212121</color>
+
+    <!-- Semantic Colors -->
+    <color name="gaj_success">#4CAF50</color>
+    <color name="gaj_success_light">#C8E6C9</color>
+    <color name="gaj_warning">#FF9800</color>
+    <color name="gaj_warning_light">#FFE0B2</color>
+    <color name="gaj_error">#B00020</color>
+    <color name="gaj_error_light">#FFCDD2</color>
+    <color name="gaj_info">#2196F3</color>
+    <color name="gaj_info_light">#BBDEFB</color>
+
+    <!-- Status Colors -->
+    <color name="gaj_active">#4CAF50</color>
+    <color name="gaj_pending">#FF9800</color>
+    <color name="gaj_suspended">#F44336</color>
+    <color name="gaj_completed">#2196F3</color>
+
+    <!-- Chart Colors -->
+    <color name="gaj_chart_1">#00695C</color>
+    <color name="gaj_chart_2">#4DB6AC</color>
+    <color name="gaj_chart_3">#FFC107</color>
+    <color name="gaj_chart_4">#FF8F00</color>
+    <color name="gaj_chart_5">#2196F3</color>
+    <color name="gaj_chart_6">#4CAF50</color>
+
+    <!-- Interactive States -->
+    <color name="gaj_ripple_primary">#1A00695C</color>
+    <color name="gaj_ripple_accent">#1AFFC107</color>
+    <color name="gaj_pressed_overlay">#0A000000</color>
+    <color name="gaj_focused_overlay">#14000000</color>
+    <color name="gaj_hovered_overlay">#08000000</color>
+
+    <!-- Border & Divider -->
+    <color name="gaj_border">#E0E0E0</color>
+    <color name="gaj_divider">#EEEEEE</color>
+    <color name="gaj_outline">#BDBDBD</color>
+
+    <!-- Legacy Colors (for backward compatibility) -->
+    <color name="gaj_red_error">#B00020</color>
+    <color name="gaj_green_dark">#00695C</color>
+    <color name="gaj_green_text">#004D40</color>
+    <color name="gaj_red_text">#B00020</color>
+    <color name="gaj_gray_bg">#F8F9FA</color>
+    <color name="gaj_gray_light">#F5F5F5</color>
+    <color name="gaj_gray_hint">#9E9E9E</color>
+    <color name="gaj_orange">#EF6C00</color>
+
+    <!-- Bottom Navigation -->
+    <color name="bottom_nav_icon_tint">@drawable/bottom_nav_tint_selector</color>
+    <color name="bottom_nav_text_tint">@drawable/bottom_nav_tint_selector</color>
+
+    <!-- Selection Colors -->
+    <color name="gaj_selected_background">#E3F2FD</color>
+    <color name="gaj_highlight">#FFF9C4</color>
+
+    <!-- ==================== GOLD/DARK REDESIGN TOKENS (NEW) ==================== -->
+    <!-- Backgrounds - extracted from ED Academy map -->
+    <color name="gold_bg_base">#0D0F13</color>          <!-- پس‌زمینه اصلی، مشکی مایل به نیوی -->
+    <color name="gold_bg_elevated">#171A21</color>       <!-- کارت‌ها، شیت‌ها -->
+    <color name="gold_bg_elevated_2">#1F232C</color>     <!-- کارت روی کارت، دیالوگ -->
+    <color name="gold_border_subtle">#2A2F3A</color>     <!-- بوردر ظریف دور کارت‌ها -->
+
+    <!-- Gold accent -->
+    <color name="gold_primary">#D4A94C</color>           <!-- طلایی اصلی -->
+    <color name="gold_primary_light">#F0C572</color>     <!-- برای گرادینت بالای دکمه -->
+    <color name="gold_primary_dark">#A9812F</color>       <!-- برای گرادینت پایین دکمه / حالت pressed -->
+    <color name="gold_glow">#33D4A94C</color>              <!-- سایه/گلوی نیمه‌شفاف دور دکمه -->
+    <color name="gold_ripple">#66F0C572</color>           <!-- ripple طلایی روشن‌تر alpha 40% -->
+
+    <!-- Text - new palette -->
+    <color name="text_primary">#F5F3EE</color>
+    <!-- FIX: Readable secondary/disabled Gold text on elevated and disabled surfaces. -->
+    <color name="text_secondary">#B5BDCA</color>
+    <color name="text_disabled">#9BA4B3</color>
+    <color name="text_on_gold">#0D0F13</color>           <!-- متن روی دکمه طلایی همیشه مشکی -->
+
+    <!-- Status (برای اعلان‌ها، حاضری، هشدارها) -->
+    <color name="status_success">#4CAF7D</color>
+    <color name="status_danger">#E0615A</color>
+    <color name="status_info">#5B8DEF</color>
+    <color name="status_warning">#D4A94C</color> <!-- هم‌رنگ طلایی -->
+
+    <!-- Gold button states -->
+    <color name="gold_button_disabled_bg">#2A2F3A</color>
+    <color name="gold_button_disabled_text">@color/text_disabled</color>
+    <color name="gold_input_focused">#D4A94C</color>
+    <color name="gold_input_error">#E0615A</color>
+
+    <!-- Card states -->
+    <color name="gold_card_border_default">#2A2F3A</color>
+    <color name="gold_card_border_focused">#D4A94C</color>
+    <color name="gold_card_border_error">#E0615A</color>
+
+    <!-- Missing light variants for backward compat -->
+    <color name="gold_bg_elevated_variant">#1F232C</color>
+    <color name="status_success_light">#1F2A24</color>
+    <color name="status_warning_light">#2A251A</color>
+    <color name="status_info_light">#1A2130</color>
+    <color name="status_danger_light">#2A1E1E</color>
+
+    <!-- FIX: Opaque muted-gold fill keeps sent messages distinct without washing out light text. -->
+    <color name="gold_chat_sent_bg">#453821</color>
+
+</resources>

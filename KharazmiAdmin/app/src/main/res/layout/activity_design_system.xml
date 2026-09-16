@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/gold_bg_base"
+    android:layoutDirection="rtl">
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/gold_primary">
+        <androidx.appcompat.widget.Toolbar
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="کتابخانه سیستم طراحی خوارزمی"
+                android:textColor="@color/white"
+                android:textSize="20sp"
+                android:textStyle="bold"/>
+        </androidx.appcompat.widget.Toolbar>
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true"
+        android:padding="@dimen/spacing_normal">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="۱. دکمه‌های کپسولی (Pill Buttons)"
+                android:textColor="@color/gold_primary"
+                android:textStyle="bold"
+                android:textSize="16sp"
+                android:layout_marginBottom="@dimen/spacing_small" />
+
+            <com.google.android.material.button.MaterialButton
+                style="@style/Widget.Kharazmi.Button.Gold"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="دکمه اکشن اصلی (Teal)"
+                android:layout_marginBottom="@dimen/spacing_small"/>
+
+            <com.google.android.material.button.MaterialButton
+                style="@style/Widget.Kharazmi.Button.Gold"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:backgroundTint="@color/gold_primary"
+                android:textColor="@color/text_on_gold"
+                android:text="دکمه اکشن فرعی (Yellow)"
+                android:layout_marginBottom="24dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="۲. کارت‌های تخت خلوت (Flat Cards)"
+                android:textColor="@color/gold_primary"
+                android:textStyle="bold"
+                android:textSize="16sp"
+                android:layout_marginBottom="@dimen/spacing_small" />
+
+            <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.Kharazmi.Card.Gold"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/spacing_small">
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="@dimen/spacing_normal"
+                    android:textColor="@color/text_primary"
+                    android:text="کارت با سایه ملایم و پس‌زمینه پویا بر پایه تم روز/شب" />
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.Kharazmi.Card.Gold"
+                app:cardBackgroundColor="@color/status_success_light"
+                app:strokeColor="@color/status_success"
+                app:strokeWidth="1dp"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="24dp">
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="@dimen/spacing_normal"
+                    android:textColor="@color/status_success"
+                    android:textStyle="bold"
+                    android:text="کارت وضعیت موفقیت‌آمیز اشباع‌زدایی شده (سبز)" />
+            </com.google.android.material.card.MaterialCardView>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="۳. آواتارهای داینامیک حروف اول نام"
+                android:textColor="@color/gold_primary"
+                android:textStyle="bold"
+                android:textSize="16sp"
+                android:layout_marginBottom="@dimen/spacing_small" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:layout_marginBottom="24dp">
+
+                <ImageView
+                    android:id="@+id/imgAvatarSample1"
+                    android:layout_width="60dp"
+                    android:layout_height="60dp"
+                    android:layout_margin="8dp"/>
+
+                <ImageView
+                    android:id="@+id/imgAvatarSample2"
+                    android:layout_width="60dp"
+                    android:layout_height="60dp"
+                    android:layout_margin="8dp"/>
+
+                <ImageView
+                    android:id="@+id/imgAvatarSample3"
+                    android:layout_width="60dp"
+                    android:layout_height="60dp"
+                    android:layout_margin="8dp"/>
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="۴. وضعیت‌های خالی و خطا (Empty State)"
+                android:textColor="@color/gold_primary"
+                android:textStyle="bold"
+                android:textSize="16sp"
+                android:layout_marginBottom="@dimen/spacing_small" />
+
+            <!-- الحاق قالب از پیش ساخته شده -->
+            <include layout="@layout/layout_empty" />
+
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

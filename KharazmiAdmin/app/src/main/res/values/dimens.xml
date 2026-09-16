@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Standard spacing -->
+    <dimen name="spacing_tiny">4dp</dimen>
+    <dimen name="spacing_small">8dp</dimen>
+    <dimen name="spacing_normal">16dp</dimen>
+    <dimen name="spacing_large">24dp</dimen>
+    <dimen name="spacing_huge">32dp</dimen>
+
+    <!-- Standard elevations -->
+    <dimen name="elevation_none">0dp</dimen>
+    <dimen name="elevation_card">4dp</dimen>
+    <dimen name="elevation_button">2dp</dimen>
+    <dimen name="elevation_appbar">8dp</dimen>
+
+    <!-- Standard corner radiuses -->
+    <dimen name="corner_radius_small">8dp</dimen>
+    <dimen name="corner_radius_card">12dp</dimen>
+    <dimen name="corner_radius_button">12dp</dimen>
+    <dimen name="corner_radius_large">16dp</dimen>
+    <dimen name="corner_radius_huge">24dp</dimen>
+
+    <!-- Standard Typography Font Sizes -->
+    <dimen name="font_size_page_title">20sp</dimen>
+    <dimen name="font_size_section_title">16sp</dimen>
+    <dimen name="font_size_body">14sp</dimen>
+    <dimen name="font_size_caption">12sp</dimen>
+</resources>

@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:background="@color/gold_bg_base"
+    android:padding="48dp"
+    android:layoutDirection="rtl"
+>
+
+    <!-- Empty State Illustration -->
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="140dp"
+        android:layout_height="140dp"
+        app:cardBackgroundColor="@color/gold_bg_elevated"
+        app:cardCornerRadius="28dp"
+        app:cardElevation="4dp"
+        app:strokeColor="@color/gold_border_subtle"
+        app:strokeWidth="1dp"
+    >
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center"
+        >
+
+            <!-- Empty Icon -->
+            <ImageView
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:src="@drawable/ic_search_24"
+                app:tint="@color/text_disabled"
+            />
+
+            <!-- Empty Text -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_normal"
+                android:text="خالی"
+                android:textAppearance="@style/TextAppearance.GajAdmin.Caption"
+                android:textColor="@color/text_disabled"
+            />
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- Empty State Message -->
+    <TextView
+        android:id="@+id/tvEmptyTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/spacing_huge"
+        android:text="موردی یافت نشد"
+        android:textAppearance="@style/TextAppearance.GajAdmin.Headline6"
+        android:textColor="@color/text_primary"
+        android:textStyle="bold"
+    />
+
+    <TextView
+        android:id="@+id/tvEmptyMessage"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/spacing_normal"
+        android:gravity="center"
+        android:text="در حال حاضر هیچ آیتمی در این بخش وجود ندارد."
+        android:textAppearance="@style/TextAppearance.GajAdmin.Body2"
+        android:textColor="@color/text_secondary"
+    />
+
+    <!-- ✅ فیکس: btnEmptyAction حذف شد - دکمه مرده بود (visibility=gone و هیچ جا وصل نبود)
+         به جای آن از btnRefresh و btnSearch به عنوان اکشن‌های اصلی استفاده می‌شود.
+         اگر نیاز به اکشن ایجاد جدید باشد، باید در Activity میزبان به صورت صریح هندل شود. -->
+
+    <!-- Alternative Actions -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/spacing_large"
+        android:orientation="horizontal"
+        android:gravity="center"
+    >
+
+        <!-- Refresh Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnRefresh"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:layout_marginEnd="@dimen/spacing_small"
+            android:text="بارگذاری مجدد"
+            android:textAppearance="@style/TextAppearance.GajAdmin.Caption"
+            android:textColor="@color/gold_primary"
+            app:cornerRadius="@dimen/spacing_small"
+            app:icon="@drawable/ic_refresh_24"
+            app:iconGravity="textStart"
+            app:iconPadding="4dp"
+            app:iconSize="16dp"
+            app:iconTint="@color/gold_primary"
+            app:strokeColor="@color/gold_primary"
+            app:strokeWidth="1dp"
+        />
+
+        <!-- Search Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSearch"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:layout_marginStart="@dimen/spacing_small"
+            android:text="جستجو"
+            android:textAppearance="@style/TextAppearance.GajAdmin.Caption"
+            android:textColor="@color/gold_primary"
+            app:cornerRadius="@dimen/spacing_small"
+            app:icon="@drawable/ic_search_24"
+            app:iconGravity="textStart"
+            app:iconPadding="4dp"
+            app:iconSize="16dp"
+            app:iconTint="@color/gold_primary"
+            app:strokeColor="@color/gold_primary"
+            app:strokeWidth="1dp"
+        />
+    </LinearLayout>
+
+    <!-- Help Text - به‌روزرسانی شده بعد از حذف btnEmptyAction -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="48dp"
+        android:gravity="center"
+        android:text="برای افزودن آیتم جدید از منوی اصلی استفاده نمایید یا لیست را بارگذاری مجدد کنید."
+        android:textAppearance="@style/TextAppearance.GajAdmin.Caption"
+        android:textColor="@color/text_disabled"
+        android:maxWidth="300dp"
+    />
+
+</LinearLayout>

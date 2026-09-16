@@ -1,0 +1,33 @@
+# secrets & local
+.env
+**/.env
+local.properties
+**/local.properties
+
+# python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.venv/
+venv/
+
+# android / build
+**/build/
+**/.gradle/
+*.apk
+*.ap_
+*.aab
+
+# db journals
+backups/
+*.db-journal
+
+# original zip (code extracted as folders)
+kharazmizip.zip
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,552 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/gold_bg_base"
+    android:layoutDirection="rtl">
+
+    <!-- AppBar -->
+    <com.google.android.material.appbar.AppBarLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/gold_primary"
+        app:elevation="@dimen/elevation_appbar"
+    >
+        <androidx.appcompat.widget.Toolbar
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize">
+            <TextView
+                android:id="@+id/tvHeaderTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="گزارش‌گیری و صورت‌حساب"
+                android:textColor="?attr/colorOnPrimary"
+                android:textAppearance="@style/TextAppearance.Kharazmi.PageTitle"/>
+        </androidx.appcompat.widget.Toolbar>
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="@dimen/spacing_normal">
+
+            <!-- ۱. کادر انتخاب نوع گزارش (آموزشگاه / معلم) -->
+            <!-- FIX: Use the declared Widget.Kharazmi.Card.Gold style; remove repeated suffixes. -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardReportTypeSelector"
+                style="@style/Widget.Kharazmi.Card.Gold"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/spacing_normal">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="@dimen/spacing_normal">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="محدوده گزارش‌گیری"
+                        android:textAppearance="@style/TextAppearance.Kharazmi.SectionTitle"
+                        android:textColor="@color/gold_primary"
+                        android:layout_marginBottom="@dimen/spacing_small"/>
+
+                    <RadioGroup
+                        android:id="@+id/rgReportScope"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center">
+
+                        <RadioButton
+                            android:id="@+id/rbScopeInstitute"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="wrap_content"
+                            android:text="آموزشگاه"
+                            android:textAppearance="@style/TextAppearance.Kharazmi.Body"
+                            android:checked="true"/>
+
+                        <RadioButton
+                            android:id="@+id/rbScopeTeacher"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="wrap_content"
+                            android:text="معلم"
+                            android:textAppearance="@style/TextAppearance.Kharazmi.Body"/>
+                    </RadioGroup>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- ۲. کادر فیلترها (انتخاب معلم، سال، ماه) -->
+            <!-- FIX: Use the declared Widget.Kharazmi.Card.Gold style; remove repeated suffixes. -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardFilters"
+                style="@style/Widget.Kharazmi.Card.Gold"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/spacing_normal">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="@dimen/spacing_normal">
+
+                    <!-- انتخاب معلم (فقط مخصوص مدیر/منشی و در صورت انتخاب معلم) -->
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/tilTeacherFilter"
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="انتخاب معلم"
+                        android:textColorHint="#757575"
+                        app:boxStrokeColor="@color/gold_primary"
+                        android:visibility="gone"
+                        android:layout_marginBottom="10dp">
+                        <AutoCompleteTextView
+                            android:id="@+id/acTeacherFilter"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="none"
+                            android:textColor="@color/text_primary"/>
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <!-- سال و ماه به صورت ساید‌بای‌ساید -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="wrap_content"
+                            android:hint="سال (شمسی)"
+                            android:textColorHint="#757575"
+                            app:boxStrokeColor="@color/gold_primary"
+                            android:layout_marginEnd="6dp">
+                            <AutoCompleteTextView
+                                android:id="@+id/acYearFilter"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:inputType="none"
+                                android:textColor="@color/text_primary"/>
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="wrap_content"
+                            android:hint="ماه"
+                            android:textColorHint="#757575"
+                            app:boxStrokeColor="@color/gold_primary"
+                            android:layout_marginStart="6dp">
+                            <AutoCompleteTextView
+                                android:id="@+id/acMonthFilter"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:inputType="none"
+                                android:textColor="@color/text_primary"/>
+                        </com.google.android.material.textfield.TextInputLayout>
+                    </LinearLayout>
+
+                    <Space android:layout_width="match_parent" android:layout_height="12dp"/>
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnFetchFinancialSummary"
+                        style="@style/Widget.Kharazmi.Button.Gold"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="نمایش آمار مالی"
+                        app:backgroundTint="@color/gold_primary"
+                    />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- ۳. نمایش نتایج آمار مالی (ماهانه) -->
+            <!-- FIX: Use the declared Widget.Kharazmi.Card.Gold style; remove repeated suffixes. -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardMonthlySummary"
+                style="@style/Widget.Kharazmi.Card.Gold"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/spacing_normal">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="@dimen/spacing_normal">
+
+                    <TextView
+                        android:id="@+id/tvMonthlyTitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="آمار مالی ماهانه"
+                        android:textAppearance="@style/TextAppearance.Kharazmi.SectionTitle"
+                        android:textColor="@color/gold_primary"
+                        android:layout_marginBottom="@dimen/spacing_normal"/>
+
+                    <!-- درآمد کل -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:paddingVertical="8dp">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="درآمد کل:"
+                            android:textAppearance="@style/TextAppearance.Kharazmi.Body"
+                            android:textStyle="bold"
+                            android:textColor="@color/text_primary"/>
+                        <View android:layout_width="0dp" android:layout_weight="1" android:layout_height="1dp"/>
+                        <TextView
+                            android:id="@+id/tvMonthlyTotal"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0 تومان"
+                            android:textAppearance="@style/TextAppearance.Kharazmi.Body"
+                            android:textStyle="bold"
+                            android:textColor="@color/text_primary"
+                            android:fontFeatureSettings="tnum"/>
+                    </LinearLayout>
+
+                    <View android:layout_width="match_parent" android:layout_height="0.5dp" android:background="@color/gold_border_subtle" />
+
+                    <!-- درآمد وصول شده -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:paddingVertical="8dp">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="درآمد وصول‌شده:"
+                            android:textAppearance="@style/TextAppearance.Kharazmi.Body"
+                            android:textStyle="bold"
+                            android:textColor="#388E3C"/>
+                        <View android:layout_width="0dp" android:layout_weight="1" android:layout_height="1dp"/>
+                        <TextView
+                            android:id="@+id/tvMonthlyCollected"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0 تومان"
+                            android:textAppearance="@style/TextAppearance.Kharazmi.Body"
+                            android:textStyle="bold"
+                            android:textColor="#388E3C"
+                            android:fontFeatureSettings="tnum"/>
+                    </LinearLayout>
+
+                    <View android:layout_width="match_parent" android:layout_height="0.5dp" android:background="@color/gold_border_subtle" />
+
+                    <!-- درآمد وصول نشده -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:paddingVertical="8dp">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="درآمد وصول‌نشده:"
+                            android:textAppearance="@style/TextAppearance.Kharazmi.Body"
+                            android:textStyle="bold"
+                            android:textColor="?attr/colorError"/>
+                        <View android:layout_width="0dp" android:layout_weight="1" android:layout_height="1dp"/>
+                        <TextView
+                            android:id="@+id/tvMonthlyUncollected"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0 تومان"
+                            android:textAppearance="@style/TextAppearance.Kharazmi.Body"
+                            android:textStyle="bold"
+                            android:textColor="?attr/colorError"
+                            android:fontFeatureSettings="tnum"/>
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- ۴. نمایش نتایج آمار مالی (سالانه - فقط برای معلمان) -->
+            <!-- FIX: Use the declared Widget.Kharazmi.Card.Gold style; remove repeated suffixes. -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardYearlySummary"
+                style="@style/Widget.Kharazmi.Card.Gold"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                android:layout_marginBottom="@dimen/spacing_normal">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="@dimen/spacing_normal">
+
+                    <TextView
+                        android:id="@+id/tvYearlyTitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="آمار مالی سالانه معلم"
+                        android:textAppearance="@style/TextAppearance.Kharazmi.SectionTitle"
+                        android:textColor="@color/gold_primary"
+                        android:layout_marginBottom="@dimen/spacing_normal"/>
+
+                    <!-- درآمد کل -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:paddingVertical="8dp">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="درآمد کل سالانه:"
+                            android:textAppearance="@style/TextAppearance.Kharazmi.Body"
+                            android:textStyle="bold"
+                            android:textColor="@color/text_primary"/>
+                        <View android:layout_width="0dp" android:layout_weight="1" android:layout_height="1dp"/>
+                        <TextView
+                            android:id="@+id/tvYearlyTotal"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0 تومان"
+                            android:textAppearance="@style/TextAppearance.Kharazmi.Body"
+                            android:textStyle="bold"
+                            android:textColor="@color/text_primary"
+                            android:fontFeatureSettings="tnum"/>
+                    </LinearLayout>
+
+                    <View android:layout_width="match_parent" android:layout_height="0.5dp" android:background="@color/gold_border_subtle" />
+
+                    <!-- درآمد وصول شده -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:paddingVertical="8dp">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="وصول‌شده سالانه:"
+                            android:textAppearance="@style/TextAppearance.Kharazmi.Body"
+                            android:textStyle="bold"
+                            android:textColor="#388E3C"/>
+                        <View android:layout_width="0dp" android:layout_weight="1" android:layout_height="1dp"/>
+                        <TextView
+                            android:id="@+id/tvYearlyCollected"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0 تومان"
+                            android:textAppearance="@style/TextAppearance.Kharazmi.Body"
+                            android:textStyle="bold"
+                            android:textColor="#388E3C"
+                            android:fontFeatureSettings="tnum"/>
+                    </LinearLayout>
+
+                    <View android:layout_width="match_parent" android:layout_height="0.5dp" android:background="@color/gold_border_subtle" />
+
+                    <!-- درآمد وصول نشده -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:paddingVertical="8dp">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="وصول‌نشده سالانه:"
+                            android:textAppearance="@style/TextAppearance.Kharazmi.Body"
+                            android:textStyle="bold"
+                            android:textColor="?attr/colorError"/>
+                        <View android:layout_width="0dp" android:layout_weight="1" android:layout_height="1dp"/>
+                        <TextView
+                            android:id="@+id/tvYearlyUncollected"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0 تومان"
+                            android:textAppearance="@style/TextAppearance.Kharazmi.Body"
+                            android:textStyle="bold"
+                            android:textColor="?attr/colorError"
+                            android:fontFeatureSettings="tnum"/>
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- ۵. بخش جدید صورت‌حساب دانش‌آموز -->
+            <!-- FIX: Use the declared Widget.Kharazmi.Card.Gold style; remove repeated suffixes. -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardStudentStatement"
+                style="@style/Widget.Kharazmi.Card.Gold"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/spacing_large">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="@dimen/spacing_normal">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="جستجو و صدور صورت‌حساب دانش‌آموز"
+                        android:textAppearance="@style/TextAppearance.Kharazmi.SectionTitle"
+                        android:textColor="@color/gold_primary"
+                        android:layout_marginBottom="@dimen/spacing_normal"/>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            style="@style/Widget.Kharazmi.Input.Gold"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="wrap_content"
+                            android:hint="نام یا کدملی دانش‌آموز"
+                            app:startIconDrawable="@drawable/ic_search_24">
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/etStudentSearchName"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:inputType="text"
+                                android:textColor="@color/text_primary"/>
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnSearchStudentStatement"
+                            style="@style/Widget.Kharazmi.Button.Gold"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="بررسی"
+                            android:layout_marginStart="@dimen/spacing_small"
+                            app:backgroundTint="@color/gold_primary"/>
+                    </LinearLayout>
+
+                    <!-- نتایج صورت‌حساب (به طور پیش‌فرض مخفی است) -->
+                    <LinearLayout
+                        android:id="@+id/llStatementResult"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:layout_marginTop="@dimen/spacing_normal"
+                        android:visibility="gone">
+
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="1dp"
+                            android:background="@color/gold_border_subtle"
+                            android:layout_marginBottom="@dimen/spacing_normal"/>
+
+                        <TextView
+                            android:id="@+id/tvStatementStudentName"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="دانش‌آموز: الارا صیامی"
+                            android:textAppearance="@style/TextAppearance.Kharazmi.SectionTitle"
+                            android:textColor="@color/text_primary"
+                            android:layout_marginBottom="4dp"/>
+
+                        <TextView
+                            android:id="@+id/tvStatementStudentCode"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="کد دانش‌آموزی: ۱۰۰۰۰۱"
+                            android:textAppearance="@style/TextAppearance.Kharazmi.Caption"
+                            android:textColor="@color/text_primary"
+                            android:layout_marginBottom="@dimen/spacing_normal"
+                            android:fontFeatureSettings="tnum"/>
+
+                        <!-- مجموع کل هزینه‌های واریزشده آموزشگاه -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:paddingVertical="6dp">
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="کل واریزی‌ها به آموزشگاه:"
+                                android:textAppearance="@style/TextAppearance.Kharazmi.Body"
+                                android:textColor="@color/text_primary"/>
+                            <View android:layout_width="0dp" android:layout_weight="1" android:layout_height="1dp"/>
+                            <TextView
+                                android:id="@+id/tvStatementPaid"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="0 تومان"
+                                android:textAppearance="@style/TextAppearance.Kharazmi.Body"
+                                android:textStyle="bold"
+                                android:textColor="#388E3C"
+                                android:fontFeatureSettings="tnum"/>
+                        </LinearLayout>
+
+                        <View android:layout_width="match_parent" android:layout_height="0.5dp" android:background="@color/gold_border_subtle" />
+
+                        <!-- مجموع کل مانده بدهی به آموزشگاه -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:paddingVertical="6dp">
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="کل مانده بدهی به آموزشگاه:"
+                                android:textAppearance="@style/TextAppearance.Kharazmi.Body"
+                                android:textColor="@color/text_primary"/>
+                            <View android:layout_width="0dp" android:layout_weight="1" android:layout_height="1dp"/>
+                            <TextView
+                                android:id="@+id/tvStatementDebt"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="0 تومان"
+                                android:textAppearance="@style/TextAppearance.Kharazmi.Body"
+                                android:textStyle="bold"
+                                android:textColor="?attr/colorError"
+                                android:fontFeatureSettings="tnum"/>
+                        </LinearLayout>
+
+                        <!-- Print Statement button modern outlined pill shape -->
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnPrintStatement"
+                            style="@style/Widget.Kharazmi.Button.Gold.Outline"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="چاپ صورت‌حساب"
+                            android:textColor="@color/gold_primary"
+                            app:strokeColor="@color/gold_primary"
+                            android:layout_marginTop="@dimen/spacing_normal"
+                            app:cornerRadius="24dp"
+                            android:paddingVertical="12dp"
+                            android:textSize="14sp"
+                            android:textStyle="bold"
+                            app:icon="@drawable/ic_print"
+                            app:iconTint="@color/gold_primary"
+                            app:iconGravity="textStart"/>
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+</LinearLayout>

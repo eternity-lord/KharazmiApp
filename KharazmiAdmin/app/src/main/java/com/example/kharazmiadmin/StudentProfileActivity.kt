@@ -1,0 +1,792 @@
+package com.example.kharazmiadmin
+
+import android.content.Intent
+import android.content.Context
+import android.graphics.Color
+import android.net.Uri
+import android.os.Bundle
+import android.view.View
+import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
+import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.floatingactionbutton.FloatingActionButton
+import com.google.android.material.materialswitch.MaterialSwitch
+import com.google.android.material.tabs.TabLayout
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.util.Locale
+import kotlin.math.abs
+import retrofit2.http.Body
+import retrofit2.http.DELETE
+import retrofit2.http.GET
+import retrofit2.http.POST
+import retrofit2.http.PUT
+import retrofit2.http.Path
+
+// ==========================================
+// 2. Unified Profile API (Updated)
+// ==========================================
+interface ProfileApi {
+    // --- Student View (Full) ---
+    @GET("admin/students/{id}/full_profile")
+    suspend fun getFullStudentProfile(@Path("id") id: Int): FullStudentProfile
+
+    @GET("students/{id}/grades")
+    suspend fun getStudentGrades(@Path("id") id: Int): StudentGradesResponse
+
+    @GET("students/{id}")
+    suspend fun getStudentProfile(@Path("id") id: Int): StudentRawProfile
+
+    @PUT("students/update/{id}")
+    suspend fun updateStudent(@Path("id") id: Int, @Body data: StudentUpdate): SimpleResponse
+
+    // --- Management ---
+    @DELETE("admin/students/{id}")
+    suspend fun deleteStudent(@Path("id") id: Int): SimpleResponse
+
+    @POST("admin/students/{id}/toggle_suspend")
+    suspend fun toggleSuspend(@Path("id") id: Int): SuspendResponse
+
+    // --- Teacher View (Full) ---
+    @GET("teachers/{id}/full_profile")
+    suspend fun getFullTeacherProfile(@Path("id") id: Int): FullTeacherProfile
+
+    @GET("teachers/{id}")
+    suspend fun getTeacherProfile(@Path("id") id: Int): TeacherRawProfile
+
+    @PUT("teachers/update/{id}") // ✅ اضافه شد برای EditTeacherActivity
+    suspend fun updateTeacher(@Path("id") id: Int, @Body data: TeacherUpdate): SimpleResponse
+
+    @retrofit2.http.Multipart
+    @POST("students/{id}/upload_photo")
+    suspend fun uploadStudentPhoto(
+        @Path("id") id: Int,
+        @retrofit2.http.Part file: okhttp3.MultipartBody.Part
+    ): SimpleResponse
+
+    @retrofit2.http.Multipart
+    @POST("teachers/{id}/upload_photo")
+    suspend fun uploadTeacherPhoto(
+        @Path("id") id: Int,
+        @retrofit2.http.Part file: okhttp3.MultipartBody.Part
+    ): SimpleResponse
+
+    @GET("teachers/{id}/pending_settlement")
+    suspend fun getPendingSettlement(@Path("id") id: Int): TeacherPendingSettlementResponse
+
+    @POST("teachers/{id}/settle")
+    suspend fun settleTeacherSessions(@Path("id") id: Int, @Body req: SettleRequest): TeacherSettlementResponse
+
+    @GET("teachers/{id}/settlement_history")
+    suspend fun getSettlementHistory(@Path("id") id: Int): List<SettlementHistoryItem>
+
+    @GET("students/{id}/installments")
+    suspend fun getStudentInstallments(@Path("id") id: Int): List<StudentInstallmentItem>
+
+    @GET("students/{id}/communication_history")
+    suspend fun getStudentCommunicationHistory(
+        @Path("id") id: Int
+    ): List<CommunicationHistoryItem>
+
+    @GET("teachers/{id}/communication_history")
+    suspend fun getTeacherCommunicationHistory(
+        @Path("id") id: Int
+    ): List<CommunicationHistoryItem>
+
+    @POST("admin/students/{id}/send_portal_link")
+    suspend fun sendPortalLink(@Path("id") id: Int): SimpleResponse
+
+    @GET("teachers/{id}/collaboration_summary")
+    suspend fun getTeacherCollaborationSummary(
+        @Path("id") id: Int
+    ): TeacherCollaborationSummary
+}
+
+// ==========================================
+// 3. Activity Logic
+// ==========================================
+class StudentProfileActivity : BaseActivity() {
+
+    private var studentId: Int = -1
+    private lateinit var tvContent: TextView
+    private lateinit var tvName: TextView
+    private lateinit var tvPhone: TextView
+    private lateinit var tabLayout: TabLayout
+    private lateinit var switchSuspend: MaterialSwitch
+    private lateinit var btnInvoice: MaterialButton
+    private lateinit var llStandardContainer: View
+    private lateinit var llCommunicationContainer: View
+    private lateinit var rvCommunicationHistory: RecyclerView
+    private lateinit var tvCommunicationEmpty: TextView
+
+    private lateinit var tvTotalDebt: TextView
+    private lateinit var tvDebtTeacher: TextView
+    private lateinit var tvDebtInstitute: TextView
+
+    private var cachedProfile: FullStudentProfile? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_student_profile)
+
+        studentId = intent.getIntExtra("STUDENT_ID", -1)
+        if (studentId == -1) {
+            Toast.makeText(this, getString(R.string.profile_id_error), Toast.LENGTH_SHORT).show()
+            finish()
+            return
+        }
+
+        initViews()
+
+        tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: TabLayout.Tab?) {
+                when (tab?.position) {
+                    0 -> {
+                        showStandardProfileContent()
+                        showInfo()
+                    }
+                    1 -> {
+                        showStandardProfileContent()
+                        showFinancial()
+                    }
+                    2 -> {
+                        showStandardProfileContent()
+                        fetchGrades()
+                    }
+                    3 -> {
+                        showStandardProfileContent()
+                        fetchInstallments()
+                    }
+                    4 -> {
+                        showCommunicationContent()
+                        fetchCommunicationHistory()
+                    }
+                }
+            }
+            override fun onTabUnselected(tab: TabLayout.Tab?) {}
+            override fun onTabReselected(tab: TabLayout.Tab?) {
+                if (tab?.position == 4) fetchCommunicationHistory()
+            }
+        })
+
+        if (intent.getBooleanExtra("OPEN_INSTALLMENTS_TAB", false)) {
+            tabLayout.getTabAt(3)?.select()
+        }
+
+        findViewById<FloatingActionButton>(R.id.fabEditProfile).setOnClickListener {
+            val intent = Intent(this, EditStudentActivity::class.java)
+            intent.putExtra("STUDENT_ID", studentId)
+            startActivity(intent)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        fetchFullData()
+        if (tabLayout.selectedTabPosition == 4) {
+            fetchCommunicationHistory()
+        }
+    }
+
+    private fun initViews() {
+        tvContent = findViewById(R.id.tvContent)
+        tvName = findViewById(R.id.tvProfileName)
+        tvPhone = findViewById(R.id.tvProfilePhone)
+        tabLayout = findViewById(R.id.tabLayoutProfile)
+        switchSuspend = findViewById(R.id.switchSuspend)
+        llStandardContainer = findViewById(R.id.llStudentStandardContainer)
+        llCommunicationContainer = findViewById(R.id.llStudentCommunicationContainer)
+        rvCommunicationHistory = findViewById(R.id.rvStudentCommunicationHistory)
+        tvCommunicationEmpty = findViewById(R.id.tvStudentCommunicationEmpty)
+        rvCommunicationHistory.layoutManager = LinearLayoutManager(this)
+        rvCommunicationHistory.isNestedScrollingEnabled = false
+
+        tvTotalDebt = findViewById(R.id.tvTotalDebt)
+        tvDebtTeacher = findViewById(R.id.tvDebtTeacher)
+        tvDebtInstitute = findViewById(R.id.tvDebtInstitute)
+        btnInvoice = findViewById(R.id.btnIssueInvoice)
+
+        findViewById<MaterialButton>(R.id.btnDeleteStudent).setOnClickListener {
+            showDeleteConfirmation()
+        }
+
+        findViewById<MaterialButton>(R.id.btnSendPortalLink).setOnClickListener {
+            sendPortalLinkToParent()
+        }
+
+        val credsPrefs = getSharedPreferences("UserCreds", Context.MODE_PRIVATE)
+        val subRole = credsPrefs.getString("USER_SUB_ROLE", "admin") ?: "admin"
+        if (subRole == "secretary") {
+            findViewById<View>(R.id.btnDeleteStudent).visibility = View.GONE
+        }
+
+        findViewById<android.widget.ImageView>(R.id.imgProfile).setOnClickListener {
+            showImageSelectDialog()
+        }
+
+        switchSuspend.setOnClickListener {
+            toggleStudentSuspension()
+        }
+
+        btnInvoice.setOnClickListener {
+            launchInvoiceActivity()
+        }
+    }
+
+    private fun fetchFullData() {
+        val retrofit = RetrofitClient.getInstance(this)
+        val api = retrofit.create(ProfileApi::class.java)
+
+        val cacheKey = "student_full_profile_" + studentId
+        val type = object : com.google.gson.reflect.TypeToken<FullStudentProfile>() {}.type
+
+        // FIX: Bug 19 - cancel screen work when this Activity is destroyed.
+
+        lifecycleScope.launch(Dispatchers.Main) {
+            CachedApiCall.execute(
+                context = this@StudentProfileActivity,
+                cacheKey = cacheKey,
+                type = type,
+                networkCall = { api.getFullStudentProfile(studentId) },
+                onSuccess = { data, isOffline, timestamp ->
+                    cachedProfile = data
+                    tvName.text = data.info.name
+                    tvPhone.text = data.info.student_mobile
+
+                    // بارگذاری عکس پروفایل با Glide
+                    val profileImg = findViewById<android.widget.ImageView>(R.id.imgProfile)
+                    if (!data.info.profile_image.isNullOrEmpty()) {
+                        val baseUrl = RetrofitClient.getInstance(this@StudentProfileActivity).baseUrl().toString()
+                        val imgUrl = baseUrl + "uploads/profiles/" + data.info.profile_image
+                        val glideAuthToken = SecureLoginStore.getToken(this@StudentProfileActivity)  // FIX M22.
+                        // FIX M3: Glide با هدر احراز (اندپوینت /uploads دیگر عمومی نیست).
+                        val glideUrl = com.bumptech.glide.load.model.GlideUrl(
+                            imgUrl,
+                            com.bumptech.glide.load.model.LazyHeaders.Builder()
+                                .addHeader("Authorization", "Bearer $glideAuthToken")
+                                .build()
+                        )
+                        com.bumptech.glide.Glide.with(this@StudentProfileActivity)
+                            .load(glideUrl)
+                            .placeholder(android.R.drawable.sym_def_app_icon)
+                            .error(android.R.drawable.sym_def_app_icon)
+                            .circleCrop()
+                            .into(profileImg)
+                    } else {
+                        profileImg.setImageDrawable(AvatarHelper.getAvatar(this@StudentProfileActivity, data.info.name, studentId))
+                    }
+
+                    switchSuspend.setOnCheckedChangeListener(null)
+                    switchSuspend.isChecked = data.info.is_suspended
+                    switchSuspend.setOnClickListener { toggleStudentSuspension() }
+
+                    // ===========================================
+                    // 🔥 لاجیک جدید نمایش مالی (هوشمند)
+                    // ===========================================
+
+                    // 1. وضعیت کلی کیف پول و بدهی
+                    tvTotalDebt.text = buildTotalStatus(data.walletTotal, data.totalDebt)
+                    tvTotalDebt.setTextColor(colorForBalance(data.walletTotal))
+
+                    // 2. کیف پول معلم
+                    tvDebtTeacher.text = buildWalletStatus(getString(R.string.profile_wallet_teacher), data.walletTeacher, data.debtTeacher)
+                    tvDebtTeacher.setTextColor(colorForBalance(data.walletTeacher))
+
+                    // 3. کیف پول آموزشگاه
+                    tvDebtInstitute.text = buildWalletStatus(getString(R.string.profile_wallet_institute), data.walletInstitute, data.debtInstitute)
+                    tvDebtInstitute.setTextColor(colorForBalance(data.walletInstitute))
+                    // ===========================================
+
+                    if (tabLayout.selectedTabPosition == 0) showInfo()
+                    else if (tabLayout.selectedTabPosition == 1) showFinancial()
+                    else if (tabLayout.selectedTabPosition == 3) fetchInstallments()
+
+                    if (isOffline) {
+                        CachedApiCall.showOfflineBanner(this@StudentProfileActivity, timestamp)
+                    } else {
+                        CachedApiCall.hideOfflineBanner(this@StudentProfileActivity)
+                    }
+                },
+                onFailure = {
+                    tvContent.text = getString(R.string.common_offline_empty)
+                }
+            )
+        }
+    }
+
+    private fun launchInvoiceActivity() {
+        val profile = cachedProfile ?: return
+        val className = profile.classes.firstOrNull() ?: getString(R.string.common_unknown_class)
+        val intent = Intent(this, InvoiceActivity::class.java).apply {
+            putExtra(InvoiceActivity.EXTRA_PREFILL_STUDENT_ID, studentId)
+            putExtra(InvoiceActivity.EXTRA_PREFILL_STUDENT_NAME, profile.info.name)
+            putExtra(InvoiceActivity.EXTRA_PREFILL_CLASS_NAME, className)
+            putExtra(InvoiceActivity.EXTRA_PREFILL_DEBT, profile.totalDebt)
+            putExtra(InvoiceActivity.EXTRA_PREFILL_DEBT_TEACHER, profile.debtTeacher)
+            putExtra(InvoiceActivity.EXTRA_PREFILL_DEBT_INSTITUTE, profile.debtInstitute)
+            putExtra(InvoiceActivity.EXTRA_PREFILL_UNPAID_SESSIONS, 0)
+            putExtra(InvoiceActivity.EXTRA_PREFILL_SEARCH_NAME, profile.info.name)
+            putExtra(InvoiceActivity.EXTRA_IS_ADMIN, true)
+        }
+        startActivity(intent)
+    }
+    private fun showInfo() {
+        cachedProfile?.let { data ->
+            val sb = StringBuilder()
+            if (data.info.is_suspended) sb.append(getString(R.string.profile_suspended))
+            if (data.info.student_code != null) sb.append(getString(R.string.profile_code, data.info.student_code))
+            sb.append(getString(R.string.profile_name, data.info.name))
+            sb.append(getString(R.string.profile_national, data.info.national_code))
+            sb.append(getString(R.string.profile_mobile, data.info.student_mobile))
+            sb.append(getString(R.string.profile_parent, data.info.parent_mobile))
+            sb.append(getString(R.string.profile_address, data.info.address))
+
+            tvContent.setOnClickListener { makeCall(data.info.parent_mobile) }
+            tvContent.text = sb.toString()
+        }
+    }
+
+    private fun showFinancial() {
+        cachedProfile?.let { data ->
+            val sb = StringBuilder()
+            sb.append(getString(R.string.profile_classes_title))
+            if (data.classes.isEmpty()) sb.append(getString(R.string.profile_no_class))
+            else data.classes.forEach { sb.append(getString(R.string.profile_bullet_row, it)) }
+
+            sb.append(getString(R.string.profile_txn_title))
+            if (data.transactions.isEmpty()) sb.append(getString(R.string.profile_no_txn))
+            else data.transactions.forEach { sb.append(getString(R.string.profile_bullet_row, it)) }
+
+            sb.append(getString(R.string.profile_wallet_title))
+            sb.append(getString(R.string.profile_bullet_row, buildTotalStatus(data.walletTotal, data.totalDebt)))
+            sb.append(getString(R.string.profile_wallet_row, buildWalletStatus(getString(R.string.profile_wallet_teacher), data.walletTeacher, data.debtTeacher)))
+            sb.append(getString(R.string.profile_wallet_row_plain, buildWalletStatus(getString(R.string.profile_wallet_institute), data.walletInstitute, data.debtInstitute)))
+
+            tvContent.text = sb.toString()
+            tvContent.setOnClickListener(null)
+        }
+    }
+
+    private fun fetchGrades() {
+        tvContent.text = getString(R.string.profile_grades_loading)
+        val retrofit = RetrofitClient.getInstance(this)
+        val api = retrofit.create(ProfileApi::class.java)
+
+        val cacheKey = "student_grades_" + studentId
+        val type = object : com.google.gson.reflect.TypeToken<StudentGradesResponse>() {}.type
+
+        // FIX: Bug 19 - cancel screen work when this Activity is destroyed.
+
+        lifecycleScope.launch(Dispatchers.Main) {
+            CachedApiCall.execute(
+                context = this@StudentProfileActivity,
+                cacheKey = cacheKey,
+                type = type,
+                networkCall = { api.getStudentGrades(studentId) },
+                onSuccess = { res, isOffline, timestamp ->
+                    val sb = StringBuilder()
+                    sb.append(getString(R.string.profile_report_title))
+                    if (res.grades.isEmpty()) {
+                        sb.append(getString(R.string.profile_no_grades))
+                    } else {
+                        if (res.averages.isNotEmpty()) {
+                            sb.append(getString(R.string.profile_avg_title))
+                            res.averages.forEach { (course, avg) ->
+                                sb.append(getString(R.string.profile_avg_row, course, avg))
+                            }
+                            sb.append("============================\n\n")
+                        }
+
+                        sb.append(getString(R.string.profile_grades_list))
+                        res.grades.forEach { g ->
+                            sb.append(getString(R.string.profile_grade_course, g.courseName))
+                            sb.append(getString(R.string.profile_grade_exam, g.examTitle))
+                            sb.append(getString(R.string.profile_grade_score, g.score, g.maxScore))
+                            sb.append(getString(R.string.profile_grade_date, g.date))
+                            if (!g.description.isNullOrEmpty()) sb.append(getString(R.string.profile_grade_desc, g.description))
+                            sb.append("----------------------------\n")
+                        }
+                    }
+                    tvContent.text = sb.toString()
+                    if (isOffline) {
+                        CachedApiCall.showOfflineBanner(this@StudentProfileActivity, timestamp)
+                    } else {
+                        CachedApiCall.hideOfflineBanner(this@StudentProfileActivity)
+                    }
+                },
+                onFailure = {
+                    tvContent.text = getString(R.string.common_offline_empty)
+                }
+            )
+        }
+    }
+
+    private fun showStandardProfileContent() {
+        llStandardContainer.visibility = View.VISIBLE
+        llCommunicationContainer.visibility = View.GONE
+    }
+
+    private fun showCommunicationContent() {
+        llStandardContainer.visibility = View.GONE
+        llCommunicationContainer.visibility = View.VISIBLE
+    }
+
+    private fun fetchCommunicationHistory() {
+        tvCommunicationEmpty.visibility = View.VISIBLE
+        tvCommunicationEmpty.text = getString(R.string.profile_comm_loading)
+        rvCommunicationHistory.visibility = View.GONE
+
+        val api = RetrofitClient.getInstance(this).create(ProfileApi::class.java)
+        // FIX: Bug 19 - cancel screen work when this Activity is destroyed.
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val history = api.getStudentCommunicationHistory(studentId)
+                withContext(Dispatchers.Main) {
+                    rvCommunicationHistory.adapter = CommunicationHistoryAdapter(history)
+                    rvCommunicationHistory.visibility =
+                        if (history.isEmpty()) View.GONE else View.VISIBLE
+                    tvCommunicationEmpty.visibility =
+                        if (history.isEmpty()) View.VISIBLE else View.GONE
+                    if (history.isEmpty()) {
+                        tvCommunicationEmpty.text = getString(R.string.profile_comm_empty)
+                    }
+                }
+            } catch (ignoredError: Exception) {
+                // FIX: Bug 19 - cancellation is not a network/UI error.
+                if (ignoredError is kotlinx.coroutines.CancellationException) throw ignoredError;
+                withContext(Dispatchers.Main) {
+                    rvCommunicationHistory.visibility = View.GONE
+                    tvCommunicationEmpty.visibility = View.VISIBLE
+                    tvCommunicationEmpty.text =
+                        getString(R.string.profile_comm_error)
+                }
+            }
+        }
+    }
+
+    private fun makeCall(number: String) {
+        if (number.length < 3) return
+        try { startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$number"))) } catch (e: Exception) {
+                // FIX: Bug 19 - cancellation is not a network/UI error.
+                if (e is kotlinx.coroutines.CancellationException) throw e;}
+    }
+
+    private fun showDeleteConfirmation() {
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.profile_delete_title))
+            .setMessage(getString(R.string.profile_delete_msg))
+            .setPositiveButton(getString(R.string.profile_delete_yes)) { _, _ -> performDelete() }
+            .setNegativeButton(getString(R.string.action_cancel), null)
+            .show()
+    }
+
+    private fun performDelete() {
+        val retrofit = RetrofitClient.getInstance(this)
+        val api = retrofit.create(ProfileApi::class.java)
+        // FIX: Bug 19 - cancel screen work when this Activity is destroyed.
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val res = api.deleteStudent(studentId)
+                withContext(Dispatchers.Main) {
+                    // بازخورد لمسی برای عملیات حذف برگشت‌ناپذیر موفق
+                    window.decorView.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+
+                    Toast.makeText(this@StudentProfileActivity, res.message, Toast.LENGTH_LONG).show()
+                    
+                    // ابطال کش
+                    CacheManager.clear(this@StudentProfileActivity, "student_full_profile_$studentId")
+                    CacheManager.clearByPrefix(this@StudentProfileActivity, "person_list_STUDENT")
+                    
+                    finish()
+                }
+            } catch (e: Exception) {
+                // FIX: Bug 19 - cancellation is not a network/UI error.
+                if (e is kotlinx.coroutines.CancellationException) throw e;
+                withContext(Dispatchers.Main) { Toast.makeText(this@StudentProfileActivity, getString(R.string.profile_delete_error), Toast.LENGTH_SHORT).show() }
+            }
+        }
+    }
+
+    private fun toggleStudentSuspension() {
+        switchSuspend.isEnabled = false
+        val retrofit = RetrofitClient.getInstance(this)
+        val api = retrofit.create(ProfileApi::class.java)
+        // FIX: Bug 19 - cancel screen work when this Activity is destroyed.
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val res = api.toggleSuspend(studentId)
+                withContext(Dispatchers.Main) {
+                    com.google.android.material.snackbar.Snackbar.make(
+                        findViewById(android.R.id.content),
+                        getString(R.string.common_ok_msg, res.message),
+                        com.google.android.material.snackbar.Snackbar.LENGTH_LONG
+                    ).show()
+                    switchSuspend.isChecked = res.is_suspended
+                    switchSuspend.isEnabled = true
+                    
+                    // ابطال کش
+                    CacheManager.clear(this@StudentProfileActivity, "student_full_profile_$studentId")
+                    CacheManager.clearByPrefix(this@StudentProfileActivity, "person_list_STUDENT")
+                    
+                    if (tabLayout.selectedTabPosition == 0) {
+                        cachedProfile?.let {
+                            cachedProfile = it.copy(info = it.info.copy(is_suspended = res.is_suspended))
+                            showInfo()
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                // FIX: Bug 19 - cancellation is not a network/UI error.
+                if (e is kotlinx.coroutines.CancellationException) throw e;
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@StudentProfileActivity, getString(R.string.profile_status_error), Toast.LENGTH_SHORT).show()
+                    switchSuspend.isChecked = !switchSuspend.isChecked
+                    switchSuspend.isEnabled = true
+                }
+            }
+        }
+    }
+
+    private fun buildTotalStatus(walletBalance: Long, totalDebt: Long): String {
+        val balanceSection = when {
+            walletBalance < 0 -> getString(R.string.profile_debt_total, formatCurrency(abs(walletBalance)))
+            walletBalance > 0 -> getString(R.string.profile_credit_total, formatCurrency(walletBalance))
+            else -> getString(R.string.profile_settled_total)
+        }
+
+        val debtSection = if (totalDebt > 0) getString(R.string.profile_debt_reg, formatCurrency(totalDebt)) else ""
+        return balanceSection + debtSection
+    }
+
+    private fun buildWalletStatus(label: String, balance: Long, debt: Long): String {
+        val status = when {
+            balance < 0 -> getString(R.string.profile_ower, formatCurrency(abs(balance)))
+            balance > 0 -> getString(R.string.profile_creditor, formatCurrency(balance))
+            else -> getString(R.string.profile_settled)
+        }
+
+        val debtSection = if (debt > 0) getString(R.string.profile_debt_short, formatCurrency(debt)) else ""
+        return "$label: $status$debtSection"
+    }
+
+    private fun colorForBalance(balance: Long): Int = when {
+        balance < 0 -> Color.parseColor("#D32F2F")
+        balance > 0 -> Color.parseColor("#388E3C")
+        else -> Color.parseColor("#616161")
+    }
+
+    private fun formatCurrency(value: Long): String =
+        String.format(Locale("en", "US"), "%,d", abs(value))
+
+    // --- منطق جدید عکس پروفایل (آپلود فیزیکی، گالری، دوربین و دسترسی‌ها) ---
+    private fun showImageSelectDialog() {
+        val options = arrayOf(getString(R.string.profile_photo_camera), getString(R.string.profile_photo_gallery))
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.profile_photo_title))
+            .setItems(options) { _, which ->
+                if (which == 0) {
+                    if (checkSelfPermission(android.Manifest.permission.CAMERA) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                        requestPermissions(arrayOf(android.Manifest.permission.CAMERA), 101)
+                    } else {
+                        openCamera()
+                    }
+                } else {
+                    openGallery()
+                }
+            }
+            .show()
+    }
+
+    private fun openGallery() {
+        val intent = Intent(Intent.ACTION_PICK)
+        intent.type = "image/*"
+        startActivityForResult(intent, 201)
+    }
+
+    private fun openCamera() {
+        val intent = Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE)
+        startActivityForResult(intent, 202)
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 101 && grantResults.isNotEmpty() && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            openCamera()
+        } else {
+            Toast.makeText(this, getString(R.string.profile_camera_denied), Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (resultCode == RESULT_OK) {
+            if (requestCode == 201) { // Gallery
+                val uri = data?.data
+                if (uri != null) {
+                    uploadImageUri(uri)
+                }
+            } else if (requestCode == 202) { // Camera
+                val bitmap = data?.extras?.get("data") as? android.graphics.Bitmap
+                if (bitmap != null) {
+                    uploadImageBitmap(bitmap)
+                }
+            }
+        }
+    }
+
+    private fun uploadImageUri(uri: Uri) {
+        // FIX: Bug 19 - cancel screen work when this Activity is destroyed.
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val inputStream = contentResolver.openInputStream(uri)
+                val file = java.io.File(cacheDir, "temp_profile.jpg")
+                val outputStream = java.io.FileOutputStream(file)
+                inputStream?.copyTo(outputStream)
+                outputStream.flush()
+                outputStream.close()
+                inputStream?.close()
+                
+                uploadFileToServer(file)
+            } catch (e: Exception) {
+                // FIX: Bug 19 - cancellation is not a network/UI error.
+                if (e is kotlinx.coroutines.CancellationException) throw e;
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@StudentProfileActivity, getString(R.string.profile_image_error), Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    private fun uploadImageBitmap(bitmap: android.graphics.Bitmap) {
+        // FIX: Bug 19 - cancel screen work when this Activity is destroyed.
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val file = java.io.File(cacheDir, "temp_profile.jpg")
+                val outputStream = java.io.FileOutputStream(file)
+                bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, outputStream)
+                outputStream.flush()
+                outputStream.close()
+                
+                uploadFileToServer(file)
+            } catch (e: Exception) {
+                // FIX: Bug 19 - cancellation is not a network/UI error.
+                if (e is kotlinx.coroutines.CancellationException) throw e;
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@StudentProfileActivity, getString(R.string.profile_image_error), Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    private fun uploadFileToServer(file: java.io.File) {
+        val requestFile = okhttp3.RequestBody.create(okhttp3.MediaType.parse("image/*"), file)
+        val body = okhttp3.MultipartBody.Part.createFormData("file", file.name, requestFile)
+        
+        val retrofit = RetrofitClient.getInstance(this)
+        val api = retrofit.create(ProfileApi::class.java)
+        
+        // FIX: Bug 19 - cancel screen work when this Activity is destroyed.
+        
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val response = api.uploadStudentPhoto(studentId, body)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@StudentProfileActivity, getString(R.string.common_ok_msg, response.message), Toast.LENGTH_SHORT).show()
+                    fetchFullData() // رفرش خودکار عکس پروفایل
+                }
+            } catch (e: Exception) {
+                // FIX: Bug 19 - cancellation is not a network/UI error.
+                if (e is kotlinx.coroutines.CancellationException) throw e;
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@StudentProfileActivity, getString(R.string.profile_upload_error), Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    // واکشی لیست اقساط شهریه با کش کلاینت‌ساید و وضعیت رنگی معوقه/آینده/پرداخت‌شده
+    private fun fetchInstallments() {
+        tvContent.text = getString(R.string.profile_inst_loading)
+        val retrofit = RetrofitClient.getInstance(this)
+        val api = retrofit.create(ProfileApi::class.java)
+
+        val cacheKey = "student_installments_" + studentId
+        val type = object : com.google.gson.reflect.TypeToken<List<StudentInstallmentItem>>() {}.type
+
+        // FIX: Bug 19 - cancel screen work when this Activity is destroyed.
+
+        lifecycleScope.launch(Dispatchers.Main) {
+            CachedApiCall.execute(
+                context = this@StudentProfileActivity,
+                cacheKey = cacheKey,
+                type = type,
+                networkCall = { api.getStudentInstallments(studentId) },
+                onSuccess = { list, isOffline, timestamp ->
+                    val sb = StringBuilder()
+                    sb.append(getString(R.string.profile_inst_title))
+                    if (list.isEmpty()) {
+                        sb.append(getString(R.string.profile_inst_empty))
+                    } else {
+                        list.forEach { item ->
+                            val statusIcon = if (item.is_paid) {
+                                getString(R.string.profile_inst_paid)
+                            } else {
+                                // FIX H3-B1: due_date is Jalali; compare as real dates via JalaliUtils (mirror of server parse_project_date).
+                                if (JalaliUtils.isBeforeToday(item.due_date)) getString(R.string.profile_inst_overdue) else getString(R.string.profile_inst_pending)
+                            }
+                            sb.append(getString(R.string.profile_inst_class, item.course_title))
+                            sb.append(getString(R.string.profile_inst_amount, String.format("%,d", item.amount)))
+                            sb.append(getString(R.string.profile_inst_due, item.due_date, statusIcon))
+                            if (item.is_paid) {
+                                sb.append(getString(R.string.profile_inst_paidat, item.paid_at))
+                            }
+                            sb.append("----------------------------\n")
+                        }
+                    }
+                    tvContent.text = sb.toString()
+                    tvContent.setOnClickListener(null)
+                    
+                    if (isOffline) {
+                        CachedApiCall.showOfflineBanner(this@StudentProfileActivity, timestamp)
+                    } else {
+                        CachedApiCall.hideOfflineBanner(this@StudentProfileActivity)
+                    }
+                },
+                onFailure = {
+                    tvContent.text = getString(R.string.common_offline_empty)
+                }
+            )
+        }
+    }
+
+    private fun sendPortalLinkToParent() {
+        val retrofit = RetrofitClient.getInstance(this)
+        val api = retrofit.create(ProfileApi::class.java)
+
+        // FIX: Bug 19 - cancel screen work when this Activity is destroyed.
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val res = api.sendPortalLink(studentId)
+                withContext(Dispatchers.Main) {
+                    com.google.android.material.snackbar.Snackbar.make(
+                        findViewById(android.R.id.content),
+                        getString(R.string.common_ok_msg, res.message),
+                        com.google.android.material.snackbar.Snackbar.LENGTH_LONG
+                    ).show()
+                }
+            } catch (e: Exception) {
+                // FIX: Bug 19 - cancellation is not a network/UI error.
+                if (e is kotlinx.coroutines.CancellationException) throw e;
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@StudentProfileActivity, getString(R.string.profile_portal_error), Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+}

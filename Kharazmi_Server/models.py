@@ -328,6 +328,8 @@ class SessionLog(Base):
     session_code = Column(Integer, unique=True, index=True, nullable=True) # جدید 🆕
 
     course_id = Column(Integer, ForeignKey("courses.id"))
+    # FIX Audit Radar N+1: relationship for joinedload optimization (read-only audit)
+    course = relationship("Course", foreign_keys=[course_id], lazy="select")
     date = Column(String)
     time = Column(String)
 

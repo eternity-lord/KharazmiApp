@@ -26,6 +26,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.ResponseBody
 import retrofit2.HttpException
+import retrofit2.Response
 import java.io.File
 import java.io.FileOutputStream
 
@@ -190,7 +191,7 @@ class AdminDashboardActivity : BaseActivity() {
     //     اثبات شده و فایل با یک تپ در Excel/Sheets/ایمیل باز یا اشتراک‌گذاری می‌شود.
     //   - بدون هیچ مجوز رانتایمی (به همین دلیل درخواست WRITE/READ_EXTERNAL_STORAGE اضافه نشد).
     // ------------------------------------------------------------------
-    private fun downloadExport(fileName: String, fetch: suspend () -> ResponseBody) {
+    private fun downloadExport(fileName: String, fetch: suspend () -> Response<ResponseBody>) {
         if (isExporting) return
         isExporting = true
         setExportButtonsEnabled(false)
@@ -198,7 +199,19 @@ class AdminDashboardActivity : BaseActivity() {
 
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                val body = fetch()
+                val response = fetch()
+                val body = response.body()
+                // با Response<ResponseBody> کد وضعیت بدون استثنا در دسترس است (401/403/5xx)
+                if (!response.isSuccessful || body == null) {
+                    val message = exportErrorMessage(response.code())
+                    withContext(Dispatchers.Main) {
+                        isExporting = false
+                        setExportButtonsEnabled(true)
+                        Toast.makeText(this@AdminDashboardActivity, message, Toast.LENGTH_LONG).show()
+                    }
+                    return@launch
+                }
+
                 val destination = File(getExternalFilesDir(null), fileName)
 
                 // استریم تدریجی با همکاری با CancellationException (الگوی ReportExporter/Bug 19)
@@ -228,22 +241,25 @@ class AdminDashboardActivity : BaseActivity() {
                 }
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
+                val message = if (e is HttpException) {
+                    exportErrorMessage(e.code())
+                } else {
+                    getString(R.string.export_error, e.message ?: "")
+                }
                 withContext(Dispatchers.Main) {
                     isExporting = false
                     setExportButtonsEnabled(true)
-                    val message = when {
-                        e is HttpException && e.code() == 403 -> getString(R.string.export_forbidden)
-                        e is HttpException && e.code() == 401 -> getString(R.string.export_session_expired)
-                        e is HttpException -> getString(
-                            R.string.export_error,
-                            getString(R.string.export_server_code, e.code())
-                        )
-                        else -> getString(R.string.export_error, e.message ?: "")
-                    }
                     Toast.makeText(this@AdminDashboardActivity, message, Toast.LENGTH_LONG).show()
                 }
             }
         }
+    }
+
+    // پیام خطای خروجی بر اساس کد وضعیت سرور (۴۰۱/۴۰۳ پیام اختصاصی دارند)
+    private fun exportErrorMessage(code: Int): String = when (code) {
+        403 -> getString(R.string.export_forbidden)
+        401 -> getString(R.string.export_session_expired)
+        else -> getString(R.string.export_error, getString(R.string.export_server_code, code))
     }
 
     private fun setExportButtonsEnabled(enabled: Boolean) {

@@ -38,8 +38,8 @@ def _csv_response(filename, ...):   # StreamingResponse + media_type='text/csv; 
 
 | فایل | تغییر |
 |---|---|
-| `ApiInterfaces.kt` | `interface ExportApi` با ۳ متد `@Streaming @GET suspend fun ...(): ResponseBody` + importهای `retrofit2.http.Streaming`/`okhttp3.ResponseBody` |
-| `AdminDashboardActivity.kt` | `exportApi`، ۳ دکمه، `downloadExport(fileName, fetch)` + `openSavedExport()` + `setExportButtonsEnabled()` + فلگ `isExporting` (ضد دابل‌کلیک) |
+| `ApiInterfaces.kt` | `interface ExportApi` با ۳ متد `@Streaming @GET suspend fun ...(): Response<ResponseBody>` + importهای `retrofit2.Response`/`retrofit2.http.Streaming`/`okhttp3.ResponseBody` |
+| `AdminDashboardActivity.kt` | `exportApi`، ۳ دکمه، `downloadExport(fileName, fetch: suspend () -> Response<ResponseBody>)` + `exportErrorMessage(code)` + `openSavedExport()` + `setExportButtonsEnabled()` + فلگ `isExporting` (ضد دابل‌کلیک) |
 | `res/layout/activity_admin_dashboard.xml` | کارت «خروجی اکسل گزارش‌ها» با ۳ `MaterialButton` (`btnExportDebtors`/`btnExportOverdue`/`btnExportAlerts`) |
 | `res/values/strings.xml` | ۱۳ رشته‌ی جدید `export_*` (عنوان کارت، برچسب دکمه‌ها، شروع، ذخیره‌شده، خطا، 403/401، open-failed، share-title، server-code) |
 
@@ -52,7 +52,9 @@ def _csv_response(filename, ...):   # StreamingResponse + media_type='text/csv; 
 ⇒ در نتیجه **نیازی به مجوز رانتایم نیست** (مجوزهای READ/WRITE_EXTERNAL در مانیفست از قبل هستند و دست‌نخورده ماندند)؛
 فایل ذخیره می‌شود و با یک تپ در Excel/Sheets باز یا از طریق chooser اشتراک‌گذاری می‌شود
 (`FileProvider.getUriForFile(this, "$packageName.provider", file)`).
-- خطاها: 403 → «فقط مدیر سیستم»، 401 → «نشست منقضی»، سایر → «خطای سرور N».
+- خطاها: چون امضا `Response<ResponseBody>` است، کد وضعیت بدون استثنا در دسترس است →
+  `if (!response.isSuccessful || body == null)` → `exportErrorMessage(code)`: 403 «فقط مدیر سیستم»، 401 «نشست منقضی»، سایر «خطای سرور N»
+  (شاخه‌ی `HttpException` هم برای سایر لایه‌ها نگه داشته شد؛ خطای شبکه/IO → پیام اریجینال).
 - استریم تدریجی بافر ۴KB با `coroutineContext.ensureActive()` (لغوپذیری در سفر به بک‌گراند).
 
 ## تست — `test_exports.py` (جدید، ۳۲۸ خط، ۱۲ تست)
@@ -90,7 +92,8 @@ alerts خالی و شبانه، read-only (count و wallet قبل/بعد)، و a
    /tmp/overdue.csv  → BOM ✓، ۸ ستون، «2,…,750000,1405/06/10,15,بحرانی» و «1,…,500000,1405/06/21,4,معوق»
    /tmp/alerts.csv   → BOM ✓، ۷ ستون، هشدار suspicious_attendance/high (جلسه 02:30)
    بدون توکن → 401
-6) اندروید — بررسی استاتیک: XML هر ۳ فایل parse شد؛ همه‌ی ۱۳ رشته‌ی `export_*` (۸ در کد + ۵ در layout) تعریف شده؛
+6) اندروید — بررسی استاتیک: امضای `Response<ResponseBody>` در ۳/۳ متد ExportApi و در `downloadExport`؛
+   هیچ import بی‌استفاده/گمشده‌ای نیست (بررسی خودکار)؛ XML هر ۳ فایل parse شد؛ همه‌ی ۱۳ رشته‌ی `export_*` (۸ در کد + ۵ در layout) تعریف شده؛
    هر ۳ `btnExport*` در layout موجود؛ همه‌ی ۳۳ `R.id` و ۲۰ `R.string` ارجاع‌شده تعریف دارند؛
    تمام `@style`/`@color`/`@drawable` کارت جدید resolve شدند (باگ `@color/gold_text_secondary`ِ ناموجود
    با `@color/gold_primary_light` جایگزین شد)؛ brace-balance دو فایل Kotlin OK.

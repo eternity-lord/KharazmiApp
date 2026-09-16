@@ -1,5 +1,7 @@
 package com.example.kharazmiadmin
 
+import okhttp3.ResponseBody
+import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
@@ -7,7 +9,6 @@ import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
 import retrofit2.http.Streaming
-import okhttp3.ResponseBody
 
 // ==========================================
 // تمام رابط‌های API اینجا تعریف می‌شوند
@@ -131,13 +132,13 @@ interface DashboardApi {
 interface ExportApi {
     @Streaming
     @GET("exports/debtors")
-    suspend fun exportDebtors(): ResponseBody
+    suspend fun exportDebtors(): Response<ResponseBody>
 
     @Streaming
     @GET("exports/overdue_installments")
-    suspend fun exportOverdueInstallments(): ResponseBody
+    suspend fun exportOverdueInstallments(): Response<ResponseBody>
 
     @Streaming
     @GET("exports/audit_alerts")
-    suspend fun exportAuditAlerts(): ResponseBody
+    suspend fun exportAuditAlerts(): Response<ResponseBody>
 }

@@ -1165,4 +1165,10 @@
     <string name="attendance_queue_row">%1$s • %2$s • %3$s\n%4$s</string>
     <string name="estudent_course_row">🎓 %1$s (%2$s)</string>
     <string name="msg_pin_error">خطا در تغییر وضعیت پین</string>
+    <!-- Timeline 360 -->
+    <string name="timeline_title">تایم‌لاین</string>
+    <string name="timeline_loading">در حال دریافت تایم‌لاین...</string>
+    <string name="timeline_empty">هنوز فعالیت ثبت‌شده‌ای وجود ندارد</string>
+    <string name="timeline_error">خطا در دریافت تایم‌لاین: %1$s</string>
+    <string name="timeline_no_data">داده‌ای برای تایم‌لاین یافت نشد</string>
 </resources>

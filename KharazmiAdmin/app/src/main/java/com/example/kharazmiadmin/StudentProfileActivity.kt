@@ -130,6 +130,11 @@ class StudentProfileActivity : BaseActivity() {
     private lateinit var llCommunicationContainer: View
     private lateinit var rvCommunicationHistory: RecyclerView
     private lateinit var tvCommunicationEmpty: TextView
+    // Timeline 360
+    private lateinit var llTimelineContainer: View
+    private lateinit var rvTimeline: RecyclerView
+    private lateinit var tvTimelineEmpty: TextView
+    private var timelineAdapter: TimelineAdapter? = null
 
     private lateinit var tvTotalDebt: TextView
     private lateinit var tvDebtTeacher: TextView
@@ -182,11 +187,16 @@ class StudentProfileActivity : BaseActivity() {
                         showCommunicationContent()
                         fetchCommunicationHistory()
                     }
+                    5 -> {
+                        showTimelineContent()
+                        fetchTimeline()
+                    }
                 }
             }
             override fun onTabUnselected(tab: TabLayout.Tab?) {}
             override fun onTabReselected(tab: TabLayout.Tab?) {
                 if (tab?.position == 4) fetchCommunicationHistory()
+                if (tab?.position == 5) fetchTimeline()
             }
         })
 
@@ -207,6 +217,9 @@ class StudentProfileActivity : BaseActivity() {
         if (tabLayout.selectedTabPosition == 4) {
             fetchCommunicationHistory()
         }
+        if (tabLayout.selectedTabPosition == 5) {
+            fetchTimeline()
+        }
     }
 
     private fun initViews() {
@@ -221,6 +234,14 @@ class StudentProfileActivity : BaseActivity() {
         tvCommunicationEmpty = findViewById(R.id.tvStudentCommunicationEmpty)
         rvCommunicationHistory.layoutManager = LinearLayoutManager(this)
         rvCommunicationHistory.isNestedScrollingEnabled = false
+        // Timeline 360
+        llTimelineContainer = findViewById(R.id.llStudentTimelineContainer)
+        rvTimeline = findViewById(R.id.rvStudentTimeline)
+        tvTimelineEmpty = findViewById(R.id.tvStudentTimelineEmpty)
+        rvTimeline.layoutManager = LinearLayoutManager(this)
+        rvTimeline.isNestedScrollingEnabled = false
+        timelineAdapter = TimelineAdapter(emptyList())
+        rvTimeline.adapter = timelineAdapter
 
         tvTotalDebt = findViewById(R.id.tvTotalDebt)
         tvDebtTeacher = findViewById(R.id.tvDebtTeacher)
@@ -460,6 +481,7 @@ class StudentProfileActivity : BaseActivity() {
     private fun showStandardProfileContent() {
         llStandardContainer.visibility = View.VISIBLE
         llCommunicationContainer.visibility = View.GONE
+        if (::llTimelineContainer.isInitialized) llTimelineContainer.visibility = View.GONE
         if (::cardContent.isInitialized) cardContent.visibility = View.VISIBLE
         if (::cardInstallments.isInitialized) cardInstallments.visibility = View.GONE
     }
@@ -467,6 +489,7 @@ class StudentProfileActivity : BaseActivity() {
     private fun showInstallmentsContent() {
         llStandardContainer.visibility = View.VISIBLE
         llCommunicationContainer.visibility = View.GONE
+        if (::llTimelineContainer.isInitialized) llTimelineContainer.visibility = View.GONE
         if (::cardContent.isInitialized) cardContent.visibility = View.GONE
         if (::cardInstallments.isInitialized) cardInstallments.visibility = View.VISIBLE
         // مالی کارت را هم نگه می‌داریم (مثل قبل) — فقط محتوای متنی جایگزین می‌شود
@@ -480,7 +503,20 @@ class StudentProfileActivity : BaseActivity() {
     private fun showCommunicationContent() {
         llStandardContainer.visibility = View.GONE
         llCommunicationContainer.visibility = View.VISIBLE
+        if (::llTimelineContainer.isInitialized) llTimelineContainer.visibility = View.GONE
         if (::cardInstallments.isInitialized) cardInstallments.visibility = View.GONE
+    }
+
+    private fun showTimelineContent() {
+        llStandardContainer.visibility = View.GONE
+        llCommunicationContainer.visibility = View.GONE
+        if (::cardInstallments.isInitialized) cardInstallments.visibility = View.GONE
+        if (::llTimelineContainer.isInitialized) llTimelineContainer.visibility = View.VISIBLE
+        if (::tvTimelineEmpty.isInitialized) {
+            tvTimelineEmpty.visibility = View.VISIBLE
+            tvTimelineEmpty.text = getString(R.string.timeline_loading)
+        }
+        if (::rvTimeline.isInitialized) rvTimeline.visibility = View.GONE
     }
 
     private fun fetchCommunicationHistory() {
@@ -511,6 +547,46 @@ class StudentProfileActivity : BaseActivity() {
                     tvCommunicationEmpty.visibility = View.VISIBLE
                     tvCommunicationEmpty.text =
                         getString(R.string.profile_comm_error)
+                }
+            }
+        }
+    }
+
+    private fun fetchTimeline() {
+        tvTimelineEmpty.visibility = View.VISIBLE
+        tvTimelineEmpty.text = getString(R.string.timeline_loading)
+        rvTimeline.visibility = View.GONE
+
+        val api = RetrofitClient.getInstance(this).create(TimelineApi::class.java)
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val list = api.getTimeline(studentId)
+                withContext(Dispatchers.Main) {
+                    if (list.isEmpty()) {
+                        tvTimelineEmpty.visibility = View.VISIBLE
+                        tvTimelineEmpty.text = getString(R.string.timeline_empty)
+                        rvTimeline.visibility = View.GONE
+                    } else {
+                        tvTimelineEmpty.visibility = View.GONE
+                        rvTimeline.visibility = View.VISIBLE
+                        timelineAdapter?.update(list)
+                    }
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                withContext(Dispatchers.Main) {
+                    rvTimeline.visibility = View.GONE
+                    tvTimelineEmpty.visibility = View.VISIBLE
+                    val detail = try {
+                        if (e is retrofit2.HttpException) {
+                            val body = e.response()?.errorBody()?.string()
+                            if (!body.isNullOrBlank()) {
+                                val obj = org.json.JSONObject(body)
+                                obj.optString("detail", e.message ?: getString(R.string.common_unknown_error))
+                            } else e.message ?: getString(R.string.common_unknown_error)
+                        } else e.message ?: getString(R.string.common_unknown_error)
+                    } catch (_: Exception) { e.message ?: getString(R.string.common_unknown_error) }
+                    tvTimelineEmpty.text = getString(R.string.timeline_error, detail)
                 }
             }
         }

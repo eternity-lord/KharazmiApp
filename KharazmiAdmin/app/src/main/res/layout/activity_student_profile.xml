@@ -95,6 +95,11 @@
                 android:layout_height="wrap_content"
                 android:text="ارتباطات"/>
 
+            <com.google.android.material.tabs.TabItem
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="تایم‌لاین"/>
+
         </com.google.android.material.tabs.TabLayout>
     </com.google.android.material.appbar.AppBarLayout>
 
@@ -386,6 +391,32 @@
 
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/rvStudentCommunicationHistory"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:nestedScrollingEnabled="false"
+                    android:paddingBottom="80dp" />
+            </LinearLayout>
+
+            <!-- Timeline 360 - Unified Activity Feed -->
+            <LinearLayout
+                android:id="@+id/llStudentTimelineContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/tvStudentTimelineEmpty"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:padding="@dimen/spacing_large"
+                    android:text="در حال دریافت تایم‌لاین..."
+                    android:textAppearance="@style/TextAppearance.Kharazmi.Body"
+                    android:textColor="?android:attr/textColorSecondary" />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rvStudentTimeline"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:nestedScrollingEnabled="false"

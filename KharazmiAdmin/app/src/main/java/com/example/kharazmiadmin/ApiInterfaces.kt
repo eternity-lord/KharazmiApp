@@ -93,3 +93,11 @@ interface AuditApi {
     @GET("audit/suspicious_patterns")
     suspend fun getSuspiciousPatterns(): List<AuditAlert>
 }
+
+// ==========================================
+// Student 360 Timeline - Unified Activity Feed
+// ==========================================
+interface TimelineApi {
+    @GET("students/{id}/timeline")
+    suspend fun getTimeline(@Path("id") id: Int): List<TimelineEvent>
+}

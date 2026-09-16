@@ -666,3 +666,15 @@ data class AuditAlert(
     @SerializedName("entity_name") val entityName: String,
     @SerializedName("detected_at") val detectedAt: String
 )
+
+// ==========================================
+// Student 360 Timeline - Unified Activity Feed
+// ==========================================
+data class TimelineEvent(
+    val timestamp: String,
+    val type: String, // "payment", "absence", "grade", "installment"
+    val title: String,
+    val subtitle: String,
+    @SerializedName("icon_name") val iconName: String,
+    @SerializedName("color_hex") val colorHex: String
+)

@@ -396,6 +396,10 @@ class Attendance(Base):
     is_billed = Column(Boolean, default=False)
     excused = Column(Boolean, default=False)
 
+    # Timeline N+1 fix: relationships for joinedload
+    session = relationship("SessionLog", foreign_keys=[session_id], lazy="select")
+    student = relationship("Student", foreign_keys=[student_id], lazy="select")
+
 
 # ==========================================
 # 9. پیامک‌ها
@@ -478,6 +482,9 @@ class Installment(Base):
     paid_amount = Column(BigInteger, default=0)
     # FIX: Bug 13 - archive cancelled installments without falsifying their paid status.
     is_deleted = Column(Boolean, default=False, server_default=text("FALSE"), nullable=False)
+
+    # Timeline N+1 fix: relationship for joinedload
+    enrollment = relationship("Enrollment", foreign_keys=[enrollment_id], lazy="select")
 
 
 # دفتر تخصیص پرداخت به اقساط (audit-v2/issues-7+9) - جدید 🆕

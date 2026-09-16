@@ -128,7 +128,9 @@ def login_user(request: Request, req: LoginRequest, db: Session = Depends(get_db
                 if _owner3 is None and _uclash3 is None:
                     teacher.mobile = mob_norm
                     _new_name = mob_norm
-            u = User(
+            # FIX F-B2: race اولین لاگین همزمان → ساخت سایه با savepoint + catch IntegrityError
+            from sqlalchemy.exc import IntegrityError  # local: فقط همین‌جا
+            _candidate = User(
                 username=_new_name,
                 password=teacher.password,  # از Teacher هش کپی می‌شود فقط بار اول
                 full_name=f"{teacher.first_name} {teacher.last_name}",
@@ -136,8 +138,26 @@ def login_user(request: Request, req: LoginRequest, db: Session = Depends(get_db
                 sub_role="teacher",
                 branch_id=teacher.branch_id
             )
-            db.add(u)
-            db.flush()
+            try:
+                with db.begin_nested():
+                    db.add(_candidate)
+                    db.flush()
+                u = _candidate
+            except IntegrityError:
+                # برنده‌ی مسابقه قبلاً همین username را ساخته؛ خودترمیم با fetch
+                u = db.query(User).filter(User.username == _new_name).first()
+                if u is None and _new_name != teacher.mobile:
+                    u = db.query(User).filter(User.username == teacher.mobile).first()
+                if u is None and mob_norm != _new_name and mob_norm != teacher.mobile:
+                    u = db.query(User).filter(User.username == mob_norm).first()
+                if u is None:
+                    raise
+                # همگام‌سازی سبک اگر برنده قدیمی باشد
+                if u.full_name != f"{teacher.first_name} {teacher.last_name}":
+                    u.full_name = f"{teacher.first_name} {teacher.last_name}"
+                if u.branch_id != teacher.branch_id:
+                    u.branch_id = teacher.branch_id
+                db.flush()
         else:
             # FIX: فقط full_name و branch_id را همگام کن، نه پسورد
             # اگر موبایل معلم عوض شده باشد، User.username قدیمی می‌ماند – برای همین teacher_id را جدا ذخیره می‌کنیم

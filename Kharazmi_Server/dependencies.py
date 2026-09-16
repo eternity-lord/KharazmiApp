@@ -476,33 +476,52 @@ def ensure_student_shadow_users(db: Session, student) -> None:
     اگر سایه‌ای از قبل باشد دست نمی‌خورد (idempotent — امن برای backfill و لاگین).
     """
     import secrets
+    from sqlalchemy.exc import IntegrityError  # FIX F-B2 local
     if student.id is None:
         db.flush()
     full_name = f"{student.first_name or ''} {student.last_name or ''}".strip()
     if not getattr(student, "user_id", None):
-        u = User(
-            username=f"student:{student.id}",
-            password=hash_password(secrets.token_urlsafe(12)),
-            full_name=full_name or f"دانش‌آموز {student.id}",
-            role="student",
-            sub_role="student",
-            branch_id=student.branch_id,
-        )
-        db.add(u)
-        db.flush()
-        student.user_id = u.id
+        # FIX F-B2: race همزمان ساخت سایه student → UNIQUE → self-heal
+        try:
+            with db.begin_nested():
+                u = User(
+                    username=f"student:{student.id}",
+                    password=hash_password(secrets.token_urlsafe(12)),
+                    full_name=full_name or f"دانش‌آموز {student.id}",
+                    role="student",
+                    sub_role="student",
+                    branch_id=student.branch_id,
+                )
+                db.add(u)
+                db.flush()
+                student.user_id = u.id
+        except IntegrityError:
+            existing = db.query(User).filter(User.username == f"student:{student.id}").first()
+            if existing is not None:
+                student.user_id = existing.id
+            else:
+                raise
     if not getattr(student, "parent_user_id", None):
-        p = User(
-            username=f"parent:{student.id}",
-            password=hash_password(secrets.token_urlsafe(12)),
-            full_name=f"ولی {full_name}".strip() or f"ولی دانش‌آموز {student.id}",
-            role="parent",
-            sub_role="parent",
-            branch_id=student.branch_id,
-        )
-        db.add(p)
-        db.flush()
-        student.parent_user_id = p.id
+        # FIX F-B2: race همزمان ساخت سایه parent → UNIQUE → self-heal
+        try:
+            with db.begin_nested():
+                p = User(
+                    username=f"parent:{student.id}",
+                    password=hash_password(secrets.token_urlsafe(12)),
+                    full_name=f"ولی {full_name}".strip() or f"ولی دانش‌آموز {student.id}",
+                    role="parent",
+                    sub_role="parent",
+                    branch_id=student.branch_id,
+                )
+                db.add(p)
+                db.flush()
+                student.parent_user_id = p.id
+        except IntegrityError:
+            existing = db.query(User).filter(User.username == f"parent:{student.id}").first()
+            if existing is not None:
+                student.parent_user_id = existing.id
+            else:
+                raise
 
 
 def get_session_student(db: Session, session) -> Optional[Student]:

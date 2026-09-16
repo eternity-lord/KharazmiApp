@@ -512,7 +512,53 @@ data class StudentInstallmentItem(
     val amount: Long,
     val due_date: String,
     val is_paid: Boolean,
-    val paid_at: String
+    val paid_at: String,
+    @SerializedName("enrollment_id") val enrollmentId: Int? = null,
+    @SerializedName("status") val status: String? = null
+)
+
+data class CreateInstallmentRequest(
+    @SerializedName("enrollment_id") val enrollmentId: Int,
+    val amount: Int,
+    @SerializedName("due_date") val dueDate: String
+)
+
+data class CreateInstallmentResponse(
+    val message: String,
+    @SerializedName("installment_id") val installmentId: Int
+)
+
+data class PayInstallmentResponse(
+    val message: String,
+    @SerializedName("receipt_id") val receiptId: Int? = null
+)
+
+data class RemindInstallmentResponse(
+    val status: String,
+    val message: String
+)
+
+data class WalletInfo(
+    val balance: Long = 0,
+    @SerializedName("wallet_teacher") val walletTeacher: Long = 0,
+    @SerializedName("wallet_institute") val walletInstitute: Long = 0,
+    @SerializedName("total_debt") val totalDebt: Long = 0,
+    @SerializedName("total_paid") val totalPaid: Long = 0
+)
+
+data class DashboardEnrollment(
+    @SerializedName("enrollment_id") val enrollmentId: Int,
+    @SerializedName("course_title") val courseTitle: String,
+    @SerializedName("total_tuition") val totalTuition: Long? = null,
+    @SerializedName("total_paid") val totalPaid: Long? = null,
+    @SerializedName("outstanding") val outstanding: Long? = null
+)
+
+data class FinancialDashboardResponse(
+    val wallet: WalletInfo? = null,
+    val enrollments: List<DashboardEnrollment> = emptyList(),
+    val installments: List<StudentInstallmentItem> = emptyList(),
+    @SerializedName("recent_transactions") val recentTransactions: List<TransactionFullItem>? = null
 )
 
 data class InstituteSettings(

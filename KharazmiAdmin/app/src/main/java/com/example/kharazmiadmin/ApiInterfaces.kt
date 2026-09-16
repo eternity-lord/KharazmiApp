@@ -64,3 +64,24 @@ interface ClassApi {
     @POST("admin/classes/suspend_bulk")
     suspend fun suspendBulkClasses(@Body req: BulkSuspendRequest): SimpleResponse
 }
+
+// ———————————————— اقساط شهریه (A1) — سه endpoint موجود سرور بدون UI ————————————————
+interface InstallmentApi {
+    @POST("finance/installments")
+    suspend fun createInstallment(@Body req: CreateInstallmentRequest): CreateInstallmentResponse
+
+    @POST("finance/installments/{id}/pay")
+    suspend fun payInstallment(
+        @Path("id") id: Int,
+        @Query("payment_method") paymentMethod: String = "نقدی",
+        @Query("branch_id") branchId: Int? = null
+    ): PayInstallmentResponse
+
+    @POST("finance/installments/{id}/remind")
+    suspend fun remindInstallment(@Path("id") id: Int): RemindInstallmentResponse
+}
+
+interface FinanceDashboardApi {
+    @GET("finance/student/{student_id}/dashboard")
+    suspend fun getFinancialDashboard(@Path("student_id") studentId: Int): FinancialDashboardResponse
+}

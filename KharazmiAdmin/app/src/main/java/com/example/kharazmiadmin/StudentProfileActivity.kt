@@ -12,6 +12,13 @@ import androidx.appcompat.app.AlertDialog
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.textfield.TextInputLayout
+import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.card.MaterialCardView
+import android.widget.AutoCompleteTextView
+import android.widget.ArrayAdapter
+import android.view.ViewGroup
+import android.view.LayoutInflater
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.materialswitch.MaterialSwitch
@@ -128,6 +135,15 @@ class StudentProfileActivity : BaseActivity() {
     private lateinit var tvDebtTeacher: TextView
     private lateinit var tvDebtInstitute: TextView
 
+    // A1: اقساط — ویوهای تب اقساط (RecyclerView + دکمه افزودن)
+    private lateinit var cardContent: View
+    private lateinit var cardInstallments: View
+    private lateinit var rvInstallments: RecyclerView
+    private lateinit var tvInstallmentsEmpty: TextView
+    private lateinit var btnAddInstallment: MaterialButton
+    private var installmentAdapter: InstallmentAdapter? = null
+    private var currentInstallments: List<StudentInstallmentItem> = emptyList()
+
     private var cachedProfile: FullStudentProfile? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -159,7 +175,7 @@ class StudentProfileActivity : BaseActivity() {
                         fetchGrades()
                     }
                     3 -> {
-                        showStandardProfileContent()
+                        showInstallmentsContent()
                         fetchInstallments()
                     }
                     4 -> {
@@ -210,6 +226,21 @@ class StudentProfileActivity : BaseActivity() {
         tvDebtTeacher = findViewById(R.id.tvDebtTeacher)
         tvDebtInstitute = findViewById(R.id.tvDebtInstitute)
         btnInvoice = findViewById(R.id.btnIssueInvoice)
+
+        // A1: bind installments views
+        cardContent = findViewById(R.id.cardContent)
+        cardInstallments = findViewById(R.id.cardInstallments)
+        rvInstallments = findViewById(R.id.rvInstallments)
+        tvInstallmentsEmpty = findViewById(R.id.tvInstallmentsEmpty)
+        btnAddInstallment = findViewById(R.id.btnAddInstallment)
+        rvInstallments.layoutManager = LinearLayoutManager(this)
+        rvInstallments.isNestedScrollingEnabled = false
+        installmentAdapter = InstallmentAdapter(emptyList(),
+            onPay = { item -> confirmAndPayInstallment(item) },
+            onRemind = { item -> confirmAndRemindInstallment(item) }
+        )
+        rvInstallments.adapter = installmentAdapter
+        btnAddInstallment.setOnClickListener { showCreateInstallmentDialog() }
 
         findViewById<MaterialButton>(R.id.btnDeleteStudent).setOnClickListener {
             showDeleteConfirmation()
@@ -429,11 +460,27 @@ class StudentProfileActivity : BaseActivity() {
     private fun showStandardProfileContent() {
         llStandardContainer.visibility = View.VISIBLE
         llCommunicationContainer.visibility = View.GONE
+        if (::cardContent.isInitialized) cardContent.visibility = View.VISIBLE
+        if (::cardInstallments.isInitialized) cardInstallments.visibility = View.GONE
+    }
+
+    private fun showInstallmentsContent() {
+        llStandardContainer.visibility = View.VISIBLE
+        llCommunicationContainer.visibility = View.GONE
+        if (::cardContent.isInitialized) cardContent.visibility = View.GONE
+        if (::cardInstallments.isInitialized) cardInstallments.visibility = View.VISIBLE
+        // مالی کارت را هم نگه می‌داریم (مثل قبل) — فقط محتوای متنی جایگزین می‌شود
+        if (::tvInstallmentsEmpty.isInitialized) {
+            tvInstallmentsEmpty.visibility = View.VISIBLE
+            tvInstallmentsEmpty.text = getString(R.string.profile_inst_loading)
+        }
+        if (::rvInstallments.isInitialized) rvInstallments.visibility = View.GONE
     }
 
     private fun showCommunicationContent() {
         llStandardContainer.visibility = View.GONE
         llCommunicationContainer.visibility = View.VISIBLE
+        if (::cardInstallments.isInitialized) cardInstallments.visibility = View.GONE
     }
 
     private fun fetchCommunicationHistory() {
@@ -709,16 +756,23 @@ class StudentProfileActivity : BaseActivity() {
         }
     }
 
-    // واکشی لیست اقساط شهریه با کش کلاینت‌ساید و وضعیت رنگی معوقه/آینده/پرداخت‌شده
+    // A1: واکشی لیست اقساط با RecyclerView + دکمه‌های پرداخت/یادآوری/افزودن
     private fun fetchInstallments() {
-        tvContent.text = getString(R.string.profile_inst_loading)
+        // نمایش حالت لودینگ در کانتینر اقساط
+        if (::cardInstallments.isInitialized) {
+            cardInstallments.visibility = View.VISIBLE
+            cardContent.visibility = View.GONE
+            tvInstallmentsEmpty.visibility = View.VISIBLE
+            tvInstallmentsEmpty.text = getString(R.string.profile_inst_loading)
+            rvInstallments.visibility = View.GONE
+        } else {
+            tvContent.text = getString(R.string.profile_inst_loading)
+        }
         val retrofit = RetrofitClient.getInstance(this)
         val api = retrofit.create(ProfileApi::class.java)
 
         val cacheKey = "student_installments_" + studentId
         val type = object : com.google.gson.reflect.TypeToken<List<StudentInstallmentItem>>() {}.type
-
-        // FIX: Bug 19 - cancel screen work when this Activity is destroyed.
 
         lifecycleScope.launch(Dispatchers.Main) {
             CachedApiCall.execute(
@@ -727,30 +781,16 @@ class StudentProfileActivity : BaseActivity() {
                 type = type,
                 networkCall = { api.getStudentInstallments(studentId) },
                 onSuccess = { list, isOffline, timestamp ->
-                    val sb = StringBuilder()
-                    sb.append(getString(R.string.profile_inst_title))
+                    currentInstallments = list
                     if (list.isEmpty()) {
-                        sb.append(getString(R.string.profile_inst_empty))
+                        tvInstallmentsEmpty.visibility = View.VISIBLE
+                        tvInstallmentsEmpty.text = getString(R.string.installment_no_installments)
+                        rvInstallments.visibility = View.GONE
                     } else {
-                        list.forEach { item ->
-                            val statusIcon = if (item.is_paid) {
-                                getString(R.string.profile_inst_paid)
-                            } else {
-                                // FIX H3-B1: due_date is Jalali; compare as real dates via JalaliUtils (mirror of server parse_project_date).
-                                if (JalaliUtils.isBeforeToday(item.due_date)) getString(R.string.profile_inst_overdue) else getString(R.string.profile_inst_pending)
-                            }
-                            sb.append(getString(R.string.profile_inst_class, item.course_title))
-                            sb.append(getString(R.string.profile_inst_amount, String.format("%,d", item.amount)))
-                            sb.append(getString(R.string.profile_inst_due, item.due_date, statusIcon))
-                            if (item.is_paid) {
-                                sb.append(getString(R.string.profile_inst_paidat, item.paid_at))
-                            }
-                            sb.append("----------------------------\n")
-                        }
+                        tvInstallmentsEmpty.visibility = View.GONE
+                        rvInstallments.visibility = View.VISIBLE
+                        installmentAdapter?.update(list)
                     }
-                    tvContent.text = sb.toString()
-                    tvContent.setOnClickListener(null)
-                    
                     if (isOffline) {
                         CachedApiCall.showOfflineBanner(this@StudentProfileActivity, timestamp)
                     } else {
@@ -758,9 +798,282 @@ class StudentProfileActivity : BaseActivity() {
                     }
                 },
                 onFailure = {
-                    tvContent.text = getString(R.string.common_offline_empty)
+                    tvInstallmentsEmpty.visibility = View.VISIBLE
+                    tvInstallmentsEmpty.text = getString(R.string.common_offline_empty)
+                    rvInstallments.visibility = View.GONE
                 }
             )
+        }
+    }
+
+    // ———————————————— A1: helpers ————————————————
+    private fun extractServerDetail(e: Exception): String? {
+        return try {
+            if (e is retrofit2.HttpException) {
+                val body = e.response()?.errorBody()?.string()
+                if (!body.isNullOrBlank()) {
+                    val obj = org.json.JSONObject(body)
+                    val d = obj.optString("detail", "")
+                    if (d.isNotBlank()) d else obj.optString("message", null)?.takeIf { it.isNotBlank() }
+                } else null
+            } else null
+        } catch (_: Exception) { null }
+    }
+
+    private fun normalizePersianDigits(input: String): String {
+        val fa = "۰۱۲۳۴۵۶۷۸۹"
+        val ar = "٠١٢٣٤٥٦٧٨٩"
+        val sb = StringBuilder(input.length)
+        for (c in input) {
+            val fi = fa.indexOf(c)
+            val ai = if (fi >= 0) -1 else ar.indexOf(c)
+            sb.append(when {
+                fi >= 0 -> ('0' + fi)
+                ai >= 0 -> ('0' + ai)
+                else -> c
+            })
+        }
+        return sb.toString()
+    }
+
+    private fun isValidJalaliDate(raw: String): Boolean {
+        val normalized = normalizePersianDigits(raw.trim())
+        val re = Regex("^\\\\d{4}/\\\\d{2}/\\\\d{2}$")
+        if (!re.matches(normalized)) return false
+        return try {
+            JalaliUtils.parseProjectDate(normalized) != null
+        } catch (_: Exception) { false }
+    }
+
+    // ———————————————— A1: پرداخت ————————————————
+    private fun confirmAndPayInstallment(item: StudentInstallmentItem) {
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.installment_pay_title))
+            .setMessage(getString(R.string.installment_pay_msg, String.format(java.util.Locale("en","US"), "%,d", item.amount)))
+            .setPositiveButton(getString(R.string.installment_pay_yes)) { _, _ -> performPayInstallment(item.id) }
+            .setNegativeButton(getString(R.string.common_cancel), null)
+            .show()
+    }
+
+    private fun performPayInstallment(installmentId: Int) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@StudentProfileActivity, getString(R.string.installment_paying), Toast.LENGTH_SHORT).show()
+                }
+                val api = RetrofitClient.getInstance(this@StudentProfileActivity).create(InstallmentApi::class.java)
+                val res = api.payInstallment(installmentId)
+                withContext(Dispatchers.Main) {
+                    val msg = res.message.takeIf { it.isNotBlank() } ?: getString(R.string.installment_pay_success)
+                    Toast.makeText(this@StudentProfileActivity, msg, Toast.LENGTH_LONG).show()
+                    CacheManager.clear(this@StudentProfileActivity, "student_installments_" + studentId)
+                    fetchInstallments()
+                    fetchFullData()
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                withContext(Dispatchers.Main) {
+                    val detail = extractServerDetail(e) ?: e.message ?: getString(R.string.common_unknown_error)
+                    Toast.makeText(this@StudentProfileActivity, getString(R.string.common_err_with_detail, detail), Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    // ———————————————— A1: یادآوری ————————————————
+    private fun confirmAndRemindInstallment(item: StudentInstallmentItem) {
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.installment_remind_title))
+            .setMessage(getString(R.string.installment_remind_msg))
+            .setPositiveButton(getString(R.string.installment_remind)) { _, _ -> performRemindInstallment(item.id) }
+            .setNegativeButton(getString(R.string.common_cancel), null)
+            .show()
+    }
+
+    private fun performRemindInstallment(installmentId: Int) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@StudentProfileActivity, getString(R.string.installment_remind_sending), Toast.LENGTH_SHORT).show()
+                }
+                val api = RetrofitClient.getInstance(this@StudentProfileActivity).create(InstallmentApi::class.java)
+                val res = api.remindInstallment(installmentId)
+                withContext(Dispatchers.Main) {
+                    val msg = res.message.takeIf { it.isNotBlank() } ?: getString(R.string.installment_remind_success)
+                    Toast.makeText(this@StudentProfileActivity, msg, Toast.LENGTH_LONG).show()
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                withContext(Dispatchers.Main) {
+                    // حتی 400 (موبایل ولی ثبت نشده) باید پیام سرور نمایش داده شود — الزام تسک
+                    val detail = extractServerDetail(e) ?: e.message ?: getString(R.string.common_unknown_error)
+                    Toast.makeText(this@StudentProfileActivity, getString(R.string.common_err_with_detail, detail), Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    // ———————————————— A1: افزودن قسط جدید ————————————————
+    private fun showCreateInstallmentDialog() {
+        // ابتدا enrollment های فعال را از dashboard بگیریم
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@StudentProfileActivity, getString(R.string.installment_loading_enrollments), Toast.LENGTH_SHORT).show()
+                }
+                val dashApi = RetrofitClient.getInstance(this@StudentProfileActivity).create(FinanceDashboardApi::class.java)
+                val dash = dashApi.getFinancialDashboard(studentId)
+                val enrollments = dash.enrollments
+                withContext(Dispatchers.Main) {
+                    if (enrollments.isEmpty()) {
+                        Toast.makeText(this@StudentProfileActivity, getString(R.string.installment_error_no_enrollment), Toast.LENGTH_LONG).show()
+                        return@withContext
+                    }
+                    val courseNames = enrollments.map { it.courseTitle }
+                    val courseIds = enrollments.map { it.enrollmentId }
+
+                    val dialogView = LayoutInflater.from(this@StudentProfileActivity).inflate(R.layout.dialog_create_installment, null)
+                    val tilCourse = dialogView.findViewById<TextInputLayout>(R.id.tilInstallmentCourse)
+                    val actvCourse = dialogView.findViewById<AutoCompleteTextView>(R.id.actvInstallmentCourse)
+                    val etAmount = dialogView.findViewById<TextInputEditText>(R.id.etInstallmentAmount)
+                    val etDue = dialogView.findViewById<TextInputEditText>(R.id.etInstallmentDue)
+                    val tilDue = dialogView.findViewById<TextInputLayout>(R.id.tilInstallmentDue)
+
+                    val adapter = ArrayAdapter(this@StudentProfileActivity, android.R.layout.simple_dropdown_item_1line, courseNames)
+                    actvCourse.setAdapter(adapter)
+                    if (enrollments.size == 1) {
+                        actvCourse.setText(courseNames[0], false)
+                        actvCourse.isEnabled = false
+                        tilCourse.isEnabled = false
+                    } else {
+                        actvCourse.setText(courseNames[0], false)
+                    }
+                    // پیش‌فرض سررسید: امروز شمسی
+                    etDue.setText(JalaliUtils.todayJalaliString())
+                    tilDue.setEndIconOnClickListener {
+                        // فوکوس ساده — تقویم شمسی در این فرم با تایپ مستقیم پر می‌شود (هم‌سبک بقیه اپ)
+                        etDue.requestFocus()
+                    }
+
+                    val dialog = AlertDialog.Builder(this@StudentProfileActivity)
+                        .setTitle(getString(R.string.installment_create_title))
+                        .setView(dialogView)
+                        .setPositiveButton(getString(R.string.action_save), null)
+                        .setNegativeButton(getString(R.string.common_cancel), null)
+                        .create()
+                    dialog.show()
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                        val selected = actvCourse.text?.toString()?.trim() ?: ""
+                        val idx = courseNames.indexOf(selected)
+                        if (idx == -1) {
+                            Toast.makeText(this@StudentProfileActivity, getString(R.string.installment_error_no_enrollment), Toast.LENGTH_SHORT).show()
+                            return@setOnClickListener
+                        }
+                        val enrollmentId = courseIds[idx]
+                        val rawAmount = etAmount.text?.toString()?.trim() ?: ""
+                        val normalizedAmountStr = normalizePersianDigits(rawAmount).replace(",", "").replace("٬", "").replace(" ", "")
+                        val amount = normalizedAmountStr.toIntOrNull()
+                        if (amount == null || amount <= 0) {
+                            etAmount.error = getString(R.string.installment_error_amount)
+                            Toast.makeText(this@StudentProfileActivity, getString(R.string.installment_error_amount), Toast.LENGTH_SHORT).show()
+                            return@setOnClickListener
+                        }
+                        if (amount > 1_000_000_000) {
+                            etAmount.error = getString(R.string.installment_error_amount)
+                            return@setOnClickListener
+                        }
+                        val rawDue = etDue.text?.toString()?.trim() ?: ""
+                        val normalizedDue = normalizePersianDigits(rawDue)
+                        if (!isValidJalaliDate(normalizedDue)) {
+                            etDue.error = getString(R.string.installment_error_due)
+                            Toast.makeText(this@StudentProfileActivity, getString(R.string.installment_error_due), Toast.LENGTH_SHORT).show()
+                            return@setOnClickListener
+                        }
+                        dialog.dismiss()
+                        performCreateInstallment(enrollmentId, amount, normalizedDue)
+                    }
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                withContext(Dispatchers.Main) {
+                    val detail = extractServerDetail(e) ?: e.message ?: getString(R.string.common_unknown_error)
+                    Toast.makeText(this@StudentProfileActivity, getString(R.string.common_err_with_detail, detail), Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    private fun performCreateInstallment(enrollmentId: Int, amount: Int, dueDate: String) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@StudentProfileActivity, getString(R.string.installment_creating), Toast.LENGTH_SHORT).show()
+                }
+                val api = RetrofitClient.getInstance(this@StudentProfileActivity).create(InstallmentApi::class.java)
+                val req = CreateInstallmentRequest(enrollmentId, amount, dueDate)
+                val res = api.createInstallment(req)
+                withContext(Dispatchers.Main) {
+                    val msg = res.message.takeIf { it.isNotBlank() } ?: getString(R.string.installment_create_success)
+                    Toast.makeText(this@StudentProfileActivity, msg, Toast.LENGTH_LONG).show()
+                    CacheManager.clear(this@StudentProfileActivity, "student_installments_" + studentId)
+                    fetchInstallments()
+                    fetchFullData()
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                withContext(Dispatchers.Main) {
+                    val detail = extractServerDetail(e) ?: e.message ?: getString(R.string.common_unknown_error)
+                    Toast.makeText(this@StudentProfileActivity, getString(R.string.common_err_with_detail, detail), Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    // ———————————————— A1: Adapter ————————————————
+    inner class InstallmentAdapter(
+        private var items: List<StudentInstallmentItem>,
+        private val onPay: (StudentInstallmentItem) -> Unit,
+        private val onRemind: (StudentInstallmentItem) -> Unit
+    ) : RecyclerView.Adapter<InstallmentAdapter.VH>() {
+        inner class VH(view: View) : RecyclerView.ViewHolder(view) {
+            val tvCourse: TextView = view.findViewById(R.id.tvInstallmentCourse)
+            val tvAmount: TextView = view.findViewById(R.id.tvInstallmentAmount)
+            val tvDue: TextView = view.findViewById(R.id.tvInstallmentDue)
+            val tvStatus: TextView = view.findViewById(R.id.tvInstallmentStatus)
+            val tvPaidAt: TextView = view.findViewById(R.id.tvInstallmentPaidAt)
+            val layoutActions: View = view.findViewById(R.id.layoutInstallmentActions)
+            val btnPay: MaterialButton = view.findViewById(R.id.btnInstallmentPay)
+            val btnRemind: MaterialButton = view.findViewById(R.id.btnInstallmentRemind)
+        }
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
+            val v = LayoutInflater.from(parent.context).inflate(R.layout.item_installment, parent, false)
+            return VH(v)
+        }
+        override fun getItemCount(): Int = items.size
+        override fun onBindViewHolder(holder: VH, position: Int) {
+            val item = items[position]
+            holder.tvCourse.text = item.course_title
+            holder.tvAmount.text = holder.itemView.context.getString(R.string.common_toman_format, item.amount)
+            holder.tvDue.text = holder.itemView.context.getString(R.string.installment_due, item.due_date)
+            if (item.is_paid) {
+                holder.tvStatus.text = holder.itemView.context.getString(R.string.installment_paid_label)
+                holder.tvStatus.setTextColor(Color.parseColor("#388E3C"))
+                holder.tvPaidAt.visibility = View.VISIBLE
+                holder.tvPaidAt.text = holder.itemView.context.getString(R.string.profile_inst_paidat, item.paid_at)
+                holder.layoutActions.visibility = View.GONE
+            } else {
+                val overdue = JalaliUtils.isBeforeToday(item.due_date)
+                holder.tvStatus.text = if (overdue) holder.itemView.context.getString(R.string.profile_inst_overdue) else holder.itemView.context.getString(R.string.profile_inst_pending)
+                holder.tvStatus.setTextColor(if (overdue) Color.parseColor("#D32F2F") else Color.parseColor("#FF8F00"))
+                holder.tvPaidAt.visibility = View.GONE
+                holder.layoutActions.visibility = View.VISIBLE
+                holder.btnPay.setOnClickListener { onPay(item) }
+                holder.btnRemind.setOnClickListener { onRemind(item) }
+            }
+        }
+        fun update(newList: List<StudentInstallmentItem>) {
+            items = newList
+            notifyDataSetChanged()
         }
     }
 

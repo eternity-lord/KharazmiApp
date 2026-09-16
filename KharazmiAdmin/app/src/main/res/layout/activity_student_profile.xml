@@ -230,6 +230,7 @@
             <!-- Main dynamic text content styled in a flat card instead of raw bordered view -->
             <!-- FIX: Use the declared Widget.Kharazmi.Card.Gold style; remove repeated suffixes. -->
             <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardContent"
                 style="@style/Widget.Kharazmi.Card.Gold"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -244,6 +245,54 @@
                     android:textAppearance="@style/TextAppearance.Kharazmi.Body"
                     android:lineSpacingExtra="8dp"
                     android:padding="@dimen/spacing_normal"/>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- A1: کانتینر اقساط — RecyclerView + دکمه افزودن قسط جدید (فقط تب اقساط) -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardInstallments"
+                style="@style/Widget.Kharazmi.Card.Gold"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/spacing_normal"
+                android:visibility="gone"
+                app:cardCornerRadius="20dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="12dp">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnAddInstallment"
+                        style="@style/Widget.Kharazmi.Button.Gold"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/installment_add_btn"
+                        app:icon="@android:drawable/ic_input_add"
+                        app:iconGravity="textStart"
+                        app:iconTint="?attr/colorOnPrimary"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:id="@+id/tvInstallmentsEmpty"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:gravity="center"
+                        android:padding="12dp"
+                        android:text="@string/installment_no_installments"
+                        android:textAppearance="@style/TextAppearance.Kharazmi.Body"
+                        android:textColor="?android:attr/textColorSecondary"
+                        android:visibility="gone" />
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/rvInstallments"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:nestedScrollingEnabled="false" />
+                </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
             <!-- Suspend switch warning card (Warm & Day/Night compatible) -->

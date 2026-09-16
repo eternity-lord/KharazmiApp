@@ -247,9 +247,9 @@ def test_financial_reads_share_active_transaction_filters(ledger):
     assert [row["id"] for row in dashboard["recent_transactions"]] == [good.id]
     assert dashboard["enrollments"][0]["total_paid"] == 100
     assert finance.get_invoice_details(ledger.enrollment.id, authorization=auth, db=ledger.db, _role="admin")["total_paid"] == 100
-    status = finance.get_student_class_status(ledger.student.id, course_id=ledger.course.id, db=ledger.db, _="admin")
+    status = finance.get_student_class_status(ledger.student.id, course_id=ledger.course.id, db=ledger.db, authorization=auth, sub_role="admin")
     assert status["paid_to_institute"] == 100
-    assert reports.get_student_statement(ledger.student.id, db=ledger.db, _="admin")["total_paid_institute"] == 100
+    assert reports.get_student_statement(ledger.student.id, db=ledger.db, authorization=auth, role="admin")["total_paid_institute"] == 100
     chart = reports.get_chart_data(authorization=auth, db=ledger.db, _="admin")
     assert chart["income_chart"][-1]["amount"] == 100
     assert chart["shares_chart"] == {"teacher": 40, "institute": 60}
@@ -257,7 +257,7 @@ def test_financial_reads_share_active_transaction_filters(ledger):
     assert stats["total_turnover"] == 100
     from today_summary import gregorian_to_jalali  # FIX (audit-v2/test-triage): گزارش شمسی‌کانونیکال؛ پارام میلادی بازه‌ی ناممکن می‌ساخت (…/09/31).
     jy, jm, _ = gregorian_to_jalali(datetime.date.today())
-    summary = reports.get_financial_summary(user_type="institute", year=jy, month=jm, authorization=auth, db=ledger.db, current_username="p2-admin")
+    summary = reports.get_financial_summary(user_type="institute", year=jy, month=jm, authorization=auth, db=ledger.db, sub_role="admin")
     assert summary["monthly"]["collected"] == 100
 
 
@@ -651,7 +651,7 @@ def test_statement_does_not_misassign_combined_tuition_to_institute_wallet(ledge
     ledger.student.wallet_teacher = -30
     ledger.student.wallet_institute = -20
     ledger.db.commit()
-    statement = reports.get_student_statement(ledger.student.id, db=ledger.db, _="admin")
+    statement = reports.get_student_statement(ledger.student.id, db=ledger.db, authorization="Bearer p2-admin-token", role="admin")
     assert statement["total_debt"] == 800
     assert statement["total_debt_institute"] == 20
 
@@ -675,9 +675,9 @@ def test_cancelled_session_cannot_be_settled(ledger):
     from routers.teachers import get_pending_settlement, settle_teacher_sessions
     from schemas import SettleRequest
     first = submit_session(ledger)
-    assert get_pending_settlement(ledger.teacher.id, db=ledger.db, _="admin")["total_amount"] == 70
+    assert get_pending_settlement(ledger.teacher.id, db=ledger.db, authorization="Bearer p2-admin-token", sub_role="admin")["total_amount"] == 70
     attendance.delete_session_endpoint(first["session_code"], db=ledger.db, _="admin")
-    assert get_pending_settlement(ledger.teacher.id, db=ledger.db, _="admin")["total_amount"] == 0
+    assert get_pending_settlement(ledger.teacher.id, db=ledger.db, authorization="Bearer p2-admin-token", sub_role="admin")["total_amount"] == 0
     with pytest.raises(HTTPException) as error:
         settle_teacher_sessions(ledger.teacher.id, SettleRequest(session_ids=[first["session_id"]]), db=ledger.db, admin_sub_role="admin")
     assert error.value.status_code == 400

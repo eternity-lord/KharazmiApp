@@ -74,7 +74,7 @@ class TestStudentsRouter(unittest.TestCase):
         self.engine.dispose()
 
     def test_search_students(self):
-        results = search_students(query="دانش", db=self.db, _="admin")
+        results = search_students(query="دانش", db=self.db, sub_role="admin")
         self.assertTrue(any(r.id == self.student.id for r in results))
 
     def test_get_student_profile_idor(self):
@@ -107,12 +107,12 @@ class TestStudentsRouter(unittest.TestCase):
         self.assertEqual(e.exception.status_code, 409)
 
     def test_get_student_grades_and_installments(self):
-        grades = get_student_grades(student_id=self.student.id, db=self.db, _="admin")
+        grades = get_student_grades(student_id=self.student.id, db=self.db, authorization="Bearer admin-token", role="admin")
         self.assertIn("grades", grades)
         self.assertEqual(len(grades["grades"]), 1)
         self.assertIn("ریاضی", grades["averages"] or list(grades["grades"][0].values()))
 
-        installments = get_student_installments(student_id=self.student.id, db=self.db, _="admin")
+        installments = get_student_installments(student_id=self.student.id, db=self.db, authorization="Bearer admin-token", role="admin")
         self.assertEqual(len(installments), 1)
         self.assertEqual(installments[0]["amount"], 500000)
 

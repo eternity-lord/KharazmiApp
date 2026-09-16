@@ -490,7 +490,7 @@ def export_analytics_excel(
         cell.border = thin_border
     ws2.row_dimensions[1].height = 28
     
-    teachers_perf = get_teachers_performance_analytics(branch_id=branch_id, limit=50, offset=0, db=db, _="admin")
+    teachers_perf = get_teachers_performance_analytics(branch_id=branch_id, limit=50, offset=0, db=db, authorization=authorization, sub_role="admin")
     for r_idx, t in enumerate(teachers_perf, 2):
         ws2.cell(row=r_idx, column=1, value=t["teacher_id"]).alignment = center_align
         ws2.cell(row=r_idx, column=2, value=t["teacher_name"]).alignment = right_align

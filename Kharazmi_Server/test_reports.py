@@ -101,27 +101,27 @@ class TestReportsRouter(unittest.TestCase):
 
     def test_financial_summary_teacher_restriction(self):
         # Teacher can only see own summary, forced to teacher type
-        result_teacher = get_financial_summary(user_type="teacher", teacher_id=self.teacher.id, authorization="Bearer teacher-token", db=self.db, current_username="teacher")
+        result_teacher = get_financial_summary(user_type="teacher", teacher_id=self.teacher.id, authorization="Bearer teacher-token", db=self.db, sub_role="teacher")
         self.assertEqual(result_teacher["user_type"], "teacher")
         self.assertEqual(result_teacher["teacher_id"], self.teacher.id)
 
         # Teacher trying to see institute summary should still be forced to teacher (logic in function)
-        result_forced = get_financial_summary(user_type="institute", authorization="Bearer teacher-token", db=self.db, current_username="teacher")
+        result_forced = get_financial_summary(user_type="institute", authorization="Bearer teacher-token", db=self.db, sub_role="teacher")
         self.assertEqual(result_forced["user_type"], "teacher")
 
         # Admin can see institute summary
-        result_admin = get_financial_summary(user_type="institute", authorization="Bearer admin-token", db=self.db, current_username="admin")
+        result_admin = get_financial_summary(user_type="institute", authorization="Bearer admin-token", db=self.db, sub_role="admin")
         self.assertEqual(result_admin["user_type"], "institute")
         self.assertIn("monthly", result_admin)
 
     def test_student_statement(self):
-        statement = get_student_statement(student_id=self.student_debtor.id, db=self.db, _="admin")
+        statement = get_student_statement(student_id=self.student_debtor.id, db=self.db, authorization="Bearer admin-token", role="admin")
         self.assertEqual(statement["student_id"], self.student_debtor.id)
         self.assertIn("total_paid_institute", statement)
         self.assertIn("total_debt_institute", statement)
 
         with self.assertRaises(HTTPException) as e:
-            get_student_statement(student_id=9999, db=self.db, _="admin")
+            get_student_statement(student_id=9999, db=self.db, authorization="Bearer admin-token", role="admin")
         self.assertEqual(e.exception.status_code, 404)
 
     def test_get_logged_in_teacher(self):
@@ -142,7 +142,7 @@ class TestReportsRouter(unittest.TestCase):
         self.assertIsNone(get_logged_in_teacher(self.db, "Bearer sec-token"))
         summary = get_financial_summary(
             user_type="institute", authorization="Bearer sec-token",
-            db=self.db, current_username="secretary",
+            db=self.db, sub_role="secretary",
         )
         self.assertEqual(summary["user_type"], "institute")
 

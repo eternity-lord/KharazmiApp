@@ -173,7 +173,7 @@ class TestClassesRouter(unittest.TestCase):
         found = [c for c in classes if c["id"] == self.course.id]
         self.assertTrue(len(found) == 1)
 
-        details = get_class_details(course_id=self.course.id, db=self.db, _="admin")
+        details = get_class_details(course_id=self.course.id, db=self.db, authorization="Bearer admin-token", sub_role="admin")
         self.assertEqual(details["course_info"].id, self.course.id)
         self.assertEqual(details["students"], [])
 

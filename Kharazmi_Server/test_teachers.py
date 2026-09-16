@@ -95,11 +95,11 @@ class TestTeachersRouter(unittest.TestCase):
         self.assertEqual(full_admin.total_students, 1)
 
     def test_get_teacher_profile(self):
-        profile = get_teacher_profile(teacher_id=self.teacher_a.id, db=self.db, _="admin")
+        profile = get_teacher_profile(teacher_id=self.teacher_a.id, db=self.db, authorization="Bearer admin-token", sub_role="admin")
         self.assertEqual(profile["first_name"], "مریم")
 
         with self.assertRaises(HTTPException) as e:
-            get_teacher_profile(teacher_id=9999, db=self.db, _="admin")
+            get_teacher_profile(teacher_id=9999, db=self.db, authorization="Bearer admin-token", sub_role="admin")
         self.assertEqual(e.exception.status_code, 404)
 
     def test_update_teacher_and_optimistic_locking(self):
@@ -125,16 +125,16 @@ class TestTeachersRouter(unittest.TestCase):
         self.assertEqual(e.exception.status_code, 403)
 
     def test_pending_settlement_and_history(self):
-        pending = get_pending_settlement(teacher_id=self.teacher_a.id, db=self.db, _="admin")
+        pending = get_pending_settlement(teacher_id=self.teacher_a.id, db=self.db, authorization="Bearer admin-token", sub_role="admin")
         self.assertEqual(pending["total_amount"], 100000)
         self.assertEqual(pending["session_count"], 1)
 
-        history = get_settlement_history(teacher_id=self.teacher_a.id, db=self.db, _="admin")
+        history = get_settlement_history(teacher_id=self.teacher_a.id, db=self.db, authorization="Bearer admin-token", sub_role="admin")
         self.assertEqual(len(history), 1)
         self.assertEqual(history[0]["total_amount"], 500000)
 
     def test_pending_settlement_teacher_with_no_class(self):
-        pending = get_pending_settlement(teacher_id=self.teacher_b.id, db=self.db, _="admin")
+        pending = get_pending_settlement(teacher_id=self.teacher_b.id, db=self.db, authorization="Bearer admin-token", sub_role="admin")
         self.assertEqual(pending["total_amount"], 0)
         self.assertEqual(pending["session_count"], 0)
 

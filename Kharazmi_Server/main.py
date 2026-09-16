@@ -9,7 +9,7 @@ import models
 from models import (
     Attendance, Course, Enrollment, Grade, InstituteShare, SessionLog, SmsLog, Student, Teacher, Transaction, User, UserSession, Settlement, Installment, ParentOTP, PricingTable
 )
-from routers import auth, students, teachers, classes, finance, reports, attendance, admin, parent, homework, calendar, messages, exams, crm, branches, automation, analytics, ai, audit, timeline, dunning, dashboard, exports
+from routers import auth, students, teachers, classes, finance, reports, attendance, admin, parent, homework, calendar, messages, exams, crm, branches, automation, analytics, ai, audit, timeline, dunning, dashboard, exports, audit_trail
 
 # ساخت اپلیکیشن
 # FIX M2: مستندات تعاملی فقط در توسعه؛ در پروداکشن (ENV=production) خاموش.
@@ -79,6 +79,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(SecurityHeadersMiddleware)
 
+# FIX Audit-Trail: میدل‌ور زمینه‌ی کاربر برای listener های لاگ مالی (فقط متدهای تغییردهنده).
+app.add_middleware(audit_trail.AuditContextMiddleware)
+
 # FIX M3: پوشه‌ی آپلود نگه داشته می‌شود ولی سرو عمومی StaticFiles حذف شد.
 os.makedirs("uploads/profiles", exist_ok=True)
 
@@ -99,6 +102,10 @@ def serve_upload(filename: str, _: str = Depends(check_user_login)):
 
 # اتصال به دیتابیس
 models.Base.metadata.create_all(bind=models.engine)
+
+# FIX Audit-Trail: فعال‌سازی listener های ردگیری تغییرات مالی (جدول financial_audit_logs
+# هم در همین فراخوانی idempotent ساخته می‌شود).
+audit_trail.setup_audit_listeners()
 
 # پچر خودکار جداول دیتابیس
 def auto_patch_database():
@@ -639,3 +646,4 @@ app.include_router(timeline.router)
 app.include_router(dunning.router)
 app.include_router(dashboard.router, prefix="/dashboard")
 app.include_router(exports.router)
+app.include_router(audit_trail.router)

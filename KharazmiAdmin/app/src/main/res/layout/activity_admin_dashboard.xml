@@ -396,6 +396,41 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
+                <!-- Financial Audit Trail (Admin only) — ورود به تاریخچه تغییرات مالی -->
+                <com.google.android.material.card.MaterialCardView
+                    style="@style/Widget.Kharazmi.Card.Gold"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    app:cardCornerRadius="16dp"
+                    app:strokeWidth="1dp"
+                    app:strokeColor="@color/gold_border_subtle">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="14dp">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/audit_trail_title"
+                            android:textAppearance="@style/TextAppearance.Kharazmi.SectionTitle"
+                            android:textColor="@color/gold_primary" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnDashboardAuditTrail"
+                            style="@style/Widget.Kharazmi.Button.Gold"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:text="@string/dashboard_action_audit_trail"
+                            app:icon="@android:drawable/ic_menu_recent_history"
+                            app:iconGravity="textStart" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
                 <!-- Export to Excel/CSV (Admin only) — سه خروجی سرور (/exports/*) -->
                 <com.google.android.material.card.MaterialCardView
                     style="@style/Widget.Kharazmi.Card.Gold"

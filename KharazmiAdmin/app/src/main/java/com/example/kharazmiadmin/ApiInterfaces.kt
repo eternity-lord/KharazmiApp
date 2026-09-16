@@ -142,3 +142,32 @@ interface ExportApi {
     @GET("exports/audit_alerts")
     suspend fun exportAuditAlerts(): Response<ResponseBody>
 }
+
+// ==========================================
+// Financial Audit Trail — تاریخچه‌ی تغییرات مالی (routers/audit_trail.py)
+// ==========================================
+interface AuditTrailApi {
+    @GET("audit-trail/logs")
+    suspend fun getLogs(
+        @Query("entity_type") entityType: String? = null,
+        @Query("entity_id") entityId: Int? = null,
+        @Query("action") action: String? = null,
+        @Query("user_id") userId: Int? = null,
+        @Query("start_date") startDate: String? = null,
+        @Query("end_date") endDate: String? = null,
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 50
+    ): AuditTrailResponse
+
+    // خروجی CSV کل لاگ‌ها از همین مدل داده — بدون اندپوینت جدید سمت سرور (سرور دست‌نخورده می‌ماند).
+    @Streaming
+    @GET("audit-trail/logs")
+    suspend fun exportLogsCsv(
+        @Query("entity_type") entityType: String? = null,
+        @Query("entity_id") entityId: Int? = null,
+        @Query("action") action: String? = null,
+        @Query("start_date") startDate: String? = null,
+        @Query("end_date") endDate: String? = null,
+        @Query("limit") limit: Int = 200
+    ): Response<ResponseBody>
+}

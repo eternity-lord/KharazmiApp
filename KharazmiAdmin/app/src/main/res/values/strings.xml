@@ -1229,4 +1229,66 @@
     <string name="export_session_expired">نشست منقضی شده — دوباره وارد شوید</string>
     <string name="export_open_failed">برنامه‌ای برای باز کردن فایل پیدا نشد؛ فایل در این مسیر ذخیره شد: %1$s</string>
     <string name="export_share_title">اشتراک‌گذاری فایل خروجی</string>
+
+    <!-- Financial Audit Trail — ردگیری تغییرات مالی (audit_trail.py) -->
+    <string name="audit_trail_title">تاریخچه تغییرات مالی</string>
+    <string name="audit_trail_filter_title">فیلترها</string>
+    <string name="audit_trail_filter_all">همه</string>
+    <string name="audit_trail_entity_transaction">تراکنش</string>
+    <string name="audit_trail_entity_installment">قسط</string>
+    <string name="audit_trail_action_create">ایجاد</string>
+    <string name="audit_trail_action_update">ویرایش</string>
+    <string name="audit_trail_action_delete">حذف</string>
+    <string name="audit_trail_entity_id_hint">شناسه رکورد مالی (اختیاری)</string>
+    <string name="audit_trail_date_from">از تاریخ</string>
+    <string name="audit_trail_date_to">تا تاریخ</string>
+    <string name="audit_trail_refresh">بروزرسانی</string>
+    <string name="audit_trail_clear_filters">پاک‌کردن فیلترها</string>
+    <string name="audit_trail_back">بازگشت</string>
+    <string name="audit_trail_load_more">بارگذاری بیشتر</string>
+    <string name="audit_trail_loading_more">در حال بارگذاری…</string>
+    <string name="audit_trail_empty">هیچ تغییری با این فیلترها ثبت نشده است</string>
+    <string name="audit_trail_summary">%1$d از %2$d تغییر • صفحه %3$d از %4$d</string>
+    <string name="audit_trail_summary_empty">—</string>
+    <string name="audit_trail_item_entity">%1$s #%2$d</string>
+    <string name="audit_trail_item_meta">👤 %1$s • 🕒 %2$s</string>
+    <string name="audit_trail_item_ip">IP: %1$s</string>
+    <string name="audit_trail_no_field_detail">جزئیات فیلد در دسترس نیست</string>
+    <string name="audit_trail_dialog_title">%1$s جزئیات تغییر</string>
+    <string name="audit_trail_dialog_meta">عملیات: %1$s روی %2$s #%3$d</string>
+    <string name="audit_trail_dialog_user">کاربر: %1$s • زمان: %2$s</string>
+    <string name="audit_trail_dialog_ip">آدرس IP: %1$s</string>
+    <string name="audit_trail_dialog_ok">بستن</string>
+    <string name="audit_trail_dialog_open_entity">بازکردن صفحه مرتبط</string>
+    <string name="audit_trail_open_installments_hint">صفحه گزارش‌ها برای دیدن اقساط باز شد</string>
+    <string name="audit_trail_forbidden">⛔ دسترسی فقط برای مدیر سیستم</string>
+    <string name="audit_trail_session_expired">توکن منقضی شده — دوباره وارد شوید</string>
+    <string name="audit_trail_server_error">خطای سرور %1$d</string>
+    <string name="audit_trail_unknown_error">خطا در دریافت تاریخچه تغییرات</string>
+    <string name="audit_trail_export">خروجی CSV</string>
+    <string name="audit_trail_export_empty">ردیفی برای خروجی گرفتن وجود ندارد</string>
+    <string name="audit_trail_export_saved">فایل ذخیره شد:\n%1$s</string>
+    <string name="audit_trail_export_error">خطا در خروجی: %1$s</string>
+    <string name="audit_trail_export_share">اشتراک‌گذاری خروجی تاریخچه</string>
+    <string name="audit_trail_export_open_failed">برنامه‌ای برای باز کردن فایل پیدا نشد؛ مسیر: %1$s</string>
+    <string name="audit_trail_csv_header">زمان,کاربر,عملیات,نوع,شناسه,فیلدهای تغییریافته,خلاصه تغییر,IP</string>
+    <string name="audit_trail_pick_ok">تأیید</string>
+    <string name="audit_trail_pick_cancel">انصراف</string>
+    <string name="audit_trail_pick_today">امروز</string>
+    <string name="audit_trail_field_amount">مبلغ</string>
+    <string name="audit_trail_field_is_paid">پرداخت‌شده</string>
+    <string name="audit_trail_field_paid_amount">مبلغ پرداخت‌شده</string>
+    <string name="audit_trail_field_paid_at">تاریخ پرداخت</string>
+    <string name="audit_trail_field_due_date">سررسید</string>
+    <string name="audit_trail_field_is_deleted">حذف‌شده</string>
+    <string name="audit_trail_field_is_reversed">برگشت‌خورده</string>
+    <string name="audit_trail_field_payment_method">روش پرداخت</string>
+    <string name="audit_trail_field_description">توضیحات</string>
+    <string name="audit_trail_field_date">تاریخ</string>
+    <string name="audit_trail_field_target_wallet">کیف پول مقصد</string>
+    <string name="audit_trail_field_student">شناسه دانش‌آموز</string>
+    <string name="audit_trail_field_enrollment">شناسه ثبت‌نام</string>
+
+    <!-- دکمه ورود به تاریخچه مالی در داشبورد ادمین -->
+    <string name="dashboard_action_audit_trail">تاریخچه تغییرات مالی</string>
 </resources>

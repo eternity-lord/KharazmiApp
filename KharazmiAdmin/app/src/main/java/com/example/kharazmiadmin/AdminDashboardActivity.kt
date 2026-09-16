@@ -139,6 +139,11 @@ class AdminDashboardActivity : BaseActivity() {
             // startActivity(Intent(this, ReportActivity::class.java))
         }
 
+        // Financial Audit Trail — تاریخچه تغییرات مالی (admin only)
+        findViewById<MaterialButton>(R.id.btnDashboardAuditTrail)?.setOnClickListener {
+            startActivity(Intent(this, AuditTrailActivity::class.java))
+        }
+
         // ---- خروجی CSV (Admin only — /exports/*) ----
         btnExportDebtors.setOnClickListener {
             downloadExport("debtors.csv") { exportApi.exportDebtors() }

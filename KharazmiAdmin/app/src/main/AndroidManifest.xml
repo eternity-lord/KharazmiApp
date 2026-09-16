@@ -188,6 +188,10 @@
             android:exported="false"
             android:label="رادار تقلب" />
         <activity
+            android:name=".AuditTrailActivity"
+            android:exported="false"
+            android:label="تاریخچه تغییرات مالی" />
+        <activity
             android:name=".DunningActivity"
             android:exported="false"
             android:label="یادآوری اقساط" />

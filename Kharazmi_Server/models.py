@@ -925,3 +925,44 @@ class ClassDeletionRequest(Base):
     decided_by_user_id = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.now)
     decided_at = Column(DateTime, nullable=True)
+
+
+# ==========================================
+# 15. ردگیری تغییرات مالی (Financial Audit Trail) - جدید 🆕
+# ==========================================
+class FinancialAuditLog(Base):
+    """لاگ هر تغییر مالی روی Transaction/Installment («چه کسی، چه زمانی، چه چیزی را عوض کرد»).
+
+    پر شدن این جدول **خودکار** است: listener های SQLAlchemy در `routers/audit_trail.py`
+    (before_flush برای مقادیر قبلی + after_flush_postexec برای مقادیر جدید/PK) این ردیف‌ها را
+    در **همان تراکنشِ نوشتن** درج می‌کنند؛ پس اگر تراکنش rollback شود، لاگ هم برمی‌گردد و
+    هرگز تغییری لاگ نمی‌شود که commit نشده است.
+
+    - old_values/new_values: JSON string از اسنپ‌شات کامل ستون‌ها (update: فقط اگر تغییر واقعی
+      باشد؛ create: old تهی، delete: new تهی). ستون‌های تغییریافته در زمان خواندن محاسبه می‌شود.
+    - user_id/username: از زمینه‌ی درخواست (میدل‌ور) — در نوشتن‌های سیستمی/ورکرها تهی می‌ماند.
+    - timestamp: UTC ذخیره می‌شود (مثل بقیه‌ی ستون‌های زمانی سیستم) و اندپوینت آن را به وقت
+      محلی سرور برمی‌گرداند تا در اپ درست دیده شود.
+    مایگریشن طبق الگوی پروژه: `Base.metadata.create_all` در main.py + `CREATE TABLE IF NOT EXISTS`
+    در `setup_audit_listeners()` (هر دو idempotent).
+    """
+    __tablename__ = "financial_audit_logs"
+    # ایندکس‌ها برای صفحه‌بندی/فیلتر اندپوینت GET /audit-trail/logs (limit 50، ترتیب زمانی نزولی).
+    __table_args__ = (
+        Index("ix_fin_audit_timestamp", "timestamp"),
+        Index("ix_fin_audit_entity", "entity_type", "entity_id"),
+        Index("ix_fin_audit_action", "action"),
+        Index("ix_fin_audit_user", "user_id"),
+    )
+    id = Column(Integer, primary_key=True, index=True)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    username = Column(String(100), nullable=True)
+    action = Column(String(50), nullable=False)       # 'create' | 'update' | 'delete'
+    entity_type = Column(String(50), nullable=False)  # 'transaction' | 'installment'
+    entity_id = Column(Integer, nullable=True)
+    old_values = Column(Text, nullable=True)          # JSON string — مقادیر قبلی
+    new_values = Column(Text, nullable=True)          # JSON string — مقادیر جدید
+    ip_address = Column(String(45), nullable=True)    # IPv4/IPv6
+
+    user = relationship("User")

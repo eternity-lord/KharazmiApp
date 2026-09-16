@@ -716,3 +716,27 @@ data class DashboardKPIs(
     @SerializedName("suspicious_alerts_count") val suspiciousAlertsCount: Int,
     @SerializedName("dunning_pending_count") val dunningPendingCount: Int
 )
+
+// ==========================================
+// Financial Audit Trail — ردگیری تغییرات مالی (admin only)
+// ==========================================
+data class AuditTrailLog(
+    val id: Int,
+    val timestamp: String,
+    val username: String? = null,
+    val action: String,                       // create | update | delete
+    @SerializedName("entity_type") val entityType: String,   // transaction | installment
+    @SerializedName("entity_id") val entityId: Int? = null,
+    @SerializedName("old_values") val oldValues: Map<String, Any>? = null,
+    @SerializedName("new_values") val newValues: Map<String, Any>? = null,
+    @SerializedName("ip_address") val ipAddress: String? = null,
+    @SerializedName("changed_fields") val changedFields: List<String> = emptyList()
+)
+
+data class AuditTrailResponse(
+    val logs: List<AuditTrailLog>,
+    val total: Int,
+    val page: Int,
+    val limit: Int,
+    val pages: Int
+)

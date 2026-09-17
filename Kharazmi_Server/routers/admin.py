@@ -889,6 +889,28 @@ def delete_transaction(id: int, db: Session = Depends(get_db), _: str = Depends(
 # 3. ویرایش تراکنش
 
 
+def _split_amount_integer(amount: int, share_a: int, share_b: int):
+    """FIX F-W1a/F-W2: تقسیمِ قطعیِ یک مبلغ بین دو سهم، با جمعِ **دقیقاً** برابر amount.
+
+    - خروجی همیشه عدد صحیح (تومان) است؛ هیچ مقدار اعشاری (float) تولید نمی‌شود.
+    - قاعده‌ی قطعیِ باقیمانده: باقیمانده (**در قدر مطلق**، هم برای مبلغ مثبت و هم منفی) همیشه
+      به سهم دوم (آموزشگاه) می‌رسد — همان قرارداد موجودِ پروژه در `submit_payment`
+      (Bug 10: `amt_teacher = amount // 2` و `amt_institute = amount - amt_teacher`) و در مسیر
+      refund رسیدهای قدیمی `both`.
+    - اگر هر دو سهم صفر/غایب باشند، تقسیم نصف-نصف (۱:۱) با همان قاعده‌ی باقیمانده است —
+      دقیقاً fallback مستندشده‌ی مسیر refund برای رسیدهای legacy.
+    """
+    share_a = int(share_a or 0)
+    share_b = int(share_b or 0)
+    total = abs(share_a) + abs(share_b)
+    if total <= 0:
+        share_a, share_b, total = 1, 1, 2
+    amount = int(amount)
+    sign = -1 if amount < 0 else 1
+    part_a = sign * (abs(amount) * abs(share_a) // total)   # قطعی و مستقل از علامت/ترتیب فراخوانی
+    return part_a, amount - part_a
+
+
 @router.put("/admin/transactions/{id}")
 def update_transaction(id: int, data: TransactionUpdate, db: Session = Depends(get_db), _: str = Depends(check_admin_access)):
     # FIX: Bug 12 - exclude archived Transaction rows from this active view.
@@ -973,33 +995,56 @@ def update_transaction(id: int, data: TransactionUpdate, db: Session = Depends(g
             d_teacher = diff
         elif trans.target_wallet == "institute":
             d_institute = diff
-        # (هدف نامشخص: مثل رفتار قبلی هیچ تغییری در کیف‌پول اعمال نمی‌شود — wallet_balance قدیمی دور ریخته می‌شد.)
+        elif trans.target_wallet == "both":
+            # FIX F-W2: رسیدهای legacy با target_wallet="both" (امروز submit_payment دو رسید جدا
+            # می‌سازد) پیش‌تر هیچ دلتایی نمی‌گرفتند ⇒ دفتر و کیف‌پول از هم واگرا می‌شدند، در حالی که
+            # دو مسیر دیگر (refund و delete) همین رسیدها را می‌شناسند.
+            # قاعده: delta = new_amount - old_amount، تقسیم با **همان نسبت سهم قبلی**؛
+            # اگر سهم قبلی موجود/معتبر نباشد، fallback نصف-نصف (باقیمانده به آموزشگاه) — همان قاعده‌ی refund.
+            prior_teacher = int(trans.share_teacher or 0)
+            prior_institute = int(trans.share_institute or 0)
+            if abs(prior_teacher) + abs(prior_institute) > 0:
+                # نسبت قبلی موجود است ⇒ سهم‌های جدید با **همان نسبت** تقسیم می‌شوند و دلتای هر کیف
+                # دقیقاً «سهم جدید − سهم قبلی» است. برای ردیف سازگار (جمع سهم قبلی == مبلغ قبلی)
+                # جمع دلتاها == delta = new_amount − old_amount؛ و کیف‌ها همیشه با سهم‌های ذخیره‌شده
+                # هم‌راستا می‌مانند — همان چیزی که مسیر refund (که همین ستون‌ها را برمی‌گرداند) لازم دارد.
+                new_teacher, new_institute = _split_amount_integer(
+                    new_amount, prior_teacher, prior_institute
+                )
+                d_teacher = new_teacher - prior_teacher
+                d_institute = new_institute - prior_institute
+                trans.share_teacher, trans.share_institute = new_teacher, new_institute
+            else:
+                # fallback مستند (سهم قبلی موجود نیست — ردیف‌های legacy بدون سهم): delta طبق
+                # فرمول new − old نصف-نصف تقسیم می‌شود (باقیمانده به آموزشگاه) و سهم‌های ردیف هم
+                # با همان نسبت ۵۰/۵۰ با مبلغ جدید هم‌راستا می‌شوند.
+                d_teacher, d_institute = _split_amount_integer(diff, 1, 1)
+                trans.share_teacher, trans.share_institute = _split_amount_integer(new_amount, 1, 1)
+        # (هدف نامشخص (None): مثل رفتار قبلی هیچ تغییری در کیف‌پول اعمال نمی‌شود — wallet_balance قدیمی دور ریخته می‌شد.)
 
     elif trans.type == "session_charge":
-        # برای تراکنش‌های هزینه جلسه (منفی)، اختلاف مبلغ را از کیف پول کم/اضافه می‌کنیم
-        # در session_charge، amount منفی است (کسری از کیف پول)
-        # diff منفی یعنی کسر بیشتر، diff مثبت یعنی کسر کمتر
-        share_teacher = trans.share_teacher if trans.share_teacher is not None else 0
-        share_institute = (
-            trans.share_institute if trans.share_institute is not None else 0
-        )
+        # FIX F-W1a/F-W1b: در session_charge قرارداد پروژه این است: amount منفی و
+        # share_teacher/share_institute مثبت‌اند و `amount == -(share_teacher + share_institute)`
+        # (سازنده: routers/attendance.py). ویرایش قبلی دلتا را با نسبتِ **اعشاری** حساب می‌کرد
+        # (`diff * teacher_ratio`) و روی ستون BigInteger می‌نوشت ⇒ پول اعشاری؛ و share_* را هم
+        # با مبلغ جدید همراستا نمی‌کرد ⇒ گزارش سهم‌ها (financial_calculations) کهنه می‌ماند.
+        prior_teacher = int(trans.share_teacher or 0)
+        prior_institute = int(trans.share_institute or 0)
+        prior_total = abs(prior_teacher) + abs(prior_institute)
 
-        if share_teacher != 0 or share_institute != 0:
-            total_share = abs(share_teacher) + abs(share_institute)
-            if total_share > 0:
-                teacher_ratio = abs(share_teacher) / total_share
-                institute_ratio = abs(share_institute) / total_share
-
-                # برای session_charge، diff را معکوس می‌کنیم چون amount منفی است
-                # اگر amount جدید کمتر از قدیم باشد (مثلاً از -10000 به -8000 تغییر کند)
-                # diff = -8000 - (-10000) = 2000 (مثبت)
-                # یعنی کسر کمتر شده، پس باید به کیف پول اضافه کنیم
-                teacher_diff = diff * teacher_ratio
-                institute_diff = diff * institute_ratio
-
-                # (teacher_diff/institute_diff عمداً float می‌مانند — عین رفتار قبلی، بدون گرد کردن.)
-                d_teacher = teacher_diff
-                d_institute = institute_diff
+        if prior_total > 0:
+            # سهم‌های جدید = تقسیم صحیحِ |مبلغ جدید| با همان نسبت قبلی (باقیمانده به آموزشگاه).
+            new_teacher, new_institute = _split_amount_integer(
+                abs(int(new_amount)), prior_teacher, prior_institute
+            )
+            # دلتای هر کیف = سهم قبلی − سهم جدید ⇒ جمع دلتاها دقیقاً برابر تغییر مبلغ است
+            # و بعد از ویرایش، کسرِ قابل‌انتساب به این ردیف دقیقاً همان سهم ذخیره‌شده می‌شود.
+            d_teacher = prior_teacher - new_teacher
+            d_institute = prior_institute - new_institute
+            trans.share_teacher = new_teacher
+            trans.share_institute = new_institute
+        # (ردیف legacy بدون هیچ سهم: مثل رفتار قبلی هیچ دلتایی اعمال نمی‌شود و سهم صفر دست‌نخورده
+        #  می‌ماند — تا مسیر delete سهمی را به کیف برنگرداند که هرگز از آن کسر نشده بود.)
 
     elif trans.type == "tuition" or trans.type == "enrollment_payment":
         # (no-op عمدی — رفتار قبلی هم فقط wallet_balance محلی را عوض می‌کرد که در write-back دور ریخته می‌شد.)

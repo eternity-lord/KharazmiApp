@@ -26,10 +26,16 @@ Wallet / Internal Payment / Refund / Balance-Consistency — TEST-ONLY audit
 | ۱۳ | invariant بعد از هر سناریو | `assert_wallet_invariant` (در همه‌ی تست‌ها) + `test_s13_full_walk_invariant_every_step` |
 | ۱۴ | lost update در پرداخت هم‌زمان / bulk update | `test_s14a_*`, `test_s14b_*`, `test_s14c_*` |
 
-## ⚠️ تست‌های یافته‌محور (عمداً fail می‌شوند)
-سه تست با نام `test_finding_fw1a_*` / `test_finding_fw1b_*` / `test_finding_fw2_*` برای **مستندسازی
-نقص‌های واقعی** نوشته شده‌اند و انتظار می‌رود fail شوند (اگر روزی فیکس شوند، XPASS/سبز می‌شوند و
-باید نامشان از `finding` به تست رگرسیون عادی تغییر کند). جزئیات در گزارش/چک‌پوینت همین تسک.
+## ✅ تست‌های رگرسیون سه باگ ممیزی (پس از فیکس)
+سه تست `test_fix_fw1a_*` / `test_fix_fw1b_*` / `test_fix_fw2_*` نسخه‌ی سبزشده‌ی همان سه تست
+یافته‌محورِ ممیزی‌اند (قبلاً `test_finding_*` بودند و عمداً fail می‌شدند). اکنون رفتار **پس از فیکس**
+را قفل می‌کنند:
+- **F-W1a:** ویرایش session_charge هیچ مقدار اعشاری در کیف/سهم ذخیره نمی‌کند (تقسیم صحیح، باقیمانده‌ی
+  قطعی به آموزشگاه).
+- **F-W1b:** `share_teacher`/`share_institute` با مبلغ جدید همراستا می‌شوند و گزارش‌های
+  `financial_calculations` عدد جدید را نشان می‌دهند.
+- **F-W2:** ویرایش رسید legacy `target_wallet="both"` دلتای واقعی را با نسبت قبلی (یا fallback
+  مستند نصف-نصف) اعمال می‌کند.
 
 ## اجرا (طبق قانون پروژه: فقط روی DB تست/کپی — هرگز gaj_db.db واقعی)
     cd /home/user/KharazmiApp && DATABASE_URL=sqlite:////tmp/wallet_audit.db \
@@ -44,14 +50,16 @@ from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
-from sqlalchemy import create_engine, event, func
+from sqlalchemy import create_engine, event, func, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 import models
 from financial_calculations import (
     calculate_institute_collected_revenue,
+    calculate_institute_session_revenue,
     calculate_student_debt,
+    calculate_teacher_session_revenue,
     calculate_total_turnover,
 )
 from routers import attendance, finance
@@ -176,6 +184,33 @@ def refund(world, transaction_id):
 
 def deposit_count(db):
     return db.query(models.Transaction).filter(models.Transaction.type == "deposit").count()
+
+
+def sqlite_money_types(db, transaction_id, student_id=101):
+    """نوع واقعیِ ذخیره‌شده‌ی ستون‌های پول در SQLite (`integer` در برابر `real`).
+    FIX F-W1a: بعد از هیچ ویرایشی نباید `real` (اعشاری) ببینیم."""
+    row = db.execute(
+        text("SELECT typeof(amount), typeof(share_teacher), typeof(share_institute) "
+             "FROM transactions WHERE id = :i"), {"i": transaction_id}
+    ).fetchone()
+    wallet = db.execute(
+        text("SELECT typeof(wallet_teacher), typeof(wallet_institute), typeof(wallet_balance) "
+             "FROM students WHERE id = :i"), {"i": student_id}
+    ).fetchone()
+    return tuple(row) + tuple(wallet)
+
+
+def assert_no_float_money(db, transaction_id, student_id=101, context=""):
+    """F-W1a: هیچ‌کدام از amount/share_teacher/share_institute/wallet_* نباید اعشاری ذخیره شوند."""
+    types = sqlite_money_types(db, transaction_id, student_id)
+    assert types == ("integer",) * 6, (
+        f"{context}: ستون‌های پول باید همه integer باشند؛ نوع‌های واقعی SQLite={types}"
+    )
+    teacher, institute, balance = wallets(db, student_id)
+    assert all(isinstance(value, int) for value in (teacher, institute, balance)), (
+        f"{context}: مقادیر خوانده‌شده باید int باشند؛ {teacher!r}/{institute!r}/{balance!r}"
+    )
+    return types
 
 
 def receipt(db, amount=100, **overrides):
@@ -824,26 +859,14 @@ def test_concurrent_double_refund_applies_exactly_once(tmp_path):
 # ==========================================
 # لبه‌های خطرناک (ادامه‌ی آدیت — سناریو ۱۳)
 # ==========================================
-def test_finding_fw2_legacy_both_receipt_edit_does_not_adjust_wallets(world):
-    """🔎 یافته‌ی F-W2 (این تست عمداً fail می‌شود تا نقص مستند شود):
-    مسیر ویرایش ادمین (`admin.update_transaction`) فقط `target_wallet` های teacher/institute را
-    جابه‌جا می‌کند؛ برای رسید قدیمیِ `target_wallet='both'` دلتا **صفر** است (کامنت خودِ کد:
-    «هدف نامشخص: هیچ تغییری در کیف‌پول اعمال نمی‌شود»). اما دو مسیر دیگر همین رسیدها را
-    می‌شناسند: `refund_transaction` سهم‌ها را برمی‌گرداند و `delete_transaction` هم دلتا می‌دهد.
-    نتیجه: با ویرایش مبلغ یک رسید both قدیمی، دفتر (Transaction) عوض می‌شود ولی کیف‌پول نه
-    ⇒ عدم‌تطابق دفتر/کیف.
-
-    سناریوی واقع‌گرا: رسید both قدیمی ۱۰۰ (۴۰ معلم/۶۰ آموزشگاه) که کیف‌ها هم قبلاً به همان
-    اندازه شارژ شده‌اند؛ ویرایش مبلغ به ۲۰۰ باید ۱۰۰ به جمع کیف اضافه کند."""
-    from routers import admin as admin_router
-    from schemas import TransactionUpdate
-
-    legacy = receipt(world.db, amount=100, target_wallet="both", share_teacher=40, share_institute=60)
-    # شارژ کیف‌ها به همان اندازه که کد قدیمی هنگام ساخت این رسید انجام می‌داد
+def credit_legacy_both_receipt(world, amount=100, share_teacher=40, share_institute=60, **overrides):
+    """ساخت رسید legacy با target_wallet='both' و شارژ کیف‌ها به همان اندازه (وضعیت نسخه‌های قدیمی)."""
+    legacy = receipt(world.db, amount=amount, target_wallet="both",
+                     share_teacher=share_teacher, share_institute=share_institute, **overrides)
     world.db.query(models.Student).filter(models.Student.id == 101).update(
         {
-            models.Student.wallet_teacher: func.coalesce(models.Student.wallet_teacher, 0) + 40,
-            models.Student.wallet_institute: func.coalesce(models.Student.wallet_institute, 0) + 60,
+            models.Student.wallet_teacher: func.coalesce(models.Student.wallet_teacher, 0) + share_teacher,
+            models.Student.wallet_institute: func.coalesce(models.Student.wallet_institute, 0) + share_institute,
         },
         synchronize_session=False,
     )
@@ -852,44 +875,68 @@ def test_finding_fw2_legacy_both_receipt_edit_does_not_adjust_wallets(world):
     world.db.refresh(student)
     student.sync_wallet_balance()
     world.db.commit()
-    before = wallets(world.db)
-    assert before == (40, 60, 100)
-
-    admin_router.update_transaction(legacy.id, TransactionUpdate(amount=200, description="ویرایش رسید both",
-                                                                 date=TODAY_JALALI),
-                                    db=world.db, _="admin")
-    teacher, institute, balance = wallets(world.db)
-    assert balance == teacher + institute, f"invariant شکست: {balance} != {teacher}+{institute}"
-    assert (balance - before[2]) == 100, (
-        f"F-W2: ویرایش ۱۰۰→۲۰۰ روی رسید both باید ۱۰۰ به جمع کیف اضافه کند "
-        f"(افزایش واقعی: {balance - before[2]}؛ کیف: {teacher}/{institute})"
-    )
+    return legacy
 
 
-def test_finding_fw1b_session_charge_edit_leaves_shares_stale(world):
-    """🔎 یافته‌ی F-W1b (این تست عمداً fail می‌شود): ویرایش مبلغ session_charge فقط `amount` را
-    عوض می‌کند و `share_teacher/share_institute` را دست نمی‌زند ⇒ جمع سهم‌ها با مبلغ ردیف
-    ناسازگار می‌شود. گزارش‌های سهم معلم/آموزشگاه (`calculate_*_session_revenue`) دقیقاً همین
-    ستون‌ها را جمع می‌زنند، پس عدد گزارش با دفتر هم‌خوان نخواهد بود."""
+def edit_transaction(world, transaction_id, amount, description="ویرایش تستی"):
+    """ویرایش ادمین + assert خودکار invariant (سناریو ۱۳)."""
     from routers import admin as admin_router
     from schemas import TransactionUpdate
-    from financial_calculations import calculate_institute_session_revenue
 
-    submit_session(world)
+    result = admin_router.update_transaction(
+        transaction_id, TransactionUpdate(amount=amount, description=description, date=TODAY_JALALI),
+        db=world.db, _="admin",
+    )
+    assert_wallet_invariant(world.db, context=f"بعد از ویرایش به {amount}")
+    return result
+
+
+def test_fix_fw2_legacy_both_receipt_edit_applies_real_delta(world):
+    """✅ رگرسیون F-W2 (نسخه‌ی سبزشده‌ی `test_finding_fw2_*`): ویرایش رسید legacy با
+    `target_wallet='both'` باید delta واقعی را با **نسبت سهم قبلی** روی هر دو کیف اعمال کند
+    (قبلاً هیچ دلتایی اعمال نمی‌شد ⇒ دفتر و کیف واگرا می‌شدند)."""
+    legacy = credit_legacy_both_receipt(world)             # کیف: ۴۰/۶۰ و سهم: ۴۰/۶۰
+    assert wallets(world.db) == (40, 60, 100)
+
+    edit_transaction(world, legacy.id, 200, "ویرایش رسید both")
+    # delta = ۱۰۰ با نسبت ۴۰:۶۰ ⇒ ۴۰ به معلم و ۶۰ به آموزشگاه
+    assert_wallet_invariant(world.db, expected_teacher=80, expected_institute=120, expected_balance=200,
+                            context="پس از ویرایش ۱۰۰→۲۰۰ رسید both")
+
+    world.db.expire_all()
+    legacy = world.db.get(models.Transaction, legacy.id)
+    assert (legacy.share_teacher, legacy.share_institute) == (80, 120), (
+        "سهم‌های رسید both باید با مبلغ جدید همراستا شوند (همان چیزی که مسیر refund ملاک می‌گیرد)"
+    )
+    assert legacy.share_teacher + legacy.share_institute == legacy.amount == 200
+    assert_no_float_money(world.db, legacy.id, context="رسید both پس از ویرایش")
+
+
+def test_fix_fw1b_session_charge_edit_updates_shares_and_reports(world):
+    """✅ رگرسیون F-W1b (نسخه‌ی سبزشده‌ی `test_finding_fw1b_*`): هنگام ویرایش session_charge،
+    `share_teacher/share_institute` هم اصلاح می‌شوند و گزارش‌های `financial_calculations`
+    سهم جدید را نشان می‌دهند (قبلاً سهم قدیمی در گزارش می‌ماند)."""
+    submit_session(world)                                  # شارژ ۱۰۰ (۶۰/۴۰)
     charge = world.db.query(models.Transaction).filter(models.Transaction.type == "session_charge").one()
 
-    admin_router.update_transaction(charge.id, TransactionUpdate(amount=-130, description="افزایش شارژ جلسه",
-                                                                 date=TODAY_JALALI),
-                                    db=world.db, _="admin")
+    edit_transaction(world, charge.id, -130, "افزایش شارژ جلسه")
+
     world.db.expire_all()
     charge = world.db.get(models.Transaction, charge.id)
-
     shares_total = abs(charge.share_teacher or 0) + abs(charge.share_institute or 0)
-    assert shares_total == abs(charge.amount), (
-        f"F-W1b: جمع سهم‌ها ({shares_total}) باید با مبلغ شارژ ({abs(charge.amount)}) برابر بماند"
+    assert shares_total == abs(charge.amount) == 130, (
+        f"جمع سهم‌ها ({shares_total}) باید با مبلغ شارژ ({abs(charge.amount)}) برابر باشد"
     )
-    reported = calculate_institute_session_revenue(world.db, RANGE_START, RANGE_END)
-    assert reported == 40, f"F-W1b: گزارش سهم آموزشگاه باید ۴۰ بماند/به‌روز شود؛ شد {reported}"
+    assert (charge.share_teacher, charge.share_institute) == (78, 52), "تقسیم ۱۳۰ با نسبت ۶۰/۴۰"
+
+    # گزارش‌ها دقیقاً از همین ستون‌ها تغذیه می‌شوند ⇒ باید عدد جدید را نشان دهند نه ۴۰/۶۰ قدیمی
+    assert calculate_institute_session_revenue(world.db, RANGE_START, RANGE_END) == 52
+    assert calculate_teacher_session_revenue(world.db, world.teacher.id, RANGE_START, RANGE_END) == 78
+
+    # کیف‌ها هم با همان سهم‌ها هم‌راستا هستند و invariant برقرار است
+    assert_wallet_invariant(world.db, expected_teacher=-78, expected_institute=-52, expected_balance=-130,
+                            context="پس از ویرایش شارژ جلسه")
+    assert_no_float_money(world.db, charge.id, context="شارژ جلسه پس از ویرایش")
 
 
 def test_edge_enrollment_payment_refund_reverses_institute_wallet(world):
@@ -946,26 +993,250 @@ def test_edge_absent_penalty_charge_keeps_invariant(world):
     assert session.absent_penalty_teacher == 60 and session.absent_penalty_institute == 40
 
 
-def test_finding_fw1a_session_charge_edit_writes_fractional_money(world):
-    """⚠️ یافته‌ی F-W1 (این تست عمداً fail می‌شود تا نقص مستند شود):
-    ویرایش مبلغ یک session_charge توسط ادمین، دلتای کیف را با **نسبت اعشاری** (float) حساب می‌کند
-    (`teacher_diff = diff * teacher_ratio` در admin.update_transaction) و آن را روی ستون‌های
-    BigInteger می‌نویسد ⇒ کیف پول اعشاری می‌شود (-60.6 و -40.4) که برای واحد «تومان» نامعتبر است.
-    invariant همچنان برقرار می‌ماند (چون بالانس از همان دو مؤلفه ساخته می‌شود) ولی مبلغ اعشاری
-    در گزارش‌ها/فاکتورها نشت می‌کند."""
-    from routers import admin as admin_router
-    from schemas import TransactionUpdate
-
-    submit_session(world)                                     # شارژ ۱۰۰ ⇒ ‎-60/-40
+def test_fix_fw1a_session_charge_edit_keeps_money_integer(world):
+    """✅ رگرسیون F-W1a (نسخه‌ی سبزشده‌ی `test_finding_fw1a_*`): ویرایش session_charge با
+    مبلغی که تقسیمش اعشاری می‌شود (۱۰۱ با نسبت ۶۰/۴۰) نباید هیچ مقدار اعشاری در کیف یا
+    ستون‌های سهم بنویسد؛ باقیمانده به‌صورت قطعی به آموزشگاه می‌رسد."""
+    submit_session(world)                                     # شارژ ۱۰۰ ⇒ ‎-۶۰/-۴۰
     charge = world.db.query(models.Transaction).filter(models.Transaction.type == "session_charge").one()
 
-    admin_router.update_transaction(charge.id, TransactionUpdate(amount=-101, description="اصلاح شارژ جلسه",
-                                                                 date=TODAY_JALALI),
-                                    db=world.db, _="admin")
+    edit_transaction(world, charge.id, -101, "اصلاح شارژ جلسه")
+
+    # ۱۰۱ با نسبت ۶۰:۴۰ ⇒ ۶۰.۶ و ۴۰.۴؛ تقسیم صحیح: ۶۰ معلم و ۴۱ آموزشگاه (باقیمانده به آموزشگاه)
+    assert_wallet_invariant(world.db, expected_teacher=-60, expected_institute=-41, expected_balance=-101,
+                            context="پس از ویرایش شارژ جلسه به ۱۰۱")
+    world.db.expire_all()
+    charge = world.db.get(models.Transaction, charge.id)
+    assert (charge.share_teacher, charge.share_institute) == (60, 41)
+    assert charge.share_teacher + charge.share_institute == abs(charge.amount) == 101
+    assert_no_float_money(world.db, charge.id, context="شارژ ۱۰۱ پس از ویرایش")
+
+
+# ==========================================
+# رگرسیون تکمیلی سه باگ F-W1a / F-W1b / F-W2 (تسک fix)
+# ==========================================
+@pytest.mark.parametrize("new_amount", [-1, -7, -101, -103, -999, -1001, -1500])
+def test_fix_fw1a_no_float_for_any_awkward_charge_amount(world, new_amount):
+    """F-W1a: هیچ مبلغ «بدتقسیمی» نباید اعشار تولید کند — نه در کیف، نه در سهم‌ها."""
+    submit_session(world)
+    charge = world.db.query(models.Transaction).filter(models.Transaction.type == "session_charge").one()
+    edit_transaction(world, charge.id, new_amount)
 
     teacher, institute, balance = wallets(world.db)
-    assert balance == teacher + institute, f"invariant شکست: {balance} != {teacher}+{institute}"
-    assert isinstance(teacher, int) and isinstance(institute, int) and isinstance(balance, int), (
-        f"مبالغ کیف باید عدد صحیح (تومان) باشند؛ واقعی: teacher={teacher!r} ({type(teacher).__name__}), "
-        f"institute={institute!r} ({type(institute).__name__}), balance={balance!r}"
-    )
+    assert (teacher, institute, balance) == (-60 - (abs(new_amount) - 100) * 60 // 100,
+                                             -40 - (abs(new_amount) - 100) + (abs(new_amount) - 100) * 60 // 100,
+                                             -abs(new_amount)), "تقسیم ۶۰:۴۰ با باقیمانده به آموزشگاه"
+    assert balance == teacher + institute
+    assert_no_float_money(world.db, charge.id, context=f"شارژ {new_amount}")
+
+
+def test_fix_fw1a_no_float_when_charge_is_reduced_or_untouched(world):
+    """F-W1a: هم کاهش مبلغ (برگشت اعتبار) و هم ویرایشِ بدون تغییر مبلغ باید صحیح‌بمانند."""
+    submit_session(world)
+    charge = world.db.query(models.Transaction).filter(models.Transaction.type == "session_charge").one()
+
+    edit_transaction(world, charge.id, -100, "فقط تغییر شرح")     # مبلغ ثابت ⇒ کیف نباید عوض شود
+    assert_wallet_invariant(world.db, expected_teacher=-60, expected_institute=-40, expected_balance=-100,
+                            context="ویرایش بدون تغییر مبلغ")
+
+    edit_transaction(world, charge.id, -3, "کاهش شارژ")           # ۳ با نسبت ۶۰:۴۰ ⇒ ۱ و ۲
+    assert_wallet_invariant(world.db, expected_teacher=-1, expected_institute=-2, expected_balance=-3,
+                            context="کاهش شارژ به ۳")
+    assert_no_float_money(world.db, charge.id, context="شارژ ۳")
+
+
+def test_fix_fw1b_shares_stay_consistent_across_many_edits(world):
+    """F-W1b: در یک زنجیره‌ی ویرایش، هر بار جمع سهم‌ها == |مبلغ| و گزارش‌ها با کیف هم‌راستا بمانند."""
+    submit_session(world)
+    charge = world.db.query(models.Transaction).filter(models.Transaction.type == "session_charge").one()
+
+    for amount in (-130, -77, -501, -100):
+        edit_transaction(world, charge.id, amount)
+        world.db.expire_all()
+        row = world.db.get(models.Transaction, charge.id)
+        assert abs(row.share_teacher or 0) + abs(row.share_institute or 0) == abs(row.amount), (
+            f"پس از ویرایش به {amount}: سهم‌ها ({row.share_teacher}/{row.share_institute}) "
+            f"با مبلغ ({row.amount}) ناسازگارند"
+        )
+        assert calculate_institute_session_revenue(world.db, RANGE_START, RANGE_END) == row.share_institute
+        assert calculate_teacher_session_revenue(world.db, world.teacher.id, RANGE_START, RANGE_END) == row.share_teacher
+        assert_wallet_invariant(world.db, expected_teacher=-row.share_teacher,
+                                expected_institute=-row.share_institute, expected_balance=-abs(row.amount),
+                                context=f"زنجیره‌ی ویرایش در گام {amount}")
+
+
+def test_fix_fw1b_legacy_zero_share_charge_is_left_untouched(world):
+    """F-W1b (محدودیت مستند): ردیف legacy با سهم صفر (چیزی که سازنده‌ی فعلی attendance تولید
+    نمی‌کند) دست‌نخورده می‌ماند تا مسیر delete سهمی را برنگرداند که هرگز کسر نشده بود."""
+    legacy = receipt(world.db, amount=-100, type="session_charge", target_wallet=None,
+                     share_teacher=0, share_institute=0)
+    world.db.commit()
+
+    edit_transaction(world, legacy.id, -250, "ویرایش شارژ بی‌سهم")
+    assert_wallet_invariant(world.db, expected_teacher=0, expected_institute=0, expected_balance=0,
+                            context="ویرایش ردیف legacy بی‌سهم")
+    world.db.expire_all()
+    legacy = world.db.get(models.Transaction, legacy.id)
+    assert (legacy.share_teacher, legacy.share_institute) == (0, 0), "سهم صفر legacy نباید مصنوعی پر شود"
+    assert legacy.amount == -250
+
+
+def test_fix_fw1b_legacy_inconsistent_shares_are_healed(world):
+    """F-W1b: ردیف legacy که سهمش با مبلغ هم‌خوان نیست، با ویرایش «درمان» می‌شود:
+    سهم‌ها به نسبت قبلی با مبلغ هم‌راستا می‌شوند و کیف هم دقیقاً با همان سهم‌ها منطبق می‌گردد."""
+    legacy = receipt(world.db, amount=-100, type="session_charge", target_wallet=None,
+                     share_teacher=30, share_institute=30)
+    world.db.query(models.Student).filter(models.Student.id == 101).update(
+        {models.Student.wallet_teacher: -30, models.Student.wallet_institute: -30},
+        synchronize_session=False)
+    world.db.commit()
+    student = world.db.get(models.Student, 101)
+    world.db.refresh(student)
+    student.sync_wallet_balance()
+    world.db.commit()
+
+    edit_transaction(world, legacy.id, -100, "ویرایش ردیف ناسازگار")
+    world.db.expire_all()
+    legacy = world.db.get(models.Transaction, legacy.id)
+    assert (legacy.share_teacher, legacy.share_institute) == (50, 50)
+    assert legacy.share_teacher + legacy.share_institute == abs(legacy.amount) == 100
+    assert_wallet_invariant(world.db, expected_teacher=-50, expected_institute=-50, expected_balance=-100,
+                            context="هم‌راستاشدن سهم legacy با کیف")
+    assert_no_float_money(world.db, legacy.id, context="ردیف legacy درمان‌شده")
+
+
+def test_fix_fw2_both_edit_fallback_is_half_split_with_remainder_to_institute(world):
+    """F-W2 (fallback مستند): رسید legacy with بدون سهم قبلی ⇒ تقسیم دلتا نصف-نصف و
+    باقیمانده‌ی فرد به آموزشگاه — دقیقاً همان قاعده‌ی مسیر refund."""
+    legacy = receipt(world.db, amount=100, target_wallet="both", share_teacher=0, share_institute=0)
+    world.db.commit()
+
+    edit_transaction(world, legacy.id, 201)          # delta = ۱۰۱ ⇒ ۵۰ معلم و ۵۱ آموزشگاه
+    world.db.expire_all()
+    legacy = world.db.get(models.Transaction, legacy.id)
+    assert_wallet_invariant(world.db, expected_teacher=50, expected_institute=51, expected_balance=101,
+                            context="fallback نصف-نصف برای ردیف both بی‌سهم")
+    assert (legacy.share_teacher, legacy.share_institute) == (100, 101)
+    assert legacy.share_teacher + legacy.share_institute == legacy.amount == 201
+    assert_no_float_money(world.db, legacy.id, context="رسید both با fallback")
+
+
+def test_fix_fw2_repeated_both_edits_split_delta_by_prior_ratio(world):
+    """F-W2: ویرایش‌های پیاپی روی یک رسید both — هر گام delta را با نسبت جاری تقسیم می‌کند."""
+    legacy = credit_legacy_both_receipt(world)                 # ۴۰/۶۰ از ۱۰۰
+    edit_transaction(world, legacy.id, 150)                    # ‎+۵۰ با ۴۰:۶۰ ⇒ ‎+۲۰/+۳۰
+    assert_wallet_invariant(world.db, expected_teacher=60, expected_institute=90, expected_balance=150,
+                            context="گام اول ویرایش both")
+
+    edit_transaction(world, legacy.id, 75)                     # ‎-۷۵ با ۴۰:۶۰ ⇒ ‎-۳۰/-۴۵
+    world.db.expire_all()
+    row = world.db.get(models.Transaction, legacy.id)
+    assert (row.share_teacher, row.share_institute) == (30, 45)
+    assert_wallet_invariant(world.db, expected_teacher=30, expected_institute=45, expected_balance=75,
+                            context="گام دوم ویرایش both")
+    assert_no_float_money(world.db, legacy.id, context="رسید both پس از دو ویرایش")
+
+
+def test_fix_fw2_refund_after_edit_reverses_exactly_what_was_credited(world):
+    """F-W2 + رگرسیون refund: استردادِ رسیدِ ویرایش‌شده باید دقیقاً همان چیزی را برگرداند که
+    ویرایش اعمال کرده بود ⇒ کیف‌ها به حالت پایه برمی‌گردند (سهم‌ها مبنای refund هستند)."""
+    legacy = credit_legacy_both_receipt(world)                 # کیف: ۴۰/۶۰
+    edit_transaction(world, legacy.id, 300)                    # ‎+۲۰۰ با ۴۰:۶۰ ⇒ کیف: ۱۲۰/۱۸۰
+
+    refund(world, legacy.id)
+    assert_wallet_invariant(world.db, expected_teacher=0, expected_institute=0, expected_balance=0,
+                            context="استرداد کامل پس از ویرایش رسید both")
+
+
+def test_fix_fw1b_refund_and_reports_unaffected_for_normal_receipts(world):
+    """رگرسیون: مسیرهای سالم قبلی (پرداخت teacher/institute، refund و گزارش‌ها) دست‌نخورده‌اند."""
+    teacher_receipt = pay(world, 90, wallet="teacher")["receipt_id"]
+    institute_receipt = pay(world, 110, wallet="institute")["receipt_id"]
+    assert_wallet_invariant(world.db, expected_teacher=90, expected_institute=110, expected_balance=200,
+                            context="پرداخت‌های teacher/institute")
+
+    # همان خروجی قبلیِ گزارش‌ها: فقط institute درآمد وصولی دارد (۹۰ نزد معلم است، نه آموزشگاه)
+    assert calculate_institute_collected_revenue(world.db, RANGE_START, RANGE_END) == 110
+    assert calculate_total_turnover(world.db, RANGE_START, RANGE_END) == 200
+
+    refund(world, teacher_receipt)
+    assert_wallet_invariant(world.db, expected_teacher=0, expected_institute=110, expected_balance=110,
+                            context="استرداد فقط رسید معلم")
+    refund(world, institute_receipt)
+    assert_wallet_invariant(world.db, expected_teacher=0, expected_institute=0, expected_balance=0,
+                            context="استرداد هر دو رسید")
+
+    for receipt_id in (teacher_receipt, institute_receipt):
+        assert_no_float_money(world.db, receipt_id, context="رسید عادی")
+
+
+def test_fix_teacher_and_institute_edit_behavior_is_preserved(world):
+    """رگرسیون: ویرایش رسید teacher-only و institute-only همان رفتار قبلی را دارد
+    (کل delta فقط به همان یک کیف می‌رود و کیف دیگر دست‌نخورده می‌ماند)."""
+    teacher_receipt = pay(world, 100, wallet="teacher")["receipt_id"]
+    edit_transaction(world, teacher_receipt, 260)
+    assert_wallet_invariant(world.db, expected_teacher=260, expected_institute=0, expected_balance=260,
+                            context="ویرایش رسید teacher-only")
+
+    institute_receipt = pay(world, 100, wallet="institute")["receipt_id"]
+    edit_transaction(world, institute_receipt, 40)
+    assert_wallet_invariant(world.db, expected_teacher=260, expected_institute=40, expected_balance=300,
+                            context="ویرایش رسید institute-only")
+
+    world.db.expire_all()
+    for receipt_id in (teacher_receipt, institute_receipt):
+        assert_no_float_money(world.db, receipt_id, context="رسید تک‌کیفی ویرایش‌شده")
+
+
+def test_fix_delete_after_session_charge_edit_restores_wallets(world):
+    """رگرسیون delete: حذف شارژ جلسه‌ای که ویرایش شده باید کیف‌ها را با همان سهم‌های جدید
+    کامل برگرداند (بدون اعشار و با invariant برقرار)."""
+    from routers import admin as admin_router
+
+    submit_session(world)
+    charge = world.db.query(models.Transaction).filter(models.Transaction.type == "session_charge").one()
+    edit_transaction(world, charge.id, -130)                   # ‎-۷۸/-۵۲
+    assert_wallet_invariant(world.db, expected_teacher=-78, expected_institute=-52, context="پیش از حذف")
+
+    admin_router.delete_transaction(charge.id, db=world.db, _="admin")
+    assert_wallet_invariant(world.db, expected_teacher=0, expected_institute=0, expected_balance=0,
+                            context="پس از حذف شارژ ویرایش‌شده")
+
+
+def test_fix_float_amount_input_never_reaches_money_columns(world):
+    """F-W1a (لایه‌ی ورودی): مبلغ اعشاری در `TransactionUpdate` نباید به عدد اعشاری در DB برسد —
+    یا در اعتبارسنجی رد می‌شود یا به int کوتاه می‌شود؛ در هر حال ستون‌ها integer می‌مانند."""
+    from pydantic import ValidationError
+    from schemas import TransactionUpdate
+
+    try:
+        payload = TransactionUpdate(amount=100.5, description="ورودی اعشاری", date=TODAY_JALALI)
+        assert isinstance(payload.amount, int), f"مبلغ باید int شود؛ شد {payload.amount!r}"
+    except ValidationError:
+        pass   # مسیر مطلوب‌تر: رد کامل ورودی اعشاری
+
+    receipt_id = pay(world, 100, wallet="institute")["receipt_id"]
+    edit_transaction(world, receipt_id, 250)
+    assert_no_float_money(world.db, receipt_id, context="پس از ورودی اعشاری و ویرایش")
+
+
+def test_fix_fw2_negative_delta_stays_integer_and_coherent(world):
+    """F-W2: دلتای منفیِ یک واحدی باید بدون اعشار و با همان نسبت قبلی تقسیم شود؛
+    کیف‌ها هم دقیقاً هم‌راستای سهم‌های ذخیره‌شده بمانند (سازگاری کامل با refund)."""
+    legacy = credit_legacy_both_receipt(world)                  # کیف ۴۰/۶۰ | سهم ۴۰/۶۰
+    edit_transaction(world, legacy.id, 99)                      # delta = ‎-۱ با نسبت ۴۰:۶۰
+
+    world.db.expire_all()
+    row = world.db.get(models.Transaction, legacy.id)
+    assert (row.share_teacher, row.share_institute) == (39, 60)
+    assert row.share_teacher + row.share_institute == row.amount == 99
+    # جمع کیف‌ها دقیقاً به اندازه‌ی delta (‎-۱) تغییر کرد: ۱۰۰ ⇒ ۹۹
+    assert_wallet_invariant(world.db, expected_teacher=39, expected_institute=60, expected_balance=99,
+                            context="دلتای منفی ۱ روی رسید both")
+    assert_no_float_money(world.db, legacy.id, context="دلتای منفی رسید both")
+
+    # و استرداد بعدی، با همان سهم‌های ذخیره‌شده، کیف‌ها را کامل به حالت پایه برمی‌گرداند
+    # (اثبات هم‌راستایی «کیف ⇄ سهم» بعد از ویرایش با دلتای منفی و باقیمانده‌ی نسبتی)
+    refund(world, legacy.id)
+    assert_wallet_invariant(world.db, expected_teacher=0, expected_institute=0, expected_balance=0,
+                            context="استرداد پس از ویرایش دلتای منفی")

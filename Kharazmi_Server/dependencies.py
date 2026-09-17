@@ -355,8 +355,14 @@ def reverse_session_financial_impacts(session_id: int, db: Session, commit: bool
             db.refresh(st)
             # FIX: Bug 18 - derive the total only through the shared wallet helper.
             st.sync_wallet_balance()
-    # (حذف Attendance دست‌نخورده — ذاتاً idempotent است و در اسکوپ بچ ۲ نیست.)
-    db.query(Attendance).filter(Attendance.session_id == session_id).delete()
+    # FIX (F-S2): برگشت مالی جلسه، ردیف‌های حضور را **آرشیو** می‌کند نه پاک فیزیکی — الگوی نرم
+    # بقیه‌ی حذف‌های پروژه (SessionLog/Transaction/Enrollment/Installment). سابقه‌ی حضور برای audit
+    # می‌ماند؛ چون قید یکتای (session_id, student_id) برجاست، مسیر ویرایش باید upsert کند
+    # (revive همان ردیف) نه INSERT تازه.
+    # idempotent: UPDATE روی همه‌ی ردیف‌های جلسه، پس اجرای دوباره بی‌اثر است.
+    db.query(Attendance).filter(Attendance.session_id == session_id).update(
+        {Attendance.is_deleted: True}, synchronize_session="fetch"
+    )
     if commit:
         db.commit()
 
@@ -400,6 +406,48 @@ def validate_session_items_membership(db: Session, course_id: int, items) -> Non
         raise HTTPException(
             status_code=422,
             detail=f"این دانش‌آموزان معلق هستند و نمی‌توانند در جلسه ثبت شوند: {suspended}",
+        )
+    # FIX (F-S1): دانش‌آموز آرشیوشده (soft-deleted) هم مثل معلق باید **قبل از** هر نوشتنی رد شود.
+    # پیش‌تر نه عضویتش چک می‌شد و نه معلق بودنش؛ نتیجه این بود که در شمارش حاضرین و سهم‌های
+    # SessionLog «حاضر» حساب می‌شد ولی حلقه‌ی شارژ او را رد می‌کرد ⇒ جلسه با سهم معلمِ بدون وصول.
+    archived = sorted(
+        r[0]
+        for r in db.query(Student.id)
+        .filter(
+            Student.id.in_(list(wanted)),
+            Student.is_deleted == True,
+        )
+        .all()
+    )
+    if archived:
+        raise HTTPException(
+            status_code=422,
+            detail=f"این دانش‌آموزان حذف/آرشیو شده‌اند و نمی‌توانند در جلسه ثبت شوند: {archived}",
+        )
+
+
+def validate_session_item_statuses(items) -> None:
+    """FIX (F-S4): وضعیت هر ردیف حضور/غیاب باید یکی از مقادیر رسمی قرارداد باشد.
+
+    یک اعتبارسنج مرکزی برای همه‌ی مسیرهای ثبت/ویرایش جلسه (schema هم همان قاعده را در مرز HTTP
+    با ۴۲۲ اجرا می‌کند). حتماً قبل از ساخت SessionLog/Attendance/Transaction صدا زده می‌شود.
+    """
+    from validation import ATTENDANCE_STATUSES, validate_attendance_status  # lazy، مثل بقیه‌ی این فایل
+
+    invalid = []
+    for item in items:
+        status = getattr(item, "status", None)
+        try:
+            validate_attendance_status(status)
+        except ValueError:
+            invalid.append(repr(status))
+    if invalid:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"وضعیت حضور نامعتبر است: {', '.join(sorted(set(invalid)))}؛ "
+                f"مقادیر مجاز: {' / '.join(ATTENDANCE_STATUSES)}"
+            ),
         )
 
 

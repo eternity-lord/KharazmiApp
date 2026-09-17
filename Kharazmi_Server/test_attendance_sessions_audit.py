@@ -69,13 +69,18 @@ from sqlalchemy.pool import StaticPool
 
 import models
 from dependencies import reverse_session_financial_impacts
+from today_summary import gregorian_to_jalali
 from financial_calculations import (
     calculate_institute_session_revenue,
     calculate_teacher_session_revenue,
     calculate_total_turnover,
 )
+from pydantic import ValidationError
+
 from routers import attendance, finance, teachers
-from schemas import AttendanceItem, AttendanceSubmitData, HistoryRequest, SettleRequest
+from routers.attendance import QrCheckInRequest
+from schemas import (AttendanceItem, AttendanceSubmitData, HistoryRequest,
+                      SettleRequest, StudentAttendanceHistoryRequest)
 
 TOKEN = "att-admin-token"
 TODAY_JALALI = "1405/06/16"          # تاریخ معتبر و گذشته‌نسبت به امروز
@@ -454,29 +459,111 @@ def test_s08a_deleted_enrollment_is_rejected_without_writes(world):
     assert wallets(world.db, 101) == (0, 0, 0)
 
 
-def test_s08b_finding_deleted_student_counts_as_present_but_charges_nobody(world):
-    """🔎 F-S1 (عمداً fail): دانش‌آموز **soft-deleted** عضو فعال کلاس، در شمارش حاضرین و سهم‌ها
-    «حاضر» حساب می‌شود و SessionLog با `attendee_count=1` و `final_teacher_cost=60` نهایی می‌شود،
-    ولی حلقه‌ی شارژ او را رد می‌کند (`st is None: continue`) ⇒ **نه رکورد حضور، نه تراکنش، نه کسر از کیف**.
+def test_s08b_fix_soft_deleted_student_is_rejected_before_any_write(world):
+    """✅ FIX F-S1 (رگرسیون): دانش‌آموز soft-deleted **قبل از هر نوشتنی** ۴۲۲ می‌گیرد.
 
-    پیامد: جلسه‌ای که کسی در آن شارژ نشده، سهم معلم را بدهکار می‌کند و شمارش حاضرینش دروغ است
-    (گزارش/تسویه‌ی معلم از همین اعداد استفاده می‌کنند). مسیر «معلق» ۴۲۲ می‌دهد (سناریو ۳) اما
-    مسیر «حذف‌شده» بی‌صدا ادامه می‌دهد.
+    قبل از fix: «حاضر» حساب می‌شد (`attendee_count=1`, `final_teacher_cost=60`) ولی نه ردیف حضور می‌گرفت،
+    نه تراکنش، نه کسر کیف — چون حلقه‌ی شارژ او را رد می‌کرد. یعنی جلسه‌ی دروغ + سهم معلم بی‌پشتوانه.
+    حالا مثل مسیر «معلق» (سناریو ۳) و در همان تابع `validate_session_items_membership` رد می‌شود.
     """
-    student = world.db.get(models.Student, 101)
-    student.is_deleted = True
+    world.db.get(models.Student, 101).is_deleted = True
     world.db.commit()
 
     before = financial_snapshot(world.db)
-    submit(world, items((101, "Present")))          # پذیرفته می‌شود
+    with pytest.raises(HTTPException) as error:
+        submit(world, items((101, "Present")))
+    assert error.value.status_code == 422
+    assert "حذف" in str(error.value.detail) or "آرشیو" in str(error.value.detail)
 
-    session = world.db.query(models.SessionLog).one()
-    written = financial_snapshot(world.db) != before
-    assert not written, (
-        "F-S1: جلسه با دانش‌آموز حذف‌شده نباید هیچ نوشتنی داشته باشد؛ "
-        f"attendee_count={session.attendee_count} final_teacher_cost={session.final_teacher_cost} "
-        f"attendance_rows={len(attendance_rows(world.db))} charge_rows={len(charge_rows(world.db, session.id))}"
-    )
+    assert world.db.query(models.SessionLog).count() == 0
+    assert world.db.query(func.count(models.Attendance.id)).scalar() == 0
+    assert world.db.query(models.Transaction).count() == 0
+    assert_no_writes(world.db, before, "F-S1 (دانش‌آموز حذف‌شده)")
+    assert wallets(world.db, 101) == (0, 0, 0)
+    assert counter_value(world.db) in (None, 0), "شمارنده‌ی جلسه مصرف نشود"
+    assert foreign_keys_ok(world.db)
+
+
+def test_s08c_fix_active_student_still_succeeds(world):
+    """✅ FIX F-S1: دانش‌آموز فعال (بدون هیچ فلگ) دقیقاً مثل قبل موفق است — رگرسیون fix."""
+    result = submit(world, items((101, "Present")))
+    session = session_row(world.db, result["session_id"])
+    assert session.attendee_count == 1
+    assert len(attendance_rows(world.db, result["session_id"])) == 1
+    assert_invariant(world.db, 101, "F-S1 (دانش‌آموز فعال)", expected=(-60, -40, -100))
+
+
+def test_s08d_fix_suspended_student_is_rejected_too(world):
+    """✅ رگرسیون سناریو ۳: مسیر «معلق» دست‌نخورده مانده است (۴۲۲ + بی‌اثری کامل)."""
+    world.db.get(models.Student, 101).is_suspended = True
+    world.db.commit()
+    before = financial_snapshot(world.db)
+    with pytest.raises(HTTPException) as error:
+        submit(world, items((101, "Present")))
+    assert error.value.status_code == 422
+    assert_no_writes(world.db, before, "سناریو ۳ (معلق)")
+
+
+def test_s08e_fix_deleted_student_is_rejected_in_edit_path_too(world):
+    """✅ FIX F-S1: مسیر جایگزین (ویرایش جلسه) هم با دانش‌آموز آرشیوشده جلسه‌ی مالی نمی‌سازد."""
+    first = submit(world, items((101, "Present")))
+    world.db.get(models.Student, 102).is_deleted = True
+    world.db.commit()
+    before = financial_snapshot(world.db)
+
+    with pytest.raises(HTTPException) as error:
+        edit(world, first["session_code"], items((101, "Present"), (102, "Present")))
+    assert error.value.status_code == 422
+    assert {t.id for t in active_charge_rows(world.db, first["session_id"])} == \
+        {t.id for t in charge_rows(world.db, first["session_id"])}
+    assert {r.student_id for r in attendance_rows(world.db, first["session_id"])} == {101}
+
+
+def _student_session(world, student_id=101, token="st-token"):
+    """ساخت سشن نقش student برای مسیر QR (مسیر واقعی: توکن شاگرد، نه ادمین)."""
+    user = models.User(id=9000 + student_id, username=f"st{student_id}", password="unused",
+                       role="student", sub_role="student", branch_id=1)
+    world.db.add(user)
+    world.db.flush()
+    world.db.get(models.Student, student_id).user_id = user.id
+    world.db.add(models.UserSession(token=token, user_id=user.id, sub_role="student",
+                                    created_at=datetime.datetime.now()))
+    world.db.commit()
+    return token
+
+
+def test_s08f_fix_deleted_student_is_rejected_in_qr_path(world):
+    """✅ FIX F-S1: مسیر جایگزین QR هم با دانش‌آموز آرشیوشده هیچ ردیف حضوری نمی‌سازد."""
+    token = _student_session(world)
+    world.db.get(models.Student, 101).is_deleted = True
+    world.db.commit()
+    before = financial_snapshot(world.db)
+
+    with pytest.raises(HTTPException) as error:
+        attendance.qr_student_check_in(
+            QrCheckInRequest(session_code=1, token="x", expires_at=0.0, salt="s"),
+            authorization=f"Bearer {token}", db=world.db, role="student")
+    assert error.value.status_code in (401, 403), "شاگرد آرشیوشده نباید بتواند حضور QR ثبت کند"
+    assert_no_writes(world.db, before, "F-S1 (QR، شاگرد آرشیوشده)")
+    assert world.db.query(func.count(models.Attendance.id)).scalar() == 0
+
+
+def test_s08g_fix_qr_path_still_works_for_active_student_of_today(world):
+    """✅ FIX F-S1: مسیر QR برای شاگرد فعالِ همان روز دست‌نخورده کار می‌کند (رگرسیون)."""
+    token = _student_session(world)
+    # مسیر QR فقط جلسه‌ی «همان روز سرور» را می‌پذیرد ⇒ تاریخ جلالی امروز را در زمان اجرا می‌سازیم.
+    jy, jm, jd = gregorian_to_jalali(datetime.datetime.utcnow().date())
+    today_real = f"{jy:04d}/{jm:02d}/{jd:02d}"
+    first = submit(world, items((101, "Absent")), date=today_real)  # بعد QR وضعیت را Present می‌کند
+
+    result = attendance.qr_student_check_in(
+        QrCheckInRequest(session_code=first["session_code"], token="x", expires_at=0.0, salt="s"),
+        authorization=f"Bearer {token}", db=world.db, role="student")
+
+    assert "موفق" in result["message"]
+    rows = attendance_rows(world.db, first["session_id"])
+    assert len(rows) == 1 and rows[0].status == "Present" and rows[0].is_deleted is False
+    assert_invariant(world.db, 101, "F-S1 (QR شاگرد فعال)")
 
 
 # ==========================================
@@ -760,24 +847,67 @@ def test_s19a_soft_delete_reverts_active_financial_effect_once(world):
     assert_invariant(world.db, 101, "سناریو ۱۹ (حذف تکراری)", expected=(0, 0, 0))
 
 
-def test_s19b_finding_delete_destroys_attendance_history(world):
-    """🔎 F-S2 (عمداً fail): `reverse_session_financial_impacts` ردیف‌های حضور را **فیزیکی** پاک می‌کند
-    (`db.query(Attendance)...delete()` در dependencies.py)، پس با حذف جلسه سابقه‌ی حضور/غیاب
-    برای همیشه از بین می‌رود — در حالی که همه‌ی حذف‌های دیگر پروژه (Enrollment/Installment/Transaction/
-    SessionLog) نرم‌اند و برای همین دلیل نگه داشته شده‌اند.
+def test_s19b_fix_attendance_history_is_archived_not_destroyed(world):
+    """✅ FIX F-S2 (رگرسیون): حذف/برگشت جلسه، ردیف‌های حضور را **آرشیو** می‌کند نه پاک فیزیکی.
 
-    انتظار: پس از حذف جلسه، سابقه‌ی حضور هم مثل بقیه آرشیو بماند (یا حداقل نشانی از حذف داشته باشد).
+    قبل از fix: `reverse_session_financial_impacts` با `.delete()` سابقه‌ی حضور را نابود می‌کرد
+    و هیچ فلگ آرشیوی هم وجود نداشت. حالا مثل بقیه‌ی حذف‌های پروژه نرم است و برای audit می‌ماند.
     """
     first = submit(world, items((101, "Present"), (102, "Absent")))
-    assert len(attendance_rows(world.db, first["session_id"])) == 2, "قبل از حذف دو ردیف حضور داریم"
+    session_id = first["session_id"]
+    assert len(attendance_rows(world.db, session_id)) == 2, "قبل از حذف دو ردیف حضور داریم"
 
     delete(world, first["session_code"])
 
-    remaining = attendance_rows(world.db, first["session_id"])
-    assert len(remaining) == 2, (
-        "F-S2: با حذف جلسه، سابقه‌ی حضور فیزیکی پاک شد "
-        f"(ردیف‌های باقی‌مانده: {len(remaining)}) و هیچ فلگ آرشیوی هم وجود ندارد"
-    )
+    remaining = attendance_rows(world.db, session_id)
+    assert len(remaining) == 2, "سابقه‌ی حضور باید بماند (آرشیو نرم)"
+    assert all(r.is_deleted is True for r in remaining), "ردیف‌ها باید is_deleted=True داشته باشند"
+    assert {r.student_id for r in remaining} == {101, 102}
+    assert foreign_keys_ok(world.db)
+    # اجرای دوباره‌ی reverse نباید چیزی را خراب کند یا اثر مالی مضاعف بسازد
+    reverse_session_financial_impacts(session_id, world.db)
+    assert len(attendance_rows(world.db, session_id)) == 2
+    assert all(r.is_deleted is True for r in attendance_rows(world.db, session_id))
+    assert_invariant(world.db, 101, "سناریو ۱۹ (reverse دوباره)", expected=(0, 0, 0))
+
+
+def test_s19d_fix_archived_attendance_is_invisible_to_active_reads_and_settlement(world):
+    """✅ FIX F-S2: ردیف آرشیوشده در گزارش‌های فعال، تاریخچه و تسویه‌ی معلم شمرده نمی‌شود."""
+    first = submit(world, items((101, "Present"), (102, "Present")))
+    session_id = first["session_id"]
+    delete(world, first["session_code"])
+
+    # تاریخچه‌ی جلسات و جزئیات جلسه: جلسه‌ی حذف‌شده هیچ ردیف حضوری نشان نمی‌دهد
+    assert attendance.get_history(HistoryRequest(course_id=world.course.id), db=world.db,
+                                  authorization=f"Bearer {TOKEN}", sub_role="admin") == []
+
+    # گزارش تکی شاگرد: جلسه‌ی حذف‌شده و ردیف آرشیوشده‌اش هیچ‌کدام دیده نمی‌شوند
+    payload = attendance.get_student_attendance_history(
+        StudentAttendanceHistoryRequest(student_id=101, course_id=world.course.id), db=world.db,
+        authorization=f"Bearer {TOKEN}", sub_role="admin")
+    assert payload["total_sessions"] == 0
+    assert payload["present_count"] == 0 and payload["absent_count"] == 0
+    assert all(row["session_id"] != session_id for row in payload["attendance_history"])
+
+    # تسویه‌ی معلم: نه جلسه و نه جریمه‌ای برای تسویه هست
+    with pytest.raises(HTTPException) as error:
+        settle(world, [session_id])
+    assert error.value.status_code == 400
+    assert world.db.query(models.Settlement).count() == 0
+
+
+def test_s19e_fix_new_session_on_the_same_date_still_works_after_soft_delete(world):
+    """✅ FIX F-S2: ردیف‌های آرشیوشده ثبت جلسه‌ی جدید در همان تاریخ را قفل نمی‌کنند."""
+    first = submit(world, items((101, "Present")))
+    delete(world, first["session_code"])
+
+    second = submit(world, items((101, "Present")))
+    assert second["session_id"] != first["session_id"]
+    assert len(attendance_rows(world.db, second["session_id"])) == 1
+    assert attendance_rows(world.db, second["session_id"])[0].is_deleted is False
+    assert len(active_charge_rows(world.db, second["session_id"])) == 1
+    assert_invariant(world.db, 101, "سناریو ۱۹ (ثبت دوباره)", expected=(-60, -40, -100))
+    assert foreign_keys_ok(world.db)
 
 
 def test_s19c_delete_keeps_financial_documents_and_links_intact(world):
@@ -1058,11 +1188,19 @@ def test_s24e_settled_session_is_locked_for_edit_and_delete(world):
     assert_invariant(world.db, 101, "سناریو ۲۴ (قفل تسویه)", expected=(-60, -40, -100))
 
 
-def test_s24f_empty_session_has_nothing_to_settle(world):
-    """جلسه‌ی بدون هیچ حاضر/جریمه قابل تسویه نیست (رد می‌شود) — پیام خطا گمراه‌کننده است."""
-    first = submit(world, [])
+def test_s24f_legacy_empty_session_has_nothing_to_settle(world):
+    """جلسه‌ی بدون هیچ حاضر/جریمه قابل تسویه نیست (رد می‌شود) — پیام خطا گمراه‌کننده است.
+
+    توجه: از FIX F-S3 به بعد جلسه‌ی خالی از API ساخته نمی‌شود؛ این ردیف **legacy** را مستقیم در DB
+    می‌سازیم تا رفتار تسویه با داده‌ی قدیمی (که در دیتابیس‌های موجود وجود دارد) مستند بماند.
+    """
+    legacy = models.SessionLog(course_id=world.course.id, date=OTHER_JALALI, session_code=999001,
+                               final_teacher_cost=0, final_institute_share=0, cost_per_student=0,
+                               attendee_count=0)
+    world.db.add(legacy)
+    world.db.commit()
     with pytest.raises(HTTPException) as error:
-        settle(world, [first["session_id"]])
+        settle(world, [legacy.id])
     assert error.value.status_code == 400
     assert "قبلاً تسویه شده" in str(error.value.detail), "پیام فعلی «قبلاً تسویه شده» است نه «چیزی برای تسویه»"
     assert world.db.query(models.Settlement).count() == 0
@@ -1222,29 +1360,196 @@ def test_s27b_concurrent_reverse_credits_the_wallet_only_once(file_world):
 # ==========================================
 # یافته‌های تکمیلی (خارج از شماره‌گذاری ۲۷ سناریو)
 # ==========================================
-def test_s_ext_items_finding_empty_attendee_list_occupies_the_date(world):
-    """🔎 F-S3 (عمداً fail): `items=[]` پذیرفته می‌شود و یک SessionLog می‌سازد که همان (کلاس، تاریخ)
-    را اشغال می‌کند؛ ثبت واقعی بعدی همان روز **۴۰۹** می‌گیرد — یعنی یک درخواست بی‌محتوا می‌تواند
-    جلسه‌ی واقعی کلاس را قفل کند."""
-    submit(world, [])
-    assert world.db.query(func.count(models.SessionLog.id)).scalar() == 0, \
-        "F-S3: درخواست بدون هیچ ردیف حضور/غیاب نباید جلسه بسازد"
+def test_fix_fs3_empty_attendee_list_is_rejected_and_does_not_lock_the_date(world):
+    """✅ FIX F-S3 (رگرسیون): درخواست بدون هیچ ردیف حضور/غیاب رد می‌شود و تاریخ را قفل نمی‌کند.
 
-    # و اگر ساخته نشد، ثبت واقعی باید موفق باشد
-    submit(world, items((101, "Present")))
-
-
-@pytest.mark.parametrize("bogus_status", ["banana", "present", "PRESENT", "حاضر", ""])
-def test_s_ext_status_finding_unknown_status_is_silently_free(world, bogus_status):
-    """🔎 F-S4 (عمداً fail): وضعیت ناشناخته/کوچک‌نویس پذیرفته می‌شود، ردیف حضور با همان متن ثبت
-    می‌شود و **هیچ شارژی** رخ نمی‌دهد (`should_charge=False`) — نه خطا، نه هشدار.
-    یعنی یک تایپ ساده در کلاینت بی‌صدا درآمد جلسه را صفر می‌کند.
-
-    انتظار: فقط وضعیت‌های معتبر پروژه (`Present`/`Late`/`Absent` طبق `models.Attendance.status`
-    و فیلترهای is_billed/جریمه) پذیرفته شوند و بقیه مثل خطای تاریخ/عضویت ⇒ ۴۲۲.
+    قبل از fix: `items=[]` یک SessionLog خالی می‌ساخت؛ ثبت واقعی همان روز بعداً ۴۰۹ می‌گرفت.
+    حالا: (۱) schema با `min_length=1` ⇒ ۴۲۲، (۲) گارد داخل endpoint ⇒ ۴۲۲ برای فراخوان مستقیم.
     """
     before = financial_snapshot(world.db)
+
+    # ۱) مرز HTTP: اعتبارسنجی pydantic
+    with pytest.raises(ValidationError):
+        AttendanceSubmitData(course_id=1, date=TODAY_JALALI, items=[])
+
+    # ۲) فراخوان مستقیم تابعی (دور زدن schema) — گارد endpoint
     with pytest.raises(HTTPException) as error:
-        submit(world, items((101, bogus_status)))
-    assert error.value.status_code == 422, f"وضعیت {bogus_status!r} باید رد شود"
+        attendance.submit_session_and_calculate(
+            SimpleNamespace(course_id=world.course.id, date=TODAY_JALALI, items=[]),
+            db=world.db, authorization=f"Bearer {TOKEN}", sub_role="admin")
+    assert error.value.status_code == 422
+    assert "خالی" in str(error.value.detail)
+
+    assert_no_writes(world.db, before, "F-S3")
+    assert wallets(world.db, 101) == (0, 0, 0)
+
+    # ۳) و حالا ثبت واقعی همان (کلاس، تاریخ) باید موفق باشد
+    result = submit(world, items((101, "Present")))
+    assert session_row(world.db, result["session_id"]).attendee_count == 1
+    assert_invariant(world.db, 101, "F-S3 (ثبت بعدی)", expected=(-60, -40, -100))
+
+
+def test_fix_fs3_edit_cannot_empty_the_session(world):
+    """✅ FIX F-S3: ویرایش هم نمی‌تواند جلسه را به «هیچ‌کس» تبدیل کند."""
+    first = submit(world, items((101, "Present")))
+    before_ids = {t.id for t in active_charge_rows(world.db, first["session_id"])}
+
+    with pytest.raises(HTTPException) as error:
+        attendance.edit_past_session(
+            first["session_code"],
+            SimpleNamespace(course_id=world.course.id, date=TODAY_JALALI, items=[]),
+            db=world.db, authorization=f"Bearer {TOKEN}", sub_role="admin")
+    assert error.value.status_code == 422
+
+    assert {t.id for t in active_charge_rows(world.db, first["session_id"])} == before_ids
+    assert len(attendance_rows(world.db, first["session_id"])) == 1
+    assert_invariant(world.db, 101, "F-S3 (ویرایش خالی)", expected=(-60, -40, -100))
+
+
+def test_fix_fs3_live_session_with_empty_roster_creates_no_session(world):
+    """✅ FIX F-S3 (کلاس زنده): راستر خالی ⇒ جلسه ساخته نمی‌شود، ولی بستن کلاس زنده سالم تمام می‌شود."""
+    live = models.LiveSession(course_id=world.course.id, status="LIVE", live_roster="{}",
+                              started_at_ts=datetime.datetime.now().timestamp())
+    world.db.add(live)
+    world.db.commit()
+
+    result = attendance.finalize_live_session(world.db, live)
+    assert result["session_id"] is None
+    assert world.db.query(models.SessionLog).count() == 0
+    assert live.status == "ENDED"
+    assert world.db.query(func.count(models.Attendance.id)).scalar() == 0
+
+
+@pytest.mark.parametrize("bogus_status", ["banana", "present", "PRESENT", "حاضر", "", "Late ", "present "])
+def test_fix_fs4_invalid_status_is_rejected_without_any_write(world, bogus_status):
+    """✅ FIX F-S4 (رگرسیون): فقط `Present`/`Late`/`Absent` (وضعیت‌های واقعی کلاینت اندروید) پذیرفته می‌شوند.
+
+    قبل از fix: هر متنی بی‌صدا ذخیره می‌شد و هیچ شارژی رخ نمی‌داد (`should_charge=False`) —
+    یک تایپ ساده درآمد جلسه را صفر می‌کرد. حالا enum/validator مرکزی ⇒ ۴۲۲ قبل از هر نوشتن.
+    """
+    before = financial_snapshot(world.db)
+
+    # لایه‌ی schema (مرز HTTP)
+    with pytest.raises(ValidationError):
+        AttendanceItem(student_id=101, status=bogus_status)
+
+    # لایه‌ی endpoint (فراخوان مستقیم / مسیرهای دیگر مثل QR و کلاس زنده) — schema دور زده می‌شود
+    raw = SimpleNamespace(course_id=world.course.id, date=TODAY_JALALI,
+                          items=[SimpleNamespace(student_id=101, status=bogus_status, excused=False)])
+    with pytest.raises(HTTPException) as error:
+        attendance.submit_session_and_calculate(
+            raw, db=world.db, authorization=f"Bearer {TOKEN}", sub_role="admin")
+    assert error.value.status_code == 422
     assert_no_writes(world.db, before, f"وضعیت نامعتبر {bogus_status!r}")
+    assert world.db.query(models.SessionLog).count() == 0
+    assert counter_value(world.db) in (None, 0)
+
+
+@pytest.mark.parametrize("good_status", ["Present", "Late", "Absent"])
+def test_fix_fs4_valid_statuses_are_accepted(world, good_status):
+    """✅ FIX F-S4: سه وضعیت معتبر پروژه بدون هیچ تغییری در رفتار مالی پذیرفته می‌شوند."""
+    result = submit(world, items((101, good_status)))
+    rows = attendance_rows(world.db, result["session_id"])
+    assert len(rows) == 1 and rows[0].status == good_status and rows[0].is_deleted is False
+    assert_invariant(world.db, 101, f"وضعیت معتبر {good_status}")
+
+
+def test_fix_fs4_late_is_charged_exactly_like_present(world):
+    """✅ FIX F-S4: `Late` مثل `Present` شارژ می‌شود (سیاست پروژه: is_billed + Present/Late)."""
+    present = submit(world, items((101, "Present")))
+    present_snapshot = [
+        (t.type, t.amount, t.session_id) for t in active_charge_rows(world.db, present["session_id"])
+    ]
+    delete(world, present["session_code"])
+
+    late = submit(world, items((101, "Late")))
+    late_snapshot = [
+        (t.type, t.amount, t.session_id) for t in active_charge_rows(world.db, late["session_id"])
+    ]
+    assert [x[:2] for x in late_snapshot] == [x[:2] for x in present_snapshot]
+    assert session_row(world.db, late["session_id"]).attendee_count == 1
+    assert_invariant(world.db, 101, "Late == Present", expected=(-60, -40, -100))
+
+
+def test_fix_fs4_edit_rejects_invalid_status_and_keeps_previous_state(world):
+    """✅ FIX F-S4: ویرایش با وضعیت نامعتبر هیچ اثری روی وضعیت و شارژ قبلی ندارد."""
+    first = submit(world, items((101, "Present")))
+    before_amounts = sorted(t.amount for t in active_charge_rows(world.db, first["session_id"]))
+
+    raw = SimpleNamespace(course_id=world.course.id, date=TODAY_JALALI,
+                          items=[SimpleNamespace(student_id=101, status="banana", excused=False)])
+    with pytest.raises(HTTPException) as error:
+        attendance.edit_past_session(first["session_code"], raw, db=world.db,
+                                     authorization=f"Bearer {TOKEN}", sub_role="admin")
+    assert error.value.status_code == 422
+
+    rows = attendance_rows(world.db, first["session_id"])
+    assert len(rows) == 1 and rows[0].status == "Present"
+    assert sorted(t.amount for t in active_charge_rows(world.db, first["session_id"])) == before_amounts
+    assert_invariant(world.db, 101, "F-S4 (ویرایش نامعتبر)", expected=(-60, -40, -100))
+
+
+def test_fix_os2_student_history_with_active_sessions_does_not_crash(world):
+    """✅ FIX (O-S2 — کشف حین fix): تاریخچه‌ی حضور شاگرد در کلاسی که جلسه دارد نباید ۵۰۰ بدهد.
+
+    قبل از fix: سطر مرده‌ی `present_count.float()` در `get_student_attendance_history` برای هر
+    کلاس با ≥۱ جلسه AttributeError می‌داد (سطر بعدی همان محاسبه‌ی درست را داشت).
+    """
+    first = submit(world, items((101, "Present"), (102, "Absent")))
+    payload = attendance.get_student_attendance_history(
+        StudentAttendanceHistoryRequest(student_id=101, course_id=world.course.id), db=world.db,
+        authorization=f"Bearer {TOKEN}", sub_role="admin")
+    assert payload["total_sessions"] == 1
+    assert payload["present_count"] == 1 and payload["absent_count"] == 0
+    assert payload["attendance_rate"] == 100.0
+    assert [row["session_id"] for row in payload["attendance_history"]] == [first["session_id"]]
+    assert payload["attendance_history"][0]["status"] == "حاضر"
+
+    # جلسه‌ای که شاگرد در آن غایب است هم درست گزارش می‌شود (نرخ ۵۰٪)
+    submit(world, items((101, "Absent")), date=OTHER_JALALI)
+    payload2 = attendance.get_student_attendance_history(
+        StudentAttendanceHistoryRequest(student_id=101, course_id=world.course.id), db=world.db,
+        authorization=f"Bearer {TOKEN}", sub_role="admin")
+    assert payload2["total_sessions"] == 2 and payload2["present_count"] == 1
+    assert payload2["attendance_rate"] == 50.0
+    assert_invariant(world.db, 101, "O-S2")
+
+
+def test_fix_fs4_migration_autopatch_adds_is_deleted_to_legacy_attendances(tmp_path, monkeypatch):
+    """✅ FIX F-S2 (migration): دیتابیس قدیمی بدون ستون `attendances.is_deleted` خودکار وصله می‌شود
+    و اجرای دوباره idempotent است (بدون از دست دادن هیچ ردیف تاریخی/مالی)."""
+    import main as server_main
+    from sqlalchemy import create_engine as _create_engine
+    from sqlalchemy.orm import sessionmaker as _sessionmaker
+
+    engine = _create_engine(f"sqlite:///{tmp_path / 'legacy.db'}", connect_args={"check_same_thread": False})
+    with engine.begin() as connection:
+        connection.execute(text("""
+            CREATE TABLE attendances (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id INTEGER, student_id INTEGER, status TEXT,
+                is_billed BOOLEAN, excused BOOLEAN, note TEXT)
+        """))
+        connection.execute(text(
+            "INSERT INTO attendances (session_id, student_id, status, is_billed, excused, note)"
+            " VALUES (7, 101, 'Present', 0, 0, 'legacy')"))
+    monkeypatch.setattr(models, "engine", engine)
+    monkeypatch.setattr(models, "SessionLocal", _sessionmaker(bind=engine))
+
+    server_main.auto_patch_database()
+    server_main.auto_patch_database()   # idempotency
+
+    with engine.connect() as connection:
+        columns = {row[1]: row for row in connection.execute(text("PRAGMA table_info(attendances)"))}
+        assert "is_deleted" in columns, "ستون آرشیو باید اضافه شود"
+        row = connection.execute(text(
+            "SELECT id, session_id, student_id, status, note, is_deleted FROM attendances")).one()
+    assert (row[1], row[2], row[3], row[4]) == (7, 101, "Present", "legacy"), \
+        "هیچ ردیف تاریخی نباید جابه‌جا/حذف شود"
+    with engine.connect() as connection:
+        assert connection.execute(text("SELECT COUNT(*) FROM attendances")).scalar() == 1
+    assert row[5] is False or row[5] == 0, "ردیف legacy باید is_deleted=False بگیرد"
+
+    with engine.connect() as connection:
+        assert sum(1 for r in connection.execute(text("PRAGMA table_info(attendances)")) if r[1] == "is_deleted") == 1
+    engine.dispose()

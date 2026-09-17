@@ -103,3 +103,20 @@ def normalize_installments(installments) -> List[Tuple[int, str]]:
     """همه‌ی اقساط یک درخواست؛ اولین قسط نامعتبر ValueError با پیام فارسی می‌دهد."""
     return [normalize_installment_fields(inst.amount, inst.due_date) for inst in (installments or [])]
 
+
+# ---------------------------------------------------------------------------
+# FIX (F-S4): وضعیت حضور/غیاب — یک قرارداد واحد برای همه‌ی مسیرهای ثبت جلسه
+# مقادیر از کلاینت رسمی استخراج شد (KharazmiAdmin: AttendanceActivity.kt / LiveClassActivity.kt /
+# LiveApi.kt) و با همه‌ی فیلترهای سرور (is_billed، جریمه‌ی غیبت، گزارش‌ها) یکی است:
+# فقط Present / Late / Absent. هیچ نسخه‌ی کوچک‌نویس/فارسی در قرارداد وجود ندارد، پس normalize
+# نمی‌کنیم؛ ورودی دیگر رد می‌شود (پیش‌تر بی‌صدا و بدون شارژ ثبت می‌شد).
+# ---------------------------------------------------------------------------
+ATTENDANCE_STATUSES = ("Present", "Late", "Absent")
+
+
+def validate_attendance_status(value) -> str:
+    """وضعیت حضور باید عیناً یکی از مقادیر رسمی قرارداد باشد (حساس به حروف)."""
+    if not isinstance(value, str) or value not in ATTENDANCE_STATUSES:
+        raise ValueError("وضعیت حضور باید یکی از Present / Late / Absent باشد")
+    return value
+

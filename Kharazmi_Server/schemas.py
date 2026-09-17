@@ -8,6 +8,7 @@ import datetime
 from pydantic import field_validator, model_validator
 from validation import (
     NationalCodeRequest,
+    validate_attendance_status,
     validate_installment_amount,
     validate_jalali_due_date,
 )
@@ -135,10 +136,18 @@ class AttendanceItem(BaseModel):
     status: str
     excused: Optional[bool] = False
 
+    # FIX (F-S4): فقط Present / Late / Absent (قرارداد رسمی کلاینت اندروید + همه‌ی فیلترهای سرور).
+    @field_validator("status")
+    @classmethod
+    def _validate_status(cls, value):
+        return validate_attendance_status(value)
+
 class AttendanceSubmitData(BaseModel):
     course_id: int
     date: str
-    items: List[AttendanceItem]
+    # FIX (F-S3): جلسه‌ی بی‌محتوا ممنوع — پیش‌تر items=[] یک SessionLog می‌ساخت و تاریخ کلاس را
+    # قفل می‌کرد (ثبت واقعی بعدی ۴۰۹ می‌گرفت). مرز HTTP ⇒ ۴۲۲ (رفتار استاندارد FastAPI).
+    items: List[AttendanceItem] = Field(min_length=1)
 
 class SmsSendRequest(BaseModel):
     target_group: str

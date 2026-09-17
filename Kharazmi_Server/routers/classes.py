@@ -542,14 +542,17 @@ def get_class_full_report(id: int, db: Session = Depends(get_db), authorization:
     session_history = []
     for sess in sessions:
         # برای هر جلسه، تعداد حاضرین و غایبین رو از جدول Attendance میشماریم
+        # FIX (F-S2): ردیف‌های آرشیوشده در شمارش گزارش کلاس نمی‌آیند.
         p_count = (
             db.query(Attendance)
-            .filter(Attendance.session_id == sess.id, Attendance.status == "Present")
+            .filter(Attendance.session_id == sess.id, Attendance.status == "Present",
+                    Attendance.is_deleted == False)
             .count()
         )
         a_count = (
             db.query(Attendance)
-            .filter(Attendance.session_id == sess.id, Attendance.status == "Absent")
+            .filter(Attendance.session_id == sess.id, Attendance.status == "Absent",
+                    Attendance.is_deleted == False)
             .count()
         )
 
@@ -647,7 +650,7 @@ def get_class_students_excel(class_id: int, db: Session = Depends(get_db), _: st
             present_count = 0
             absent_count = 0
             for session in sessions:
-                att = db.query(Attendance).filter(Attendance.session_id == session.id, Attendance.student_id == st.id).first()
+                att = db.query(Attendance).filter(Attendance.session_id == session.id, Attendance.student_id == st.id, Attendance.is_deleted == False).first()
                 if att:
                     if att.status in ["Present", "Late"]:
                         present_count += 1
@@ -755,6 +758,7 @@ def get_class_students_full(id: int, db: Session = Depends(get_db), authorizatio
                     .filter(
                         Attendance.session_id == session.id,
                         Attendance.student_id == st.id,
+                        Attendance.is_deleted == False
                     )
                     .first()
                 )
@@ -910,6 +914,7 @@ def _build_class_deletion_snapshot(db: Session, course) -> dict:
             attended = db.query(func.count(Attendance.id)).filter(
                 Attendance.session_id.in_(session_ids),
                 Attendance.student_id == en.student_id,
+                Attendance.is_deleted == False,   # FIX (F-S2): آرشیوشده‌ها در «جلسات حاضرشده» نمی‌آیند.
                 Attendance.status.in_(["Present", "Late"])
             ).scalar() or 0
         final_tuition, _ = get_enrollment_tuition_and_discount(en)
@@ -933,6 +938,7 @@ def _build_class_deletion_snapshot(db: Session, course) -> dict:
         unbilled = {r[0] for r in db.query(Attendance.session_id).filter(
             Attendance.session_id.in_(session_ids),
             Attendance.is_billed == False,
+            Attendance.is_deleted == False,   # FIX (F-S2): آرشیوشده‌ها طلب معلم را باز نمی‌کنند.
             Attendance.status.in_(["Present", "Late"])
         ).distinct().all()}
         # FIX: H6(A2) - طلب معلم = مبالغ قراردادی + جریمه‌ی غایبین غیرموجه.

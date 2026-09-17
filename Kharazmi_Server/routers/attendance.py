@@ -16,8 +16,10 @@ from models import (
 from schemas import (
     HistoryRequest, LoginRequest, TeacherInfo, FullTeacherProfile, StudentCreate, TeacherCreate, CourseCreate, EnrollmentCreate, GradeCreate, GradeItem, AttendanceLogRequest, AttendanceItem, AttendanceSubmitData, SmsSendRequest, ChangePasswordRequest, StudentProfileInfo, FullStudentProfile, TeacherProfileInfo, FullTeacherProfile, ClassReportInfo, ClassStudentData, ClassSessionHistory, FullClassReport, ShareConfigModel, StudentUpdate, TeacherUpdate, PersonListItem, TransactionUpdate, StudentAttendanceHistoryRequest, AdvancedSearchItem, FinanceSubmitData, PrintReceiptRequest, TransactionTestData
 )
-from dependencies import get_db, check_admin_access, check_user_login, get_enrollment_tuition_and_discount, SESSION_EXPIRY_DAYS, get_session_student, get_session_parent, validate_session_items_membership
+from dependencies import get_db, check_admin_access, check_user_login, get_enrollment_tuition_and_discount, SESSION_EXPIRY_DAYS, get_session_student, get_session_parent, validate_session_items_membership, validate_session_item_statuses
 from financial_calculations import compute_session_shares
+# FIX (F-S4): قرارداد واحد وضعیت حضور — هم در schema و هم در مسیرهای داخلی (کلاس زنده).
+from validation import validate_attendance_status
 
 router = APIRouter()
 
@@ -53,6 +55,29 @@ def _verify_live_course_teacher(db: Session, course, authorization, sub_role, ac
     logged = get_logged_in_teacher(db, authorization)
     if not logged or logged.id != course.teacher_id:
         raise HTTPException(status_code=403, detail=f"شما مالک این کلاس نیستید و مجاز به مدیریت {action_label} نیستید")
+
+
+def _upsert_attendance_row(db: Session, session_id: int, student_id: int, status: str, excused: bool):
+    """FIX (F-S2): یک ردیف حضور به‌ازای هر (جلسه، دانش‌آموز) — بدون INSERT تکراری.
+
+    قید یکتای `uq_attendance_session_student` برجاست و ردیف آرشیوشده هم سطرش را نگه می‌دارد، پس
+    ویرایش جلسه/ثبت دوباره باید همان ردیف را احیا (revive) کند نه ردیف تازه بسازد. این تابع در
+    حلقه‌های ثبت و ویرایش استفاده می‌شود تا رفتار یکی باشد.
+    """
+    row = (
+        db.query(Attendance)
+        .filter(Attendance.session_id == session_id, Attendance.student_id == student_id)
+        .first()
+    )
+    if row is None:
+        row = Attendance(session_id=session_id, student_id=student_id, status=status, excused=excused,
+                         is_billed=False, is_deleted=False)
+        db.add(row)
+        return row
+    row.status = status
+    row.excused = excused
+    row.is_deleted = False
+    return row
 
 
 def claim_live_session_for_finalize(db: Session, session_id: int, auto: bool = False) -> bool:
@@ -94,12 +119,37 @@ def finalize_live_session(db: Session, live: LiveSession) -> dict:
         roster = {}
 
     items = []
+    skipped_ineligible = []
     for sid_str, entry in roster.items():
         if not isinstance(entry, dict):
             continue
         try:
             sid = int(sid_str)
         except Exception:
+            continue
+        # FIX (F-S4): راسترِ legacy ممکن است وضعیت غیرمجاز داشته باشد؛ به‌جای ۵۰۰ شدن بستن جلسه،
+        # ردیف نامعتبر نادیده گرفته می‌شود (هیچ مالی برایش جابه‌جا نمی‌شود).
+        try:
+            validate_attendance_status(str(entry.get("status", "Present")))
+        except ValueError:
+            skipped_ineligible.append(sid)
+            continue
+        # FIX (F-S1): دانش‌آموز حذف‌شده/معلق/بدون عضویت فعال نباید در جلسه بیاید. راستر داده‌ی UI است،
+        # پس اینجا ردیف نامواجد **فیلتر** می‌شود (به‌جای رد کل بستن جلسه) تا finalize کلاس زنده
+        # به‌خاطر آرشیو شدن یک دانش‌آموز وسط کلاس شکست نخورد؛ اصولاً هیچ ردیفی از او نوشته نمی‌شود.
+        student = (
+            db.query(Student)
+            .filter(Student.id == sid, Student.is_deleted == False, Student.is_suspended == False)
+            .first()
+        )
+        enrolled = (
+            db.query(Enrollment)
+            .filter(Enrollment.student_id == sid, Enrollment.course_id == course.id,
+                    Enrollment.is_deleted == False)
+            .first()
+        )
+        if student is None or enrolled is None:
+            skipped_ineligible.append(sid)
             continue
         items.append(
             AttendanceItem(
@@ -109,12 +159,22 @@ def finalize_live_session(db: Session, live: LiveSession) -> dict:
             )
         )
 
-    # FIX F-C6(a): راستر خالی = صفر حاضر (نه همه حاضر). items خالی دست‌نخورده به submit می‌رسد:
-    # SessionLog با صفر حاضر ساخته می‌شود (تاریخچه حفظ) ولی present_count=0 یعنی صفر تومان جابه‌جایی.
-    # (fallback قبلیِ «همه حاضر» کل کلاس را برای جلسه‌ای که برگزار نشده بود شارژ می‌کرد.)
-
+    # FIX F-C6(a): راستر خالی = صفر حاضر (نه همه حاضر) — fallback قبلیِ «همه حاضر» کل کلاس را شارژ می‌کرد.
+    # FIX (F-S3): اما جلسه‌ی بدون هیچ ردیف مجاز **ساخته نمی‌شود** (هم‌سیاست با ثبت دستی): کلاس زنده
+    # بسته می‌شود و SessionLog خالی ساخته نمی‌شود تا تاریخ کلاس قفل نشود.
     start_ts = float(live.started_at_ts or time_module.time())
     date_str = _greg_date_from_ts(start_ts)
+
+    if not items:
+        live.status = "ENDED"
+        live.end_time = _now_str()
+        db.commit()
+        return {
+            "message": "جلسه‌ی زنده پایان یافت؛ هیچ ردیف حضور قابل‌ثبتی نداشت و جلسه‌ای ثبت نشد.",
+            "session_id": None,
+            "session_code": None,
+            "details": {"skipped_student_ids": skipped_ineligible},
+        }
 
     data = AttendanceSubmitData(course_id=course.id, date=date_str, items=items)
 
@@ -283,8 +343,13 @@ def save_live_status(
         existing = {}
     for sid, entry in body.items.items():
         if isinstance(entry, dict):
+            # FIX (F-S4): وضعیت نامعتبر نباید وارد راستر شود (وگرنه در finalize بی‌صدا/خطا می‌شد).
+            try:
+                _status = validate_attendance_status(str(entry.get("status", "Present")))
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail=str(exc))
             existing[str(sid)] = {
-                "status": str(entry.get("status", "Present")),
+                "status": _status,
                 "excused": bool(entry.get("excused", False)),
             }
     live.live_roster = json.dumps(existing, ensure_ascii=False)
@@ -356,7 +421,9 @@ def get_class_attendance(req: AttendanceLogRequest, db: Session = Depends(get_db
     if not session:
         return []
 
-    atts = db.query(Attendance).filter(Attendance.session_id == session.id).all()
+    atts = db.query(Attendance).filter(
+        Attendance.session_id == session.id, Attendance.is_deleted == False,  # FIX (F-S2)
+    ).all()
     result = []
     for a in atts:
         st = db.query(Student).filter(Student.id == a.student_id, Student.is_deleted == False).first()
@@ -409,6 +476,14 @@ def submit_session_and_calculate(
     ).first():
         raise HTTPException(status_code=409, detail="جلسه این کلاس در این تاریخ قبلاً ثبت شده است")
 
+    # FIX (F-S3): درخواست بدون هیچ ردیف حضور/غیاب نباید جلسه بسازد (schema هم min_length=1 دارد؛
+    # این گارد برای فراخوان مستقیم تابعی است) — وگرنه یک درخواست خالی تاریخ کلاس را برای همیشه قفل می‌کند.
+    if not data.items:
+        raise HTTPException(
+            status_code=422,
+            detail="لیست حضور/غیاب نمی‌تواند خالی باشد؛ برای ثبت جلسه حداقل یک دانش‌آموز لازم است",
+        )
+
     # FIX: H6(C1) - آیتم تکراری برای یک دانش‌آموز در همین ثبت ممنوع (قبل از هر db.add).
     seen_ids = set()
     for i in data.items:
@@ -418,6 +493,8 @@ def submit_session_and_calculate(
 
     # FIX: H6(B) - همه‌ی آیتم‌ها باید عضو فعال همین کلاس باشند (قبل از هر db.add).
     validate_session_items_membership(db, course.id, data.items)
+    # FIX (F-S4): وضعیت‌های نامعتبر باید قبل از ساخت جلسه/حضور/تراکنش رد شوند (گارد فراخوان مستقیم).
+    validate_session_item_statuses(data.items)
 
     # 1. شمارش حاضرین و غایبین غیرموجه مشمول جریمه
     present_students = [i for i in data.items if i.status in ["Present", "Late"]]
@@ -497,12 +574,8 @@ def submit_session_and_calculate(
         if st is None:
             continue
 
-        att = Attendance(
-            session_id=session.id,
-            student_id=item.student_id,
-            status=item.status,
-            excused=excused_val
-        )
+        # FIX (F-S2): upsert — ردیف آرشیوشده‌ی همین (جلسه، دانش‌آموز) احیا می‌شود نه INSERT تازه.
+        att = _upsert_attendance_row(db, session.id, item.student_id, item.status, excused_val)
 
         # تعیین وضعیت کسر وجه: حاضرین و غایبین غیرموجه (اگر جریمه غیبت فعال باشد)
         should_charge = False
@@ -584,7 +657,6 @@ def submit_session_and_calculate(
                 commit=False,  # FIX atomicity: کامیت با کامیت نهایی حلقه ثبت جلسه (خط پایانی تابع)
             )
 
-        db.add(att)
 
     # FIX: H6(C2) - backstop یکتایی (session_id, student_id) در سطح دیتابیس.
     try:
@@ -700,7 +772,10 @@ def get_student_attendance_history(req: StudentAttendanceHistoryRequest, db: Ses
     history_list = []
 
     for s in sessions:
-        att = db.query(Attendance).filter(Attendance.session_id == s.id, Attendance.student_id == req.student_id).first()
+        att = db.query(Attendance).filter(
+            Attendance.session_id == s.id, Attendance.student_id == req.student_id,
+            Attendance.is_deleted == False,   # FIX (F-S2)
+        ).first()
         status_text = "ثبت نشده"
         if att:
             if att.status in ["Present", "Late"]:
@@ -718,7 +793,7 @@ def get_student_attendance_history(req: StudentAttendanceHistoryRequest, db: Ses
             "attendee_count": s.attendee_count
         })
 
-    rate = (present_count.float() / total_sessions * 100) if total_sessions > 0 else 100.0
+    # FIX (O-S2 — کشف‌شده حین fix): سطر قبلی `present_count.float()` بود که در پایتون همیشه AttributeError می‌داد ⇒ هر کلاس با ≥۱ جلسه این endpoint را ۵۰۰ می‌کرد (سطر بعدی همان محاسبه‌ی درست را داشت و بر روی سطر خراب سایه می‌انداخت) ⇒ سطر مرده حذف شد.
     # در کاتلین تبدیل به فلوت داریم، در پایتون مستقیم تقسیم میکنیم
     rate = (present_count / total_sessions * 100) if total_sessions > 0 else 100.0
 
@@ -754,7 +829,9 @@ def get_session_details(session_code: int, db: Session = Depends(get_db), author
     if course and course.teacher:
         t_name = f"{course.teacher.first_name} {course.teacher.last_name}"
         
-    atts = db.query(Attendance).filter(Attendance.session_id == session.id).all()
+    atts = db.query(Attendance).filter(
+        Attendance.session_id == session.id, Attendance.is_deleted == False,  # FIX (F-S2)
+    ).all()
     items = []
     for a in atts:
         student = db.query(Student).filter(Student.id == a.student_id, Student.is_deleted == False).first()
@@ -807,6 +884,7 @@ def edit_past_session(
     settled_exists = db.query(Attendance.id).filter(
         Attendance.session_id == session.id,
         Attendance.is_billed == True,
+        Attendance.is_deleted == False,   # FIX (F-S2): ردیف آرشیوشده جلسه‌ی فعال را قفل نمی‌کند.
     ).first()
     # FIX H8-gap: جلسه‌ی تسویه‌شده از هر مسیر (حضور یا جریمه) قفل ویرایش است — وگرنه جلسه‌ی
     # تماماً-غایبِ تسویه‌شده (که ردیف billed ندارد) بعد از تسویه دست‌کاری و دوباره تسویه می‌شد.
@@ -835,6 +913,13 @@ def edit_past_session(
     if date_clash:
         raise HTTPException(status_code=409, detail="جلسه این کلاس در این تاریخ قبلاً ثبت شده است")
 
+    # FIX (F-S3): ویرایش هم نمی‌تواند جلسه را به «هیچ‌کس» تبدیل کند (هم‌سیاست با ثبت).
+    if not data.items:
+        raise HTTPException(
+            status_code=422,
+            detail="لیست حضور/غیاب نمی‌تواند خالی باشد؛ برای ثبت جلسه حداقل یک دانش‌آموز لازم است",
+        )
+
     # FIX: H6(C1) - آیتم تکراری برای یک دانش‌آموز در همین ثبت ممنوع (قبل از reverse مخرب).
     seen_ids = set()
     for i in data.items:
@@ -844,6 +929,8 @@ def edit_past_session(
 
     # FIX: H6(B) - همه‌ی آیتم‌ها باید عضو فعال همین کلاس باشند (قبل از reverse مخرب).
     validate_session_items_membership(db, course.id, data.items)
+    # FIX (F-S4): وضعیت نامعتبر قبل از reverse/شارژ رد شود.
+    validate_session_item_statuses(data.items)
 
     # FIX H19-F2: پیش‌گشت شعبه (hoist چک H7 از داخل حلقه) — قبل از reverse مخرب.
     # شرط عین حلقه‌ی اصلی: فقط آیتم‌های «شاگرد موجود + باید شارژ شود» چک می‌شوند.
@@ -914,12 +1001,8 @@ def edit_past_session(
         if st is None:
             continue
 
-        att = Attendance(
-            session_id=session.id,
-            student_id=item.student_id,
-            status=item.status,
-            excused=excused_val
-        )
+        # FIX (F-S2): upsert — ردیف آرشیوشده‌ی همین (جلسه، دانش‌آموز) احیا می‌شود نه INSERT تازه.
+        att = _upsert_attendance_row(db, session.id, item.student_id, item.status, excused_val)
 
         should_charge = False
         if item.status in ["Present", "Late"]:
@@ -983,7 +1066,6 @@ def edit_past_session(
                 )
             )
 
-        db.add(att)
 
     # FIX: H6(C2) - backstop یکتایی (session_id, student_id) در سطح دیتابیس.
     # FIX (audit-v2/#14): این حالا تنها کامیت تابع است (reverse با commit=False است و backstop بالا flush).
@@ -1027,6 +1109,7 @@ def delete_session_endpoint(
     settled_exists = db.query(Attendance.id).filter(
         Attendance.session_id == session.id,
         Attendance.is_billed == True,
+        Attendance.is_deleted == False,   # FIX (F-S2): ردیف آرشیوشده جلسه‌ی فعال را قفل نمی‌کند.
     ).first()
     if settled_exists or session.is_penalty_settled:
         raise HTTPException(
@@ -1104,25 +1187,33 @@ def qr_student_check_in(
     if parse_project_date(sess.date) != datetime.datetime.utcnow().date():
         raise HTTPException(status_code=403, detail="این کد QR فقط برای جلسه‌ی همان روز معتبر است")
         
-    enrolled = db.query(Enrollment).filter(Enrollment.student_id == student_id, Enrollment.course_id == sess.course_id).first()
+    # FIX (F-S1): دانش‌آموز آرشیوشده اجازه‌ی هیچ مسیر حضور (از جمله QR) ندارد — هم‌سیاست با ثبت جلسه.
+    if own.is_deleted:
+        raise HTTPException(status_code=403, detail="حساب شما حذف/آرشیو شده است و امکان ثبت حضور وجود ندارد")
+
+    # FIX (F-S1): فقط ثبت‌نام **فعال** مجاز است (ردیف آرشیوشده مثل نبودن ثبت‌نام است).
+    enrolled = db.query(Enrollment).filter(
+        Enrollment.student_id == student_id,
+        Enrollment.course_id == sess.course_id,
+        Enrollment.is_deleted == False,
+    ).first()
     if not enrolled:
         raise HTTPException(status_code=403, detail="شما در این کلاس ثبت‌نام نکرده‌اید و مجاز به حضور نیستید")
-        
-    existing_att = db.query(Attendance).filter(Attendance.session_id == sess.id, Attendance.student_id == student_id).first()
+
+    # FIX (F-S2): فقط ردیف **فعال** معیار «قبلاً ثبت شده» است؛ ردیف آرشیوشده مثل نبودن آن است.
+    existing_att = db.query(Attendance).filter(
+        Attendance.session_id == sess.id,
+        Attendance.student_id == student_id,
+        Attendance.is_deleted == False,
+    ).first()
     if existing_att and existing_att.status in ["Present", "Late"]:
         raise HTTPException(status_code=400, detail="حضور شما قبلاً در این جلسه ثبت شده است")
-        
+
     if existing_att:
         existing_att.status = "Present"
     else:
-        new_att = Attendance(
-            session_id=sess.id,
-            student_id=student_id,
-            status="Present",
-            is_billed=False,
-            excused=False
-        )
-        db.add(new_att)
+        # ردیف آرشیوشده‌ی همین (جلسه، دانش‌آموز) احیا می‌شود، نه INSERT تازه (قید یکتا).
+        _upsert_attendance_row(db, sess.id, student_id, "Present", False)
         
     db.commit()
     

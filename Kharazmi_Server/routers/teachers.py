@@ -706,6 +706,7 @@ def get_pending_settlement(
         .filter(
             Attendance.session_id.in_(session_ids),
             Attendance.is_billed == False,
+            Attendance.is_deleted == False,   # FIX (F-S2)
             Attendance.status.in_(["Present", "Late"])
         )
         .all()
@@ -797,6 +798,7 @@ def settle_teacher_sessions(
         r[0] for r in db.query(Attendance.session_id).filter(
             Attendance.session_id.in_(session_ids),
             Attendance.is_billed == False,
+            Attendance.is_deleted == False,   # FIX (F-S2)
             Attendance.status.in_(["Present", "Late"])
         ).distinct().all()
     }
@@ -813,6 +815,7 @@ def settle_teacher_sessions(
         .filter(
             Attendance.session_id.in_(session_ids),
             Attendance.is_billed == False,
+            Attendance.is_deleted == False,   # FIX (F-S2)
             Attendance.status.in_(["Present", "Late"])
         )
         .all()
@@ -837,6 +840,7 @@ def settle_teacher_sessions(
         .filter(
             Attendance.session_id.in_(session_ids),
             Attendance.is_billed == False,
+            Attendance.is_deleted == False,   # FIX (F-S2)
             Attendance.status.in_(["Present", "Late"])
         )
         .update({Attendance.is_billed: True}, synchronize_session=False)

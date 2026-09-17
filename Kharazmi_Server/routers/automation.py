@@ -158,12 +158,14 @@ def run_automation_engine(
                     # Count attendances
                     total_sessions = db.query(Attendance).join(SessionLog).filter(
                         SessionLog.course_id == en.course_id,
-                        Attendance.student_id == s.id
+                        Attendance.student_id == s.id,
+                        Attendance.is_deleted == False,   # FIX (F-S2)
                     ).count()
                     if total_sessions > 2: # run only if at least 3 sessions held
                         presents = db.query(Attendance).join(SessionLog).filter(
                             SessionLog.course_id == en.course_id,
                             Attendance.student_id == s.id,
+                            Attendance.is_deleted == False,   # FIX (F-S2)
                             Attendance.status == "Present"
                         ).count()
                         rate = (presents / total_sessions) * 100
@@ -191,6 +193,7 @@ def run_automation_engine(
                     absences = db.query(Attendance).join(SessionLog).filter(
                         SessionLog.course_id == en.course_id,
                         Attendance.student_id == s.id,
+                        Attendance.is_deleted == False,   # FIX (F-S2)
                         Attendance.status == "Absent",
                         Attendance.excused == False
                     ).count()
@@ -317,7 +320,8 @@ def run_automation_engine(
             students = db.query(Student).filter(Student.is_deleted == False).all()
             for s in students:
                 last_attendance = db.query(Attendance).join(SessionLog).filter(
-                    Attendance.student_id == s.id
+                    Attendance.student_id == s.id,
+                    Attendance.is_deleted == False,   # FIX (F-S2)
                 ).order_by(SessionLog.date.desc()).first()
                 if last_attendance:
                     try:

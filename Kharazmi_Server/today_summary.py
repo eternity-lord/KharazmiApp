@@ -300,6 +300,7 @@ def build_admin_smart_alerts(
             db.query(Attendance.session_id)
             .filter(
                 Attendance.is_billed == False,
+                Attendance.is_deleted == False,   # FIX (F-S2)
                 Attendance.status.in_(["Present", "Late"]),
             )
             .distinct()
@@ -551,6 +552,7 @@ def _teacher_unsettled_amount(
             SessionLog.course_id.in_(course_ids),
             _date_prefix_filter(SessionLog.date, week_dates),
             Attendance.is_billed == False,
+            Attendance.is_deleted == False,   # FIX (F-S2)
             Attendance.status.in_(["Present", "Late"]),
         )
         .distinct()

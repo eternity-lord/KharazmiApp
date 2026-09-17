@@ -342,7 +342,7 @@ def get_student_report_card(
             total_sessions = len(session_ids)
             p_count = 0
             if total_sessions > 0:
-                atts = db.query(Attendance).filter(Attendance.student_id == student_id, Attendance.session_id.in_(session_ids)).all()
+                atts = db.query(Attendance).filter(Attendance.student_id == student_id, Attendance.session_id.in_(session_ids), Attendance.is_deleted == False).all()
                 p_count = len([a for a in atts if a.status in ["Present", "Late"]])
                 
             attendance_pct = (p_count / total_sessions) * 100 if total_sessions > 0 else 100.0

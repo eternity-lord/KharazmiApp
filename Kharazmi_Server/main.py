@@ -236,6 +236,10 @@ def auto_patch_database():
             ("transactions", "is_reversed", "BOOLEAN DEFAULT FALSE", "UPDATE transactions SET is_reversed = FALSE WHERE is_reversed IS NULL;"),
             ("attendances", "is_billed", "BOOLEAN DEFAULT FALSE", "UPDATE attendances SET is_billed = FALSE WHERE is_billed IS NULL;"),
             ("attendances", "excused", "BOOLEAN DEFAULT FALSE", "UPDATE attendances SET excused = FALSE WHERE excused IS NULL;"),
+            # FIX (F-S2): آرشیو نرم حضور — دیتابیس‌های قدیمی ستون را ندارند؛ پیش‌فرض FALSE یعنی
+            # ردیف‌های موجود «فعال» می‌مانند (هیچ سابقه‌ای بی‌دلیل آرشیو نمی‌شود). idempotent است
+            # چون فقط وقتی column_exists منفی باشد ALTER می‌خورد.
+            ("attendances", "is_deleted", "BOOLEAN DEFAULT FALSE", "UPDATE attendances SET is_deleted = FALSE WHERE is_deleted IS NULL;"),
             ("teachers", "wallet_balance", "BIGINT DEFAULT 0", "UPDATE teachers SET wallet_balance = 0 WHERE wallet_balance IS NULL;"),
             ("students", "version", "INTEGER DEFAULT 1", "UPDATE students SET version = 1 WHERE version IS NULL;"),
             ("teachers", "version", "INTEGER DEFAULT 1", "UPDATE teachers SET version = 1 WHERE version IS NULL;"),

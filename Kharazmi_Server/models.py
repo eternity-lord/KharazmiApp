@@ -381,6 +381,9 @@ class LiveSession(Base):
 class Attendance(Base):
     __tablename__ = "attendances"
     # FIX: H6(C2) - یک رکورد حضور/غیاب برای هر (جلسه، دانش‌آموز).
+    # FIX (F-S2): قید یکتا عمداً partial نشد؛ ردیف آرشیوشده هم جای خودش را نگه می‌دارد و مسیر
+    # ویرایش جلسه همان ردیف را revive می‌کند (upsert) تا «یک ردیف به‌ازای هر جفت» همیشه برقرار بماند.
+    # مزیت: روی دیتابیس‌های موجود (که این قید را از قبل دارند) هیچ مایگریشن قید لازم نیست.
     __table_args__ = (
         UniqueConstraint("session_id", "student_id", name="uq_attendance_session_student"),
     )
@@ -391,6 +394,8 @@ class Attendance(Base):
     student_id = Column(Integer, ForeignKey("students.id"))
 
     status = Column(String)  # Present, Absent, Late
+    # FIX (F-S2): آرشیو نرم — سابقه‌ی حضور بعد از حذف/برگشت جلسه برای audit باقی می‌ماند.
+    is_deleted = Column(Boolean, default=False, server_default=text("FALSE"), nullable=False)
 
     # آیا این جلسه در تسویه‌حساب معلم لحاظ شده؟ (فقط settle_teacher_sessions آن را True می‌کند)
     is_billed = Column(Boolean, default=False)

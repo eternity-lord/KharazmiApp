@@ -207,13 +207,15 @@ def get_analytics_dashboard(
         .select_from(Attendance)
         .join(SessionLog, Attendance.session_id == SessionLog.id)
         .join(Course, SessionLog.course_id == Course.id)
-        .filter(Attendance.status == "Present")
+        # FIX (F-S2): ردیف حضور آرشیوشده و جلسه‌ی حذف‌شده از نرخ حضور بیرون‌اند.
+        .filter(Attendance.status == "Present", Attendance.is_deleted == False, SessionLog.is_deleted == False)
     )
     att_total_query = (
         db.query(SessionLog.date)
         .select_from(Attendance)
         .join(SessionLog, Attendance.session_id == SessionLog.id)
         .join(Course, SessionLog.course_id == Course.id)
+        .filter(Attendance.is_deleted == False, SessionLog.is_deleted == False)
     )
     if resolved_branch:
         att_present_query = att_present_query.filter(Course.branch_id == resolved_branch)
@@ -324,8 +326,8 @@ def get_teachers_performance_analytics(
             # میانگین نمرات مربی
             avg_score = db.query(func.avg(Grade.score)).filter(Grade.course_id.in_(c_ids)).scalar() or 0.0
             # حضور و غیاب کلاس‌های مربی
-            p_cnt = db.query(func.count(Attendance.id)).join(SessionLog).filter(SessionLog.course_id.in_(c_ids), Attendance.status == "Present").scalar() or 0
-            tot_cnt = db.query(func.count(Attendance.id)).join(SessionLog).filter(SessionLog.course_id.in_(c_ids)).scalar() or 0
+            p_cnt = db.query(func.count(Attendance.id)).join(SessionLog).filter(SessionLog.course_id.in_(c_ids), Attendance.status == "Present", Attendance.is_deleted == False, SessionLog.is_deleted == False).scalar() or 0
+            tot_cnt = db.query(func.count(Attendance.id)).join(SessionLog).filter(SessionLog.course_id.in_(c_ids), Attendance.is_deleted == False, SessionLog.is_deleted == False).scalar() or 0
             att_rate = (p_cnt / tot_cnt * 100) if tot_cnt > 0 else 100.0
             
         # کیف پول واحد معلم: طلب فعلی = جمع جلسات دارای حضور تسویه‌نشده (همان منطق pending_settlement)
@@ -335,7 +337,7 @@ def get_teachers_performance_analytics(
             sess_rows = db.query(SessionLog.id, SessionLog.final_teacher_cost, SessionLog.absent_penalty_teacher, SessionLog.is_penalty_settled).filter(SessionLog.is_deleted == False, SessionLog.course_id.in_(c_ids)).all()
             if sess_rows:
                 all_sids = [r[0] for r in sess_rows]
-                unbilled_sids = {r[0] for r in db.query(Attendance.session_id).filter(Attendance.session_id.in_(all_sids), Attendance.is_billed == False, Attendance.status.in_(["Present", "Late"])).distinct().all()}
+                unbilled_sids = {r[0] for r in db.query(Attendance.session_id).filter(Attendance.session_id.in_(all_sids), Attendance.is_billed == False, Attendance.is_deleted == False, Attendance.status.in_(["Present", "Late"])).distinct().all()}
                 pending_total = sum((r[1] or 0) + (r[2] or 0) for r in sess_rows if r[0] in unbilled_sids or ((r[2] or 0) > 0 and not r[3]))  # FIX H8-gap/follow-up: شاخه‌ی جریمه هم طلب است (همان منطق دوشاخه‌ی settle)
 
         results.append({
@@ -372,8 +374,8 @@ def get_classes_performance_analytics(
         # FIX: Bug 13 - exclude archived Enrollment rows from this active view.
         st_count = db.query(func.count(Enrollment.id)).filter(Enrollment.is_deleted == False).filter(Enrollment.course_id == c.id).scalar() or 0
         avg_score = db.query(func.avg(Grade.score)).filter(Grade.course_id == c.id).scalar() or 0.0
-        p_cnt = db.query(func.count(Attendance.id)).join(SessionLog).filter(SessionLog.course_id == c.id, Attendance.status == "Present").scalar() or 0
-        tot_cnt = db.query(func.count(Attendance.id)).join(SessionLog).filter(SessionLog.course_id == c.id).scalar() or 0
+        p_cnt = db.query(func.count(Attendance.id)).join(SessionLog).filter(SessionLog.course_id == c.id, Attendance.status == "Present", Attendance.is_deleted == False, SessionLog.is_deleted == False).scalar() or 0
+        tot_cnt = db.query(func.count(Attendance.id)).join(SessionLog).filter(SessionLog.course_id == c.id, Attendance.is_deleted == False, SessionLog.is_deleted == False).scalar() or 0
         att_rate = (p_cnt / tot_cnt * 100) if tot_cnt > 0 else 100.0
         
         results.append({

@@ -217,8 +217,8 @@ def chat_with_ai_assistant(
             tools_data["student_summary"] = {"first_name": st.first_name, "last_name": st.last_name, "student_code": st.student_code}
             
     if "get_student_attendance" in allowed_tools and req.student_id:
-        tot_cnt = db.query(Attendance).filter(Attendance.student_id == req.student_id).count()
-        p_cnt = db.query(Attendance).filter(Attendance.student_id == req.student_id, Attendance.status == "Present").count()
+        tot_cnt = db.query(Attendance).filter(Attendance.student_id == req.student_id, Attendance.is_deleted == False).count()
+        p_cnt = db.query(Attendance).filter(Attendance.student_id == req.student_id, Attendance.status == "Present", Attendance.is_deleted == False).count()
         rate = (p_cnt / tot_cnt * 100) if tot_cnt > 0 else 100.0
         tools_data["student_attendance"] = {"total_sessions": tot_cnt, "presents": p_cnt, "attendance_rate": rate}
         

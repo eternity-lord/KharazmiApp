@@ -367,6 +367,102 @@ def test_role_08_parent_cannot_read_other_child_by_id_swap(api):
 # سناریو ۹: student
 # ==========================================
 def test_role_09_student_reads_only_self(api):
+    """سناریو ۹ + ✅ FIX F-R1 (رگرسیون): `/students/my_profile` با TestClient واقعی resolve می‌شود.
+
+    قبل از fix: مسیر ثابت توسط route داینامیک `/students/{student_id}` (ثبت‌شده جلوتر) سایه افتاده بود
+    و همیشه ۴۲۲ (int_parsing) می‌داد. حالا ۲۰۰ می‌دهد و داده‌ی همان سشن برمی‌گردد.
+    """
+    mine = api.client.get("/students/my_profile", headers=hdr("tok_student"))
+    assert mine.status_code == 200, (
+        f"F-R1: /students/my_profile برای شاگرد = {mine.status_code} — {mine.text[:160]}")
+
+    body = mine.json()
+    # اثبات «متعلق به همین سشن»: فقط کلاس ثبت‌نام‌شده‌ی ۱۰۱ (کلاس الف)، نه کلاس دانش‌آموز دیگر (کلاس ب)
+    assert any("کلاس الف" in c for c in body["classes"]), body["classes"]
+    assert not any("کلاس ب" in c for c in body["classes"]), (
+        f"پروفایل دانش‌آموز دیگر برگشت: {body['classes']}")
+
+    # IDOR: پارامتر اضافه‌ی student_id نباید منبع شناسه را عوض کند (id از سشن استخراج می‌شود)
+    forced = api.client.get("/students/my_profile?student_id=102", headers=hdr("tok_student"))
+    assert forced.status_code == 200, forced.text
+    assert not any("کلاس ب" in c for c in forced.json()["classes"]), (
+        "پارامتر ورودی توانست دامنه‌ی دانش‌آموز را عوض کند (IDOR)")
+
+    # خودِ شاگرد از مسیر عددی هم فقط خودش را می‌بیند
+    own = api.client.get("/students/101", headers=hdr("tok_student"))
+    assert own.status_code == 200 and "S-101" in own.text, own.text
+    other = api.client.get("/students/102", headers=hdr("tok_student"))
+    assert other.status_code == 403, f"شاگرد در students/102 = {other.status_code}"
+
+
+def test_role_09c_numeric_route_and_role_policies_unchanged_after_fr1(api):
+    """✅ F-R1 (رگرسیون): جابه‌جایی route هیچ policy قبلی را عوض نکرد و مسیر عددی سالم است."""
+    # مسیر عددی `/students/{student_id}` — همان policyهای قبلی
+    assert api.client.get("/students/101", headers=hdr("tok_admin")).status_code == 200
+    assert api.client.get("/students/101", headers=hdr("tok_secretary")).status_code == 200
+    assert api.client.get("/students/101", headers=hdr("tok_teacher_a")).status_code == 200
+    assert api.client.get("/students/102", headers=hdr("tok_teacher_a")).status_code == 403
+    assert api.client.get("/students/101", headers=hdr("tok_parent")).status_code == 200
+    assert api.client.get("/students/102", headers=hdr("tok_parent")).status_code == 403
+    assert api.client.get("/students/102", headers=hdr("tok_student")).status_code == 403
+
+    # my_profile قرارداد خودش را دارد: فقط سشن نقش student (بدون تغییر نسبت به قبل از fix)
+    for token in ("tok_admin", "tok_secretary", "tok_teacher_a", "tok_parent", "tok_unknown"):
+        r = api.client.get("/students/my_profile", headers=hdr(token))
+        assert r.status_code == 401, f"{token} در my_profile = {r.status_code} (قرارداد: ۴۰۱)"
+
+    # بدون توکن ⇒ ۴۰۱ (نه ۴۲۲)
+    no_token = api.client.get("/students/my_profile")
+    assert no_token.status_code == 401, f"بدون توکن = {no_token.status_code}"
+
+
+def test_role_09b_student_and_parent_cannot_search_all_people(api):
+    """سناریو ۷/۹ (تکمیلی): جستجوی سراسری شاگردان/معلمان برای شاگرد و ولی بسته است (۴۰۳)."""
+    # (مسیر /students/my_profile جداگانه در test_role_09 بررسی می‌شود — یافته‌ی F-R1)
+    staff_only = ["/students/search?query=شاگرد", "/students/search_simple?query=شاگرد",
+                  "/admin/students/search?query=شاگرد", "/admin/teachers/search?query=معلم",
+                  "/teachers/list"]
+    for token in ("tok_student", "tok_parent"):
+        for path in staff_only:
+            r = api.client.get(path, headers=hdr(token))
+            assert r.status_code == 403, f"{token} در {path} = {r.status_code} (باید ۴۰۳)"
+
+
+# ==========================================
+# سناریو ۷ و ۸: parent
+# ==========================================
+def test_role_07_parent_reads_only_own_child(api):
+    """سناریو ۷: ولی ۶۰۱ فقط فرزند خودش (۱۰۱) را می‌بیند."""
+    profile = api.client.get("/parent/child_profile", headers=hdr("tok_parent"))
+    assert profile.status_code == 200, profile.text
+    assert "شاگرد الف" in profile.text or "101" in profile.text
+
+    own = api.client.get("/students/101", headers=hdr("tok_parent"))
+    assert own.status_code == 200, own.text
+
+
+def test_role_08_parent_cannot_read_other_child_by_id_swap(api):
+    """سناریو ۸: با تغییر ID (student_id در URL یا انتخاب فرزند دیگر) ولی به داده‌ی فرزند دیگر نمی‌رسد."""
+    for path in ("/students/102", "/students/102/grades", "/students/102/installments",
+                 "/finance/student/102/dashboard", "/finance/invoice/2"):
+        r = api.client.get(path, headers=hdr("tok_parent"))
+        assert r.status_code == 403, f"ولی در {path} = {r.status_code} (باید ۴۰۳)"
+
+    # تلاش برای انتخاب فرزندِ ولیِ دیگر با توکن موقت (IDOR کلاسیک)
+    switch = api.client.post("/parent/select_child", json={"temp_token": "tok_temp_parent",
+                                                           "student_id": 102})
+    assert switch.status_code == 403, f"select_child فرزند دیگر = {switch.status_code}"
+
+    # انتخاب فرزند خودش باید موفق باشد
+    own_switch = api.client.post("/parent/select_child", json={"temp_token": "tok_temp_parent",
+                                                               "student_id": 101})
+    assert own_switch.status_code == 200, own_switch.text
+
+
+# ==========================================
+# سناریو ۹: student
+# ==========================================
+def test_role_09_student_reads_only_self(api):
     """سناریو ۹: شاگرد فقط داده‌ی خودش را می‌خواند؛ با تغییر ID به شاگرد دیگر نمی‌رسد.
 
     نکته‌ی یافته‌محور (F-R1): مسیر اختصاصی `/students/my_profile` توسط route داینامیک
@@ -532,7 +628,10 @@ def notif_world(tmp_path, monkeypatch):
                 _mk_user(504, "student:104", "student"),
                 _mk_user(604, "parent:104", "parent"),
                 _mk_user(505, "student:105", "student"),
-                _mk_user(605, "parent:105", "parent")])
+                _mk_user(605, "parent:105", "parent"),
+                _mk_user(506, "student:106", "student"),   # user_id دارد، parent_user_id ندارد
+                _mk_user(507, "student:107", "student"),   # user_id ندارد، parent_user_id دارد
+                _mk_user(607, "parent:107", "parent")])
     db.add(models.Teacher(id=1, first_name="معلم", last_name="الف", national_code="T-1",
                           mobile="09120000009", teacher_code=101, is_approved=True, branch_id=1))
     db.add_all([
@@ -548,7 +647,17 @@ def notif_world(tmp_path, monkeypatch):
         models.Student(id=105, first_name="شاگرد", last_name="صد و پنج", national_code="S-105",
                        student_mobile="09120000505", parent_mobile=None,
                        user_id=505, parent_user_id=605, branch_id=1),
+        # parent_user_id ندارد (سناریو ۶-الف): اعلان شاگرد باید درست برود، اعلان ولی skip/رزولو نشود
+        models.Student(id=106, first_name="شاگرد", last_name="صد و شش", national_code="S-106",
+                       student_mobile="09120000506", parent_mobile="09120000606",
+                       user_id=506, parent_user_id=None, branch_id=1),
+        # user_id ندارد (سناریو ۶-ب): هیچ اعلانی نباید با ۱۰۷ ساخته شود
+        models.Student(id=107, first_name="شاگرد", last_name="صد و هفت", national_code="S-107",
+                       student_mobile="09120000507", parent_mobile="09120000607",
+                       user_id=None, parent_user_id=607, branch_id=1),
     ])
+    db.add(models.AutomationRule(id=1, name="قاعده قسط", condition_type="installment_overdue",
+                                 threshold=1, action_type="student_notification", active=True))
     db.add(models.Course(id=1, title="کلاس", code="C-1", teacher_id=1, branch_id=1,
                          grade_level="دهم", teacher_session_price=100, is_admin_approved=True))
     db.commit()
@@ -559,6 +668,10 @@ def notif_world(tmp_path, monkeypatch):
                           total_paid=0, register_date=TODAY_JALALI),
         models.Enrollment(id=3, student_id=105, course_id=1, branch_id=1, total_tuition=1000,
                           total_paid=0, register_date=TODAY_JALALI),
+        models.Enrollment(id=4, student_id=106, course_id=1, branch_id=1, total_tuition=1000,
+                          total_paid=0, register_date=TODAY_JALALI),
+        models.Enrollment(id=5, student_id=107, course_id=1, branch_id=1, total_tuition=1000,
+                          total_paid=0, register_date=TODAY_JALALI),
     ])
     # سه قسط overdue (سررسید گذشته، پرداخت‌نشده)
     db.add_all([
@@ -567,6 +680,10 @@ def notif_world(tmp_path, monkeypatch):
         models.Installment(id=2, enrollment_id=2, amount=250000, due_date=PAST_JALALI,
                            is_paid=False, is_deleted=False),
         models.Installment(id=3, enrollment_id=3, amount=250000, due_date=PAST_JALALI,
+                           is_paid=False, is_deleted=False),
+        models.Installment(id=4, enrollment_id=4, amount=250000, due_date=PAST_JALALI,
+                           is_paid=False, is_deleted=False),
+        models.Installment(id=5, enrollment_id=5, amount=250000, due_date=PAST_JALALI,
                            is_paid=False, is_deleted=False),
     ])
     db.commit()
@@ -590,11 +707,10 @@ def _installment_notifications(db):
 
 
 def test_installment_notifications_use_user_ids_not_student_id(notif_world):
-    """🔎 سناریو ۱-۴ و ۸ (باگ قطعی): اعلان قسط باید با **user_id** ساخته شود، نه Student.id.
+    """✅ FIX F-R2 (رگرسیون اصلی): اعلان قسط با **user_id** ساخته می‌شود، نه Student.id.
 
-    expected:  (recipient_user_id=501, recipient_role="student") و (601, "parent")
-    actual:    main.py:461 و main.py:470 هر دو `recipient_user_id=st.id` می‌فرستند ⇒ (101, "parent") و (101, "student")
-    محل کد:    Kharazmi_Server/main.py:461 و 470 (بلوک «یادآوری اقساط» داخل auto_patch_database)
+    قبل از fix: main.py:461 و 470 هر دو `recipient_user_id=st.id` می‌فرستادند ⇒ (101, "parent") و (101, "student").
+    حالا: از `dependencies.resolve_notification_recipient` استفاده می‌شود ⇒ (501, "student") و (601, "parent").
     """
     _run_real_auto_reminder()
     rows = _installment_notifications(notif_world.db)
@@ -607,7 +723,7 @@ def test_installment_notifications_use_user_ids_not_student_id(notif_world):
 
 
 def test_installment_notification_never_targets_student_id_namespace(notif_world):
-    """🔎 سناریو ۵: هیچ اعلان قسطی نباید recipient_user_id=101 (Student.id) داشته باشد.
+    """✅ FIX F-R2 (رگرسیون): هیچ اعلان قسطی نباید recipient_user_id=101 (Student.id) داشته باشد.
 
     خطر: ۱۰۱ در فضای User.id یک کاربر دیگر است ⇒ اعلان ولی/شاگرد در صندوق کاربر بی‌ربط می‌افتد
     (نشت اطلاعات مالی به کاربر دیگر) و خودِ صاحب اعلان هیچ‌وقت آن را نمی‌بیند.
@@ -618,35 +734,88 @@ def test_installment_notification_never_targets_student_id_namespace(notif_world
     assert wrong == [], f"اعلان‌هایی با recipient_user_id=Student.id ساخته شد: {wrong}"
 
 
-def test_installment_notification_actual_recipient_is_student_id(notif_world):
-    """📌 مستندسازی actual باگ (این تست خودِ رفتار باگ‌دار را ثبت می‌کند تا در گزارش قابل ارجاع باشد):
-    در نسخه‌ی فعلی اعلان‌ها با recipient_user_id=101 و نقش‌های parent/student ثبت می‌شوند."""
+def test_installment_notification_actual_recipient_is_user_id(notif_world):
+    """✅ FIX F-R2 (رگرسیون): مقادیر واقعی ثبت‌شده بعد از fix — (501,'student') و (601,'parent')،
+    و audit trail پیامک هم شناسه‌ی درست را دارد (`notif_student_501` / `notif_parent_601`)."""
     _run_real_auto_reminder()
     rows = _installment_notifications(notif_world.db)
-    pairs = sorted((r.recipient_user_id, r.recipient_role) for r in rows if r.recipient_user_id == 101)
-    assert (101, "parent") in pairs and (101, "student") in pairs, (
-        "انتظار می‌رفت رفتار فعلی (باگ) دقیقاً (101,parent)+(101,student) باشد؛ actual=%r" % (pairs,))
+    pairs = sorted((r.recipient_user_id, r.recipient_role) for r in rows)
+    assert (501, "student") in pairs and (601, "parent") in pairs, pairs
+    assert all(rid not in (101, 104) for rid, _ in pairs), (
+        f"هیچ اعلانی نباید در فضای Student.id باشد؛ actual={pairs}")
 
-    # شاهد مکمل: ردیف SmsLog این اعلان‌ها هم شناسه‌ی اشتباه (فضای Student.id) را در audit trail دارد
-    sms_groups = {s.target_group for s in notif_world.db.query(models.SmsLog)
+    sms_groups = {row.target_group for row in notif_world.db.query(models.SmsLog)
                   .filter(models.SmsLog.target_group.like("notif_%")).all()}
-    assert {"notif_parent_101", "notif_student_101"} <= sms_groups, (
-        f"SmsLog نیز شناسه‌ی اشتباه را ثبت می‌کند؛ actual={sorted(sms_groups)}")
+    assert {"notif_student_501", "notif_parent_601"} <= sms_groups, sorted(sms_groups)
+    assert not any(g.endswith("_101") or g.endswith("_104") for g in sms_groups), sorted(sms_groups)
 
 
-def test_auto_reminder_without_user_ids_never_falls_back_to_student_id(notif_world):
-    """🔎 سناریو ۶: شاگرد بدون user_id/parent_user_id ⇒ نه fallback به Student.id و نه اعلان بی‌صاحب."""
+def test_installment_notification_recipients_are_never_none(notif_world):
+    """✅ FIX F-R2: هیچ اعلانی با recipient_user_id=NULL ساخته نمی‌شود (حتی برای شاگرد بی‌user_id)."""
     _run_real_auto_reminder()
-    rows = _installment_notifications(notif_world.db)
-    for_104 = [r for r in rows if r.recipient_user_id in (104,)]
-    assert for_104 == [], f"برای شاگرد ۱۰۴ اعلان با Student.id ساخته شد: {[(r.id, r.recipient_role) for r in for_104]}"
+    rows = notif_world.db.query(models.Notification).all()
+    assert rows, "این سناریو باید حداقل یک اعلان بسازد"
+    assert all(r.recipient_user_id is not None for r in rows), (
+        [(r.id, r.recipient_role) for r in rows if r.recipient_user_id is None])
 
-    # سیاست درست: یا رزولو به shadow-user (User.id واقعی) یا skip — نکته‌ی مهم: هیچ ردیفی با id=104
-    st104 = notif_world.db.get(models.Student, 104)
-    if st104.user_id:
-        assert notif_world.db.get(models.User, st104.user_id) is not None, "user_id باید به یک User واقعی اشاره کند"
-    if st104.parent_user_id:
-        assert notif_world.db.get(models.User, st104.parent_user_id) is not None
+
+def test_auto_reminder_with_missing_parent_user_id_still_notifies_student(notif_world):
+    """🔎 سناریو ۶-الف (fix شد): شاگرد ۱۰۶ فقط user_id دارد ⇒ اعلان شاگرد باید برود،
+    برای ولی هیچ اعلانی با Student.id ساخته نشود، و خطای ناخواسته رخ ندهد."""
+    _run_real_auto_reminder()
+    db = notif_world.db
+    rows = _installment_notifications(db)
+    pairs = {(r.recipient_user_id, r.recipient_role) for r in rows}
+
+    assert (506, "student") in pairs, f"اعلان شاگرد با user_id=506 نیامد: {sorted(pairs)}"
+    assert not any(rid == 106 for rid, _ in pairs), f"Student.id=106 به‌عنوان recipient استفاده شد: {sorted(pairs)}"
+
+    # رفتار امن برای ولی: resolver در نبود parent_user_id یک shadow-user می‌سازد (نه Student.id).
+    st106 = db.get(models.Student, 106)
+    if st106.parent_user_id is not None:
+        owner = db.get(models.User, st106.parent_user_id)
+        assert owner is not None and owner.sub_role == "parent", (
+            "parent_user_id باید به یک User واقعی با نقش parent اشاره کند")
+        assert (st106.parent_user_id, "parent") in pairs, "اعلان ولی رزولوشده ارسال نشد"
+    else:
+        assert not any(r[1] == "parent" and r[0] == 106 for r in rows)
+
+
+def test_auto_reminder_with_missing_user_id_never_uses_student_id(notif_world):
+    """🔎 سناریو ۶-ب (fix شد): شاگرد ۱۰۷ بدون user_id ⇒ هیچ اعلان دانش‌آموزی با id=107 ساخته نشود؛
+    resolver مرکزی یا shadow-user می‌سازد یا None برمی‌گرداند — در هر دو حالت بدون خطا و بدون fallback."""
+    _run_real_auto_reminder()
+    db = notif_world.db
+    rows = _installment_notifications(db)
+    assert not any(r.recipient_user_id == 107 for r in rows), (
+        f"Student.id=107 به‌عنوان recipient_user_id استفاده شد: {[(r.id, r.recipient_role) for r in rows]}")
+
+    st107 = db.get(models.Student, 107)
+    if st107.user_id is not None:                      # مسیر shadow-user
+        owner = db.get(models.User, st107.user_id)
+        assert owner is not None and owner.sub_role == "student"
+        assert any(r.recipient_user_id == st107.user_id and r.recipient_role == "student" for r in rows), \
+            "اگر user_id رزولو شد، اعلان شاگرد باید به همان User.id برود"
+    else:                                              # مسیر skip
+        assert not any(r.recipient_role == "student" and r.recipient_user_id is None for r in rows)
+
+    # ولی ۱۰۷ باید اعلان خودش را بگیرد (مستقل از وضعیت user_id شاگرد)
+    assert any(r.recipient_user_id == 607 and r.recipient_role == "parent" for r in rows), \
+        f"اعلان ولی ۶۰۷ نیامد: {[(r.recipient_user_id, r.recipient_role) for r in rows]}"
+
+
+def test_automation_notification_mapping_regression(notif_world):
+    """✅ رگرسیون F-R2 (مسیر دیگری که از قبل سالم بود): automation.trigger_notification_action
+    برای نقش student از shadow/User.id استفاده می‌کند، نه Student.id."""
+    from routers.automation import trigger_notification_action
+    db = notif_world.db
+    trigger_notification_action(db, rule_id=1, recipient_id=101, recipient_role="student",
+                                title="از automation", body="...", trigger_details="regression")
+    db.commit()
+    rows = db.query(models.Notification).filter(models.Notification.title == "از automation").all()
+    assert len(rows) == 1
+    assert rows[0].recipient_user_id == 501, (
+        f"automation باید User.id=501 بفرستد نه Student.id؛ actual={rows[0].recipient_user_id}")
 
 
 def test_recipient_resolver_creates_shadow_user_not_student_id(notif_world):
@@ -672,10 +841,8 @@ def test_recipient_resolver_missing_subject_returns_none(notif_world):
 
 
 def test_each_user_only_sees_own_installment_notification(notif_world):
-    """🔎 سناریو ۷: صندوق اعلان هر کاربر فقط ردیف‌های recipient_user_id خودش (+ نقش خودش) را نشان می‌دهد.
-
-    تحت باگ: ۵۰۱ و ۶۰۱ هیچ اعلان قسطی نمی‌بینند (چون همه با ۱۰۱ ثبت شده) ⇒ این تست هم red می‌شود.
-    """
+    """✅ FIX F-R2 (رگرسیون، سناریو ۷): صندوق اعلان هر کاربر فقط ردیف‌های recipient_user_id خودش
+    (+ نقش خودش) را نشان می‌دهد؛ تحت باگ هر دو صندوق خالی بود."""
     _run_real_auto_reminder()
     db = notif_world.db
     student_inbox = db.query(models.Notification).filter(

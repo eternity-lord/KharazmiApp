@@ -454,25 +454,38 @@ def auto_patch_database():
                                 
                                 # Send In-App & Push Notifications
                                 try:
-                                    from dependencies import NotificationService
+                                    # FIX (F-R2): recipient_user_id اعلان‌ها در فضای User.id است، نه Student.id.
+                                    # مپ مرکزی پروژه (dependencies.resolve_notification_recipient) برای
+                                    # نقش student از Student.user_id و برای parent از Student.parent_user_id
+                                    # استفاده می‌کند (و در نبودشان shadow-user می‌سازد). اگر مخاطب رزولو نشد،
+                                    # همان نقش skip می‌شود؛ هرگز Student.id (یا None) به‌عنوان fallback نمی‌رود.
+                                    from dependencies import NotificationService, resolve_notification_recipient
                                     # Parent Notification
-                                    NotificationService.send_notification(
-                                        db=db,
-                                        recipient_user_id=st.id,
-                                        recipient_role="parent",
-                                        type="installment",
-                                        title="💰 سررسید قسط شهریه فرزند شما",
-                                        body=f"بدینوسیله به اطلاع می‌رساند قسط شهریه فرزند شما {st.first_name} به مبلغ {inst.amount:,} تومان سررسید {inst.due_date} شده است. لطفاً جهت تسویه حساب اقدام فرمایید."
-                                    )
+                                    parent_recipient = resolve_notification_recipient(db, st.id, "parent")
+                                    if parent_recipient is None:
+                                        print(f"⚠️ Installment reminder skipped (parent) for student {st.id}: no resolvable parent_user_id")
+                                    else:
+                                        NotificationService.send_notification(
+                                            db=db,
+                                            recipient_user_id=parent_recipient,
+                                            recipient_role="parent",
+                                            type="installment",
+                                            title="💰 سررسید قسط شهریه فرزند شما",
+                                            body=f"بدینوسیله به اطلاع می‌رساند قسط شهریه فرزند شما {st.first_name} به مبلغ {inst.amount:,} تومان سررسید {inst.due_date} شده است. لطفاً جهت تسویه حساب اقدام فرمایید."
+                                        )
                                     # Student Notification
-                                    NotificationService.send_notification(
-                                        db=db,
-                                        recipient_user_id=st.id,
-                                        recipient_role="student",
-                                        type="installment",
-                                        title="💰 سررسید قسط شهریه شما",
-                                        body=f"بدینوسیله به اطلاع می‌رساند قسط شهریه شما به مبلغ {inst.amount:,} تومان سررسید {inst.due_date} شده است. لطفاً اقدام فرمایید."
-                                    )
+                                    student_recipient = resolve_notification_recipient(db, st.id, "student")
+                                    if student_recipient is None:
+                                        print(f"⚠️ Installment reminder skipped (student) for student {st.id}: no resolvable user_id")
+                                    else:
+                                        NotificationService.send_notification(
+                                            db=db,
+                                            recipient_user_id=student_recipient,
+                                            recipient_role="student",
+                                            type="installment",
+                                            title="💰 سررسید قسط شهریه شما",
+                                            body=f"بدینوسیله به اطلاع می‌رساند قسط شهریه شما به مبلغ {inst.amount:,} تومان سررسید {inst.due_date} شده است. لطفاً اقدام فرمایید."
+                                        )
                                 except Exception as n_err:
                                     print(f"⚠️ Error sending automated installment notification: {n_err}")
             db.commit()

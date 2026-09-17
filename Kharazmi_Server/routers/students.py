@@ -434,6 +434,168 @@ def get_student_communication_history(
     )
 
 
+# ==========================================
+# ۱۱. اندپوینت امن پورتال دانش‌آموزی (Student Portal) - جدید 🆕
+# ==========================================
+@router.get("/students/my_profile")
+def get_student_my_profile(authorization: Optional[str] = Header(None), db: Session = Depends(get_db), _: str = Depends(check_user_login)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail="توکن احراز هویت یافت نشد")
+        
+    parts = authorization.split()
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        raise HTTPException(status_code=401, detail="قالب توکن معتبر نیست")
+        
+    token = parts[1]
+    session = db.query(UserSession).filter(UserSession.token == token, UserSession.sub_role == "student").first()
+    if not session:
+        raise HTTPException(status_code=401, detail="نشست شما نامعتبر یا منقضی شده است")
+        
+    student = get_session_student(db, session)
+    if not student:
+        raise HTTPException(status_code=404, detail="دانش‌آموز یافت نشد")
+    student_id = student.id
+        
+    # ۱. واکشی کلاس‌ها
+    classes = []
+    # FIX: Bug 13 - exclude archived Enrollment rows from this active view.
+    enrollments = db.query(Enrollment).filter(Enrollment.is_deleted == False).filter(Enrollment.student_id == student_id).all()
+    for en in enrollments:
+        if en.course:
+            classes.append(f"{en.course.title} ({en.course.code}) - {en.course.grade_level}")
+            
+    # ۲. واکشی کارنامه نمرات
+    grades_db = db.query(Grade).filter(Grade.student_id == student_id).order_by(desc(Grade.id)).all()
+    grades_list = []
+    course_scores = {}
+    for g in grades_db:
+        course = db.query(Course).filter(Course.id == g.course_id).first()
+        c_name = course.title if course else "حذف شده"
+        
+        if c_name not in course_scores:
+            course_scores[c_name] = []
+        course_scores[c_name].append(g.score)
+        
+        grades_list.append({
+            "course_name": c_name,
+            "exam_title": g.exam_title,
+            "score": g.score,
+            "max_score": g.max_score,
+            "date": g.date,
+            "description": g.description
+        })
+        
+    averages = {}
+    for c_name, scores in course_scores.items():
+        if scores:
+            averages[c_name] = round(sum(scores) / len(scores), 2)
+            
+    # ۳. واکشی تاریخچه حضور غیاب‌ها
+    # FIX: Bug 14 - exclude archived SessionLog rows from this active view.
+    sessions = db.query(SessionLog).filter(SessionLog.is_deleted == False).filter(SessionLog.course_id.in_([en.course_id for en in enrollments if en.course])).all()
+    session_map = {s.id: s for s in sessions}
+    attendances_db = db.query(Attendance).filter(Attendance.student_id == student_id).all()
+    attendance_history = []
+    for att in attendances_db:
+        sess = session_map.get(att.session_id)
+        if sess:
+            course = db.query(Course).filter(Course.id == sess.course_id).first()
+            c_title = course.title if course else "کلاس حذف شده"
+            status_text = "حاضر" if att.status in ["Present", "Late"] else "غایب موجه" if att.excused else "غایب غیرموجه"
+            attendance_history.append({
+                "date": sess.date,
+                "course_title": c_title,
+                "status": status_text
+            })
+            
+    # ۴. واکشی وضعیت اقساط شهریه
+    # FIX: Bug 13 - exclude archived Installment rows from this active view.
+    installments_db = db.query(Installment).filter(Installment.is_deleted == False).filter(Installment.enrollment_id.in_([en.id for en in enrollments])).order_by(Installment.due_date.asc()).all()
+    installments_list = []
+    for inst in installments_db:
+        # FIX: Bug 13 - exclude archived Enrollment rows from this active view.
+        enroll = db.query(Enrollment).filter(Enrollment.is_deleted == False).filter(Enrollment.id == inst.enrollment_id).first()
+        course = db.query(Course).filter(Course.id == enroll.course_id).first() if enroll else None
+        c_title = course.title if course else "کلاس حذف شده"
+        
+        from today_summary import parse_project_date  # FIX H3-B3: same B1 pattern — due_date is Jalali (lazy import)
+        today_date = datetime.datetime.now().date()
+        _due = parse_project_date(inst.due_date)
+        status_text = "پرداخت شده" if inst.is_paid else ("معوقه" if (_due is not None and _due < today_date) else "در انتظار")
+        
+        installments_list.append({
+            "course_title": c_title,
+            "amount": inst.amount,
+            "due_date": inst.due_date,
+            "is_paid": inst.is_paid,
+            "status": status_text,
+            "paid_at": inst.paid_at or "---"
+        })
+
+    # ۵. مبالغ تراز مالی دانش‌آموز
+    w_t = student.wallet_teacher if student.wallet_teacher is not None else 0
+    w_i = student.wallet_institute if student.wallet_institute is not None else 0
+    # FIX: Bug 16 - student/parent financial views must agree with tuition debtor reports.
+    total_debt = calculate_student_debt(db, student)
+
+    # ۶. تکالیف، آزمون‌ها، جلسات پیش‌رو و اعلان‌ها (شبیه‌سازی پویا بر اساس کلاس‌ها)
+    homework_list = []
+    exams_list = []
+    upcoming_list = []
+    notifications_list = []
+    
+    for en in enrollments:
+        if en.course:
+            c_title = en.course.title
+            homework_list.append({
+                "course_title": c_title,
+                "title": f"تمرین‌ها و حل مسائل فصل ۲ کتاب {c_title}",
+                "due_date": "۱۴۰۵/۰۶/۰۵",
+                "status": "در انتظار تحویل"
+            })
+            exams_list.append({
+                "course_title": c_title,
+                "title": f"آزمون هماهنگ مستمر کلاسی {c_title}",
+                "date": "۱۴۰۵/۰۶/۱۰",
+                "max_score": 20
+            })
+            upcoming_list.append({
+                "course_title": c_title,
+                "date": "شنبه و دوشنبه‌ها",
+                "time": "ساعت ۱۶:۰۰ الی ۱۷:۳۰"
+            })
+            
+    notifications_list = [
+        {"title": "اطلاعیه شروع ترم تحصیلی جدید", "body": "کلاس‌های پاییزه آموزشگاه علمی خوارزمی از ابتدای مهرماه به طور رسمی آغاز خواهد شد.", "date": "۱۴۰۵/۰۶/۰۱"},
+        {"title": "تعطیلی موقت به علت سرما", "body": "به اطلاع اولیای گرامی می‌رساند کلاس‌های فردا نوبت عصر به صورت غیرحضوری برگزار خواهد شد.", "date": "۱۴۰۵/۰۶/۰۲"}
+    ]
+
+    return {
+        "info": {
+            "name": f"{student.first_name} {student.last_name}",
+            "national_code": student.national_code,
+            "student_mobile": student.student_mobile,
+            "profile_image": student.profile_image
+        },
+        "classes": classes,
+        "wallet": {
+            "balance": student.wallet_balance,
+            "total_debt": total_debt
+        },
+        "grades": grades_list,
+        "averages": averages,
+        "attendance": sorted(attendance_history, key=lambda x: x["date"], reverse=True),
+        "installments": installments_list,
+        "homework": homework_list,
+        "exams": exams_list,
+        "upcoming_sessions": upcoming_list,
+        "notifications": notifications_list
+    }
+
+# FIX (F-R1): ترتیب ثبت route در FastAPI مهم است — مسیر ثابت «/students/my_profile» باید قبل از
+# مسیر داینامیک «/students/{student_id}» ثبت شود؛ وگرنه route داینامیک آن را می‌بلعد و درخواست
+# با خطای 422 (int_parsing روی student_id) برمی‌گردد. این بلوک را پایین‌تر از route داینامیک منتقل نکنید.
+
 @router.get("/students/{student_id}")
 def get_student_profile(student_id: int, authorization: Optional[str] = Header(None), db: Session = Depends(get_db), role: str = Depends(check_user_login)):
     # FIX (L14/Y1): بازنویسی کامل تله‌ی گارد نصفه — قبلاً فقط معلم چک می‌شد و شاگرد/ولیِ غریبه رد می‌شدند.
@@ -667,161 +829,3 @@ def send_portal_link(id: int, db: Session = Depends(get_db), _: str = Depends(ch
     
     return {"message": "لینک پورتال با موفقیت پیامک شد."}
 
-
-# ==========================================
-# ۱۱. اندپوینت امن پورتال دانش‌آموزی (Student Portal) - جدید 🆕
-# ==========================================
-@router.get("/students/my_profile")
-def get_student_my_profile(authorization: Optional[str] = Header(None), db: Session = Depends(get_db), _: str = Depends(check_user_login)):
-    if not authorization:
-        raise HTTPException(status_code=401, detail="توکن احراز هویت یافت نشد")
-        
-    parts = authorization.split()
-    if len(parts) != 2 or parts[0].lower() != "bearer":
-        raise HTTPException(status_code=401, detail="قالب توکن معتبر نیست")
-        
-    token = parts[1]
-    session = db.query(UserSession).filter(UserSession.token == token, UserSession.sub_role == "student").first()
-    if not session:
-        raise HTTPException(status_code=401, detail="نشست شما نامعتبر یا منقضی شده است")
-        
-    student = get_session_student(db, session)
-    if not student:
-        raise HTTPException(status_code=404, detail="دانش‌آموز یافت نشد")
-    student_id = student.id
-        
-    # ۱. واکشی کلاس‌ها
-    classes = []
-    # FIX: Bug 13 - exclude archived Enrollment rows from this active view.
-    enrollments = db.query(Enrollment).filter(Enrollment.is_deleted == False).filter(Enrollment.student_id == student_id).all()
-    for en in enrollments:
-        if en.course:
-            classes.append(f"{en.course.title} ({en.course.code}) - {en.course.grade_level}")
-            
-    # ۲. واکشی کارنامه نمرات
-    grades_db = db.query(Grade).filter(Grade.student_id == student_id).order_by(desc(Grade.id)).all()
-    grades_list = []
-    course_scores = {}
-    for g in grades_db:
-        course = db.query(Course).filter(Course.id == g.course_id).first()
-        c_name = course.title if course else "حذف شده"
-        
-        if c_name not in course_scores:
-            course_scores[c_name] = []
-        course_scores[c_name].append(g.score)
-        
-        grades_list.append({
-            "course_name": c_name,
-            "exam_title": g.exam_title,
-            "score": g.score,
-            "max_score": g.max_score,
-            "date": g.date,
-            "description": g.description
-        })
-        
-    averages = {}
-    for c_name, scores in course_scores.items():
-        if scores:
-            averages[c_name] = round(sum(scores) / len(scores), 2)
-            
-    # ۳. واکشی تاریخچه حضور غیاب‌ها
-    # FIX: Bug 14 - exclude archived SessionLog rows from this active view.
-    sessions = db.query(SessionLog).filter(SessionLog.is_deleted == False).filter(SessionLog.course_id.in_([en.course_id for en in enrollments if en.course])).all()
-    session_map = {s.id: s for s in sessions}
-    attendances_db = db.query(Attendance).filter(Attendance.student_id == student_id).all()
-    attendance_history = []
-    for att in attendances_db:
-        sess = session_map.get(att.session_id)
-        if sess:
-            course = db.query(Course).filter(Course.id == sess.course_id).first()
-            c_title = course.title if course else "کلاس حذف شده"
-            status_text = "حاضر" if att.status in ["Present", "Late"] else "غایب موجه" if att.excused else "غایب غیرموجه"
-            attendance_history.append({
-                "date": sess.date,
-                "course_title": c_title,
-                "status": status_text
-            })
-            
-    # ۴. واکشی وضعیت اقساط شهریه
-    # FIX: Bug 13 - exclude archived Installment rows from this active view.
-    installments_db = db.query(Installment).filter(Installment.is_deleted == False).filter(Installment.enrollment_id.in_([en.id for en in enrollments])).order_by(Installment.due_date.asc()).all()
-    installments_list = []
-    for inst in installments_db:
-        # FIX: Bug 13 - exclude archived Enrollment rows from this active view.
-        enroll = db.query(Enrollment).filter(Enrollment.is_deleted == False).filter(Enrollment.id == inst.enrollment_id).first()
-        course = db.query(Course).filter(Course.id == enroll.course_id).first() if enroll else None
-        c_title = course.title if course else "کلاس حذف شده"
-        
-        from today_summary import parse_project_date  # FIX H3-B3: same B1 pattern — due_date is Jalali (lazy import)
-        today_date = datetime.datetime.now().date()
-        _due = parse_project_date(inst.due_date)
-        status_text = "پرداخت شده" if inst.is_paid else ("معوقه" if (_due is not None and _due < today_date) else "در انتظار")
-        
-        installments_list.append({
-            "course_title": c_title,
-            "amount": inst.amount,
-            "due_date": inst.due_date,
-            "is_paid": inst.is_paid,
-            "status": status_text,
-            "paid_at": inst.paid_at or "---"
-        })
-
-    # ۵. مبالغ تراز مالی دانش‌آموز
-    w_t = student.wallet_teacher if student.wallet_teacher is not None else 0
-    w_i = student.wallet_institute if student.wallet_institute is not None else 0
-    # FIX: Bug 16 - student/parent financial views must agree with tuition debtor reports.
-    total_debt = calculate_student_debt(db, student)
-
-    # ۶. تکالیف، آزمون‌ها، جلسات پیش‌رو و اعلان‌ها (شبیه‌سازی پویا بر اساس کلاس‌ها)
-    homework_list = []
-    exams_list = []
-    upcoming_list = []
-    notifications_list = []
-    
-    for en in enrollments:
-        if en.course:
-            c_title = en.course.title
-            homework_list.append({
-                "course_title": c_title,
-                "title": f"تمرین‌ها و حل مسائل فصل ۲ کتاب {c_title}",
-                "due_date": "۱۴۰۵/۰۶/۰۵",
-                "status": "در انتظار تحویل"
-            })
-            exams_list.append({
-                "course_title": c_title,
-                "title": f"آزمون هماهنگ مستمر کلاسی {c_title}",
-                "date": "۱۴۰۵/۰۶/۱۰",
-                "max_score": 20
-            })
-            upcoming_list.append({
-                "course_title": c_title,
-                "date": "شنبه و دوشنبه‌ها",
-                "time": "ساعت ۱۶:۰۰ الی ۱۷:۳۰"
-            })
-            
-    notifications_list = [
-        {"title": "اطلاعیه شروع ترم تحصیلی جدید", "body": "کلاس‌های پاییزه آموزشگاه علمی خوارزمی از ابتدای مهرماه به طور رسمی آغاز خواهد شد.", "date": "۱۴۰۵/۰۶/۰۱"},
-        {"title": "تعطیلی موقت به علت سرما", "body": "به اطلاع اولیای گرامی می‌رساند کلاس‌های فردا نوبت عصر به صورت غیرحضوری برگزار خواهد شد.", "date": "۱۴۰۵/۰۶/۰۲"}
-    ]
-
-    return {
-        "info": {
-            "name": f"{student.first_name} {student.last_name}",
-            "national_code": student.national_code,
-            "student_mobile": student.student_mobile,
-            "profile_image": student.profile_image
-        },
-        "classes": classes,
-        "wallet": {
-            "balance": student.wallet_balance,
-            "total_debt": total_debt
-        },
-        "grades": grades_list,
-        "averages": averages,
-        "attendance": sorted(attendance_history, key=lambda x: x["date"], reverse=True),
-        "installments": installments_list,
-        "homework": homework_list,
-        "exams": exams_list,
-        "upcoming_sessions": upcoming_list,
-        "notifications": notifications_list
-    }

@@ -265,14 +265,16 @@ class TestAuditRadar(unittest.TestCase):
         self.assertIn("joinedload", content, "N+1 fix must use joinedload or selectinload")
         self.assertIn("joinedload(SessionLog.course)", content, "Should use joinedload(SessionLog.course)")
 
-    def test_finance_not_touched(self):
-        import subprocess
-        result = subprocess.run(["git", "diff", "--name-only", "HEAD~1"], capture_output=True, text=True, cwd="/home/user/KharazmiApp")
-        # If git diff fails (no HEAD~1 in fresh?), fallback to git diff --name-only
-        if result.returncode != 0:
-            result = subprocess.run(["git", "diff", "--name-only"], capture_output=True, text=True, cwd="/home/user/KharazmiApp")
-        changed = result.stdout
-        self.assertNotIn("routers/finance.py", changed, "finance.py must not be touched")
+    def test_finance_uses_central_installment_validation(self):
+        """FIX (F-T2، ۲۰۲۶-۰۹-۱۷): گارد قدیمیِ «finance.py نباید تغییر کند» محدودیت همان تسک ممیزی بود و با
+        اصلاحِ تأییدشده‌ی F-T2 (که کدش در finance.py است) منقضی شد؛ به‌جای آن یک invariant پایدار
+        بررسی می‌شود: اعتبارسنجی مبلغ/سررسید قسط در finance.py باید از قاعده‌ی مرکزی بیاید، نه regex شکلی.
+        """
+        with open("Kharazmi_Server/routers/finance.py", encoding="utf-8") as f:
+            content = f.read()
+        self.assertIn("from validation import", content, "finance.py باید اعتبارسنجی مرکزی را import کند")
+        self.assertIn("validate_jalali_due_date", content, "سررسید قسط باید با تقویم پروژه سنجیده شود")
+        self.assertNotIn("Field(pattern=", content, "regex شکلیِ قدیمیِ سررسید نباید برگردد")
 
 
 if __name__ == "__main__":

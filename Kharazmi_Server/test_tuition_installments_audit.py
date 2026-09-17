@@ -37,9 +37,14 @@ Tuition / Discount / Contractual Debt / Enrollment / Installment — TEST-ONLY a
 | ۲۳ | rollback وسط پرداخت | `test_s23_*` |
 | ۲۴ | دو پرداخت هم‌زمان روی یک قسط | `test_s24_*` |
 
-## ⚠️ تست‌های یافته‌محور (عمداً fail می‌شوند)
-`test_finding_t1_*` و `test_finding_t2_*` نقص‌های واقعی را مستند می‌کنند (طبق دستور تسک هیچ fix‌ای
-انجام نشده). اگر روزی اصلاح شوند سبز/XPASS می‌شوند.
+## ✅ تست‌های رگرسیون fix (F-T1/F-T2 — هر دو اصلاح شدند)
+| ID | موضوع | تست‌ها |
+|---|---|---|
+| F-T1 | اعتبارسنجی اقساط مسیر ثبت‌نام (مبلغ صحیح مثبت + تاریخ) | `test_fix_t1_*` |
+| F-T2 | رد تاریخ‌های ناموجود جلالی (تقویم پروژه) در همه‌ی مسیرها | `test_fix_t2_*` |
+دو تست یافته‌محور قبلی (`test_finding_t1_*`/`test_finding_t2_*`) پس از fix به همین تست‌های سبز
+تبدیل شدند؛ سیاست یکسان هر دو مسیر (schema ⇒ ۴۲۲، لایه‌ی endpoint ⇒ ۴۰۰) و «هیچ نوشتنی» در DB
+در همین فایل تست می‌شود.
 
 ## اجرا (طبق قانون پروژه: فقط روی DB تست/کپی — هرگز gaj_db.db واقعی)
     cd /home/user/KharazmiApp && DATABASE_URL=sqlite:////tmp/tuition_audit.db \
@@ -66,8 +71,8 @@ from financial_calculations import (
     calculate_student_debt,
     calculate_total_turnover,
 )
-from routers import classes, dashboard, finance
-from routers.finance import InstallmentCreateRequest
+from routers import classes, dashboard, dunning, finance
+from routers.finance import InstallmentCreateRequest, InstallmentUpdateRequest
 from schemas import EnrollmentCreate, FinanceSubmitData, InstallmentCreate
 from today_summary import parse_project_date
 
@@ -732,38 +737,290 @@ def test_s24_concurrent_manual_payments_settle_exactly_once(tmp_path):
 # ==========================================
 # یافته‌های ممیزی (عمداً fail — طبق دستور تسک هیچ fix‌ای انجام نشده)
 # ==========================================
-def test_finding_t1_enrollment_installments_skip_validation(world):
-    """🔎 F-T1: مسیر «ثبت‌نام همراه با اقساط» (`classes.add_enrollment` → schemas.InstallmentCreate)
-    هیچ اعتبارسنجی‌ای روی مبلغ/تاریخ قسط ندارد، در حالی که اندپوینت اختصاصی
-    `POST /finance/installments` همان ورودی‌ها را با ۴۲۲ رد می‌کند ⇒ سیاست ناهمگون و امکان ساخت
-    قسط با مبلغ ≤ ۰ یا تاریخ نامعتبر (که بعداً از مسیر وصول با ۴۰۰ رد می‌شود و در گزارش‌ها
-    به‌شکل «در انتظار» گیر می‌کند)."""
+# ==========================================
+# FIX رگرسیون F-T1 — مسیر «ثبت‌نام همراه اقساط» باید همان اعتبارسنجیِ مسیر مستقل را داشته باشد
+# ==========================================
+def _enrollment_payload(installments=None, **overrides):
+    """شکل واقعی payload ثبت‌نام (dict) برای آزمودن اعتبارسنجی تودرتوی schema."""
+    payload = dict(student_id=101, course_id=2, register_date=TODAY_JALALI, shift="صبح",
+                   total_tuition=1000, paid_amount=0, payment_method="نقدی", receiver="صندوق",
+                   discount_type="none", discount_value=0, installments=installments)
+    payload.update(overrides)
+    return payload
+
+
+INVALID_INSTALLMENT_PAYLOADS = [
+    {"amount": -5, "due_date": TODAY_JALALI},          # F-T1: مبلغ منفی
+    {"amount": 0, "due_date": TODAY_JALALI},           # F-T1: مبلغ صفر
+    {"amount": -5, "due_date": "bad-date"},            # F-T1: مبلغ منفی + تاریخ بی‌قالب
+    {"amount": 0, "due_date": "1405/13/45"},           # F-T1: مبلغ صفر + ماه/روز ناموجود
+    {"amount": 100.5, "due_date": TODAY_JALALI},       # مبلغ اعشاری نباید truncate شود
+    {"amount": 10, "due_date": "1405/07/31"},          # F-T2: ۳۱ ماه ۳۰روزه
+    {"amount": 10, "due_date": "1405/12/30"},          # F-T2: ۳۰ اسفند سال غیرکبیسه
+]
+
+INVALID_JALALI_DATES = [
+    "1405/07/31",   # ماه ۷ تا ۱۲ سی روزه‌اند
+    "1405/12/30",   # ۱۴۰۵ غیرکبیسه
+    "1405/13/01",   # ماه خارج از ۱..۱۲
+    "1405/00/01",   # ماه صفر
+    "1405/01/00",   # روز صفر
+    "bad-date",     # بی‌قالب
+]
+
+VALID_JALALI_DATES = ["1405/01/31", "1405/06/31", "1405/07/30", "1405/12/29"]
+
+
+@pytest.mark.parametrize("payload", INVALID_INSTALLMENT_PAYLOADS)
+def test_fix_t1_invalid_installments_rejected_identically_on_both_paths(world, payload):
+    """FIX F-T1/F-T2: مسیر مستقل قسط و مسیر ثبت‌نام همراه اقساط باید **یک سیاست** داشته باشند.
+
+    هر دو مسیر در مرز schema (۴۲۲) رد می‌کنند و پیام خطایشان هم یکی است ⇒ یک قاعده‌ی مرکزی.
+    """
+    with pytest.raises(ValidationError):
+        InstallmentCreateRequest(enrollment_id=1, **payload)
+    with pytest.raises(ValidationError):
+        EnrollmentCreate(**_enrollment_payload(installments=[payload]))
+    # هیچ ردیفی ساخته نشده و بدهی دست‌نخورده است
+    assert world.db.query(models.Installment).count() == 0
+    assert student_debt(world.db) == 800
+
+
+def test_fix_t1_error_messages_are_identical_on_both_paths(world):
+    """اثبات «اعتبارسنجی مرکزی»: برای ورودی نامعتبر، پیام خطای دو مسیر عیناً یکی است."""
+    def first_message(build):
+        with pytest.raises(ValidationError) as error:
+            build()
+        return error.value.errors()[0]["msg"]
+
+    def independent():
+        return InstallmentCreateRequest(enrollment_id=1, amount=-5, due_date="bad-date")
+
+    def enrollment_path():
+        return EnrollmentCreate(**_enrollment_payload(installments=[{"amount": -5, "due_date": "bad-date"}]))
+
+    assert first_message(independent) == first_message(enrollment_path)
+
+    def independent_date():
+        return InstallmentCreateRequest(enrollment_id=1, amount=10, due_date="1405/07/31")
+
+    def enrollment_date():
+        return EnrollmentCreate(**_enrollment_payload(installments=[{"amount": 10, "due_date": "1405/07/31"}]))
+
+    assert first_message(independent_date) == first_message(enrollment_date)
+
+
+def test_fix_t1_invalid_installment_writes_nothing_at_all(world):
+    """قسط نامعتبر: نه ردیف قسط، نه ثبت‌نام نیمه‌کاره، نه تراکنش ناقص، نه تغییر بدهی، نه یادآوری.
+
+    دو لایه آزموده می‌شود:
+      ۱) مرز HTTP (schema) ⇒ ValidationError و هیچ نوشتنی؛
+      ۲) لایه‌ی endpoint برای فراخوان داخلی که schema را دور می‌زند ⇒ ۴۰۰ و توقف **پیش از** هر نوشتن.
+    """
+    db = world.db
+    counts_before = {
+        "enrollments": db.query(func.count(models.Enrollment.id)).scalar(),
+        "installments": db.query(func.count(models.Installment.id)).scalar(),
+        "transactions": db.query(func.count(models.Transaction.id)).scalar(),
+        "notifications": db.query(func.count(models.Notification.id)).scalar(),
+        "sms": db.query(func.count(models.SmsLog.id)).scalar(),
+    }
+    debt_before = student_debt(db)
+
+    # ۱) مرز HTTP
+    with pytest.raises(ValidationError):
+        EnrollmentCreate(**_enrollment_payload(paid_amount=100, installments=[
+            {"amount": -5, "due_date": "bad-date"},
+            {"amount": 0, "due_date": "1405/13/45"},
+        ]))
+
+    # ۲) فراخوان داخلی با شیء duck-type که از schema عبور نکرده است
+    sneaky = SimpleNamespace(amount=-5, due_date="bad-date")
+    data = SimpleNamespace(student_id=101, course_id=2, register_date=TODAY_JALALI, shift="صبح",
+                           total_tuition=1000, paid_amount=100, payment_method="نقدی",
+                           receiver="صندوق", discount_type="none", discount_value=0,
+                           installments=[sneaky])
+    with pytest.raises(HTTPException) as error:
+        classes.add_enrollment(data, db=db, _="admin")
+    assert error.value.status_code == 400, "لایه‌ی endpoint مثل اعتبارسنجی‌های همین تابع ⇒ ۴۰۰"
+    db.rollback()   # همان کاری که بستن session در get_db انجام می‌دهد (معامله هرگز کامیت نشد)
+
+    after = {
+        "enrollments": db.query(func.count(models.Enrollment.id)).scalar(),
+        "installments": db.query(func.count(models.Installment.id)).scalar(),
+        "transactions": db.query(func.count(models.Transaction.id)).scalar(),
+        "notifications": db.query(func.count(models.Notification.id)).scalar(),
+        "sms": db.query(func.count(models.SmsLog.id)).scalar(),
+    }
+    assert after == counts_before
+    assert student_debt(db) == debt_before, "بدهی دانش‌آموز نباید تغییر کند"
+    assert (wallets(db)[0], wallets(db)[1]) == (0, 0), "کیف هم نباید شارژ شود"
+    assert dunning.get_dunning_drafts(authorization=f"Bearer {TOKEN}", db=db, _="admin") == [], \
+        "برای قسط نامعتبر نباید هیچ پیش‌نویس یادآوری ساخته شود"
+
+
+@pytest.mark.parametrize("amount", [0, -1, -5, 100.5, 0.9, "100.5", "0", True, float("nan"), float("inf")])
+def test_fix_t1_amount_must_be_positive_integer_on_both_paths(world, amount):
+    """مبلغ: صفر/منفی/اعشاری/غیرعددی در هر دو مسیر یکسان رد می‌شود (بدون truncate و بدون ذخیره)."""
+    with pytest.raises(ValidationError):
+        InstallmentCreateRequest(enrollment_id=1, amount=amount, due_date=TODAY_JALALI)
+    with pytest.raises(ValidationError):
+        InstallmentCreate(amount=amount, due_date=TODAY_JALALI)
+    assert world.db.query(models.Installment).count() == 0
+
+
+def test_fix_t1_fractional_amount_is_not_silently_truncated(world):
+    """۱۰۰٫۵ نباید به ۱۰۰ تبدیل شود (نه در مدل، نه در DB) — ولی ورودی‌های صحیح‌مقدار مشکلی ندارند."""
+    with pytest.raises(ValidationError) as error:
+        InstallmentCreate(amount=100.5, due_date=TODAY_JALALI)
+    assert "اعشاری" in str(error.value)
+    with pytest.raises(ValidationError):
+        InstallmentCreateRequest(enrollment_id=1, amount=99.999, due_date=TODAY_JALALI)
+    assert world.db.query(models.Installment).count() == 0
+
+    # سازگاری: ۱۰۰٫۰ و "100" (رفتار سست قبلی pydantic برای غیراعشاری) حفظ شده است
+    assert InstallmentCreate(amount=100.0, due_date=TODAY_JALALI).amount == 100
+    assert InstallmentCreate(amount="100", due_date=TODAY_JALALI).amount == 100
+
+
+def test_fix_t1_valid_installments_still_saved_by_enrollment_path(world):
+    """رگرسیون مثبت: مسیر ثبت‌نام همراه اقساط با ورودی معتبر دقیقاً همان اقساط را ذخیره می‌کند."""
     result = add_enrollment(world, course_id=2, total_tuition=1000, installments=[
-        InstallmentCreate(amount=-5, due_date="bad-date"),
-        InstallmentCreate(amount=0, due_date="1405/13/45"),
+        InstallmentCreate(amount=300, due_date="1405/07/01"),
+        InstallmentCreate(amount=500, due_date="1405/08/01"),
     ])
-    rows = world.db.query(models.Installment).filter(
-        models.Installment.enrollment_id == result["enrollment_id"]).all()
-    created = sorted((r.amount, r.due_date) for r in rows)
-    assert created == [], (
-        f"F-T1: انتظار می‌رفت اقساط نامعتبر (مبلغ ≤۰ یا تاریخ نامعتبر) ساخته نشوند؛ "
-        f"ساخته‌شده‌ها: {created}"
-    )
+    world.db.expire_all()
+    rows = (world.db.query(models.Installment)
+            .filter(models.Installment.enrollment_id == result["enrollment_id"])
+            .order_by(models.Installment.id).all())
+    assert [(r.amount, r.due_date, r.is_paid) for r in rows] == [
+        (300, "1405/07/01", False), (500, "1405/08/01", False)]
+    assert enrollment_debt(world.db, result["enrollment_id"]) == 1000
+    assert student_debt(world.db) == 1800   # ۸۰۰ ثبت‌نام قبلی + ۱۰۰۰ ثبت‌نام جدید
 
 
-def test_finding_t2_regex_accepts_calendar_invalid_jalali_dates(world):
-    """🔎 F-T2: الگوی اعتبارسنجی `due_date` در `InstallmentCreateRequest` فقط «شکل» تاریخ را چک می‌کند
-    (`\\d{4}/MM/DD` با DD تا ۳۱)، پس تاریخ‌های ناموجود جلالی مثل ۳۱ ماه‌های ۷ تا ۱۲ (که ۳۰ روزه‌اند)
-    یا ۳۰ اسفند سال غیرکبیسه پذیرفته می‌شوند؛ `parse_project_date` بعداً آن‌ها را None می‌کند،
-    پس وضعیت قسط همیشه «در انتظار» می‌ماند و هیچ یادآوری معوقه‌ای فعال نمی‌شود."""
-    for bogus in ("1405/07/31", "1405/12/30"):
-        try:
-            request = InstallmentCreateRequest(enrollment_id=1, amount=10, due_date=bogus)
-        except ValidationError:
-            continue   # رفتار مطلوب
-        result = create_installment(world, amount=10, due_date=request.due_date)
-        row = installment_row(world.db, result["installment_id"])
-        assert row is None, (
-            f"F-T2: تاریخ ناموجود {bogus!r} پذیرفته و قسط ساخته شد "
-            f"(parse_project_date آن None است ⇒ وضعیت «در انتظار»/بدون یادآوری)"
-        )
+def test_fix_t1_central_validator_is_shared_by_every_creation_path():
+    """منبع حقیقت واحد: توابع مرکزی همان چیزی را قبول/رد می‌کنند که هر دو schema."""
+    from validation import normalize_installments, validate_installment_amount, validate_jalali_due_date
+
+    assert normalize_installments([InstallmentCreate(amount=7, due_date=TODAY_JALALI)]) == [(7, TODAY_JALALI)]
+    assert validate_jalali_due_date("1403/12/30") == "1403/12/30"     # مرز کبیسه
+    assert validate_installment_amount("250") == 250
+    for bogus in INVALID_JALALI_DATES:
+        with pytest.raises(ValueError):
+            validate_jalali_due_date(bogus)
+    for bad_amount in (0, -5, 100.5, True, "1e3"):
+        with pytest.raises(ValueError):
+            validate_installment_amount(bad_amount)
+
+
+def test_fix_t1_http_layer_returns_422_on_both_endpoints(world):
+    """مرز HTTP (تصمیم status code): خطای اعتبارسنجی schema ⇒ **۴۲۲** برای هر دو اندپوینت.
+
+    چون اعتبارسنجی در لایه‌ی Medل Pydantic انجام می‌شود، FastAPI پیش از رسیدن درخواست به بدنه‌ی
+    endpoint آن را با ۴۲۲ برمی‌گرداند؛ این رفتار برای مسیر مستقل قسط و مسیر ثبت‌نام همراه اقساط یکی است
+    (لایه‌ی ۴۰۰ داخل endpoint فقط برای فراخوان‌های داخلیِ دورزننده‌ی schema است — تست جداگانه دارد).
+    """
+    from fastapi.testclient import TestClient
+    from dependencies import get_db
+    from main import app
+
+    def override_get_db():
+        yield world.db
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        client = TestClient(app)
+        headers = {"Authorization": f"Bearer {TOKEN}"}
+        before = world.db.query(func.count(models.Installment.id)).scalar()
+
+        independent = client.post("/finance/installments", headers=headers, json={
+            "enrollment_id": 1, "amount": 10, "due_date": "1405/07/31"})
+        assert independent.status_code == 422, independent.text
+        assert "وجود ندارد" in independent.json()["detail"][0]["msg"]
+
+        enrollment = client.post("/enrollments/add", headers=headers, json=_enrollment_payload(
+            installments=[{"amount": -5, "due_date": "bad-date"}]))
+        assert enrollment.status_code == 422, enrollment.text
+
+        fractional = client.post("/finance/installments", headers=headers, json={
+            "enrollment_id": 1, "amount": 100.5, "due_date": TODAY_JALALI})
+        assert fractional.status_code == 422, fractional.text
+
+        assert world.db.query(func.count(models.Installment.id)).scalar() == before
+        assert student_debt(world.db) == 800
+    finally:
+        app.dependency_overrides.clear()
+        world.db.rollback()
+
+
+# ==========================================
+# FIX رگرسیون F-T2 — تاریخ ناموجود جلالی نباید ذخیره شود
+# ==========================================
+@pytest.mark.parametrize("due_date", VALID_JALALI_DATES)
+def test_fix_t2_calendar_valid_dates_are_still_accepted_everywhere(world, due_date):
+    """تاریخ‌های معتبر (شامل ۳۱ ماه‌های ۱..۶ و ۳۰ ماه‌های ۷..۱۲) در هر دو مسیر پذیرفته می‌شوند."""
+    assert parse_project_date(due_date) is not None, "مرجع، تقویم خود پروژه است"
+    result = create_installment(world, amount=10, due_date=due_date)
+    assert installment_row(world.db, result["installment_id"]).due_date == due_date
+    add_enrollment(world, course_id=2, total_tuition=1000, installments=[
+        InstallmentCreate(amount=5, due_date=due_date)])
+    world.db.expire_all()
+    assert (world.db.query(models.Installment)
+            .filter(models.Installment.due_date == due_date).count()) == 2
+
+
+@pytest.mark.parametrize("due_date", INVALID_JALALI_DATES)
+def test_fix_t2_calendar_invalid_dates_rejected_in_every_path(world, due_date):
+    """FIX F-T2: مسیر ساخت مستقل، مسیر ثبت‌نام همراه اقساط و مسیر ویرایش (PUT) یکسان رد می‌کنند."""
+    with pytest.raises(ValidationError):
+        InstallmentCreateRequest(enrollment_id=1, amount=10, due_date=due_date)
+    with pytest.raises(ValidationError):
+        EnrollmentCreate(**_enrollment_payload(installments=[{"amount": 10, "due_date": due_date}]))
+    with pytest.raises(ValidationError):
+        InstallmentUpdateRequest(due_date=due_date)
+
+    assert world.db.query(models.Installment).filter(models.Installment.due_date == due_date).count() == 0
+    assert world.db.query(func.count(models.Installment.id)).scalar() == 0
+    assert student_debt(world.db) == 800
+    assert dunning.get_dunning_drafts(authorization=f"Bearer {TOKEN}", db=world.db, _="admin") == []
+
+
+@pytest.mark.parametrize("due_date,accepted", [
+    ("1403/12/30", True),    # ۱۴۰۳ کبیسه ⇒ ۳۰ اسفند وجود دارد
+    ("1399/12/30", True),    # کبیسه‌ی دیگر پروژه
+    ("1404/12/29", True),    # آخرین روز اسفند غیرکبیسه
+    ("1404/12/30", False),   # ۱۴۰۴ غیرکبیسه
+    ("1405/12/30", False),
+    ("1405/07/31", False),   # ماه ۳۰روزه
+])
+def test_fix_t2_leap_year_boundary_matches_project_calendar(world, due_date, accepted):
+    """مرز کبیسه: تصمیم با تقویم پروژه (`parse_project_date`) سنجیده و در هر دو مسیر یکسان اعمال می‌شود."""
+    assert (parse_project_date(due_date) is not None) is accepted
+    if accepted:
+        assert create_installment(world, amount=10, due_date=due_date)["installment_id"]
+    else:
+        with pytest.raises(ValidationError):
+            InstallmentCreateRequest(enrollment_id=1, amount=10, due_date=due_date)
+        with pytest.raises(ValidationError):
+            InstallmentCreate(amount=10, due_date=due_date)
+        assert world.db.query(func.count(models.Installment.id)).scalar() == 0
+
+
+def test_fix_t2_update_installment_rejects_bogus_due_date_without_touching_row(world):
+    """رگرسیون PUT: ویرایش سررسید ناموجود ⇒ ۴۲۲ در schema و ردیف دست‌نخورده (بدون ذخیره‌ی نیمه‌کاره)."""
+    installment_id = create_installment(world, amount=250, due_date="1405/07/30")["installment_id"]
+    before = installment_row(world.db, installment_id)
+    snapshot = (before.amount, before.due_date, before.is_paid)
+
+    with pytest.raises(ValidationError):
+        InstallmentUpdateRequest(due_date="1405/07/31")
+    world.db.rollback()
+
+    after = installment_row(world.db, installment_id)
+    assert (after.amount, after.due_date, after.is_paid) == snapshot
+
+    # مسیر معتبر هم بدون رگرسیون کار می‌کند
+    finance.update_installment(installment_id, InstallmentUpdateRequest(due_date="1405/07/30"),
+                               db=world.db, authorization=f"Bearer {TOKEN}", _="admin")
+    assert installment_row(world.db, installment_id).due_date == "1405/07/30"

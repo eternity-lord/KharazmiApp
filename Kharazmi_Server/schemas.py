@@ -5,8 +5,12 @@ from pydantic.fields import FieldInfo
 from pydantic import BaseModel
 import datetime
 # FIX: Bug 22 - validate identity writes and cross-field score bounds centrally.
-from pydantic import model_validator
-from validation import NationalCodeRequest
+from pydantic import field_validator, model_validator
+from validation import (
+    NationalCodeRequest,
+    validate_installment_amount,
+    validate_jalali_due_date,
+)
 
 class HistoryRequest(BaseModel):
     course_id: int
@@ -68,8 +72,19 @@ class CourseCreate(BaseModel):
     bg_color: str = "#FFFFFF"
 
 class InstallmentCreate(BaseModel):
-    amount: int
+    # FIX (F-T1/F-T2): همان اعتبارسنجی مرکزی مسیر مستقل قسط — مبلغ صحیح مثبت + تاریخ شمسی موجود.
+    amount: int = Field(gt=0)
     due_date: str
+
+    @field_validator("amount", mode="before")
+    @classmethod
+    def _validate_amount(cls, value):
+        return validate_installment_amount(value)
+
+    @field_validator("due_date")
+    @classmethod
+    def _validate_due_date(cls, value):
+        return validate_jalali_due_date(value)
 
 class EnrollmentCreate(BaseModel):
     student_id: int

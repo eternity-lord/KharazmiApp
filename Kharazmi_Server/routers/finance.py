@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field  # FIX: Bug 22 - constrain online payment amounts at request validation.
+from pydantic import BaseModel, Field, field_validator  # FIX: Bug 22 - constrain online payment amounts at request validation.
 from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Header, Request
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.exc import IntegrityError  # FIX (audit-v2/idempotency): شکار مسابقه‌ی retry هم‌زمان روی UNIQUE کلید
@@ -22,6 +22,8 @@ from dependencies import get_db, check_admin_access, check_admin_or_secretary_ac
 # FIX: Bug 16 - share the tuition-minus-payment debt calculation across financial views.
 from dependencies import limiter  # FIX F-B1: ریت‌لیمیت کال‌بک پرداخت (endpoint پول بدون احراز).
 from financial_calculations import calculate_student_debt
+# FIX (F-T2): اعتبارسنجی مرکزی تاریخ/مبلغ قسط — یک منبع حقیقت برای هر دو مسیر ساخت قسط.
+from validation import validate_installment_amount, validate_jalali_due_date
 # FIX: Bug 11 - the existing refund audit write needs its model imported at runtime.
 from models import ActivityLog
 
@@ -776,12 +778,36 @@ class PaymentInitiateRequest(BaseModel):
 class InstallmentCreateRequest(BaseModel):
     enrollment_id: int
     amount: int = Field(gt=0)
-    due_date: str = Field(pattern=r"^\d{4}/(0[1-9]|1[0-2])/(0[1-9]|[12]\d|3[01])$")  # yyyy/MM/dd شمسی معتبر
+    due_date: str  # FIX (F-T2): قالب + وجود تقویمی با validator مرکزی (نه فقط regex شکل)
+
+    @field_validator("amount", mode="before")
+    @classmethod
+    def _validate_amount(cls, value):
+        return validate_installment_amount(value)
+
+    @field_validator("due_date")
+    @classmethod
+    def _validate_due_date(cls, value):
+        return validate_jalali_due_date(value)
 
 class InstallmentUpdateRequest(BaseModel):
     amount: Optional[int] = Field(default=None, gt=0)
-    due_date: Optional[str] = Field(default=None, pattern=r"^\d{4}/(0[1-9]|1[0-2])/(0[1-9]|[12]\d|3[01])$")
+    due_date: Optional[str] = None  # FIX (F-T2): ویرایش سررسید هم از همان قاعده‌ی تقویمی رد می‌شود
     is_paid: Optional[bool] = None
+
+    @field_validator("amount", mode="before")
+    @classmethod
+    def _validate_amount(cls, value):
+        if value is None:
+            return None
+        return validate_installment_amount(value)
+
+    @field_validator("due_date")
+    @classmethod
+    def _validate_due_date(cls, value):
+        if value is None:
+            return None
+        return validate_jalali_due_date(value)
 
 
 # --- ۱. شروع فرآیند پرداخت آنلاین ---

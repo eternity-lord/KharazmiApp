@@ -24,6 +24,8 @@ router = APIRouter()
 
 # FIX: Bug 22 - reuse the same checksum as schemas and online registration.
 from validation import is_valid_iranian_national_code
+# FIX (F-T1): اعتبارسنجی مرکزی اقساط — مسیر ثبت دانش‌آموز + ثبت‌نام هم همان قاعده‌ی مسیر مستقل قسط را دارد.
+from validation import normalize_installments
 
 
 @router.post("/students/register")
@@ -76,6 +78,14 @@ def register_and_enroll_student(
 
     if db.query(Student).filter(Student.national_code == req.national_code).first():
         raise HTTPException(status_code=400, detail="کد ملی وارد شده تکراری است")
+
+    # FIX (F-T1): اقساط پیش از هر نوشتنی با قاعده‌ی مرکزی سنجیده می‌شوند تا مسیر «ثبت دانش‌آموز +
+    # ثبت‌نام همراه اقساط» و مسیر مستقل قسط یک سیاست داشته باشند. schema در مرز HTTP ۴۲۲ می‌دهد؛
+    # این لایه برای فراخوان داخلی است و مثل بقیه‌ی اعتبارسنجی‌های همین اندپوینت ۴۰۰ می‌دهد.
+    try:
+        normalized_installments = normalize_installments(req.installments)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
         
     try:
         from dependencies import get_next_sequence_value
@@ -164,13 +174,13 @@ def register_and_enroll_student(
             db.flush() # تولید آیدی اینرولمنت
             enroll_id = new_enroll.id
             
-            # ذخیره فیزیکی اقساط شهریه در صورت ارسال
-            if req.installments:
-                for inst in req.installments:
+            # ذخیره فیزیکی اقساط شهریه در صورت ارسال (مقادیر اعتبارسنجی‌شده‌ی مرکزی)
+            if normalized_installments:
+                for amount, due_date in normalized_installments:
                     db.add(Installment(
                         enrollment_id=new_enroll.id,
-                        amount=inst.amount,
-                        due_date=inst.due_date,
+                        amount=amount,
+                        due_date=due_date,
                         is_paid=False
                     ))
             

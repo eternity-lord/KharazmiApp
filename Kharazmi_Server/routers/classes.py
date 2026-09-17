@@ -23,6 +23,8 @@ from dependencies import get_db, check_admin_access, check_admin_or_secretary_ac
 
 # FIX: Bug 16 - share the tuition-minus-payment debt calculation across financial views.
 from financial_calculations import calculate_student_debt, calculate_enrollment_debt, MAX_TEACHER_SESSION_PRICE
+# FIX (F-T1): اعتبارسنجی مرکزی اقساط — همان قاعده‌ی مسیر مستقل قسط، برای مسیر ثبت‌نام همراه اقساط.
+from validation import normalize_installments
 
 router = APIRouter()
 
@@ -401,6 +403,15 @@ def add_enrollment(data: EnrollmentCreate, db: Session = Depends(get_db), _: str
         d_type = "none"
         d_val = 0
 
+    # FIX (F-T1): اقساط همین‌جا و پیش از هر نوشتنی با قاعده‌ی مرکزی سنجیده می‌شوند تا
+    # مسیر «ثبت‌نام همراه اقساط» و مسیر مستقل قسط رفتار یکسان داشته باشند. schema همین قاعده را
+    # در مرز HTTP اجرا می‌کند (۴۲۲)؛ این لایه برای فراخوان‌های داخلی/آینده است ⇒ ۴۰۰ مثل بقیه‌ی
+    # اعتبارسنجی‌های همین اندپوینت (تخفیف) و اعتبارسنجی مبلغ در pay_installment_manually.
+    try:
+        normalized_installments = normalize_installments(data.installments)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
     # FIX S3: Enrollment.branch_id همان منطق Transaction.branch_id (student.branch_id وگرنه course.branch_id) — قبلاً همیشه NULL می‌ماند
     new_enroll = Enrollment(
         student_id=data.student_id,
@@ -416,13 +427,13 @@ def add_enrollment(data: EnrollmentCreate, db: Session = Depends(get_db), _: str
     db.add(new_enroll)
     db.flush() # جهت تولید آیدی ثبت‌نام کلاسی
 
-    # ذخیره فیزیکی اقساط شهریه در صورت ارسال از کلاینت
-    if data.installments:
-        for inst in data.installments:
+    # ذخیره فیزیکی اقساط شهریه در صورت ارسال از کلاینت (مقادیر اعتبارسنجی‌شده‌ی مرکزی)
+    if normalized_installments:
+        for amount, due_date in normalized_installments:
             db.add(Installment(
                 enrollment_id=new_enroll.id,
-                amount=inst.amount,
-                due_date=inst.due_date,
+                amount=amount,
+                due_date=due_date,
                 is_paid=False
             ))
 

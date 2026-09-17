@@ -1291,4 +1291,141 @@
 
     <!-- دکمه ورود به تاریخچه مالی در داشبورد ادمین -->
     <string name="dashboard_action_audit_trail">تاریخچه تغییرات مالی</string>
+
+    <!-- ==================== DESIGN SYSTEM (Phase 1) — Login ==================== -->
+    <string name="ds_login_brand">آموزشگاه خوارزمی</string>
+    <string name="ds_login_subtitle">سیستم مدیریت آموزشی مدرن</string>
+    <string name="ds_login_mobile_hint">شماره همراه</string>
+    <string name="ds_login_password_note">(تنها برای معلمان دارای کلمه عبور)</string>
+    <string name="ds_main_header_default">آموزشگاه علمی آزاد خوارزمی</string>
+    <string name="ds_login_settings_desc">تنظیمات آدرس سرور</string>
+    <string name="ds_login_logo_desc">نشان آموزشگاه خوارزمی</string>
+    <string name="ds_login_remember_me">مرا به خاطر بسپار</string>
+    <string name="ds_login_parent_portal">ورود والدین و اولیا دانش‌آموز</string>
+    <string name="ds_login_student_portal">ورود دانش‌آموزان به پورتال</string>
+    <string name="ds_login_version">نسخه ۱.۰.۰ - Gold Edition</string>
+
+    <!-- ==================== DESIGN SYSTEM (Phase 1) — Main Dashboard ==================== -->
+    <string name="ds_main_today_title">وضعیت امروز</string>
+    <string name="ds_main_today_title_desc">وضعیت امروز — برای به‌روزرسانی لمس کنید</string>
+    <string name="ds_main_kpi_classes">کلاس امروز</string>
+    <string name="ds_main_kpi_payments">پرداخت امروز (تومان)</string>
+    <string name="ds_main_kpi_enrollments">ثبت‌نام امروز</string>
+    <string name="ds_main_alert_icon_desc">هشدار</string>
+    <string name="ds_main_late_default">کلاس دیرشروع</string>
+    <string name="ds_main_financial_alerts_section">هشدارهای مالی هوشمند</string>
+    <string name="ds_main_installment_summary_default">اقساط سررسیدشده</string>
+    <string name="ds_main_teacher_settlement_summary_default">تسویه‌های معوق معلمان</string>
+    <string name="ds_main_details_cta">جزئیات</string>
+    <string name="ds_main_dashboard_icon_desc">باز کردن منوی کشویی</string>
+    <string name="ds_main_section_ops">عملیات روزمره</string>
+    <string name="ds_main_section_tools">ابزارهای مدیریتی</string>
+    <string name="ds_main_section_finance">مالی و شهریه</string>
+    <string name="ds_main_section_academic">آموزشی</string>
+    <string name="ds_main_section_admin">مدیریت ارشد</string>
+    <string name="ds_main_menu_dashboard">پیشخوان</string>
+    <string name="ds_main_menu_register">ثبت‌نام سریع</string>
+    <string name="ds_main_menu_students">دانش‌آموزان</string>
+    <string name="ds_main_menu_teachers">لیست مربیان</string>
+    <string name="ds_main_menu_management">بخش مدیریت</string>
+    <string name="ds_main_menu_reports">گزارشات مالی</string>
+    <string name="ds_main_menu_sms">سامانه پیامک</string>
+    <string name="ds_main_menu_settings">تنظیمات مرکزی</string>
+    <string name="ds_main_menu_quick_invoice">ثبت حواله سریع</string>
+    <string name="ds_main_menu_statement">صدور صورت‌حساب</string>
+    <string name="ds_main_menu_grades">نمرات کلاسی</string>
+    <string name="ds_main_menu_sessions">اصلاح حضور غیاب</string>
+    <string name="ds_main_menu_live">کلاس‌های در حال برگزاری</string>
+
+    <!-- ==================== DESIGN SYSTEM (Phase 1) — Catalog ==================== -->
+    <string name="ds_cat_title">کتابخانه سیستم طراحی خوارزمی</string>
+    <string name="ds_cat_subtitle">فاز ۱ — Design System / Login / Main Dashboard</string>
+    <string name="ds_cat_colors">۱. رنگ‌ها و توکن‌های معنایی</string>
+    <string name="ds_cat_typography">۲. تایپوگرافی</string>
+    <string name="ds_cat_buttons">۳. دکمه‌ها</string>
+    <string name="ds_cat_inputs">۴. فیلدهای ورودی</string>
+    <string name="ds_cat_cards">۵. کارت‌ها</string>
+    <string name="ds_cat_chips">۶. چیپ‌ها</string>
+    <string name="ds_cat_status">۷. وضعیت‌ها (رنگ + متن + آیکون)</string>
+    <string name="ds_cat_states">۸. حالت خالی، بارگذاری و خطا</string>
+    <string name="ds_cat_avatars">۹. آواتارهای داینامیک</string>
+
+    <string name="ds_sample_pagetitle">عنوان صفحه</string>
+    <string name="ds_sample_sectiontitle">عنوان بخش</string>
+    <string name="ds_sample_body">متن اصلی: خوانا روی سطح تیره با کنتراست کافی.</string>
+    <string name="ds_sample_caption">توضیح کمکی (Caption)</string>
+    <string name="ds_sample_money">۱۲٬۵۰۰٬۰۰۰ تومان</string>
+    <string name="ds_sample_error">مقدار وارد شده معتبر نیست.</string>
+    <string name="ds_sample_status">در انتظار تأیید</string>
+    <string name="ds_sample_label">برچسب</string>
+    <string name="ds_sample_overline">بخش بالای عنوان</string>
+
+    <string name="ds_btn_primary">دکمه اصلی</string>
+    <string name="ds_btn_secondary">دکمه ثانویه</string>
+    <string name="ds_btn_ghost">دکمه شبح (متنی)</string>
+    <string name="ds_btn_danger">حذف</string>
+    <string name="ds_btn_disabled">حالت غیرفعال</string>
+    <string name="ds_btn_with_icon">با آیکون</string>
+
+    <string name="ds_input_name">نام و نام خانوادگی</string>
+    <string name="ds_input_focused">حالت فوکوس</string>
+    <string name="ds_input_phone">شماره تماس</string>
+    <string name="ds_input_error_text">شماره تماس معتبر نیست</string>
+    <string name="ds_input_disabled">غیرقابل ویرایش</string>
+    <string name="ds_input_password">رمز عبور</string>
+
+    <string name="ds_card_default_title">کارت سطح ۱</string>
+    <string name="ds_card_default_body">کارت پایه روی سطح میانی، با مرز ظریف و ارتفاع کم.</string>
+    <string name="ds_card_nested_title">کارت تودرتو (سطح ۲)</string>
+    <string name="ds_card_nested_body">برای دیالوگ‌ها و کارت‌های داخل کارت.</string>
+    <string name="ds_card_interactive">کارت تعاملی — برای لمس</string>
+    <string name="ds_card_status_success">وضعیت موفقیت‌آمیز</string>
+    <string name="ds_card_status_warning">وضعیت هشدار</string>
+    <string name="ds_card_status_danger">وضعیت خطر</string>
+    <string name="ds_card_status_info">وضعیت اطلاع‌رسانی</string>
+
+    <string name="ds_chip_cash">پرداخت نقدی</string>
+    <string name="ds_chip_pos">کارتخوان</string>
+    <string name="ds_chip_inperson">حضوری</string>
+    <string name="ds_chip_tag">برچسب</string>
+
+    <string name="ds_status_success">پرداخت شد</string>
+    <string name="ds_status_warning">در انتظار پرداخت</string>
+    <string name="ds_status_danger">معوق</string>
+    <string name="ds_status_info">اطلاع‌رسانی</string>
+    <string name="ds_status_debt">بدهی</string>
+    <string name="ds_status_credit">اعتبار</string>
+
+    <string name="ds_state_empty_title">موردی یافت نشد</string>
+    <string name="ds_state_empty_body">با دکمه‌های زیر لیست را بارگذاری مجدد کنید یا جست‌وجو نمایید.</string>
+    <string name="ds_state_loading">در حال بارگذاری…</string>
+    <string name="ds_state_error_title">بارگذاری ناموفق بود</string>
+    <string name="ds_state_error_body">اتصال شبکه را بررسی کنید و دوباره تلاش کنید.</string>
+    <string name="ds_state_retry">تلاش مجدد</string>
+    <string name="ds_state_action">افزودن مورد جدید</string>
+
+    <string name="ds_color_bg_base">پس‌زمینه پایه</string>
+    <string name="ds_color_surface">سطح ۱</string>
+    <string name="ds_color_surface2">سطح ۲</string>
+    <string name="ds_color_border">مرز ظریف</string>
+    <string name="ds_color_accent">اکسنت طلایی</string>
+    <string name="ds_color_success">موفقیت</string>
+    <string name="ds_color_warning">هشدار</string>
+    <string name="ds_color_danger">خطر</string>
+    <string name="ds_color_info">اطلاع</string>
+    <string name="ds_color_debt">بدهی</string>
+    <string name="ds_color_credit">اعتبار</string>
+    <string name="ds_color_text_primary">متن اصلی</string>
+    <string name="ds_color_text_secondary">متن ثانویه</string>
+    <string name="ds_color_text_disabled">متن غیرفعال</string>
+    <string name="ds_color_usage_hint">هر رنگ معنایی همیشه همراه متن یا آیکون نمایش داده می‌شود؛ رنگ تنها حامل معنا نیست.</string>
+
+    <!-- ==================== DESIGN SYSTEM (Phase 1) — Drawer ==================== -->
+    <string name="ds_drawer_user_default">کاربر سامانه</string>
+    <string name="ds_drawer_subtitle">پنل مدیریت آموزشگاه</string>
+    <string name="ds_drawer_logout">خروج از حساب</string>
+    <string name="ds_drawer_logo_desc">نشان آموزشگاه خوارزمی</string>
+    <string name="ds_empty_hint">برای افزودن آیتم جدید از منوی اصلی استفاده کنید یا لیست را بارگذاری مجدد نمایید.</string>
+
+    <string name="ds_ip_hint">مثال: 192.168.1.5</string>
 </resources>

@@ -356,18 +356,18 @@
     <string name="invoice_hint_amount">مبلغ پرداختی (تومان)</string>
     <string name="invoice_no_enrollment">این دانش‌آموز در هیچ کلاسی ثبت‌نام نشده است</string>
     <string name="invoice_pick_class">انتخاب کلاس برای %1$s</string>
-    <string name="invoice_total">مبلغ کل کلاس (شهریه): %1$s تومان</string>
-    <string name="invoice_paid_teacher">پرداخت شده مربی: %1$s تومان</string>
-    <string name="invoice_paid_institute">%1$s\n(پرداخت شده آموزشگاه: %2$s تومان)</string>
-    <string name="invoice_due_teacher">قابل پرداخت مربی: %1$s %2$s تومان</string>
-    <string name="invoice_due_institute">قابل پرداخت آموزشگاه: %1$s %2$s تومان</string>
+    <string name="invoice_total">شهریه قراردادی کلاس: %1$s تومان</string>
+    <string name="invoice_paid_teacher">پرداخت‌شده به معلم: %1$s تومان</string>
+    <string name="invoice_paid_institute">کلاس: %1$s\n(پرداخت‌شده به آموزشگاه: %2$s تومان)</string>
+    <string name="invoice_due_teacher">سهم معلم (قابل پرداخت): %1$s %2$s تومان</string>
+    <string name="invoice_due_institute">سهم آموزشگاه (قابل پرداخت): %1$s %2$s تومان</string>
     <string name="invoice_class_empty">این کلاس دانش‌آموزی ندارد</string>
     <string name="invoice_student_row">%1$s (بدهی کل: %2$s, معلم: %3$s, آموزشگاه: %4$s)</string>
     <string name="invoice_pick_student">انتخاب دانش‌آموز از %1$s</string>
-    <string name="invoice_debt_total">بدهی کل: %1$s تومان</string>
-    <string name="invoice_debt_teacher">بدهی به معلم: %1$s تومان</string>
-    <string name="invoice_debt_institute">بدهی به آموزشگاه: %1$s تومان</string>
-    <string name="invoice_unpaid">جلسات تسویه نشده: %1$s</string>
+    <string name="invoice_debt_total">بدهی باقی‌مانده: %1$s تومان</string>
+    <string name="invoice_debt_teacher">بدهی سهم معلم: %1$s تومان</string>
+    <string name="invoice_debt_institute">بدهی سهم آموزشگاه: %1$s تومان</string>
+    <string name="invoice_unpaid">جلسات تسویه‌نشده: %1$s</string>
     <string name="invoice_desc_settle">بابت تسویه %1$s جلسه بدهکار</string>
     <string name="invoice_desc_tuition">بابت شهریه</string>
     <string name="invoice_amount_empty">لطفا مبلغ را وارد کنید</string>
@@ -419,21 +419,21 @@
     <string name="profile_id_error">خطا در دریافت شناسه</string>
     <string name="profile_wallet_teacher">سهم معلم</string>
     <string name="profile_wallet_institute">سهم آموزشگاه</string>
-    <string name="profile_suspended">"⛔ وضعیت: معلق (غیرفعال)\n\n"</string>
-    <string name="profile_code">"🆔 کد دانش‌آموز: %1$s\n\n"</string>
-    <string name="profile_name">"👤 نام: %1$s\n\n"</string>
-    <string name="profile_national">"🔢 کد ملی: %1$s\n\n"</string>
-    <string name="profile_mobile">"📱 موبایل: %1$s\n\n"</string>
-    <string name="profile_parent">"📞 والدین: %1$s\n\n"</string>
-    <string name="profile_address">"🏠 آدرس: %1$s\n"</string>
-    <string name="profile_classes_title">"📋 کلاس‌های ثبت‌نام شده:\n"</string>
+    <string name="profile_suspended">"وضعیت: معلق (غیرفعال)\n\n"</string>
+    <string name="profile_code">"کد دانش‌آموز: %1$s\n\n"</string>
+    <string name="profile_name">"نام: %1$s\n\n"</string>
+    <string name="profile_national">"کد ملی: %1$s\n\n"</string>
+    <string name="profile_mobile">"موبایل: %1$s\n\n"</string>
+    <string name="profile_parent">"تماس با والدین: %1$s\n\n"</string>
+    <string name="profile_address">"آدرس: %1$s\n"</string>
+    <string name="profile_classes_title">"کلاس‌های ثبت‌نام‌شده:\n"</string>
     <string name="profile_no_class">"- بدون کلاس\n"</string>
-    <string name="profile_txn_title">"\n💳 تراکنش‌های اخیر:\n"</string>
+    <string name="profile_txn_title">"\nتراکنش‌های اخیر:\n"</string>
     <string name="profile_no_txn">- تراکنشی یافت نشد</string>
-    <string name="profile_wallet_title">"\n💼 وضعیت کیف پول:\n"</string>
+    <string name="profile_wallet_title">"\nوضعیت کیف پول:\n"</string>
     <string name="profile_wallet_row">"• %1$s\n"</string>
     <string name="profile_wallet_row_plain">• %1$s</string>
-    <string name="profile_grades_loading">در حال دریافت نمرات...</string>
+    <string name="profile_grades_loading">در حال دریافت نمرات…</string>
     <string name="profile_report_title">"📊 کارنامه تجمیعی نمرات:\n\n"</string>
     <string name="profile_no_grades">--- هنوز نمره‌ای ثبت نشده است ---</string>
     <string name="profile_avg_title">"📈 میانگین نمرات به تفکیک درس:\n"</string>
@@ -443,7 +443,7 @@
     <string name="profile_grade_score">"⭐ نمره: %1$s از %2$s\n"</string>
     <string name="profile_grade_date">"📅 تاریخ: %1$s\n"</string>
     <string name="profile_grade_desc">"💬 توضیحات: %1$s\n"</string>
-    <string name="profile_comm_loading">در حال دریافت تاریخچه ارتباطات...</string>
+    <string name="profile_comm_loading">در حال دریافت تاریخچه ارتباطات…</string>
     <string name="profile_comm_empty">هنوز سابقه ارتباطی ثبت نشده است</string>
     <string name="profile_comm_error">خطا در دریافت تاریخچه ارتباطات یا نداشتن دسترسی</string>
     <string name="profile_delete_title">حذف دانش‌آموز</string>
@@ -451,13 +451,13 @@
     <string name="profile_delete_yes">حذف کن</string>
     <string name="profile_delete_error">خطا در حذف</string>
     <string name="profile_status_error">خطا در تغییر وضعیت</string>
-    <string name="profile_debt_total">بدهی کل: %1$s تومان</string>
-    <string name="profile_credit_total">بستانکار کل: %1$s تومان</string>
-    <string name="profile_settled_total">وضعیت کل: تسویه</string>
+    <string name="profile_debt_total">بدهی باقی‌مانده: %1$s تومان</string>
+    <string name="profile_credit_total">اعتبار دانش‌آموز: %1$s تومان</string>
+    <string name="profile_settled_total">تسویه‌شده</string>
     <string name="profile_debt_reg">" | بدهی ثبت‌شده: %1$s تومان"</string>
-    <string name="profile_ower">بدهکار %1$s تومان</string>
-    <string name="profile_creditor">بستانکار %1$s تومان</string>
-    <string name="profile_settled">تسویه</string>
+    <string name="profile_ower">بدهی %1$s تومان</string>
+    <string name="profile_creditor">اعتبار %1$s تومان</string>
+    <string name="profile_settled">تسویه‌شده</string>
     <string name="profile_debt_short">" | بدهی: %1$s تومان"</string>
     <string name="profile_photo_camera">گرفتن عکس با دوربین</string>
     <string name="profile_photo_gallery">انتخاب از گالری</string>
@@ -465,21 +465,21 @@
     <string name="profile_camera_denied">دسترسی به دوربین داده نشد</string>
     <string name="profile_image_error">خطا در پردازش تصویر</string>
     <string name="profile_upload_error">خطا در آپلود عکس (حجم بیش از ۵ مگابایت یا فرمت نامعتبر)</string>
-    <string name="profile_inst_loading">در حال دریافت اقساط...</string>
+    <string name="profile_inst_loading">در حال دریافت اقساط…</string>
     <string name="profile_inst_title">"💳 وضعیت اقساط شهریه دانش‌آموز:\n\n"</string>
     <string name="profile_inst_empty">--- هیچ قسطی برای این دانش‌آموز تعریف نشده است ---</string>
     <string name="profile_inst_paid">🟢 [پرداخت شده]</string>
-    <string name="profile_inst_overdue">🔴 [معوقه/گذشته]</string>
-    <string name="profile_inst_pending">🟡 [در انتظار]</string>
+    <string name="profile_inst_overdue">معوق — پرداخت‌نشده</string>
+    <string name="profile_inst_pending">در انتظار پرداخت</string>
     <string name="profile_inst_class">"📘 کلاس: %1$s\n"</string>
     <string name="profile_inst_amount">"💰 مبلغ قسط: %1$s تومان\n"</string>
     <string name="profile_inst_due">"📅 سررسید: %1$s  %2$s\n"</string>
-    <string name="profile_inst_paidat">"✅ تاریخ پرداخت: %1$s\n"</string>
+    <string name="profile_inst_paidat">"تاریخ پرداخت: %1$s"</string>
     <!-- A1: اقساط — دکمه‌های عملیاتی پرداخت/یادآوری/افزودن قسط جدید -->
     <string name="installment_add_btn">➕ افزودن قسط جدید</string>
     <string name="installment_pay">پرداخت</string>
     <string name="installment_remind">یادآوری</string>
-    <string name="installment_paid_label">✅ پرداخت شده</string>
+    <string name="installment_paid_label">پرداخت‌شده</string>
     <string name="installment_unpaid_label">⏳ پرداخت نشده</string>
     <string name="installment_pay_title">تأیید پرداخت قسط</string>
     <string name="installment_pay_msg">آیا از پرداخت این قسط به مبلغ %1$s تومان اطمینان دارید؟</string>
@@ -500,7 +500,7 @@
     <string name="installment_loading_enrollments">در حال دریافت ثبت‌نام‌ها...</string>
     <string name="installment_select_course_title">انتخاب کلاس برای قسط</string>
     <string name="installment_no_installments">هیچ قسطی برای این دانش‌آموز وجود ندارد — با افزودن قسط جدید شروع کنید</string>
-    <string name="installment_due">📅 سررسید: %1$s</string>
+    <string name="installment_due">سررسید: %1$s</string>
     <string name="installment_due_hint">فرمت تاریخ: ۱۴۰۳/۰۶/۲۲ (شمسی، مثل بقیه فرم‌های اپ)</string>
     <string name="installment_paying">در حال ثبت پرداخت...</string>
     <string name="installment_creating">در حال ایجاد قسط...</string>
@@ -869,11 +869,11 @@
     <string name="txn_course_row">بابت: %1$s (%2$s)</string>
     <string name="txn_amount_row">%1$s تومان</string>
     <string name="txn_del_title">حذف حواله</string>
-    <string name="txn_del_msg">آیا مطمئن هستید؟ با حذف این حواله، مبلغ آن از پرداختی دانش‌آموز کسر می‌شود.</string>
+    <string name="txn_del_msg">با حذف این حواله، مبلغ آن از پرداختی دانش‌آموز کسر می‌شود و بدهی او افزایش می‌یابد. این عملیات قطعی است و ردیف تراکنش پاک می‌شود.</string>
     <string name="txn_del_error">خطا در حذف</string>
     <string name="txn_amount_hint">مبلغ جدید (ریال)</string>
     <string name="txn_edit_title">ویرایش مبلغ حواله</string>
-    <string name="txn_edit_done">✅ ویرایش فیش چاپی با موفقیت انجام شد و نسخه اصلاح‌شده صادر گردید.</string>
+    <string name="txn_edit_done">ویرایش انجام شد و نسخه اصلاح‌شده فیش صادر گردید.</string>
     <string name="txn_edit_error">خطا در ویرایش</string>
     <string name="chart_att_title">روند حضور و غیاب کلاس %1$s</string>
     <string name="chart_funnel_loading">در حال دریافت قیف ثبت‌نام...</string>
@@ -1167,7 +1167,7 @@
     <string name="msg_pin_error">خطا در تغییر وضعیت پین</string>
     <!-- Timeline 360 -->
     <string name="timeline_title">تایم‌لاین</string>
-    <string name="timeline_loading">در حال دریافت تایم‌لاین...</string>
+    <string name="timeline_loading">در حال دریافت تایم‌لاین…</string>
     <string name="timeline_empty">هنوز فعالیت ثبت‌شده‌ای وجود ندارد</string>
     <string name="timeline_error">خطا در دریافت تایم‌لاین: %1$s</string>
     <string name="timeline_no_data">داده‌ای برای تایم‌لاین یافت نشد</string>
@@ -1428,4 +1428,94 @@
     <string name="ds_empty_hint">برای افزودن آیتم جدید از منوی اصلی استفاده کنید یا لیست را بارگذاری مجدد نمایید.</string>
 
     <string name="ds_ip_hint">مثال: 192.168.1.5</string>
+
+    <!-- ====================================================================================
+         DESIGN SYSTEM (Phase 2) — صفحه‌های مالی/شهریه/اقساط/تراکنش/پروفایل دانش‌آموز
+         فقط متن نمایشی. هیچ منطق، فرمول یا قراردادی اینجا نیست.
+         ==================================================================================== -->
+
+    <!-- تب‌های پروفایل دانش‌آموز -->
+    <string name="ds_profile_tab_info">مشخصات</string>
+    <string name="ds_profile_tab_finance">مالی و شهریه</string>
+    <string name="ds_profile_tab_grades">کارنامه</string>
+    <string name="ds_profile_tab_installments">اقساط</string>
+    <string name="ds_profile_tab_comm">ارتباطات</string>
+    <string name="ds_profile_tab_timeline">تایم‌لاین</string>
+
+    <!-- پروفایل: سرصفحه و بخش‌ها -->
+    <string name="ds_profile_avatar_desc">تصویر دانش‌آموز (برای تغییر لمس کنید)</string>
+    <string name="ds_profile_finance_title">وضعیت حساب دانش‌آموز</string>
+    <string name="ds_profile_finance_note">بدهی و اعتبار همیشه با متن و رنگ نمایش داده می‌شوند؛ مبلغ هیچ‌وقت با علامت منفی نشان داده نمی‌شود.</string>
+    <string name="ds_profile_issue_invoice">صدور فیش و ثبت حواله</string>
+    <string name="ds_profile_installments_header">اقساط و سررسیدها</string>
+    <string name="ds_profile_comm_header">تاریخچه ارتباطات با اولیا</string>
+    <string name="ds_profile_timeline_header">تایم‌لاین فعالیت‌های دانش‌آموز</string>
+    <string name="ds_profile_portal">ارسال لینک پورتال به اولیا</string>
+    <string name="ds_profile_delete">حذف کامل دانش‌آموز</string>
+    <string name="ds_profile_suspend_title">تعلیق دانش‌آموز (غیرفعال موقت)</string>
+    <string name="ds_profile_suspend_note">در صورت تعلیق، دانش‌آموز در جست‌وجوی کلاس‌بندی نمایش داده نمی‌شود اما سوابق مالی و آموزشی او حفظ می‌گردد.</string>
+    <string name="ds_profile_edit_desc">ویرایش پروفایل</string>
+
+    <!-- اقساط (item) -->
+    <string name="ds_inst_amount_label">مبلغ قسط</string>
+
+    <!-- فاکتور/ثبت پرداخت -->
+    <string name="ds_inv_step_student">۱. انتخاب دانش‌آموز</string>
+    <string name="ds_inv_step_summary">۲. خلاصه حساب دانش‌آموز</string>
+    <string name="ds_inv_step_payment">۳. اطلاعات پرداخت</string>
+    <string name="ds_inv_search_title">جست‌وجوی دانش‌آموز یا کلاس</string>
+    <string name="ds_inv_receipt_no">شماره فیش: خودکار (سیستمی)</string>
+    <string name="ds_inv_wallet_label">کیف پول مقصد پرداخت</string>
+    <string name="ds_inv_method_label">روش پرداخت</string>
+    <string name="ds_inv_submit">تأیید و ثبت نهایی</string>
+    <string name="ds_inv_confirm_note">قبل از ثبت نهایی، پنجره خلاصه (مبلغ، سهم‌ها و روش پرداخت) نمایش داده می‌شود و پس از تأیید، رسید صادر می‌گردد.</string>
+    <string name="ds_inv_sign_note">علامت + یعنی مبلغ قابل پرداخت (بدهی) و علامت − یعنی اعتبار کیف پول.</string>
+
+    <!-- مدیریت تراکنش‌ها -->
+    <string name="ds_txn_excel">خروجی Excel</string>
+    <string name="ds_txn_pdf">چاپ PDF</string>
+    <string name="ds_txn_sum_label">جمع کل تراکنش‌های نمایش‌داده‌شده</string>
+    <string name="ds_txn_safety_note">پیش از ویرایش یا حذف، مبلغ و شماره حواله را با رسید کاغذی مقایسه کنید.</string>
+    <string name="ds_txn_amount_label">مبلغ تراکنش</string>
+    <string name="ds_txn_print">چاپ</string>
+    <string name="ds_txn_edit">ویرایش</string>
+    <string name="ds_txn_delete">حذف</string>
+
+    <!-- گزارش‌گیری -->
+    <string name="ds_rpt_scope_title">۱. محدوده گزارش‌گیری</string>
+    <string name="ds_rpt_period_title">۲. فیلتر بازه زمانی</string>
+    <string name="ds_rpt_year_hint">سال (شمسی)</string>
+    <string name="ds_rpt_month_hint">ماه</string>
+    <string name="ds_rpt_teacher_hint">انتخاب معلم</string>
+    <string name="ds_rpt_get">تولید گزارش مالی</string>
+    <string name="ds_rpt_monthly_default">آمار مالی ماهانه</string>
+    <string name="ds_rpt_yearly_default">آمار مالی سالانه معلم</string>
+    <string name="ds_rpt_row_total">کل درآمد دوره</string>
+    <string name="ds_rpt_row_collected">درآمد وصول‌شده</string>
+    <string name="ds_rpt_row_uncollected">درآمد وصول‌نشده</string>
+    <string name="ds_rpt_yearly_row_total">کل درآمد سالانه</string>
+    <string name="ds_rpt_yearly_row_collected">وصول‌شده سالانه</string>
+    <string name="ds_rpt_yearly_row_uncollected">وصول‌نشده سالانه</string>
+    <string name="ds_rpt_statement_title">۳. صورت‌حساب دانش‌آموز</string>
+    <string name="ds_rpt_statement_desc">جست‌وجو با نام یا کد ملی و صدور صورت‌حساب رسمی</string>
+    <string name="ds_rpt_stmt_paid">کل واریزی به آموزشگاه</string>
+    <string name="ds_rpt_stmt_debt">مانده بدهی به آموزشگاه</string>
+    <string name="ds_rpt_print_statement">چاپ صورت‌حساب</string>
+    <string name="ds_rpt_search_btn">بررسی</string>
+    <string name="ds_rpt_scope_institute">آموزشگاه</string>
+    <string name="ds_rpt_scope_teacher">معلم</string>
+
+    <!-- تکمیل کلیدهای فاز ۲ (چیدمان‌های مالی) -->
+    <string name="ds_profile_content_loading">در حال دریافت اطلاعات…</string>
+    <string name="ds_inv_page_title">صدور فیش و ثبت حواله</string>
+    <string name="ds_inv_search_hint">نام دانش‌آموز، کلاس یا کدملی…</string>
+    <string name="ds_inv_desc_hint">توضیحات (بابت…)</string>
+    <string name="ds_inv_wallet_both">هر دو</string>
+    <string name="ds_inv_pay_card">کارتخوان</string>
+    <string name="ds_inv_pay_cash">نقدی</string>
+    <string name="ds_inv_pay_transfer">کارت به کارت</string>
+    <string name="ds_rpt_page_title">گزارش‌گیری و صورت‌حساب</string>
+    <string name="ds_rpt_statement_search_hint">نام یا کد ملی دانش‌آموز</string>
+    <!-- DESIGN SYSTEM (Phase 2): جای‌نگهدار مقدار تا پیش از بارگذاری داده -->
+    <string name="ds_value_placeholder">—</string>
 </resources>

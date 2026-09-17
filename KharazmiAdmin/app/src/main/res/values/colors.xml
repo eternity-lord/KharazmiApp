@@ -171,6 +171,9 @@
     <color name="ds_danger">@color/status_danger</color>
     <color name="ds_danger_container">@color/status_danger_light</color>
     <color name="ds_danger_on_container">#F2A9A4</color>
+    <!-- DESIGN SYSTEM (Phase 2): سطح پرشده خطر — تیره‌تر از ds_danger تا متن سفید کنتراست ≥4.5 بگیرد -->
+    <color name="ds_danger_deep">#B03A33</color>
+    <color name="ds_danger_deep_pressed">#8E2B25</color>
 
     <!-- معنایی: اطلاع -->
     <color name="ds_info">@color/status_info</color>

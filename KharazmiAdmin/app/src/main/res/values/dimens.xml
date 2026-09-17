@@ -73,4 +73,6 @@
     <dimen name="max_text_width">320dp</dimen>
     <dimen name="skeleton_line_height">12dp</dimen>
     <dimen name="skeleton_block_height">64dp</dimen>
+    <!-- DESIGN SYSTEM (Phase 2): ارتفاع نوار عنوان صفحات = جایگزین ?attr/actionBarSize در چیدمان‌های مالی -->
+    <dimen name="ds_toolbar_height">56dp</dimen>
 </resources>

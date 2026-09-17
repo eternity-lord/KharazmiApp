@@ -37,6 +37,12 @@ Wallet / Internal Payment / Refund / Balance-Consistency — TEST-ONLY audit
 - **F-W2:** ویرایش رسید legacy `target_wallet="both"` دلتای واقعی را با نسبت قبلی (یا fallback
   مستند نصف-نصف) اعمال می‌کند.
 
+## ✅ تست‌های رگرسیون F-D1 (حذف رسید legacy `both`)
+تست‌های `test_delete_both_*` / `test_delete_never_touches_*` / `test_refund_after_delete_*`
+سناریوهای تسک را قفل می‌کنند: حذف رسید `both` (سهم‌های مساوی/نامساوی/فرد)، حذف بعد از ویرایش،
+حذف تکراری (۴۰۴ و بی‌اثر)، رسیدهای تک‌کیفی، ردیف deleted/reversed، استرداد بعد از حذف (۴۰۴)،
+هم‌راستایی عددی با `refund_transaction` و fallback مستند «بدون سهم».
+
 ## اجرا (طبق قانون پروژه: فقط روی DB تست/کپی — هرگز gaj_db.db واقعی)
     cd /home/user/KharazmiApp && DATABASE_URL=sqlite:////tmp/wallet_audit.db \
         PYTHONPATH=/home/user/KharazmiApp/Kharazmi_Server \
@@ -1240,3 +1246,207 @@ def test_fix_fw2_negative_delta_stays_integer_and_coherent(world):
     refund(world, legacy.id)
     assert_wallet_invariant(world.db, expected_teacher=0, expected_institute=0, expected_balance=0,
                             context="استرداد پس از ویرایش دلتای منفی")
+
+
+# ==========================================
+# F-D1 — delete_transaction برای رسیدهای target_wallet="both"
+# (تست‌های failing-first طبق تسک؛ قبل از فیکس باید fail شوند)
+# ==========================================
+def assert_wallet_money_integer(db, student_id=101, context=""):
+    """ستون‌های کیف باید در SQLite واقعاً integer باشند (بدون اعشار) — نسخه‌ی بدون وابستگی به ردیف تراکنش."""
+    types = db.execute(
+        text("SELECT typeof(wallet_teacher), typeof(wallet_institute), typeof(wallet_balance) "
+             "FROM students WHERE id = :i"), {"i": student_id}
+    ).fetchone()
+    assert tuple(types) == ("integer",) * 3, f"{context}: نوع ستون‌های کیف باید integer باشد؛ شد {tuple(types)}"
+    teacher, institute, balance = wallets(db, student_id)
+    assert all(isinstance(v, int) for v in (teacher, institute, balance)), (
+        f"{context}: مقادیر کیف باید int باشند؛ {teacher!r}/{institute!r}/{balance!r}"
+    )
+
+
+def delete_receipt(world, transaction_id):
+    """حذف ادمین + assert خودکار invariant (سناریو ز)."""
+    from routers import admin as admin_router
+
+    result = admin_router.delete_transaction(transaction_id, db=world.db, _="admin")
+    assert_wallet_invariant(world.db, context="بعد از حذف تراکنش")
+    return result
+
+
+def test_delete_both_receipt_returns_both_wallets_to_zero(world):
+    """سناریوی اصلی F-D1: رسید both (مبلغ ۱۰۰، سهم ۴۰/۶۰) که کیف‌ها ۴۰/۶۰ شارژ شده‌اند؛
+    حذف باید هر دو کیف را به صفر برگرداند و هیچ ردیف reversal تکراری نسازد.
+    (سیاست پروژه برای delete = hard-delete — تصمیم H11.)"""
+    legacy = credit_legacy_both_receipt(world)                 # کیف ۴۰/۶۰ | سهم ۴۰/۶۰
+    assert_wallet_invariant(world.db, expected_teacher=40, expected_institute=60, expected_balance=100,
+                            context="پیش از حذف رسید both")
+    transaction_id = legacy.id
+
+    delete_receipt(world, transaction_id)
+
+    assert_wallet_invariant(world.db, expected_teacher=0, expected_institute=0, expected_balance=0,
+                            context="پس از حذف رسید both")
+    assert_wallet_money_integer(world.db, context="پس از حذف رسید both")
+    # سیاست H11: ردیف hard-delete می‌شود و هیچ ردیف reversal جدیدی ساخته نمی‌شود
+    assert world.db.query(models.Transaction).filter(models.Transaction.id == transaction_id).first() is None
+    assert world.db.query(models.Transaction).filter(models.Transaction.type == "reversal").count() == 0
+
+
+def test_delete_both_receipt_unequal_shares(world):
+    """سناریو الف: سهم‌های نامساوی (۳۰/۷۰) هم باید کامل برگردند."""
+    legacy = credit_legacy_both_receipt(world, amount=100, share_teacher=30, share_institute=70)
+    assert wallets(world.db) == (30, 70, 100)
+
+    delete_receipt(world, legacy.id)
+    assert_wallet_invariant(world.db, expected_teacher=0, expected_institute=0, expected_balance=0,
+                            context="حذف رسید both با سهم نامساوی")
+
+
+def test_delete_both_receipt_odd_amount(world):
+    """سناریو ب: مبلغ فرد (۱۰۱ با سهم ۵۰/۵۱) هم باید بی‌اعشار و کامل برگردد."""
+    legacy = credit_legacy_both_receipt(world, amount=101, share_teacher=50, share_institute=51)
+    assert wallets(world.db) == (50, 51, 101)
+
+    delete_receipt(world, legacy.id)
+    assert_wallet_invariant(world.db, expected_teacher=0, expected_institute=0, expected_balance=0,
+                            context="حذف رسید both با مبلغ فرد")
+    assert_wallet_money_integer(world.db, context="حذف مبلغ فرد")
+
+
+def test_delete_both_receipt_after_edit_reverses_final_amount(world):
+    """سناریو ج: ویرایش ۱۰۰→۲۰۱ (سهم ۸۰/۱۲۱) و سپس حذف ⇒ اثر کامل مبلغ نهایی باید برگردد."""
+    legacy = credit_legacy_both_receipt(world)                 # ۴۰/۶۰ از ۱۰۰
+    edit_transaction(world, legacy.id, 201)
+    assert_wallet_invariant(world.db, expected_teacher=80, expected_institute=121, expected_balance=201,
+                            context="پس از ویرایش به ۲۰۱")
+    world.db.expire_all()
+    edited = world.db.get(models.Transaction, legacy.id)
+    assert (edited.share_teacher, edited.share_institute) == (80, 121)
+
+    delete_receipt(world, legacy.id)
+    assert_wallet_invariant(world.db, expected_teacher=0, expected_institute=0, expected_balance=0,
+                            context="حذف رسید both ویرایش‌شده")
+
+
+def test_delete_both_receipt_twice_is_rejected_and_idempotent(world):
+    """سناریو د: حذف تکراری باید ۴۰۴ بدهد و اثر مالی را دوباره برنگرداند."""
+    from routers import admin as admin_router
+
+    legacy = credit_legacy_both_receipt(world)
+    delete_receipt(world, legacy.id)
+    assert wallets(world.db) == (0, 0, 0)
+
+    with pytest.raises(HTTPException) as error:
+        admin_router.delete_transaction(legacy.id, db=world.db, _="admin")
+    assert error.value.status_code == 404
+    world.db.rollback()
+    assert_wallet_invariant(world.db, expected_teacher=0, expected_institute=0, expected_balance=0,
+                            context="حذف تکراری رسید both")
+
+
+def test_delete_teacher_only_and_institute_only_behaviour_preserved(world):
+    """سناریو هـ: حذف رسیدهای تک‌کیفی همان رفتار قبلی را دارد (فقط همان کیف برمی‌گردد)."""
+    from routers import admin as admin_router
+
+    teacher_receipt_id = pay(world, 100, wallet="teacher")["receipt_id"]
+    admin_router.delete_transaction(teacher_receipt_id, db=world.db, _="admin")
+    assert_wallet_invariant(world.db, expected_teacher=0, expected_institute=0, expected_balance=0,
+                            context="حذف رسید teacher-only")
+
+    institute_receipt_id = pay(world, 120, wallet="institute")["receipt_id"]
+    admin_router.delete_transaction(institute_receipt_id, db=world.db, _="admin")
+    assert_wallet_invariant(world.db, expected_teacher=0, expected_institute=0, expected_balance=0,
+                            context="حذف رسید institute-only")
+    assert_wallet_money_integer(world.db, context="حذف رسیدهای تک‌کیفی")
+
+
+def test_delete_never_touches_already_deleted_or_reversed_rows(world):
+    """سناریو و: ردیف deleted یا reversed نباید دوباره اثر مالی برگرداند (۴۰۴، کیف دست‌نخورده)."""
+    from routers import admin as admin_router
+
+    soft_deleted = credit_legacy_both_receipt(world)           # کیف ۴۰/۶۰ شارژ شد
+    soft_deleted.is_deleted = True
+    world.db.commit()
+
+    reversed_row = receipt(world.db, amount=100, target_wallet="both",
+                           share_teacher=40, share_institute=60, is_reversed=True)
+    world.db.commit()
+
+    for label, transaction_id in (("deleted", soft_deleted.id), ("reversed", reversed_row.id)):
+        with pytest.raises(HTTPException) as error:
+            admin_router.delete_transaction(transaction_id, db=world.db, _="admin")
+        assert error.value.status_code == 404, f"ردیف {label} باید ۴۰۴ بدهد"
+        world.db.rollback()
+        assert_wallet_invariant(world.db, expected_teacher=40, expected_institute=60, expected_balance=100,
+                                context=f"حذف ردیف {label}")
+    assert world.db.query(models.Transaction).filter(models.Transaction.type == "reversal").count() == 0
+
+
+def test_refund_after_delete_is_rejected_and_changes_nothing(world):
+    """سناریو ح: بعد از hard-delete ردیف وجود ندارد ⇒ استرداد باید ۴۰۴ بدهد و کیف دست‌نخورده بماند."""
+    legacy = credit_legacy_both_receipt(world)
+    delete_receipt(world, legacy.id)
+    assert wallets(world.db) == (0, 0, 0)
+
+    with pytest.raises(HTTPException) as error:
+        refund(world, legacy.id)
+    assert error.value.status_code == 404, "استرداد تراکنش حذف‌شده باید ۴۰۴ (یافت نشد) بدهد"
+    world.db.rollback()
+    assert_wallet_invariant(world.db, expected_teacher=0, expected_institute=0, expected_balance=0,
+                            context="استرداد بعد از حذف")
+
+
+def test_refund_of_soft_deleted_both_receipt_is_rejected(world):
+    """سناریو ح (تکمیل): رسید soft-deleted هنوز در DB هست ولی استرداد نباید آن را برگرداند (۴۰۴)."""
+    legacy = credit_legacy_both_receipt(world)
+    legacy.is_deleted = True
+    world.db.commit()
+
+    with pytest.raises(HTTPException) as error:
+        refund(world, legacy.id)
+    assert error.value.status_code == 404
+    world.db.rollback()
+    assert_wallet_invariant(world.db, expected_teacher=40, expected_institute=60, expected_balance=100,
+                            context="استرداد ردیف soft-deleted")
+
+
+def test_delete_both_matches_refund_for_identical_receipt(world):
+    """هم‌راستایی با refund: دو رسید یکسان both ⇒ حذف یکی و استرداد دیگری باید **همان** مبالغ را برگردانند."""
+    from routers import admin as admin_router
+
+    first = credit_legacy_both_receipt(world, amount=101, share_teacher=50, share_institute=51)
+    second = credit_legacy_both_receipt(world, amount=101, share_teacher=50, share_institute=51)
+    assert wallets(world.db) == (100, 102, 202)
+
+    admin_router.delete_transaction(first.id, db=world.db, _="admin")
+    after_delete = wallets(world.db)
+    assert after_delete == (50, 51, 101), (
+        f"حذف باید دقیقاً سهم‌های رسید اول (۵۰/۵۱) را برگرداند؛ شد {after_delete}"
+    )
+
+    refund(world, second.id)
+    assert wallets(world.db) == (0, 0, 0), "استرداد رسید دوم هم باید دقیقاً همان سهم‌ها را برگرداند"
+
+
+def test_delete_both_receipt_without_shares_uses_documented_fallback(world):
+    """F-D1 + fallback مستند: رسید both بدون سهم قبلی ⇒ همان قاعده‌ی refund (نصف-نصف، باقیمانده به آموزشگاه)."""
+    legacy = receipt(world.db, amount=101, target_wallet="both", share_teacher=0, share_institute=0)
+    world.db.query(models.Student).filter(models.Student.id == 101).update(
+        {
+            models.Student.wallet_teacher: func.coalesce(models.Student.wallet_teacher, 0) + 50,
+            models.Student.wallet_institute: func.coalesce(models.Student.wallet_institute, 0) + 51,
+        },
+        synchronize_session=False,
+    )
+    world.db.commit()
+    student = world.db.get(models.Student, 101)
+    world.db.refresh(student)
+    student.sync_wallet_balance()
+    world.db.commit()
+    assert wallets(world.db) == (50, 51, 101)
+
+    delete_receipt(world, legacy.id)
+    assert_wallet_invariant(world.db, expected_teacher=0, expected_institute=0, expected_balance=0,
+                            context="حذف رسید both بدون سهم (fallback)")
+    assert_wallet_money_integer(world.db, context="fallback رسید both")

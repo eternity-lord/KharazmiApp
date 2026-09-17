@@ -833,7 +833,21 @@ def delete_transaction(id: int, db: Session = Depends(get_db), _: str = Depends(
             d_teacher = -t_amount
         elif trans.target_wallet == "institute":
             d_institute = -t_amount
-        # (هدف نامشخص: مثل رفتار قبلی هیچ تغییری اعمال نمی‌شود — wallet_balance قدیمی دور ریخته می‌شد.)
+        elif trans.target_wallet == "both":
+            # FIX F-D1: رسیدهای legacy با target_wallet="both" (امروز submit_payment دو رسید جدا
+            # می‌سازد) هنگام حذف هیچ اثری از کیف برنمی‌گرداندند ⇒ واگرایی دفتر/کیف — دقیقاً همان
+            # شکافی که مسیر refund برای همین ردیف‌ها پوشش می‌دهد.
+            # قاعده‌ی کانونیکال (آینه‌ی refund_transaction، بدون تغییر اعداد):
+            #   جمع سهم‌های ذخیره‌شده == مبلغ ⇒ همان سهم‌ها کسر می‌شوند،
+            #   وگرنه fallback مستند پروژه: نصف-نصف با باقیمانده به آموزشگاه.
+            share_teacher = int(trans.share_teacher or 0)
+            share_institute = int(trans.share_institute or 0)
+            if share_teacher + share_institute != t_amount:
+                share_teacher = t_amount // 2
+                share_institute = t_amount - share_teacher
+            d_teacher = -share_teacher
+            d_institute = -share_institute
+        # (هدف نامشخص (None): مثل رفتار قبلی هیچ تغییری اعمال نمی‌شود — wallet_balance قدیمی دور ریخته می‌شد.)
 
     elif trans.type == "session_charge":
         # برای تراکنش‌های هزینه جلسه (منفی)، مبلغ را به کیف پول برمی‌گردانیم

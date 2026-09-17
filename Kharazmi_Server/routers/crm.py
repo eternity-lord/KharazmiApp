@@ -268,6 +268,10 @@ def public_online_registration(req: OnlineRegisterRequest, db: Session = Depends
         enroll = Enrollment(
             student_id=student.id,
             course_id=req.course_id,
+            # FIX (F-C2/S3 تکمیلی): شعبه‌ی ثبت‌نام — همان منطق تراکنش (شاگرد، وگرنه کلاس).
+            # بدون آن، analytics که با Enrollment.branch_id فیلتر می‌کند (analytics.py:177/185/193)
+            # این ثبت‌نام را برای کاربر شعبه‌دار از دست می‌داد (NULL هرگز =شعبه نمی‌شود).
+            branch_id=student.branch_id if student.branch_id is not None else course.branch_id,
             register_date=today,
             shift="عصر",
             total_tuition=1000000, # default price or tuition

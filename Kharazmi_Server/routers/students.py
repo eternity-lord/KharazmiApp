@@ -149,6 +149,10 @@ def register_and_enroll_student(
             new_enroll = Enrollment(
                 student_id=new_student.id,
                 course_id=req.course_id,
+                # FIX (F-C2/S3 تکمیلی): شعبه‌ی ثبت‌نام — همان منطق تراکنش (شاگرد، وگرنه کلاس).
+                # بدون آن، analytics که با Enrollment.branch_id فیلتر می‌کند (analytics.py:177/185/193)
+                # این ثبت‌نام را برای کاربر شعبه‌دار از دست می‌داد (NULL هرگز =شعبه نمی‌شود).
+                branch_id=new_student.branch_id if new_student.branch_id is not None else course.branch_id,
                 register_date=req.register_date,
                 shift=req.shift,
                 total_tuition=req.total_tuition,

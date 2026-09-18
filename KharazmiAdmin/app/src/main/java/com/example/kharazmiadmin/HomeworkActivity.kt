@@ -364,26 +364,26 @@ class HomeworkAdapter(
         val item = list[position]
         holder.title.text = item.title
         holder.course.text = item.course_title
-        holder.date.text = getString(R.string.hw_due_short, item.due_date)
+        holder.date.text = holder.itemView.context.getString(R.string.hw_due_short, item.due_date)
 
         val statusVal = item.status.lowercase()
         holder.status.text = when (statusVal) {
-            "pending" -> getString(R.string.hw_st_pending)
-            "submitted" -> getString(R.string.hw_st_submitted)
-            "graded" -> getString(R.string.hw_st_graded)
-            "late" -> getString(R.string.hw_st_late)
+            "pending" -> holder.itemView.context.getString(R.string.hw_st_pending)
+            "submitted" -> holder.itemView.context.getString(R.string.hw_st_submitted)
+            "graded" -> holder.itemView.context.getString(R.string.hw_st_graded)
+            "late" -> holder.itemView.context.getString(R.string.hw_st_late)
             else -> item.status
         }
 
         if (item.score != null) {
-            holder.score.text = getString(R.string.hw_score_row, item.score, item.max_score)
+            holder.score.text = holder.itemView.context.getString(R.string.hw_score_row, item.score, item.max_score)
             holder.score.visibility = View.VISIBLE
         } else {
             holder.score.visibility = View.GONE
         }
 
         if (!item.feedback.isNullOrEmpty()) {
-            holder.feedback.text = getString(R.string.hw_feedback_row, item.feedback)
+            holder.feedback.text = holder.itemView.context.getString(R.string.hw_feedback_row, item.feedback)
             holder.feedback.visibility = View.VISIBLE
         } else {
             holder.feedback.visibility = View.GONE
@@ -418,16 +418,16 @@ class SubmissionsAdapter(
         
         val statusVal = item.status.lowercase()
         holder.status.text = when (statusVal) {
-            "submitted" -> getString(R.string.hw_st_submitted)
-            "graded" -> getString(R.string.hw_st_graded)
-            "late" -> getString(R.string.hw_st_late2)
+            "submitted" -> holder.itemView.context.getString(R.string.hw_st_submitted)
+            "graded" -> holder.itemView.context.getString(R.string.hw_st_graded)
+            "late" -> holder.itemView.context.getString(R.string.hw_st_late2)
             else -> item.status
         }
 
         if (item.score != null) {
-            holder.details.text = getString(R.string.hw_det_row, item.score, item.feedback ?: "---")
+            holder.details.text = holder.itemView.context.getString(R.string.hw_det_row, item.score, item.feedback ?: "---")
         } else {
-            holder.details.text = getString(R.string.hw_det_wait)
+            holder.details.text = holder.itemView.context.getString(R.string.hw_det_wait)
         }
 
         holder.btnGrade.setOnClickListener { onGradeClick(item) }

@@ -281,8 +281,8 @@ class CredentialsSearchAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = list[position]
-        holder.title.text = getString(R.string.common_person_row, item.name)
-        holder.subtitle.text = getString(R.string.tcred_sub_row, item.national_code, item.mobile)
+        holder.title.text = holder.itemView.context.getString(R.string.common_person_row, item.name)
+        holder.subtitle.text = holder.itemView.context.getString(R.string.tcred_sub_row, item.national_code, item.mobile)
         holder.itemView.setOnClickListener { onClick(item) }
     }
 

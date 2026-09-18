@@ -885,12 +885,12 @@ class SearchAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = list[position]
-        val icon = if (item.type == "class") getString(R.string.invoice_icon_class) else getString(R.string.invoice_icon_person)
+        val icon = if (item.type == "class") holder.itemView.context.getString(R.string.invoice_icon_class) else holder.itemView.context.getString(R.string.invoice_icon_person)
         holder.title.text = "$icon ${item.title}"
 
         // نمایش اطلاعات اضافی
         val extraInfo = if (item.total_debt != null && item.total_debt > 0)
-            getString(R.string.invoice_extra_debt, String.format("%,d", item.total_debt))
+            holder.itemView.context.getString(R.string.invoice_extra_debt, String.format("%,d", item.total_debt))
         else
             item.info
 

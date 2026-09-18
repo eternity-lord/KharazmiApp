@@ -213,16 +213,16 @@ class DeletionRequestAdapter(
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = list[position]
         val t = item.snapshot?.totals
-        holder.title.text = item.course_title ?: getString(R.string.delreq_row_title, item.course_id)
-        holder.code.text = getString(R.string.delreq_row_code, item.request_id, item.created_at ?: "")
+        holder.title.text = item.course_title ?: holder.itemView.context.getString(R.string.delreq_row_title, item.course_id)
+        holder.code.text = holder.itemView.context.getString(R.string.delreq_row_code, item.request_id, item.created_at ?: "")
         val roleFa = when (item.requested_by_role) {
-            "teacher" -> getString(R.string.delreq_role_teacher)
-            "secretary" -> getString(R.string.delreq_role_secretary)
+            "teacher" -> holder.itemView.context.getString(R.string.delreq_role_teacher)
+            "secretary" -> holder.itemView.context.getString(R.string.delreq_role_secretary)
             else -> item.requested_by_role ?: "-"
         }
-        holder.teacher.text = getString(R.string.delreq_row_requester, item.requester_name ?: "-", roleFa)
-        holder.price.text = getString(R.string.delreq_row_debt, String.format("%,d", t?.total_debt ?: 0))
-        holder.schedule.text = getString(R.string.delreq_row_stats, t?.students ?: 0, item.snapshot?.sessions_total ?: 0, if (item.forgive_session_charges) getString(R.string.common_yes) else getString(R.string.common_no))
+        holder.teacher.text = holder.itemView.context.getString(R.string.delreq_row_requester, item.requester_name ?: "-", roleFa)
+        holder.price.text = holder.itemView.context.getString(R.string.delreq_row_debt, String.format("%,d", t?.total_debt ?: 0))
+        holder.schedule.text = holder.itemView.context.getString(R.string.delreq_row_stats, t?.students ?: 0, item.snapshot?.sessions_total ?: 0, if (item.forgive_session_charges) holder.itemView.context.getString(R.string.common_yes) else holder.itemView.context.getString(R.string.common_no))
         holder.btnApprove.setOnClickListener { onApprove(item.request_id) }
         holder.btnReject.setOnClickListener { onReject(item.request_id) }
         holder.itemView.setOnClickListener { onDetail(item) }

@@ -611,20 +611,20 @@ class ProfileClassAdapter(
         val classItem = classes[position]
 
         holder.tvClassName.text = classItem.title ?: ""
-        holder.tvClassCode.text = getString(R.string.tprof_class_code, classItem.code ?: "")
+        holder.tvClassCode.text = holder.itemView.context.getString(R.string.tprof_class_code, classItem.code ?: "")
         holder.tvClassDetails.text = classItem.grade_level ?: ""
 
         when {
             classItem.is_suspended -> {
-                holder.tvClassStatus.text = getString(R.string.tprof_suspended)
+                holder.tvClassStatus.text = holder.itemView.context.getString(R.string.tprof_suspended)
                 holder.tvClassStatus.setTextColor(android.graphics.Color.parseColor("#FF9800"))
             }
             !classItem.is_admin_approved -> {
-                holder.tvClassStatus.text = getString(R.string.tprof_pending2)
+                holder.tvClassStatus.text = holder.itemView.context.getString(R.string.tprof_pending2)
                 holder.tvClassStatus.setTextColor(android.graphics.Color.parseColor("#2196F3"))
             }
             else -> {
-                holder.tvClassStatus.text = getString(R.string.tprof_active)
+                holder.tvClassStatus.text = holder.itemView.context.getString(R.string.tprof_active)
                 holder.tvClassStatus.setTextColor(android.graphics.Color.parseColor("#4CAF50"))
             }
         }
@@ -652,11 +652,11 @@ class PendingSessionsAdapter(private val list: List<PendingSettlementSession>) :
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = list[position]
-        val codeStr = if (item.session_code != null) getString(R.string.tprof_code2, item.session_code) else ""
-        holder.tvClassTitle.text = getString(R.string.tprof_row, item.class_title, codeStr, item.present_count)
-        holder.tvSessionDate.text = getString(R.string.tprof_date, item.date)
+        val codeStr = if (item.session_code != null) holder.itemView.context.getString(R.string.tprof_code2, item.session_code) else ""
+        holder.tvClassTitle.text = holder.itemView.context.getString(R.string.tprof_row, item.class_title, codeStr, item.present_count)
+        holder.tvSessionDate.text = holder.itemView.context.getString(R.string.tprof_date, item.date)
         val amt = item.amount ?: 0L
-        holder.tvSessionAmount.text = getString(R.string.portal_money, String.format(java.util.Locale.US, "%,d", amt))
+        holder.tvSessionAmount.text = holder.itemView.context.getString(R.string.portal_money, String.format(java.util.Locale.US, "%,d", amt))
     }
 
     override fun getItemCount() = list.size
@@ -678,9 +678,9 @@ class SettlementHistoryAdapter(private val list: List<SettlementHistoryItem>) : 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = list[position]
         val amt = item.total_amount ?: 0L
-        holder.tvSettledAmount.text = getString(R.string.portal_money, String.format(java.util.Locale.US, "%,d", amt))
-        holder.tvSettledDate.text = getString(R.string.tprof_settled_date, item.settled_at)
-        holder.tvSessionCount.text = getString(R.string.tprof_sessions, item.session_count)
+        holder.tvSettledAmount.text = holder.itemView.context.getString(R.string.portal_money, String.format(java.util.Locale.US, "%,d", amt))
+        holder.tvSettledDate.text = holder.itemView.context.getString(R.string.tprof_settled_date, item.settled_at)
+        holder.tvSessionCount.text = holder.itemView.context.getString(R.string.tprof_sessions, item.session_count)
     }
 
     override fun getItemCount() = list.size

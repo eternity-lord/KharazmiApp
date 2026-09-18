@@ -323,14 +323,14 @@ class CalendarAdapter(
         val item = list[position]
         holder.title.text = item.title
         holder.detail.text = item.detail
-        holder.schedule.text = getString(R.string.cal_time_row, item.schedule)
+        holder.schedule.text = holder.itemView.context.getString(R.string.cal_time_row, item.schedule)
 
         val typeVal = item.type.lowercase()
         holder.type.text = when (typeVal) {
-            "class" -> getString(R.string.cal_type_class)
-            "exam" -> getString(R.string.cal_type_exam)
-            "homework deadline" -> getString(R.string.cal_type_hw)
-            "payment due" -> getString(R.string.cal_type_pay)
+            "class" -> holder.itemView.context.getString(R.string.cal_type_class)
+            "exam" -> holder.itemView.context.getString(R.string.cal_type_exam)
+            "homework deadline" -> holder.itemView.context.getString(R.string.cal_type_hw)
+            "payment due" -> holder.itemView.context.getString(R.string.cal_type_pay)
             else -> item.type
         }
     }
@@ -355,9 +355,9 @@ class RoomsAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = list[position]
-        holder.name.text = getString(R.string.cal_room_row, item.name)
-        holder.capacity.text = getString(R.string.cal_cap_row, item.capacity)
-        holder.location.text = getString(R.string.cal_loc_row, item.location)
+        holder.name.text = holder.itemView.context.getString(R.string.cal_room_row, item.name)
+        holder.capacity.text = holder.itemView.context.getString(R.string.cal_cap_row, item.capacity)
+        holder.location.text = holder.itemView.context.getString(R.string.cal_loc_row, item.location)
     }
 
     override fun getItemCount() = list.size

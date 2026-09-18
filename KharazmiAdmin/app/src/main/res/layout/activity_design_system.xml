@@ -583,7 +583,9 @@
                         android:layout_marginTop="@dimen/spacing_normal"
                         android:hint="@string/ds_input_phone"
                         app:errorEnabled="true"
-                        app:errorText="@string/ds_input_error_text">
+                        app:boxStrokeColor="@color/ds_danger"
+                        app:helperText="@string/ds_input_error_text"
+                        app:helperTextTextColor="@color/ds_danger">
 
                         <com.google.android.material.textfield.TextInputEditText
                             android:layout_width="match_parent"

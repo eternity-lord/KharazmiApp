@@ -82,15 +82,15 @@ class HistoryAdapter(private val list: List<SessionHistoryItem>) : RecyclerView.
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = list[position]
-        holder.date.text = getString(R.string.shist_date, item.date)
-        holder.attendees.text = getString(R.string.shist_att, item.attendees)
-        holder.cost.text = getString(R.string.shist_cost, String.format("%,d", item.cost_per_student))
+        holder.date.text = holder.itemView.context.getString(R.string.shist_date, item.date)
+        holder.attendees.text = holder.itemView.context.getString(R.string.shist_att, item.attendees)
+        holder.cost.text = holder.itemView.context.getString(R.string.shist_cost, String.format("%,d", item.cost_per_student))
 
         // 🆕 نمایش زمان واقعی شروع/پایان جلسه (برای کلاس‌های زنده)
         if (!item.start_time.isNullOrEmpty()) {
             holder.tvTime.visibility = View.VISIBLE
             val end = item.end_time ?: ""
-            holder.tvTime.text = if (end.isNotEmpty()) getString(R.string.shist_time_full, item.start_time, end) else getString(R.string.shist_time_start, item.start_time)
+            holder.tvTime.text = if (end.isNotEmpty()) holder.itemView.context.getString(R.string.shist_time_full, item.start_time, end) else holder.itemView.context.getString(R.string.shist_time_start, item.start_time)
         } else {
             holder.tvTime.visibility = View.GONE
         }
@@ -99,19 +99,19 @@ class HistoryAdapter(private val list: List<SessionHistoryItem>) : RecyclerView.
         val statusVal = item.status ?: "Finished"
         when (statusVal.lowercase()) {
             "finished" -> {
-                holder.tvStatus.text = getString(R.string.shist_st_done)
+                holder.tvStatus.text = holder.itemView.context.getString(R.string.shist_st_done)
                 holder.tvStatus.setTextColor(android.graphics.Color.parseColor("#388E3C"))
                 holder.imgStatusIcon.setImageResource(android.R.drawable.checkbox_on_background)
                 holder.imgStatusIcon.imageTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#388E3C"))
             }
             "modified" -> {
-                holder.tvStatus.text = getString(R.string.shist_st_modified)
+                holder.tvStatus.text = holder.itemView.context.getString(R.string.shist_st_modified)
                 holder.tvStatus.setTextColor(android.graphics.Color.parseColor("#F57C00"))
                 holder.imgStatusIcon.setImageResource(android.R.drawable.ic_menu_edit)
                 holder.imgStatusIcon.imageTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#F57C00"))
             }
             "deleted" -> {
-                holder.tvStatus.text = getString(R.string.shist_st_deleted)
+                holder.tvStatus.text = holder.itemView.context.getString(R.string.shist_st_deleted)
                 holder.tvStatus.setTextColor(android.graphics.Color.parseColor("#D32F2F"))
                 holder.imgStatusIcon.setImageResource(android.R.drawable.ic_delete)
                 holder.imgStatusIcon.imageTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#D32F2F"))

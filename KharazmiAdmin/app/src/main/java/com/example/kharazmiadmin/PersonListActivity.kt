@@ -186,7 +186,7 @@ class PersonAdapter(private val list: List<PersonListItem>, private val mode: St
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = list[position]
         holder.tvName.text = item.name
-        holder.tvCode.text = getString(R.string.plist_code_mobile, item.national_code, item.mobile)
+        holder.tvCode.text = holder.itemView.context.getString(R.string.plist_code_mobile, item.national_code, item.mobile)
 
         holder.itemView.setOnClickListener {
             val context = holder.itemView.context
@@ -228,14 +228,14 @@ class ImprovedTeacherAdapter(private val list: List<PersonListItem>) : RecyclerV
         val item = list[position]
 
         holder.tvTeacherName.text = item.name
-        holder.tvTeacherMobile.text = getString(R.string.common_mobile_row, item.mobile)
-        holder.tvNationalCode.text = getString(R.string.plist_national_row, item.national_code)
+        holder.tvTeacherMobile.text = holder.itemView.context.getString(R.string.common_mobile_row, item.mobile)
+        holder.tvNationalCode.text = holder.itemView.context.getString(R.string.plist_national_row, item.national_code)
 
         if (item.is_suspended) {
-            holder.tvTeacherStatus.text = getString(R.string.tprof_suspended)
+            holder.tvTeacherStatus.text = holder.itemView.context.getString(R.string.tprof_suspended)
             holder.tvTeacherStatus.setTextColor(android.graphics.Color.parseColor("#FF9800"))
         } else {
-            holder.tvTeacherStatus.text = getString(R.string.tprof_active)
+            holder.tvTeacherStatus.text = holder.itemView.context.getString(R.string.tprof_active)
             holder.tvTeacherStatus.setTextColor(android.graphics.Color.parseColor("#4CAF50"))
         }
 
@@ -244,7 +244,7 @@ class ImprovedTeacherAdapter(private val list: List<PersonListItem>) : RecyclerV
                 val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${item.mobile}"))
                 holder.itemView.context.startActivity(intent)
             } else {
-                Toast.makeText(holder.itemView.context, getString(R.string.plist_no_phone), Toast.LENGTH_SHORT).show()
+                Toast.makeText(holder.itemView.context, holder.itemView.context.getString(R.string.plist_no_phone), Toast.LENGTH_SHORT).show()
             }
         }
 

@@ -123,12 +123,12 @@ class LiveClassesAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = list[position]
-        holder.title.text = getString(R.string.lclss_class_row, item.classTitle, item.courseCode)
-        holder.teacher.text = getString(R.string.lclss_teacher_row, item.teacherName)
-        holder.elapsed.text = getString(R.string.lclss_elapsed, item.elapsedMinutes)
-        holder.present.text = getString(R.string.lclss_present, item.present)
-        holder.absent.text = getString(R.string.lclss_absent, item.absent)
-        holder.undetermined.text = getString(R.string.lclss_undet, item.undetermined)
+        holder.title.text = holder.itemView.context.getString(R.string.lclss_class_row, item.classTitle, item.courseCode)
+        holder.teacher.text = holder.itemView.context.getString(R.string.lclss_teacher_row, item.teacherName)
+        holder.elapsed.text = holder.itemView.context.getString(R.string.lclss_elapsed, item.elapsedMinutes)
+        holder.present.text = holder.itemView.context.getString(R.string.lclss_present, item.present)
+        holder.absent.text = holder.itemView.context.getString(R.string.lclss_absent, item.absent)
+        holder.undetermined.text = holder.itemView.context.getString(R.string.lclss_undet, item.undetermined)
         holder.itemView.setOnClickListener { onClick(item) }
     }
 

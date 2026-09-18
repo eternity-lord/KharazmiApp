@@ -85,7 +85,7 @@ object ReportExporter {
                     </tbody>
                 </table>
                 <div class="footer">
-                    ${getString(R.string.rexp_footer)}
+                    ${context.getString(R.string.rexp_footer)}
                 </div>
             </body>
             </html>
@@ -115,7 +115,7 @@ object ReportExporter {
         // FIX: Bug 19 - never create an unowned background job from a UI helper.
         val owner = context as? LifecycleOwner
         if (owner == null) {
-            onError(getString(R.string.rexp_no_page))
+            onError(context.getString(R.string.rexp_no_page))
             return
         }
         onStart()
@@ -162,13 +162,13 @@ object ReportExporter {
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     }
                     
-                    context.startActivity(Intent.createChooser(intent, getString(R.string.rexp_share_title)))
+                    context.startActivity(Intent.createChooser(intent, context.getString(R.string.rexp_share_title)))
                 }
             } catch (e: Exception) {
                 // FIX: Bug 19 - cancellation must not open UI callbacks on a destroyed screen.
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 withContext(Dispatchers.Main) {
-                    onError(e.message ?: getString(R.string.rexp_server_error))
+                    onError(e.message ?: context.getString(R.string.rexp_server_error))
                 }
             }
         }

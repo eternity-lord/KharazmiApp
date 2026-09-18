@@ -46,9 +46,9 @@ class CommunicationHistoryAdapter(
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val item = items[position]
         val isSms = item.type == "sms"
-        holder.type.text = if (isSms) getString(R.string.commhist_type_sms, item.typeLabel) else getString(R.string.commhist_type_chat, item.typeLabel)
+        holder.type.text = if (isSms) holder.itemView.context.getString(R.string.commhist_type_sms, item.typeLabel) else holder.itemView.context.getString(R.string.commhist_type_chat, item.typeLabel)
         holder.date.text = item.date
-        holder.parties.text = getString(R.string.commhist_parties, item.sender, item.recipient)
+        holder.parties.text = holder.itemView.context.getString(R.string.commhist_parties, item.sender, item.recipient)
         holder.summary.text = item.summary
 
         val params = holder.card.layoutParams as LinearLayout.LayoutParams

@@ -428,8 +428,8 @@ class ChildrenAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = list[position]
-        holder.title.text = getString(R.string.common_person_row, item.name)
-        holder.subtitle.text = getString(R.string.pportal_child_hint)
+        holder.title.text = holder.itemView.context.getString(R.string.common_person_row, item.name)
+        holder.subtitle.text = holder.itemView.context.getString(R.string.pportal_child_hint)
         holder.itemView.setOnClickListener { onClick(item) }
     }
 

@@ -133,21 +133,21 @@ class LiveRosterAdapter(
         // رنگ وضعیت وضعیت‌ها (بدون تغییر پالت برند/وضعیتی)
         when (item.status) {
             "Present", "Late" -> {
-                holder.status.text = if (item.status == "Late") getString(R.string.lrost_late) else getString(R.string.lrost_present)
+                holder.status.text = if (item.status == "Late") holder.itemView.context.getString(R.string.lrost_late) else holder.itemView.context.getString(R.string.lrost_present)
                 holder.status.setTextColor(android.graphics.Color.parseColor("#2E7D32"))
             }
             "Absent" -> {
-                holder.status.text = if (item.excused) getString(R.string.lrost_excused) else getString(R.string.lrost_absent)
+                holder.status.text = if (item.excused) holder.itemView.context.getString(R.string.lrost_excused) else holder.itemView.context.getString(R.string.lrost_absent)
                 holder.status.setTextColor(android.graphics.Color.parseColor("#C62828"))
             }
             else -> {
-                holder.status.text = getString(R.string.lrost_unknown)
+                holder.status.text = holder.itemView.context.getString(R.string.lrost_unknown)
                 holder.status.setTextColor(android.graphics.Color.parseColor("#F57F17"))
             }
         }
 
-        holder.studentPhone.text = getString(R.string.lrost_st_phone, item.studentMobile.ifEmpty { getString(R.string.lrost_unset) })
-        holder.parentPhone.text = getString(R.string.lrost_par_phone, item.parentMobile.ifEmpty { getString(R.string.lrost_unset) })
+        holder.studentPhone.text = holder.itemView.context.getString(R.string.lrost_st_phone, item.studentMobile.ifEmpty { holder.itemView.context.getString(R.string.lrost_unset) })
+        holder.parentPhone.text = holder.itemView.context.getString(R.string.lrost_par_phone, item.parentMobile.ifEmpty { holder.itemView.context.getString(R.string.lrost_unset) })
 
         holder.btnCallStudent.setOnClickListener {
             call(holder.itemView, item.studentMobile)
@@ -170,7 +170,7 @@ class LiveRosterAdapter(
             val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
             view.context.startActivity(intent)
         } else {
-            Toast.makeText(view.context, getString(R.string.lrost_no_phone), Toast.LENGTH_SHORT).show()
+            Toast.makeText(view.context, view.context.getString(R.string.lrost_no_phone), Toast.LENGTH_SHORT).show()
         }
     }
 }

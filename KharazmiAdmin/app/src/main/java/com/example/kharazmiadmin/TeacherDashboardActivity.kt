@@ -505,7 +505,7 @@ class TeacherClassAdapter(
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = list[position]
         holder.title.text = item.title
-        holder.code.text = getString(R.string.tdash_code_row, item.code)
+        holder.code.text = holder.itemView.context.getString(R.string.tdash_code_row, item.code)
 
         // اعمال رنگ پس‌زمینه کارت کلاس بر اساس bg_color ثبت شده
         if (!item.bg_color.isNullOrEmpty()) {
@@ -521,15 +521,15 @@ class TeacherClassAdapter(
         }
 
         if (item.is_suspended) {
-            holder.sub.text = getString(R.string.tdash_suspended)
+            holder.sub.text = holder.itemView.context.getString(R.string.tdash_suspended)
             holder.sub.setTextColor(android.graphics.Color.parseColor("#D32F2F"))
             holder.itemView.alpha = 0.5f
         } else if (item.is_admin_approved) {
-            holder.sub.text = getString(R.string.tdash_active)
+            holder.sub.text = holder.itemView.context.getString(R.string.tdash_active)
             holder.sub.setTextColor(android.graphics.Color.parseColor("#388E3C"))
             holder.itemView.alpha = 1.0f
         } else {
-            holder.sub.text = getString(R.string.tdash_pending)
+            holder.sub.text = holder.itemView.context.getString(R.string.tdash_pending)
             holder.sub.setTextColor(android.graphics.Color.parseColor("#F57C00"))
             holder.itemView.alpha = 1.0f
         }
@@ -540,7 +540,7 @@ class TeacherClassAdapter(
         if (!item.students_preview.isNullOrEmpty()) {
             item.students_preview.forEach { name ->
                 val tv = TextView(holder.itemView.context)
-                tv.text = getString(R.string.common_bullet_row, name)
+                tv.text = holder.itemView.context.getString(R.string.common_bullet_row, name)
                 tv.textSize = 12f
                 tv.setTextColor(android.graphics.Color.parseColor("#555555")) // Gray color
                 tv.setPadding(0, 4, 0, 4)
@@ -548,7 +548,7 @@ class TeacherClassAdapter(
             }
         } else {
             val tv = TextView(holder.itemView.context)
-            tv.text = getString(R.string.tdash_no_students)
+            tv.text = holder.itemView.context.getString(R.string.tdash_no_students)
             tv.textSize = 10f
             tv.setTextColor(android.graphics.Color.GRAY)
             holder.llStudentPreview.addView(tv)

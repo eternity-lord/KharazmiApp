@@ -295,9 +295,9 @@ class LeadsAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = list[position]
-        holder.name.text = getString(R.string.common_person_row, item.name)
-        holder.course.text = getString(R.string.crm_row_course, item.interested_course)
-        holder.followUp.text = getString(R.string.crm_row_follow, item.next_follow_up ?: getString(R.string.crm_unset))
+        holder.name.text = holder.itemView.context.getString(R.string.common_person_row, item.name)
+        holder.course.text = holder.itemView.context.getString(R.string.crm_row_course, item.interested_course)
+        holder.followUp.text = holder.itemView.context.getString(R.string.crm_row_follow, item.next_follow_up ?: holder.itemView.context.getString(R.string.crm_unset))
         holder.status.text = item.status
         
         holder.itemView.setOnClickListener { onClick(item) }

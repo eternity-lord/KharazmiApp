@@ -737,6 +737,8 @@
     <string name="csetup_preview_dash">شهریه نهایی: ---</string>
     <string name="csetup_search_title">جستجوی دانش‌آموز</string>
     <string name="csetup_search_add">افزودن به کلاس</string>
+    <string name="csetup_search_empty">دانش‌آموزی یافت نشد</string>
+    <string name="csetup_search_error">خطا در جستجوی دانش‌آموز؛ اتصال اینترنت را بررسی کنید</string>
     <string name="csetup_tuition_neg">شهریه پایه نمی‌تواند منفی باشد</string>
     <string name="csetup_disc_range">درصد تخفیف باید بین ۰ و ۱۰۰ باشد</string>
     <string name="csetup_disc_over">مبلغ تخفیف ثابت نمی‌تواند بیشتر از شهریه پایه باشد</string>

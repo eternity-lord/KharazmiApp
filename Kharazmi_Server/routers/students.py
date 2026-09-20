@@ -234,23 +234,60 @@ def search_students(query: str, db: Session = Depends(get_db), sub_role: str = D
 
 
 @router.get("/students/search_simple")
-def search_students_simple(query: str, db: Session = Depends(get_db), sub_role: str = Depends(check_user_login)):
+def search_students_simple(query: str, authorization: Optional[str] = Header(None), db: Session = Depends(get_db), sub_role: str = Depends(check_user_login)):
     # FIX (L14/Y1): جستجوی سراسری PII شاگردان — فقط کارکنان (ادمین/منشی/معلم). شاگرد/ولی 403.
     if sub_role not in ("admin", "secretary", "teacher"):
         raise HTTPException(status_code=403, detail="شما دسترسی لازم برای جستجوی دانش‌آموزان را ندارید")
-    # فقط دانش‌آموزانی که تعلیق نیستند (is_suspended == False) برگردانده شوند
-    results = (
-        db.query(Student).filter(Student.is_deleted == False)
-        .filter(
-            (Student.last_name.contains(query))
-            | (Student.national_code.contains(query))
+
+    # FIX(search): ورودی را normalize کن (trim + جمع‌فشرده‌کردن فاصله‌های تکراری)؛ خالی/تک‌حرفی
+    # → لیست خالی (بدون fetch گسترده).
+    q = " ".join(query.split())
+    if len(q) < 2:
+        return []
+
+    from routers.analytics import get_user_branch_filter
+    # FIX(search): branch isolation — کاربر شعبه‌دار فقط شعبه‌ی خودش (شامل عدم دیدن رکوردهای
+    # branch=NULL legacy). ادمین بدون شعبه = policy فعلی (دیدن همه). نقش‌های دیگر بدون شعبه
+    # scope مشخصی ندارند → نتیجه خالی (نشت داده ممنوع؛ fallback حدسی ممنوع).
+    resolved_branch = get_user_branch_filter(db, authorization, None)
+    base = db.query(Student).filter(Student.is_deleted == False, Student.is_suspended == False)
+    if resolved_branch is not None:
+        base = base.filter(Student.branch_id == resolved_branch)
+    elif sub_role != "admin":
+        return []
+
+    # FIX(search): چندفیلدی + چندکلمه‌ای + case-insensitive سازگار با SQLite/PostgreSQL
+    # (func.lower + LIKE). هر کلمه باید حداقل یکی از فیلدها را بدهد (نام کامل = ترکیب
+    # کلمات روی first/last). همه‌چیز در WHERE — load کردن دانش‌آموزان در Python ندارد.
+    words = q.split()
+    conds = []
+    for word in words:
+        w = f"%{word.lower()}%"
+        match = or_(
+            func.lower(Student.first_name).like(w),
+            func.lower(Student.last_name).like(w),
+            func.lower(Student.national_code).like(w),
+            func.lower(Student.student_mobile).like(w),
         )
-        .filter(Student.is_suspended == False)
-        .all()
-    )
+        if word.isdigit():
+            # student_code عدد است؛ موبایل هم به‌صورت دقیق (شامل شکل بدون ۰ اول) چک می‌شود
+            match = or_(
+                match,
+                Student.student_code == int(word),
+                Student.student_mobile == word,
+                *( [Student.student_mobile == "0" + word] if len(word) == 10 and word.startswith("9") else [] ),
+            )
+        conds.append(match)
+
+    # FIX(search): سقف نتایج — ۲۰ مورد (استقرار پایدار، بدون صفحه‌بندی اضافه)
+    results = base.filter(*conds).order_by(desc(Student.id)).limit(20).all()
 
     return [
-        {"id": s.id, "name": f"{s.first_name} {s.last_name} ({s.national_code})"}
+        {
+            # FIX(search): id فیلد واقعی response است — کلاینت جدید نباید از متن display-id parse کند
+            "id": s.id,
+            "name": f"{(s.first_name or '').strip()} {(s.last_name or '').strip()}".strip() + (f" ({s.national_code})" if s.national_code else ""),
+        }
         for s in results
     ]
 

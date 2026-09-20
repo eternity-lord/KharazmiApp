@@ -58,6 +58,10 @@ class ClassSetupActivity : BaseActivity() {
 
     private var classId: Int = -1
     private var className: String = ""
+
+    // FIX(search): نتایج آخرین جست‌وجو — کلیک handler از id واقعی API استفاده می‌کند (نه parse متن)
+    private var searchResults: List<StudentSearchItem> = emptyList()
+    private var searchRequestSeq = 0
     private lateinit var rv: RecyclerView
     private lateinit var api: ClassSetupNetworkApi
     private lateinit var listApi: ClassListApi
@@ -241,27 +245,28 @@ class ClassSetupActivity : BaseActivity() {
         }
 
         // سرچ زنده دانش‌آموز
+        // FIX(search): debounce 300ms — تا تایپ آرام نشود request نمی‌رود (قبلاً برای هر کاراکتر)
+        var pendingSearch: Runnable? = null
         acSearch.addTextChangedListener(object : TextWatcher {
             override fun afterTextChanged(s: Editable?) {
-                if (s.toString().length >= 2) {
-                    searchServer(s.toString(), acSearch)
+                val q = s.toString().trim()
+                pendingSearch?.let { view.removeCallbacks(it) }
+                if (q.length >= 2) {
+                    val captured = q
+                    val runnable = Runnable { searchServer(captured, acSearch) }
+                    pendingSearch = runnable
+                    view.postDelayed(runnable, 300L)
                 }
             }
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
         })
 
-        acSearch.setOnItemClickListener { parent, _, position, _ ->
-            val selectedStr = parent.getItemAtPosition(position) as String
-            tvInfo.text = selectedStr
-            try {
-                val idStr = selectedStr.substringAfterLast("(").substringBefore(")")
-                selectedId = idStr.toInt()
-            } catch (e: Exception) {
-                // FIX: Bug 19 - cancellation is not a network/UI error.
-                if (e is kotlinx.coroutines.CancellationException) throw e;
-                selectedId = -1
-            }
+        acSearch.setOnItemClickListener { _, _, position, _ ->
+            // FIX(search): id واقعی از response API — parse شکننده از متن نمایشی حذف شد
+            val item = searchResults.getOrNull(position) ?: return@setOnItemClickListener
+            selectedId = item.id
+            tvInfo.text = "${item.name} (${item.id})"
         }
 
         val cbSplitInstallments = view.findViewById<CheckBox>(R.id.cbSplitInstallments)
@@ -330,19 +335,32 @@ class ClassSetupActivity : BaseActivity() {
 
     private fun searchServer(query: String, ac: AutoCompleteTextView) {
         // FIX: Bug 19 - cancel screen work when this Activity is destroyed.
+        // FIX(search): شمارنده‌ی نسلی — پاسخِ request کهنه (تایپ سریع) بی‌اثر می‌شود
+        val requestId = ++searchRequestSeq
         lifecycleScope.launch(Dispatchers.IO) {
-            try {
-                val list = api.searchStudents(query)
-                val names = list.map { "${it.name} (${it.id})" }
-                withContext(Dispatchers.Main) {
-                    val adapter = ArrayAdapter(this@ClassSetupActivity, android.R.layout.simple_dropdown_item_1line, names)
-                    ac.setAdapter(adapter)
-                    ac.showDropDown()
-                }
+            val fetched: List<StudentSearchItem>? = try {
+                api.searchStudents(query)
             } catch (e: Exception) {
                 // FIX: Bug 19 - cancellation is not a network/UI error.
                 if (e is kotlinx.coroutines.CancellationException) throw e;
                 android.util.Log.e("ClassSetupActivity", "searchServer failed", e)
+                null
+            }
+            withContext(Dispatchers.Main) {
+                if (requestId != searchRequestSeq) return@withContext // درخواست تازه‌تری آمده → رد
+                if (fetched == null) {
+                    // FIX(search): خطای شبکه/API — dropdown خالی + پیام قابل فهم
+                    searchResults = emptyList()
+                    ac.setAdapter(ArrayAdapter(this@ClassSetupActivity, android.R.layout.simple_dropdown_item_1line, listOf(getString(R.string.csetup_search_error))))
+                    Toast.makeText(this@ClassSetupActivity, getString(R.string.csetup_search_error), Toast.LENGTH_SHORT).show()
+                    return@withContext
+                }
+                searchResults = fetched
+                // FIX(search): حالت خالی مشخص — ردیف «یافت نشد» غیرقابل‌انتخاب است
+                val names = if (fetched.isEmpty()) listOf(getString(R.string.csetup_search_empty))
+                            else fetched.map { "${it.name} (${it.id})" }
+                ac.setAdapter(ArrayAdapter(this@ClassSetupActivity, android.R.layout.simple_dropdown_item_1line, names))
+                ac.showDropDown()
             }
         }
     }

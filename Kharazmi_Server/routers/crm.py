@@ -1,6 +1,5 @@
 import os
 import datetime
-import random
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Header
 from pydantic import BaseModel, Field
@@ -11,7 +10,7 @@ from sqlalchemy import or_  # FIX (F-C7): ایمپورت گمشده — کل م�
 from sqlalchemy import desc
 
 import models
-from models import Lead, Student, Enrollment, Course, Transaction, SmsLog
+from models import Lead, Student, Enrollment, Course, Transaction, SmsLog, Branch
 from dependencies import get_db, check_user_login, require_permission, NotificationService, get_next_sequence_value, ensure_student_shadow_users, normalize_mobile
 
 router = APIRouter()
@@ -42,6 +41,41 @@ class LeadNoteRequest(BaseModel):
     next_follow_up: Optional[str] = None
     status: Optional[str] = None
 
+# FIX(crm): ردیف legacy ممکن است created_at/نام/موبایل/… برابر NULL باشد. هر رکورد به‌صورت
+# جدا null-safe می‌شود تا یک رکورد ناقص کل لیست را 500 نکند؛ برای created_at خالی مقدار
+# جعلی تولید نمی‌شود (برگشت "" کنترل‌شده — قرارداد response همان str است).
+def _lead_to_response(lead: Lead) -> LeadResponseModel:
+    return LeadResponseModel(
+        id=lead.id,
+        name=lead.name or "",
+        mobile=lead.mobile or "",
+        interested_course=lead.interested_course or "",
+        source=lead.source or "Web",
+        status=lead.status or "NEW",
+        notes=lead.notes,
+        next_follow_up=lead.next_follow_up,
+        created_at=lead.created_at.strftime("%Y/%m/%d") if lead.created_at else "",
+    )
+
+# FIX(crm): کد ملی موقت یکتا و race-safe در همان فضای legacy «0000» (کامیت‌های قبلی random
+# بودند ⇒ collision با unique national_code ⇒ IntegrityError خام 500). شمارندهٔ مشترک
+# (افزایش اتمیک Bug-15) + چک وجود در صورت تصادف (مثلاً با کدهای random قدیمی) + retry محدود.
+_NC_SPACE_START = 100000
+_NC_SPACE_SIZE = 900000
+_NC_MAX_ATTEMPTS = 1000
+
+
+def _generate_unique_temp_national_code(db: Session) -> str:
+    for _ in range(_NC_MAX_ATTEMPTS):
+        value = get_next_sequence_value(db, "crm_lead_nc", _NC_SPACE_START)
+        digits = (value - _NC_SPACE_START) % _NC_SPACE_SIZE + _NC_SPACE_START
+        candidate = f"0000{digits:06d}"
+        if db.query(Student.id).filter(Student.national_code == candidate).first() is None:
+            return candidate
+    # اگر retry باقی‌مانده collision را حل نکرد: خطای کنترل‌شده (نه 500 خام)
+    raise HTTPException(status_code=503, detail="امکان ساخت کد ملی موقت یکتا نیست؛ لطفاً کمی بعد دوباره تلاش کنید")
+
+
 # FIX: Bug 22 - validate the public registration payload before creating any records.
 class OnlineRegisterRequest(NationalCodeRequest):
     first_name: str
@@ -65,10 +99,15 @@ def create_crm_lead(
 ):
     from routers.analytics import get_user_branch_filter
 
+    # FIX(crm): شعبهٔ کاربر شعبه‌دار همیشه شعبه‌ی خودش است (isolation دست‌نخورده)؛ برای کاربر
+    # بدون شعبه، branch_id ارسالی اعتبارسنجی می‌شود. قبلاً `or 1` شعبه را حدسی انتخاب می‌کرد و
+    # id نامعتبر تا insert می‌رسید ⇒ IntegrityError خام 500.
     resolved_branch = get_user_branch_filter(db, authorization, req.branch_id)
-    # Preserve compatibility for legacy central-admin clients while ensuring
-    # every newly-created lead is attributable to a branch.
-    resolved_branch = resolved_branch or req.branch_id or 1
+    if resolved_branch is None:
+        raise HTTPException(status_code=400, detail="شعبه مشخص نیست؛ لطفاً branch_id معتبر ارسال کنید")
+    branch = db.query(Branch).filter(Branch.id == resolved_branch).first()
+    if not branch or not branch.active:
+        raise HTTPException(status_code=400, detail="شعبه انتخابی معتبر یا فعال نیست")
     # FIX H20: نرمال‌سازی موبایل سرنخ (خالی مجاز) — convert بعدی مقدار تمیز می‌برد.
     _raw_mob = (req.mobile or "").strip()
     lead_mobile = normalize_mobile(_raw_mob) if _raw_mob else ""
@@ -87,17 +126,8 @@ def create_crm_lead(
     db.add(new_lead)
     db.commit()
     db.refresh(new_lead)
-    return LeadResponseModel(
-        id=new_lead.id,
-        name=new_lead.name,
-        mobile=new_lead.mobile,
-        interested_course=new_lead.interested_course,
-        source=new_lead.source,
-        status=new_lead.status,
-        notes=new_lead.notes,
-        next_follow_up=new_lead.next_follow_up,
-        created_at=new_lead.created_at.strftime("%Y/%m/%d")
-    )
+    # FIX(crm): همان helper null-safe — قرارداد response عوض نشد
+    return _lead_to_response(new_lead)
 
 # --- 2. Admin/Secretary: View Leads Pipeline List ---
 @router.get("/crm/leads/list", response_model=List[LeadResponseModel])
@@ -107,20 +137,9 @@ def get_crm_leads_list(
     _login_role: str = Depends(check_user_login)
 ):
     leads = db.query(Lead).order_by(desc(Lead.id)).all()
-    return [
-        LeadResponseModel(
-            id=l.id,
-            name=l.name,
-            mobile=l.mobile,
-            interested_course=l.interested_course,
-            source=l.source,
-            status=l.status,
-            notes=l.notes,
-            next_follow_up=l.next_follow_up,
-            created_at=l.created_at.strftime("%Y/%m/%d")
-        )
-        for l in leads
-    ]
+    # FIX(crm): هر رکورد جدا null-safe می‌شود — created_at=NULL یا فیلدهای NULLِ legacy
+    # (name/mobile/…) دیگر کل لیست را 500 (AttributeError/ValueError) نمی‌کنند.
+    return [_lead_to_response(l) for l in leads]
 
 # --- 3. Admin/Secretary: Add Notes & Update Lead status ---
 @router.post("/crm/leads/{id}/notes")
@@ -156,59 +175,79 @@ def convert_lead_to_student(
     lead = db.query(Lead).filter(Lead.id == id).first()
     if not lead:
         raise HTTPException(status_code=404, detail="سرنخ یافت نشد")
-        
-    # FIX H20: نرمال‌سازی موبایل ذخیره‌شده‌ی سرنخ (legacy ممکن است خام باشد)؛ نامعتبرِ غیرخالی یعنی سرنخ نیاز به اصلاح دارد.
+
+    # FIX(crm): idempotency — سرنخ تبدیل‌شده دوباره تبدیل نمی‌شود (Student تکراری ساخته نمی‌شود).
+    if lead.converted_student_id is not None or lead.status == "REGISTERED":
+        raise HTTPException(status_code=400, detail="این سرنخ قبلاً به دانش‌آموز تبدیل شده است")
+
+    # FIX(crm): موبایل برای Student معتبر الزامی است — خالی یا نامعتبر قبل از ساخت Student
+    # با 400 واضح متوقف می‌شود (قبلاً Student با موبایل خالی ساخته می‌شد).
+    # FIX H20: نرمال‌سازی موبایل ذخیره‌شده‌ی سرنخ (legacy ممکن است خام باشد).
     _raw_mob = (lead.mobile or "").strip()
-    lead_mobile = normalize_mobile(_raw_mob) if _raw_mob else ""
-    if _raw_mob and not lead_mobile:
+    if not _raw_mob:
+        raise HTTPException(status_code=400, detail="شماره موبایل این سرنخ خالی است؛ ابتدا موبایل سرنخ را تکمیل کنید")
+    lead_mobile = normalize_mobile(_raw_mob)
+    if not lead_mobile:
         raise HTTPException(status_code=400, detail="فرمت شماره موبایل این سرنخ معتبر نیست؛ ابتدا آن را اصلاح کنید")
     # Check duplicate student
     existing_st = db.query(Student).filter(Student.student_mobile == lead_mobile).first()
     if existing_st:
         raise HTTPException(status_code=400, detail="دانش‌آموزی با این شماره موبایل قبلاً در سیستم ثبت‌نام شده است")
-        
-    # Convert to Student
-    next_code = get_next_sequence_value(db, "student", 100001)
-    new_student = Student(
-        first_name=lead.name,
-        last_name="",
-        father_name="",
-        national_code=f"0000{random.randint(100000, 999999)}", # temporary code
-        birth_date="",
-        student_mobile=lead_mobile,
-        parent_mobile="",
-        home_phone="",
-        address="ثبت شده از سرنخ",
-        study_status="در حال تحصیل",
-        gender="نامشخص",
-        student_code=next_code,
-        branch_id=lead.branch_id,
-    )
-    db.add(new_student)
-    db.flush()
-    lead.status = "REGISTERED"
-    lead.converted_at = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
-    lead.converted_student_id = new_student.id
 
-    # Enroll in course if course_id is supplied
-    # FIX (F-C3): تک‌کامیت — ثبت‌نام قبل از کامیت ساخته می‌شود تا کرش وسط، سرنخِ REGISTEREDِ
-    # بدون ثبت‌نام نسازد (پنجره‌ی کرش، نه ریس همزمانی؛ UPDATE مشروط به INSERT جدا نمی‌خورد).
-    if course_id:
-        course = db.query(Course).filter(Course.id == course_id).first()
-        if course:
-            enroll = Enrollment(
-                student_id=new_student.id,
-                course_id=course_id,
-                branch_id=course.branch_id or lead.branch_id,
-                register_date=datetime.datetime.now().strftime("%Y/%m/%d"),
-                shift="عصر",
-                total_tuition=1000000,
-                total_paid=0
-            )
-            db.add(enroll)
-    db.commit()
-            
-    return {"message": f"سرنخ با موفقیت به دانش‌آموز '{lead.name}' با کد {next_code} تبدیل شد.", "student_id": new_student.id}
+    # FIX(crm): عملیات atomic — هر خطا (شامل collision کد ملی یا کرش وسط) کل چیز را
+    # rollback می‌کند؛ Lead هرگز در وضعیت نیمه‌تبدیل (REGISTERED بدون Student) نمی‌ماند.
+    try:
+        national_code = _generate_unique_temp_national_code(db)
+        next_code = get_next_sequence_value(db, "student", 100001)
+        new_student = Student(
+            first_name=lead.name or "",
+            last_name="",
+            father_name="",
+            national_code=national_code,
+            birth_date="",
+            student_mobile=lead_mobile,
+            parent_mobile="",
+            home_phone="",
+            address="ثبت شده از سرنخ",
+            study_status="در حال تحصیل",
+            gender="نامشخص",
+            student_code=next_code,
+            branch_id=lead.branch_id,
+        )
+        db.add(new_student)
+        db.flush()
+        lead.status = "REGISTERED"
+        lead.converted_at = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+        lead.converted_student_id = new_student.id
+
+        # Enroll in course if course_id is supplied
+        # FIX (F-C3): تک‌کامیت — ثبت‌نام قبل از کامیت ساخته می‌شود تا کرش وسط، سرنخِ REGISTEREDِ
+        # بدون ثبت‌نام نسازد (پنجره‌ی کرش، نه ریس همزمانی؛ UPDATE مشروط به INSERT جدا نمی‌خورد).
+        if course_id:
+            course = db.query(Course).filter(Course.id == course_id).first()
+            if course:
+                enroll = Enrollment(
+                    student_id=new_student.id,
+                    course_id=course_id,
+                    branch_id=course.branch_id or lead.branch_id,
+                    register_date=datetime.datetime.now().strftime("%Y/%m/%d"),
+                    shift="عصر",
+                    total_tuition=1000000,
+                    total_paid=0
+                )
+                db.add(enroll)
+        db.commit()
+    except HTTPException:
+        # خطای کنترل‌شده‌ی خود ما (مثل 503 کد ملی) — rollback و بازنمایی همان خطا
+        db.rollback()
+        raise
+    except Exception as e:
+        # FIX(crm): IntegrityError خام (یا هر خطای دیگر) به کاربر نمی‌رسد — rollback کامل
+        db.rollback()
+        print(f"⚠️ CRM convert failed for lead {id}, rolled back: {e}")
+        raise HTTPException(status_code=500, detail="خطا در تبدیل سرنخ به دانش‌آموز؛ هیچ داده‌ای ذخیره نشد")
+
+    return {"message": f"سرنخ با موفقیت به دانش‌آموز '{lead.name or ''}' با کد {next_code} تبدیل شد.", "student_id": new_student.id}
 
 # --- 5. Public: Online Registration (Transaction-safe, duplicate prevention) ---
 @router.post("/crm/register_online")

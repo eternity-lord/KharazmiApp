@@ -87,11 +87,21 @@ def create_class(course: CourseCreate, override: bool = False, db: Session = Dep
         course.teacher_id = me.id
         if (course.teacher_session_price or 0) > MAX_TEACHER_SESSION_PRICE:
             raise HTTPException(status_code=400, detail=f"نرخ هر جلسه برای هر شاگرد نمی‌تواند بیشتر از {MAX_TEACHER_SESSION_PRICE:,} تومان باشد؛ برای نرخ بالاتر با ادمین هماهنگ کنید")
-    from dependencies import get_next_sequence_value
+    from dependencies import get_next_sequence_value, get_current_user, resolve_creation_branch
     next_code = str(get_next_sequence_value(db, "class", 100001))
+
+    # FIX(branch): کلاس جدید باید branch معتبر داشته باشد — سیاست مرکزی resolve_creation_branch:
+    # معلم → فقط branch خودش (ارزش ارسالی کلاینت برای معلم هرگز کورکورانه قبول نمی‌شود)؛
+    # ادمین/منشی → branch خودشان یا branch صریحِ مجاز؛ حالت مبهم → 400 واضح.
+    if sub_role not in ("admin", "secretary"):
+        branch_id = resolve_creation_branch(db, teacher=me, requested_branch_id=course.branch_id)
+    else:
+        current_user = get_current_user(authorization, db)
+        branch_id = resolve_creation_branch(db, user=current_user, requested_branch_id=course.branch_id)
 
     course_data = course.dict()
     course_data["code"] = next_code
+    course_data["branch_id"] = branch_id
 
     if not override:
         # بررسی تداخل زمانی کلاس‌های غیرمعلق همین معلم
@@ -301,14 +311,17 @@ def get_class_details(course_id: int, db: Session = Depends(get_db), authorizati
         if not st:
             continue
         final_tuition, discount_amt = get_enrollment_tuition_and_discount(enroll)
-        debt = final_tuition - enroll.total_paid
+        # FIX(null-data): total_paid legacy ممکن است NULL باشد — مثل 0 حساب می‌شود
+        # (صرفاً در محاسبه/نمایش؛ داده‌ی واقعی دیتابیس بدون تغییر می‌ماند).
+        debt = final_tuition - (enroll.total_paid or 0)
         students_list.append(
             {
-                "student_name": f"{st.first_name} {st.last_name}",
+                # FIX(null-data): نام‌های legacy NULL → فال‌بک نمایشی امن (نه «None None»).
+                "student_name": f"{st.first_name or ''} {st.last_name or ''}".strip() or "نامشخص",
                 "student_id": st.id,
                 "student_code": st.student_code,
                 "total_tuition": final_tuition,
-                "paid": enroll.total_paid,
+                "paid": enroll.total_paid or 0,
                 "debt": debt,
                 "enrollment_id": enroll.id,
                 "discount_type": getattr(enroll, "discount_type", "none") or "none",

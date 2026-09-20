@@ -269,6 +269,18 @@
     <string name="attendance_edit_loaded">اصلاح جلسه #%1$s: %2$s</string>
     <string name="attendance_history_error">خطا در بارگذاری سوابق این جلسه</string>
     <string name="attendance_class_list_error">خطا در دریافت لیست کلاس</string>
+    <!-- FIX(null-class): پیام‌های تفکیک‌شده‌ی خطا + انتخابگر کلاس (فقط افزودن کلید جدید) -->
+    <string name="attendance_select_class_title">انتخاب کلاس برای حضور و غیاب</string>
+    <string name="attendance_class_missing">کلاسی انتخاب نشده است — ابتدا یک کلاس معتبر انتخاب کنید</string>
+    <string name="attendance_class_deleted">کلاس حذف شده یا در دسترس نیست</string>
+    <string name="attendance_class_without_title">کلاس بدون عنوان</string>
+    <string name="attendance_session_not_found">جلسه‌ی مورد نظر یافت نشد</string>
+    <string name="attendance_not_found">مورد درخواست‌شده یافت نشد</string>
+    <string name="attendance_unauthorized">جلسه‌ی شما به پایان رسیده است؛ دوباره وارد شوید</string>
+    <string name="attendance_no_permission">شما مجاز به مشاهده‌ی این کلاس نیستید</string>
+    <string name="attendance_server_error">خطای سرور (%1$d): %2$s</string>
+    <string name="attendance_network_error">اتصال به سرور برقرار نشد — اتصال اینترنت را بررسی کنید</string>
+    <string name="attendance_classes_empty">هیچ کلاسی یافت نشد</string>
     <string name="attendance_confirm_edit_title">تأیید اصلاح حضور و غیاب</string>
     <string name="attendance_confirm_submit_title">تأیید ثبت حضور و غیاب</string>
     <string name="attendance_confirm_edit_msg">آیا از اصلاح حضور و غیاب این جلسه اطمینان دارید؟</string>
@@ -928,6 +940,7 @@
     <string name="crm_note_done">✅ یادداشت پیگیری با موفقیت ثبت شد</string>
     <string name="crm_note_error">خطا در بروزرسانی پیگیری</string>
     <string name="crm_conv_error">خطا در تبدیل سرنخ به دانش‌آموز رسمی</string>
+    <string name="crm_error_detail">خطا: %1$s</string>
     <string name="crm_row_course">🎓 دوره علاقه: %1$s</string>
     <string name="crm_row_follow">📅 پیگیری بعدی: %1$s</string>
     <string name="crm_unset">ثبت نشده</string>

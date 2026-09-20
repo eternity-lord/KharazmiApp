@@ -87,9 +87,9 @@ class PersonListActivity : BaseActivity() {
                 val rows = currentList.map { item ->
                     listOf(
                         item.id.toString(),
-                        item.name,
-                        item.national_code,
-                        item.mobile
+                        item.name ?: "",
+                        item.national_code ?: "",
+                        item.mobile ?: ""
                     )
                 }
 
@@ -185,8 +185,13 @@ class PersonAdapter(private val list: List<PersonListItem>, private val mode: St
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = list[position]
-        holder.tvName.text = item.name
-        holder.tvCode.text = getString(R.string.plist_code_mobile, item.national_code, item.mobile)
+        // FIX(null-data): نام/کد ملی/موبایل legacy ممکن است null باشند — فال‌بک امن + تله‌ی نهایی.
+        try {
+            holder.tvName.text = item.name ?: ""
+            holder.tvCode.text = holder.itemView.context.getString(R.string.plist_code_mobile, item.national_code ?: "", item.mobile ?: "")
+        } catch (e: Exception) {
+            android.util.Log.e("PersonAdapter", "Error binding row ${item.id}", e)
+        }
 
         holder.itemView.setOnClickListener {
             val context = holder.itemView.context
@@ -226,44 +231,49 @@ class ImprovedTeacherAdapter(private val list: List<PersonListItem>) : RecyclerV
 
     override fun onBindViewHolder(holder: TeacherViewHolder, position: Int) {
         val item = list[position]
+        // FIX(null-data): نام/موبایل/کد ملی legacy ممکن است null باشند — فال‌بک امن در نمایش و
+        // تله‌ی نهایی: یک رکورد ناقص نباید کل RecyclerView لیست مربیان را crash کند.
+        try {
+            holder.tvTeacherName.text = item.name ?: ""
+            holder.tvTeacherMobile.text = holder.itemView.context.getString(R.string.common_mobile_row, item.mobile ?: "")
+            holder.tvNationalCode.text = holder.itemView.context.getString(R.string.plist_national_row, item.national_code ?: "")
 
-        holder.tvTeacherName.text = item.name
-        holder.tvTeacherMobile.text = getString(R.string.common_mobile_row, item.mobile)
-        holder.tvNationalCode.text = getString(R.string.plist_national_row, item.national_code)
-
-        if (item.is_suspended) {
-            holder.tvTeacherStatus.text = getString(R.string.tprof_suspended)
-            holder.tvTeacherStatus.setTextColor(android.graphics.Color.parseColor("#FF9800"))
-        } else {
-            holder.tvTeacherStatus.text = getString(R.string.tprof_active)
-            holder.tvTeacherStatus.setTextColor(android.graphics.Color.parseColor("#4CAF50"))
-        }
-
-        holder.btnCallTeacher.setOnClickListener {
-            if (item.mobile.isNotEmpty()) {
-                val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${item.mobile}"))
-                holder.itemView.context.startActivity(intent)
+            if (item.is_suspended) {
+                holder.tvTeacherStatus.text = holder.itemView.context.getString(R.string.tprof_suspended)
+                holder.tvTeacherStatus.setTextColor(android.graphics.Color.parseColor("#FF9800"))
             } else {
-                Toast.makeText(holder.itemView.context, getString(R.string.plist_no_phone), Toast.LENGTH_SHORT).show()
+                holder.tvTeacherStatus.text = holder.itemView.context.getString(R.string.tprof_active)
+                holder.tvTeacherStatus.setTextColor(android.graphics.Color.parseColor("#4CAF50"))
             }
-        }
 
-        holder.btnViewProfile.setOnClickListener {
-            val intent = Intent(holder.itemView.context, TeacherProfileActivity::class.java)
-            intent.putExtra("TEACHER_ID", item.id)
-            holder.itemView.context.startActivity(intent)
-        }
+            holder.btnCallTeacher.setOnClickListener {
+                if (!item.mobile.isNullOrBlank()) {
+                    val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${item.mobile}"))
+                    holder.itemView.context.startActivity(intent)
+                } else {
+                    Toast.makeText(holder.itemView.context, holder.itemView.context.getString(R.string.plist_no_phone), Toast.LENGTH_SHORT).show()
+                }
+            }
 
-        holder.btnViewClasses.setOnClickListener {
-            val intent = Intent(holder.itemView.context, TeacherProfileActivity::class.java)
-            intent.putExtra("TEACHER_ID", item.id)
-            holder.itemView.context.startActivity(intent)
-        }
+            holder.btnViewProfile.setOnClickListener {
+                val intent = Intent(holder.itemView.context, TeacherProfileActivity::class.java)
+                intent.putExtra("TEACHER_ID", item.id)
+                holder.itemView.context.startActivity(intent)
+            }
 
-        holder.itemView.setOnClickListener {
-            val intent = Intent(holder.itemView.context, TeacherProfileActivity::class.java)
-            intent.putExtra("TEACHER_ID", item.id)
-            holder.itemView.context.startActivity(intent)
+            holder.btnViewClasses.setOnClickListener {
+                val intent = Intent(holder.itemView.context, TeacherProfileActivity::class.java)
+                intent.putExtra("TEACHER_ID", item.id)
+                holder.itemView.context.startActivity(intent)
+            }
+
+            holder.itemView.setOnClickListener {
+                val intent = Intent(holder.itemView.context, TeacherProfileActivity::class.java)
+                intent.putExtra("TEACHER_ID", item.id)
+                holder.itemView.context.startActivity(intent)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("ImprovedTeacherAdapter", "Error binding row ${item.id}", e)
         }
     }
 

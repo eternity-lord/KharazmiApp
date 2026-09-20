@@ -244,10 +244,12 @@ data class TeacherRawProfile(
 
 data class PersonListItem(
     val id: Int,
-    val name: String,
-    val national_code: String,
-    val mobile: String,
-    val role: String,
+    // FIX(null-data): فیلدهای legacy (نام/کد ملی/موبایل) ممکن است null باشند —
+    // null‌پذیر تا یک رکورد ناقص کل لیست افراد/مربیان را نشکند.
+    val name: String? = null,
+    val national_code: String? = null,
+    val mobile: String? = null,
+    val role: String = "",
     val is_suspended: Boolean = false
 )
 
@@ -329,6 +331,9 @@ data class FinanceResponse(
 data class FullStudentProfile(
     val info: StudentInfo,
     val classes: List<String>,
+    // FIX(invoice): enrollmentهای فعال با شناسه‌های واقعی — صدور فیش بدون حدس از نام نمایشی
+    // (سرورهای قدیمی بدون این فیلد کار می‌کنند → emptyList)
+    val enrollments: List<ActiveStudentEnrollment> = emptyList(),
     val transactions: List<String>,
     @SerializedName("wallet_total") val walletTotal: Long = 0,
     @SerializedName("wallet_teacher") val walletTeacher: Long = 0,
@@ -338,6 +343,15 @@ data class FullStudentProfile(
     @SerializedName("debt_institute") val debtInstitute: Long = 0,
     val total_paid_institute: Long = 0,
     val teachers_financial: List<TeacherFinancialItem>? = null
+)
+
+// FIX(invoice): یک enrollment فعال با شناسه‌های واقعی (نه متن نمایشی)
+data class ActiveStudentEnrollment(
+    val enrollment_id: Int,
+    val course_id: Int,
+    val title: String? = null,
+    val code: String? = null,
+    val branch_id: Int? = null
 )
 
 data class TeacherFinancialItem(
@@ -406,10 +420,11 @@ data class FullTeacherProfile(
 )
 
 data class TeacherInfo(
-    val name: String,
-    val mobile: String,
-    val national_code: String,
-    val status: String,
+    // FIX(null-data): فیلدهای legacy ممکن است null باشند — null‌پذیر + فال‌بک امن در نمایش.
+    val name: String? = null,
+    val mobile: String? = null,
+    val national_code: String? = null,
+    val status: String? = null,
     val card_number: String? = null,
     val teacher_code: Int? = null,
     val profile_image: String? = null
@@ -482,10 +497,12 @@ data class TeacherPendingSettlementResponse(
 
 data class PendingSettlementSession(
     val session_id: Int,
-    val date: String,
-    val class_title: String,
-    val amount: Long,
-    val present_count: Int,
+    // FIX(null-data): این فیلدها در داده‌های legacy سرور ممکن است null باشند —
+    // null‌پذیر تا یک رکورد ناقص کل RecyclerView تسویه را نشکند.
+    val date: String? = null,
+    val class_title: String? = null,
+    val amount: Long? = null,
+    val present_count: Int = 0,
     val session_code: Int? = null
 )
 
@@ -498,9 +515,10 @@ data class TeacherSettlementResponse(
 
 data class SettlementHistoryItem(
     val id: Int,
-    val total_amount: Long,
-    val session_count: Int,
-    val settled_at: String
+    // FIX(null-data): مبالغ/تاریخ legacy ممکن است null باشند — null‌پذیر + فال‌بک امن در نمایش.
+    val total_amount: Long? = null,
+    val session_count: Int = 0,
+    val settled_at: String? = null
 )
 
 data class BulkSmsRequest(val student_ids: List<Int>)

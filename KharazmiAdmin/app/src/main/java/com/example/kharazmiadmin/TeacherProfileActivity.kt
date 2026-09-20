@@ -265,10 +265,11 @@ class TeacherProfileActivity : BaseActivity() {
                 networkCall = { profileApi.getFullTeacherProfile(teacherId) },
                 onSuccess = { data, isOffline, timestamp ->
                     // پر کردن هدر
+                    // FIX(null-data): فیلدهای legacy ممکن است null باشند — فال‌بک امن در نمایش.
                     val codeStr = if (data.info.teacher_code != null) getString(R.string.tprof_code, data.info.teacher_code) else ""
-                    findViewById<TextView>(R.id.tvTeacherName).text = "${data.info.name}$codeStr"
-                    findViewById<TextView>(R.id.tvTeacherPhone).text = data.info.mobile
-                    teacherMobile = data.info.mobile
+                    findViewById<TextView>(R.id.tvTeacherName).text = "${data.info.name ?: ""}$codeStr"
+                    findViewById<TextView>(R.id.tvTeacherPhone).text = data.info.mobile ?: ""
+                    teacherMobile = data.info.mobile ?: ""
 
                     // بارگذاری عکس پروفایل با Glide
                     val profileImg = findViewById<android.widget.ImageView>(R.id.imgTeacherProfile)
@@ -291,7 +292,7 @@ class TeacherProfileActivity : BaseActivity() {
                                 .circleCrop()
                                 .into(profileImg)
                         } else {
-                            profileImg.setImageDrawable(AvatarHelper.getAvatar(this@TeacherProfileActivity, data.info.name, teacherId))
+                            profileImg.setImageDrawable(AvatarHelper.getAvatar(this@TeacherProfileActivity, data.info.name ?: "", teacherId))
                         }
                     }
 
@@ -611,20 +612,20 @@ class ProfileClassAdapter(
         val classItem = classes[position]
 
         holder.tvClassName.text = classItem.title ?: ""
-        holder.tvClassCode.text = getString(R.string.tprof_class_code, classItem.code ?: "")
+        holder.tvClassCode.text = holder.itemView.context.getString(R.string.tprof_class_code, classItem.code ?: "")
         holder.tvClassDetails.text = classItem.grade_level ?: ""
 
         when {
             classItem.is_suspended -> {
-                holder.tvClassStatus.text = getString(R.string.tprof_suspended)
+                holder.tvClassStatus.text = holder.itemView.context.getString(R.string.tprof_suspended)
                 holder.tvClassStatus.setTextColor(android.graphics.Color.parseColor("#FF9800"))
             }
             !classItem.is_admin_approved -> {
-                holder.tvClassStatus.text = getString(R.string.tprof_pending2)
+                holder.tvClassStatus.text = holder.itemView.context.getString(R.string.tprof_pending2)
                 holder.tvClassStatus.setTextColor(android.graphics.Color.parseColor("#2196F3"))
             }
             else -> {
-                holder.tvClassStatus.text = getString(R.string.tprof_active)
+                holder.tvClassStatus.text = holder.itemView.context.getString(R.string.tprof_active)
                 holder.tvClassStatus.setTextColor(android.graphics.Color.parseColor("#4CAF50"))
             }
         }
@@ -652,11 +653,17 @@ class PendingSessionsAdapter(private val list: List<PendingSettlementSession>) :
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = list[position]
-        val codeStr = if (item.session_code != null) getString(R.string.tprof_code2, item.session_code) else ""
-        holder.tvClassTitle.text = getString(R.string.tprof_row, item.class_title, codeStr, item.present_count)
-        holder.tvSessionDate.text = getString(R.string.tprof_date, item.date)
-        val amt = item.amount ?: 0L
-        holder.tvSessionAmount.text = getString(R.string.portal_money, String.format(java.util.Locale.US, "%,d", amt))
+        // FIX(null-data): class_title/date legacy ممکن است null باشند — فال‌بک امن + تله‌ی نهایی:
+        // یک رکورد ناقص نباید کل RecyclerView تسویه را crash کند.
+        try {
+            val codeStr = if (item.session_code != null) holder.itemView.context.getString(R.string.tprof_code2, item.session_code) else ""
+            holder.tvClassTitle.text = holder.itemView.context.getString(R.string.tprof_row, item.class_title ?: "", codeStr, item.present_count)
+            holder.tvSessionDate.text = holder.itemView.context.getString(R.string.tprof_date, item.date ?: "")
+            val amt = item.amount ?: 0L
+            holder.tvSessionAmount.text = holder.itemView.context.getString(R.string.portal_money, String.format(java.util.Locale.US, "%,d", amt))
+        } catch (e: Exception) {
+            android.util.Log.e("PendingSessionsAdapter", "Error binding row ${item.session_id}", e)
+        }
     }
 
     override fun getItemCount() = list.size
@@ -677,10 +684,15 @@ class SettlementHistoryAdapter(private val list: List<SettlementHistoryItem>) : 
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = list[position]
-        val amt = item.total_amount ?: 0L
-        holder.tvSettledAmount.text = getString(R.string.portal_money, String.format(java.util.Locale.US, "%,d", amt))
-        holder.tvSettledDate.text = getString(R.string.tprof_settled_date, item.settled_at)
-        holder.tvSessionCount.text = getString(R.string.tprof_sessions, item.session_count)
+        // FIX(null-data): فال‌بک امن برای رکوردهای legacy ناقص + تله‌ی نهایی (یک رکورد کل لیست را نمی‌شکند).
+        try {
+            val amt = item.total_amount ?: 0L
+            holder.tvSettledAmount.text = holder.itemView.context.getString(R.string.portal_money, String.format(java.util.Locale.US, "%,d", amt))
+            holder.tvSettledDate.text = holder.itemView.context.getString(R.string.tprof_settled_date, item.settled_at ?: "")
+            holder.tvSessionCount.text = holder.itemView.context.getString(R.string.tprof_sessions, item.session_count)
+        } catch (e: Exception) {
+            android.util.Log.e("SettlementHistoryAdapter", "Error binding row ${item.id}", e)
+        }
     }
 
     override fun getItemCount() = list.size

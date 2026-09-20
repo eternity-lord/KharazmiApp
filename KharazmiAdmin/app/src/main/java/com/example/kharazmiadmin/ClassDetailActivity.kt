@@ -713,52 +713,52 @@ class ClassStudentAdapter(
         if (fullStudent != null) {
             val dType = fullStudent.discount_type ?: "none"
             val dVal = fullStudent.discount_value ?: 0
-            val codeStr = if (fullStudent.student_code != null) getString(R.string.cdetail_code_row, fullStudent.student_code) else ""
+            val codeStr = if (fullStudent.student_code != null) holder.itemView.context.getString(R.string.cdetail_code_row, fullStudent.student_code) else ""
 
             if (dType != "none" && dVal > 0) {
-                val dValDisp = if (dType == "percentage") "$dVal%" else getString(R.string.common_toman_format, dVal)
-                holder.tvStudentName.text = getString(R.string.cdetail_student_row, student.student_name, codeStr, dValDisp)
+                val dValDisp = if (dType == "percentage") "$dVal%" else holder.itemView.context.getString(R.string.common_toman_format, dVal)
+                holder.tvStudentName.text = holder.itemView.context.getString(R.string.cdetail_student_row, student.student_name, codeStr, dValDisp)
             } else {
                 holder.tvStudentName.text = "${student.student_name}$codeStr"
             }
 
             // Show attendance information
-            holder.tvStudentMobile.text = getString(R.string.common_mobile_row, fullStudent.mobile)
+            holder.tvStudentMobile.text = holder.itemView.context.getString(R.string.common_mobile_row, fullStudent.mobile)
 
             // Show attendance rate
-            holder.tvStudentPaid.text = getString(R.string.cdetail_att_pct, String.format("%.1f", fullStudent.attendance_rate))
+            holder.tvStudentPaid.text = holder.itemView.context.getString(R.string.cdetail_att_pct, String.format("%.1f", fullStudent.attendance_rate))
             holder.tvStudentPaid.visibility = View.VISIBLE
 
             // Show detailed debt information
             val totalDebt = fullStudent.debt_teacher + fullStudent.debt_institute
             if (totalDebt > 0) {
-                val breakdown = getString(R.string.cdetail_debt_break, String.format("%,d", fullStudent.debt_teacher), String.format("%,d", fullStudent.debt_institute))
-                holder.tvStudentDebt.text = getString(R.string.cdetail_debt_total, String.format("%,d", totalDebt), breakdown)
-                holder.tvStudentStatus.text = getString(R.string.cdetail_unsettled)
+                val breakdown = holder.itemView.context.getString(R.string.cdetail_debt_break, String.format("%,d", fullStudent.debt_teacher), String.format("%,d", fullStudent.debt_institute))
+                holder.tvStudentDebt.text = holder.itemView.context.getString(R.string.cdetail_debt_total, String.format("%,d", totalDebt), breakdown)
+                holder.tvStudentStatus.text = holder.itemView.context.getString(R.string.cdetail_unsettled)
                 holder.tvStudentStatus.setTextColor(android.graphics.Color.parseColor("#D32F2F")) // Red
             } else {
-                holder.tvStudentDebt.text = getString(R.string.cdetail_no_debt)
-                holder.tvStudentStatus.text = getString(R.string.cdetail_settled)
+                holder.tvStudentDebt.text = holder.itemView.context.getString(R.string.cdetail_no_debt)
+                holder.tvStudentStatus.text = holder.itemView.context.getString(R.string.cdetail_settled)
                 holder.tvStudentStatus.setTextColor(android.graphics.Color.parseColor("#388E3C")) // Green
             }
 
             // Show suspension status if applicable
             if (fullStudent.is_suspended) {
-                holder.tvStudentStatus.text = getString(R.string.cdetail_susp)
+                holder.tvStudentStatus.text = holder.itemView.context.getString(R.string.cdetail_susp)
                 holder.tvStudentStatus.setTextColor(android.graphics.Color.parseColor("#FF9800")) // Orange
             }
         } else {
             // Fallback to basic info
-            holder.tvStudentMobile.text = getString(R.string.cdetail_sid_row, student.student_id)
+            holder.tvStudentMobile.text = holder.itemView.context.getString(R.string.cdetail_sid_row, student.student_id)
 
             // Show debt information
             if (student.debt > 0) {
-                holder.tvStudentDebt.text = getString(R.string.cdetail_debt_row, String.format("%,d", student.debt))
-                holder.tvStudentStatus.text = getString(R.string.cdetail_unsettled)
+                holder.tvStudentDebt.text = holder.itemView.context.getString(R.string.cdetail_debt_row, String.format("%,d", student.debt))
+                holder.tvStudentStatus.text = holder.itemView.context.getString(R.string.cdetail_unsettled)
                 holder.tvStudentStatus.setTextColor(android.graphics.Color.parseColor("#D32F2F")) // Red
             } else {
-                holder.tvStudentDebt.text = getString(R.string.cdetail_no_debt)
-                holder.tvStudentStatus.text = getString(R.string.cdetail_settled)
+                holder.tvStudentDebt.text = holder.itemView.context.getString(R.string.cdetail_no_debt)
+                holder.tvStudentStatus.text = holder.itemView.context.getString(R.string.cdetail_settled)
                 holder.tvStudentStatus.setTextColor(android.graphics.Color.parseColor("#388E3C")) // Green
             }
 

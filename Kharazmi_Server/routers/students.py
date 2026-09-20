@@ -50,13 +50,18 @@ def register_student(request: Request, student: StudentCreate, db: Session = Dep
     if _raw_pm and not parent_mobile:
         raise HTTPException(status_code=400, detail="فرمت شماره موبایل ولی صحیح نیست")
 
-    from dependencies import get_next_sequence_value
+    from dependencies import get_next_sequence_value, resolve_creation_branch
     next_code = get_next_sequence_value(db, "student", 100001)
+
+    # FIX(branch): دانش‌آموز جدید باید branch معتبر داشته باشد — سیاست مرکزی:
+    # branch صریح فعال، وگرنه فقط branch فعالِ تک‌شعبه‌ای؛ در حالت مبهم 400 واضح (تخمین ممنوع).
+    branch_id = resolve_creation_branch(db, requested_branch_id=student.branch_id)
 
     student_data = student.dict()
     student_data["student_code"] = next_code
     student_data["student_mobile"] = student_mobile
     student_data["parent_mobile"] = parent_mobile
+    student_data["branch_id"] = branch_id
 
     new_student = Student(**student_data)
     db.add(new_student)
@@ -69,7 +74,8 @@ def register_student(request: Request, student: StudentCreate, db: Session = Dep
 @router.post("/students/register_and_enroll")
 def register_and_enroll_student(
     req: StudentRegisterAndEnrollRequest, 
-    db: Session = Depends(get_db), 
+    db: Session = Depends(get_db),
+    authorization: Optional[str] = Header(None),
     _: str = Depends(check_admin_or_secretary_access)
 ):
     # 1. بررسی صحت کد ملی و عدم تکراری بودن کدملی دانش‌آموز
@@ -88,8 +94,21 @@ def register_and_enroll_student(
         raise HTTPException(status_code=400, detail=str(exc))
         
     try:
-        from dependencies import get_next_sequence_value
+        from dependencies import get_next_sequence_value, get_current_user, resolve_creation_branch
         next_code = get_next_sequence_value(db, "student", 100001)
+
+        # FIX(branch): دانش‌آموز با branch معتبر ساخته می‌شود (سیاست مرکزی — branch کاربر فعلی،
+        # وگرنه branch همان کلاسِ انتخاب‌شده، وگرنه فقط تک‌شعبه‌ی فعال؛ در حالت مبهم 400 واضح).
+        # Enrollment/Transaction هم از همین branch پیاده می‌شوند (منطق H7: شاگرد، وگرنه کلاس).
+        current_user = get_current_user(authorization, db)
+        fallback_branch = None
+        if req.course_id is not None:
+            _fb_course = db.query(Course).filter(Course.id == req.course_id).first()
+            if _fb_course is not None:
+                fallback_branch = _fb_course.branch_id
+        branch_id = resolve_creation_branch(
+            db, user=current_user, requested_branch_id=req.branch_id, fallback_branch_id=fallback_branch
+        )
 
         # 2. ثبت فیزیکی مشخصات دانش‌آموز
         # FIX H20: نرمال‌سازی موبایل‌ها قبل از ذخیره (خالی مجاز و دست‌نخورده می‌ماند).
@@ -114,6 +133,8 @@ def register_and_enroll_student(
             address=req.address or "ثبت نشده",
             study_status=req.study_status or "در حال تحصیل",
             gender=req.gender,
+            # FIX(branch): رکورد جدید بدون شعبه ساخته نمی‌شود.
+            branch_id=branch_id,
             wallet_teacher=0,
             wallet_institute=0,
             wallet_balance=0

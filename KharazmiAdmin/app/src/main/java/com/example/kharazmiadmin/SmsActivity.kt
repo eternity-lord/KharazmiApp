@@ -152,10 +152,10 @@ class SmsAdapter(private val list: List<SmsLogItem>) : RecyclerView.Adapter<SmsA
             "all_teachers" -> "همه معلمان"
             else -> "بدهکاران"
         }
-        holder.target.text = getString(R.string.sms_to_row, targetFa)
+        holder.target.text = holder.itemView.context.getString(R.string.sms_to_row, targetFa)
         holder.msg.text = item.message_text
         holder.date.text = item.date
-        holder.count.text = getString(R.string.sms_count_row, item.sent_count)
+        holder.count.text = holder.itemView.context.getString(R.string.sms_count_row, item.sent_count)
     }
 
     override fun getItemCount() = list.size

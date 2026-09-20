@@ -373,7 +373,35 @@ class StudentProfileActivity : BaseActivity() {
 
     private fun launchInvoiceActivity() {
         val profile = cachedProfile ?: return
-        val className = profile.classes.firstOrNull() ?: getString(R.string.common_unknown_class)
+        val fallbackName = profile.classes.firstOrNull() ?: getString(R.string.common_unknown_class)
+        val enrollments = profile.enrollments
+        when {
+            enrollments.size == 1 -> {
+                // FIX(invoice): تنها کلاس فعال → شناسه‌ی واقعی همان enrollment می‌رود (نه نام نمایشی)
+                val en = enrollments[0]
+                openInvoice(en.enrollment_id, en.course_id, en.title?.trim()?.takeIf { it.isNotEmpty() } ?: fallbackName)
+            }
+            enrollments.size > 1 -> {
+                // FIX(invoice): چند کلاس فعال → اول انتخاب کلاس (با شناسه واقعی)؛ فیش هرگز با نام کلاس حدس‌زده نمی‌شود
+                val labels = enrollments.map { enrollmentLabel(it) }
+                AlertDialog.Builder(this)
+                    .setTitle(getString(R.string.invoice_pick_class, profile.info.name))
+                    .setItems(labels.toTypedArray()) { _, which ->
+                        val en = enrollments[which]
+                        openInvoice(en.enrollment_id, en.course_id, en.title?.trim()?.takeIf { it.isNotEmpty() } ?: fallbackName)
+                    }
+                    .setNegativeButton(R.string.common_cancel, null)
+                    .show()
+            }
+            else -> {
+                // enrollment فعالی نیست (سرور قدیمی یا واقعاً بدون کلاس) → رفتار قبلی: فیش عمومی
+                openInvoice(null, -1, fallbackName)
+            }
+        }
+    }
+
+    private fun openInvoice(enrollmentId: Int?, courseId: Int, className: String) {
+        val profile = cachedProfile ?: return
         val intent = Intent(this, InvoiceActivity::class.java).apply {
             putExtra(InvoiceActivity.EXTRA_PREFILL_STUDENT_ID, studentId)
             putExtra(InvoiceActivity.EXTRA_PREFILL_STUDENT_NAME, profile.info.name)
@@ -384,9 +412,27 @@ class StudentProfileActivity : BaseActivity() {
             putExtra(InvoiceActivity.EXTRA_PREFILL_UNPAID_SESSIONS, 0)
             putExtra(InvoiceActivity.EXTRA_PREFILL_SEARCH_NAME, profile.info.name)
             putExtra(InvoiceActivity.EXTRA_IS_ADMIN, true)
+            // FIX(invoice): شناسه‌های واقعی (فقط وقتی enrollment معتبر انتخاب/مشخص است)
+            if (enrollmentId != null && enrollmentId > 0) {
+                putExtra(InvoiceActivity.EXTRA_PREFILL_ENROLLMENT_ID, enrollmentId)
+                putExtra(InvoiceActivity.EXTRA_PREFILL_COURSE_ID, courseId)
+            }
         }
         startActivity(intent)
     }
+
+    // FIX(invoice): برچسب نمایشی فقط برای UI — هیچ‌جا از روی این متن شناسه استخراج نمی‌شود
+    private fun enrollmentLabel(en: ActiveStudentEnrollment): String {
+        val title = en.title?.trim().orEmpty()
+        val code = en.code?.trim().orEmpty()
+        return when {
+            title.isNotEmpty() && code.isNotEmpty() -> "$title (کد: $code)"
+            title.isNotEmpty() -> title
+            code.isNotEmpty() -> code
+            else -> getString(R.string.common_unknown_class)
+        }
+    }
+
     private fun showInfo() {
         cachedProfile?.let { data ->
             val sb = StringBuilder()

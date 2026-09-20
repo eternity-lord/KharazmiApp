@@ -17,6 +17,7 @@ import com.google.android.material.textfield.TextInputEditText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import retrofit2.HttpException
 import retrofit2.http.*
 
 // API Models for CRM
@@ -188,9 +189,25 @@ class CrmLeadsActivity : BaseActivity() {
                 // FIX: Bug 19 - cancellation is not a network/UI error.
                 if (e is kotlinx.coroutines.CancellationException) throw e;
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(this@CrmLeadsActivity, getString(R.string.crm_lead_error), Toast.LENGTH_SHORT).show()
+                    // FIX(crm): 4xx → detail کنترل‌شده‌ی سرور (مثلاً «شعبه انتخابی معتبر یا فعال نیست»)
+                    val detail = serverErrorDetail(e)
+                    val msg = if (detail != null) getString(R.string.crm_error_detail, detail) else getString(R.string.crm_lead_error)
+                    Toast.makeText(this@CrmLeadsActivity, msg, Toast.LENGTH_LONG).show()
                 }
             }
+        }
+    }
+
+    // FIX(crm): «detail» کنترل‌شده‌ی سرور از بدنه‌ی خطای 4xx؛ غیر-HTTP یا بدنه‌ی غیرJSON → null
+    private fun serverErrorDetail(e: Exception): String? {
+        val http = e as? HttpException ?: return null
+        if (http.code() !in 400..499) return null
+        return try {
+            http.response()?.errorBody()?.string()?.let { body ->
+                org.json.JSONObject(body).optString("detail").takeIf { it.isNotBlank() }
+            }
+        } catch (ignored: Exception) {
+            null
         }
     }
 
@@ -269,7 +286,10 @@ class CrmLeadsActivity : BaseActivity() {
                 // FIX: Bug 19 - cancellation is not a network/UI error.
                 if (e is kotlinx.coroutines.CancellationException) throw e;
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(this@CrmLeadsActivity, getString(R.string.crm_conv_error), Toast.LENGTH_SHORT).show()
+                    // FIX(crm): 4xx → detail کنترل‌شده‌ی سرور (مثلاً «موبایل سرنخ خالی است…»)
+                    val detail = serverErrorDetail(e)
+                    val msg = if (detail != null) getString(R.string.crm_error_detail, detail) else getString(R.string.crm_conv_error)
+                    Toast.makeText(this@CrmLeadsActivity, msg, Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -295,9 +315,9 @@ class LeadsAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = list[position]
-        holder.name.text = getString(R.string.common_person_row, item.name)
-        holder.course.text = getString(R.string.crm_row_course, item.interested_course)
-        holder.followUp.text = getString(R.string.crm_row_follow, item.next_follow_up ?: getString(R.string.crm_unset))
+        holder.name.text = holder.itemView.context.getString(R.string.common_person_row, item.name)
+        holder.course.text = holder.itemView.context.getString(R.string.crm_row_course, item.interested_course)
+        holder.followUp.text = holder.itemView.context.getString(R.string.crm_row_follow, item.next_follow_up ?: holder.itemView.context.getString(R.string.crm_unset))
         holder.status.text = item.status
         
         holder.itemView.setOnClickListener { onClick(item) }

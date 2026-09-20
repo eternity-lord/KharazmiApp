@@ -486,7 +486,7 @@ class ClassSetupStudentAdapter(
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = list[position]
         holder.tvName.text = "${position + 1}. ${item.student_name}"
-        holder.tvDebt.text = getString(R.string.csetup_debt_row, String.format(Locale("en", "US"), "%,d", item.debt))
+        holder.tvDebt.text = holder.itemView.context.getString(R.string.csetup_debt_row, String.format(Locale("en", "US"), "%,d", item.debt))
 
         holder.tvName.setOnClickListener {
             val intent = Intent(holder.itemView.context, StudentProfileActivity::class.java)

@@ -17,7 +17,7 @@ import java.lang.reflect.Type
 object CachedApiCall {
 
     // قالب‌بندی زمان خورشیدی گذشته از آخرین آپدیت
-    fun getOfflineTimeString(timestamp: Long): String {
+    fun getOfflineTimeString(context: Context, timestamp: Long): String {
         val diff = System.currentTimeMillis() - timestamp
         val seconds = diff / 1000
         val minutes = seconds / 60
@@ -25,10 +25,10 @@ object CachedApiCall {
         val days = hours / 24
 
         return when {
-            days > 0 -> getString(R.string.capi_days_ago, days)
-            hours > 0 -> getString(R.string.capi_hours_ago, hours)
-            minutes > 0 -> getString(R.string.capi_mins_ago, minutes)
-            else -> getString(R.string.capi_just_now)
+            days > 0 -> context.getString(R.string.capi_days_ago, days)
+            hours > 0 -> context.getString(R.string.capi_hours_ago, hours)
+            minutes > 0 -> context.getString(R.string.capi_mins_ago, minutes)
+            else -> context.getString(R.string.capi_just_now)
         }
     }
 
@@ -70,8 +70,8 @@ object CachedApiCall {
         val bannerId = 998877
         var banner = root.findViewById<TextView>(bannerId)
 
-        val timeStr = getOfflineTimeString(timestamp)
-        val text = getString(R.string.capi_offline_banner, timeStr)
+        val timeStr = getOfflineTimeString(activity, timestamp)
+        val text = activity.getString(R.string.capi_offline_banner, timeStr)
 
         if (banner == null) {
             banner = TextView(activity).apply {

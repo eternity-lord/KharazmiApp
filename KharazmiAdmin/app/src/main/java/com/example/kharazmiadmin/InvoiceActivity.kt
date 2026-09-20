@@ -247,21 +247,35 @@ class InvoiceActivity : BaseActivity() {
             try {
                 val fullProfile = api.getFullStudentProfile(studentId)
                 withContext(Dispatchers.Main) {
-                    if (fullProfile.classes.isEmpty()) {
-                        Toast.makeText(this@InvoiceActivity, getString(R.string.invoice_no_enrollment), Toast.LENGTH_SHORT).show()
-                        return@withContext
-                    }
-
-                    val classNames = fullProfile.classes.toTypedArray()
-                    AlertDialog.Builder(this@InvoiceActivity)
-                        .setTitle(getString(R.string.invoice_pick_class, studentName))
-                        .setItems(classNames) { _, which ->
-                            val selectedClassStr = classNames[which]
-                            // استخراج کد کلاس از داخل پرانتز
-                            val courseCode = selectedClassStr.substringAfter("کد: ").substringBefore(")")
-                            loadStudentClassStatus(studentId, studentName, selectedClassStr, courseCode)
+                    val enrollments = fullProfile.enrollments
+                    when {
+                        // FIX(invoice): انتخاب از داده‌ی واقعی (enrollment_id/course_id) — دیگر متن نمایشی parse نمی‌شود
+                        enrollments.size == 1 -> {
+                            val en = enrollments[0]
+                            loadStudentClassStatus(studentId, studentName, enrollmentLabel(en), courseId = en.course_id)
                         }
-                        .show()
+                        enrollments.size > 1 -> {
+                            showEnrollmentPickerDialog(studentName, enrollments) { en ->
+                                loadStudentClassStatus(studentId, studentName, enrollmentLabel(en), courseId = en.course_id)
+                            }
+                        }
+                        fullProfile.classes.isEmpty() -> {
+                            Toast.makeText(this@InvoiceActivity, getString(R.string.invoice_no_enrollment), Toast.LENGTH_SHORT).show()
+                        }
+                        else -> {
+                            // مسیر قدیمی (سرور بدون فیلد enrollments): نام نمایشی + کد داخل پرانتز
+                            val classNames = fullProfile.classes.toTypedArray()
+                            AlertDialog.Builder(this@InvoiceActivity)
+                                .setTitle(getString(R.string.invoice_pick_class, studentName))
+                                .setItems(classNames) { _, which ->
+                                    val selectedClassStr = classNames[which]
+                                    // استخراج کد کلاس از داخل پرانتز
+                                    val courseCode = selectedClassStr.substringAfter("کد: ").substringBefore(")")
+                                    loadStudentClassStatus(studentId, studentName, selectedClassStr, courseCode = courseCode)
+                                }
+                                .show()
+                        }
+                    }
                 }
             } catch (e: Exception) {
                 // FIX: Bug 19 - cancellation is not a network/UI error.
@@ -274,7 +288,8 @@ class InvoiceActivity : BaseActivity() {
     private var selectedCourseId: Int = -1
     private var selectedEnrollmentId: Int? = null
 
-    private fun loadStudentClassStatus(studentId: Int, studentName: String, className: String, courseCode: String) {
+    // FIX(invoice): یکی از دو مسیر — courseId واقعی (داده‌ی جدید سرور) یا courseCode قدیمی (سازگاری)
+    private fun loadStudentClassStatus(studentId: Int, studentName: String, className: String, courseId: Int? = null, courseCode: String? = null) {
         selectedEnrollmentId = null // تا resolve جدید، پرداخت عمومی است
         selectedStudentId = studentId
         cardInfo.visibility = View.VISIBLE
@@ -287,7 +302,7 @@ class InvoiceActivity : BaseActivity() {
 
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                val status = api.getStudentClassStatus(studentId, null, courseCode)
+                val status = api.getStudentClassStatus(studentId, courseId, courseCode)
                 selectedCourseId = status.course_id ?: -1
                 selectedEnrollmentId = status.enrollment_id
 
@@ -401,7 +416,15 @@ class InvoiceActivity : BaseActivity() {
             val debtTeacherVal = intent.getLongExtra(EXTRA_PREFILL_DEBT_TEACHER, 0L)
             val debtInstituteVal = intent.getLongExtra(EXTRA_PREFILL_DEBT_INSTITUTE, 0L)
             val unpaid = intent.getIntExtra(EXTRA_PREFILL_UNPAID_SESSIONS, 0)
+            val prefillEnrollmentId = intent.getIntExtra(EXTRA_PREFILL_ENROLLMENT_ID, -1)
+            val prefillCourseId = intent.getIntExtra(EXTRA_PREFILL_COURSE_ID, -1)
             fillStudentData(prefillStudentId, name, className, debt, unpaid, debtTeacherVal, debtInstituteVal)
+            // FIX(invoice): پروفایل شناسه‌ی واقعی enrollment را می‌فرستد (تک‌کلاسه) یا نتیجه‌ی
+            // پیکر انتخاب کلاس را (چندکلاسه) — فیش به همین enrollment وصل می‌شود.
+            if (prefillEnrollmentId > 0) {
+                selectedEnrollmentId = prefillEnrollmentId
+                if (prefillCourseId > 0) selectedCourseId = prefillCourseId
+            }
         }
 
         intent.getStringExtra(EXTRA_PREFILL_SEARCH_NAME)?.takeIf { it.isNotBlank() }?.let { query ->
@@ -476,45 +499,124 @@ class InvoiceActivity : BaseActivity() {
                 etAmount.error = getString(R.string.invoice_total_invalid)
                 return@setOnClickListener
             }
-            val walletDisplay = when(targetWallet) {
-                "teacher" -> getString(R.string.invoice_wallet_teacher)
-                "institute" -> getString(R.string.invoice_wallet_institute)
-                "both" -> getString(R.string.invoice_wallet_both, String.format("%,d", amountTeacher ?: 0), String.format("%,d", amountInstitute ?: 0), String.format("%,d", totalForDisplay))
-                else -> targetWallet
-            }
-
-            val confirmationMessage = """
-                |${getString(R.string.invoice_confirm_amount, String.format("%,d", totalForDisplay), tvStName.text)}
-                |
-                |${getString(R.string.invoice_confirm_wallet, walletDisplay)}
-                |${getString(R.string.invoice_confirm_paymethod, payMethod)}
-            """.trimMargin()
-
-            AlertDialog.Builder(this)
-                .setTitle(getString(R.string.invoice_confirm_title))
-                .setMessage(confirmationMessage)
-                .setPositiveButton(getString(R.string.invoice_confirm_yes)) { _, _ ->
-                    // FIX (audit-v2/idempotency): همان کلید برای همه‌ی retryها (نه تازه)؛ ولی اگر کاربر بعد از
-                    // خطا فرم را عوض کرد (پرداخت تازه)، امضا عوض می‌شود و کلید تازه ساخته می‌شود — وگرنه replay
-                    // اشتباهِ رسید قبلی یا گیرکردن روی 422 رخ می‌داد. چرخش صفحه کلید را می‌اندازد (رفتار قبلی).
-                    val formSig = "$selectedStudentId|$amount|$targetWallet|$desc|$payMethod|$amountTeacher|$amountInstitute|$selectedEnrollmentId|$currentPersianDate"
-                    val idemKey = if (pendingPaymentKey != null && pendingPaymentSig == formSig) pendingPaymentKey!! else UUID.randomUUID().toString().also { pendingPaymentKey = it; pendingPaymentSig = formSig }
-                    sendData(FinanceSubmitData(
-                        student_id = selectedStudentId,
-                        amount = amount,
-                        target_wallet = targetWallet,
-                        description = desc,
-                        payment_method = payMethod,
-                        date = currentPersianDate,
-                        amount_institute = amountInstitute,
-                        amount_teacher = amountTeacher,
-                        enrollment_id = selectedEnrollmentId,
-                        idempotency_key = idemKey
-                    ))
+            // FIX(invoice): دانش‌آموز چندکلاسه باید همیشه با enrollment واقعی پرداخت کند. اگر
+            // enrollment_id تنظیم نشده، پرداخت را متوقف کن: تک‌کلاسه خودکار وصل می‌شود (قانون سرور)،
+            // چندکلاسه پیکر انتخاب کلاس را می‌بیند و submit تا انتخاب واقعی متوقف می‌ماند.
+            if (selectedEnrollmentId == null) {
+                ensureEnrollmentForSubmit { ok ->
+                    if (ok) showPaymentConfirmation(amount, payMethod, targetWallet, desc, amountTeacher, amountInstitute, totalForDisplay)
                 }
-                .setNegativeButton(getString(R.string.common_cancel), null)
-                .show()
+                return@setOnClickListener
+            }
+            showPaymentConfirmation(amount, payMethod, targetWallet, desc, amountTeacher, amountInstitute, totalForDisplay)
         }
+    }
+
+    // FIX(invoice): دیالوگ تأیید پرداخت (جدا شده تا بعد از resolve هم از همان مسیر اصلی continue شود)
+    private fun showPaymentConfirmation(amount: Long, payMethod: String, targetWallet: String, desc: String, amountTeacher: Long?, amountInstitute: Long?, totalForDisplay: Long) {
+        val walletDisplay = when(targetWallet) {
+            "teacher" -> getString(R.string.invoice_wallet_teacher)
+            "institute" -> getString(R.string.invoice_wallet_institute)
+            "both" -> getString(R.string.invoice_wallet_both, String.format("%,d", amountTeacher ?: 0), String.format("%,d", amountInstitute ?: 0), String.format("%,d", totalForDisplay))
+            else -> targetWallet
+        }
+
+        val confirmationMessage = """
+            |${getString(R.string.invoice_confirm_amount, String.format("%,d", totalForDisplay), tvStName.text)}
+            |
+            |${getString(R.string.invoice_confirm_wallet, walletDisplay)}
+            |${getString(R.string.invoice_confirm_paymethod, payMethod)}
+        """.trimMargin()
+
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.invoice_confirm_title))
+            .setMessage(confirmationMessage)
+            .setPositiveButton(getString(R.string.invoice_confirm_yes)) { _, _ ->
+                // FIX (audit-v2/idempotency): همان کلید برای همه‌ی retryها (نه تازه)؛ ولی اگر کاربر بعد از
+                // خطا فرم را عوض کرد (پرداخت تازه)، امضا عوض می‌شود و کلید تازه ساخته می‌شود — وگرنه replay
+                // اشتباهِ رسید قبلی یا گیرکردن روی 422 رخ می‌داد. چرخش صفحه کلید را می‌اندازد (رفتار قبلی).
+                val formSig = "$selectedStudentId|$amount|$targetWallet|$desc|$payMethod|$amountTeacher|$amountInstitute|$selectedEnrollmentId|$currentPersianDate"
+                val idemKey = if (pendingPaymentKey != null && pendingPaymentSig == formSig) pendingPaymentKey!! else UUID.randomUUID().toString().also { pendingPaymentKey = it; pendingPaymentSig = formSig }
+                sendData(FinanceSubmitData(
+                    student_id = selectedStudentId,
+                    amount = amount,
+                    target_wallet = targetWallet,
+                    description = desc,
+                    payment_method = payMethod,
+                    date = currentPersianDate,
+                    amount_institute = amountInstitute,
+                    amount_teacher = amountTeacher,
+                    enrollment_id = selectedEnrollmentId,
+                    idempotency_key = idemKey
+                ))
+            }
+            .setNegativeButton(getString(R.string.common_cancel), null)
+            .show()
+    }
+
+    // FIX(invoice): اگر enrollment_id تنظیم نشده (مثلاً فیش از پروفایل روی کلاینت قدیمی باز شده)،
+    // enrollmentهای فعال را می‌آورد: یکی → خودکار وصل می‌شود (هم‌راستا با قانون سرور)؛ چند → متوقف و
+    // پیکر انتخاب کلاس؛ صفر → پرداخت عمومی (قانون سرور). خطای fetch (شبکه) → fail-soft؛ خطای کنترل‌شده
+    // سرور موقع submit نمایش داده می‌شود.
+    private fun ensureEnrollmentForSubmit(onResolved: (Boolean) -> Unit) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val active: List<ActiveStudentEnrollment> = try {
+                api.getFullStudentProfile(selectedStudentId).enrollments
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                android.util.Log.e("InvoiceActivity", "ensureEnrollmentForSubmit failed (fail-soft)", e)
+                emptyList()
+            }
+            withContext(Dispatchers.Main) {
+                when {
+                    active.size == 1 -> {
+                        selectedEnrollmentId = active[0].enrollment_id
+                        onResolved(true)
+                    }
+                    active.size > 1 -> {
+                        // چند enrollment فعال: پرداخت متوقف — فقط بعد از انتخاب واقعی کلاس ادامه پیدا می‌کند
+                        showEnrollmentPickerDialog(tvStName.text.toString(), active) { en ->
+                            selectedEnrollmentId = en.enrollment_id
+                            tvStClass.text = enrollmentLabel(en)
+                            onResolved(true)
+                        }
+                        onResolved(false)
+                    }
+                    else -> onResolved(true)
+                }
+            }
+        }
+    }
+
+    // FIX(invoice): پیکر انتخاب کلاس از enrollmentهای واقعی (برچسب فقط برای UI — شناسه از داده می‌آید)
+    private fun showEnrollmentPickerDialog(studentName: String, active: List<ActiveStudentEnrollment>, onPicked: (ActiveStudentEnrollment) -> Unit) {
+        val labels = active.map { enrollmentLabel(it) }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.invoice_pick_class, studentName))
+            .setItems(labels) { _, which -> onPicked(active[which]) }
+            .setNegativeButton(getString(R.string.common_cancel), null)
+            .show()
+    }
+
+    // FIX(invoice): برچسب نمایشی فقط برای UI — هیچ‌جا از روی این متن شناسه استخراج نمی‌شود
+    private fun enrollmentLabel(en: ActiveStudentEnrollment): String {
+        val title = en.title?.trim().orEmpty()
+        val code = en.code?.trim().orEmpty()
+        return when {
+            title.isNotEmpty() && code.isNotEmpty() -> "$title (کد: $code)"
+            title.isNotEmpty() -> title
+            code.isNotEmpty() -> code
+            else -> getString(R.string.common_unknown_class)
+        }
+    }
+
+    // FIX(invoice): «detail» کنترل‌شده‌ی سرور از بدنه‌ی خطا (پیام فارسی قابل فهم)؛ بدنه‌ی غیرJSON → null
+    private fun serverDetail(e: HttpException): String? = try {
+        e.response()?.errorBody()?.string()?.let { body ->
+            org.json.JSONObject(body).optString("detail").takeIf { it.isNotBlank() }
+        }
+    } catch (ignored: Exception) {
+        null
     }
 
     private fun sendData(data: FinanceSubmitData) {
@@ -552,6 +654,13 @@ class InvoiceActivity : BaseActivity() {
                         e is HttpException && e.code() == 429 -> getString(R.string.invoice_err_too_many)
                         e is HttpException && e.code() >= 500 -> getString(R.string.invoice_err_server)
                         e is java.io.IOException -> getString(R.string.invoice_err_network)
+                        e is HttpException -> {
+                            // FIX(invoice): 4xx → detail کنترل‌شده‌ی سرور (مثلاً «چند ثبت‌نام فعال دارد»)
+                            // قابل فهم نمایش می‌شود، نه «HTTP 400» خام
+                            val detail = serverDetail(e)
+                            if (detail != null) getString(R.string.invoice_submit_error, detail)
+                            else getString(R.string.invoice_submit_error, e.message)
+                        }
                         else -> getString(R.string.invoice_submit_error, e.message)
                     }
                     Toast.makeText(this@InvoiceActivity, friendly, Toast.LENGTH_LONG).show()
@@ -861,6 +970,9 @@ class InvoiceActivity : BaseActivity() {
         const val EXTRA_PREFILL_UNPAID_SESSIONS = "EXTRA_PREFILL_UNPAID_SESSIONS"
         const val EXTRA_PREFILL_SEARCH_NAME = "EXTRA_PREFILL_SEARCH_NAME"
         const val EXTRA_IS_ADMIN = "IS_ADMIN"
+        // FIX(invoice): شناسه‌های واقعی از پروفایل/پیکر انتخاب‌شده (نه متن نمایشی)
+        const val EXTRA_PREFILL_ENROLLMENT_ID = "EXTRA_PREFILL_ENROLLMENT_ID"
+        const val EXTRA_PREFILL_COURSE_ID = "EXTRA_PREFILL_COURSE_ID"
     }
 }
 
@@ -885,12 +997,12 @@ class SearchAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = list[position]
-        val icon = if (item.type == "class") getString(R.string.invoice_icon_class) else getString(R.string.invoice_icon_person)
+        val icon = if (item.type == "class") holder.itemView.context.getString(R.string.invoice_icon_class) else holder.itemView.context.getString(R.string.invoice_icon_person)
         holder.title.text = "$icon ${item.title}"
 
         // نمایش اطلاعات اضافی
         val extraInfo = if (item.total_debt != null && item.total_debt > 0)
-            getString(R.string.invoice_extra_debt, String.format("%,d", item.total_debt))
+            holder.itemView.context.getString(R.string.invoice_extra_debt, String.format("%,d", item.total_debt))
         else
             item.info
 

@@ -344,7 +344,8 @@ def get_teacher_full_profile(
     class_names = []
 
     for c in courses:
-        class_names.append(f"{c.title} ({c.code}) - {c.grade_level}")
+        # FIX(null-data): فیلدهای legacy ممکن است NULL باشند — نمایش امن به‌جای «None» و شکست.
+        class_names.append(f"{c.title or 'کلاس بدون عنوان'} ({c.code or ''}) - {c.grade_level or ''}")
 
         # تعداد شاگردان و درآمد این کلاس
         # FIX: Bug 13 - exclude archived Enrollment rows from this active view.
@@ -352,8 +353,9 @@ def get_teacher_full_profile(
         total_students += len(enrollments)
 
         # جمع مبالغ پرداختی شاگردان این کلاس
+        # FIX(null-data): total_paid legacy ممکن است NULL باشد — مثل صفر حساب می‌شود (بدون تغییر مقدار واقعی).
         for en in enrollments:
-            total_revenue += en.total_paid
+            total_revenue += (en.total_paid or 0)
 
     # 4. خلاصه همکاری (فقط برای admin، بدون تغییر منطق مالی - فقط اطلاعات خام)
     collaboration = None
@@ -366,9 +368,11 @@ def get_teacher_full_profile(
 
     return FullTeacherProfile(
         info=TeacherProfileInfo(
-            name=f"{teacher.first_name} {teacher.last_name}",
-            mobile=teacher.mobile,
-            national_code=teacher.national_code,
+            # FIX(null-data): mobile/national_code/نام‌های legacy ممکن است NULL باشند —
+            # پاسخ با مقدار امن برمی‌گردد تا ValidationError/500 نشود (کنتراکت API بدون تغییر).
+            name=f"{teacher.first_name or ''} {teacher.last_name or ''}".strip() or "نامشخص",
+            mobile=teacher.mobile or "",
+            national_code=teacher.national_code or "",
             status="فعال" if teacher.is_approved else "در انتظار تایید",
             profile_image=teacher.profile_image,
             teacher_code=teacher.teacher_code,
@@ -664,6 +668,8 @@ def get_pending_settlement(
     teacher = db.query(Teacher).filter(Teacher.id == teacher_id).first()
     if not teacher:
         raise HTTPException(status_code=404, detail="معلم یافت نشد")
+    # FIX(null-data): نام‌های legacy ممکن است NULL باشند — نمایش امن «نامشخص» به‌جای «None None».
+    teacher_name = f"{teacher.first_name or ''} {teacher.last_name or ''}".strip() or "نامشخص"
 
     # کیف پول واحد معلم: جمع مبالغ تسویه‌شده (برای نمایش در کنار طلب فعلی)
     settled_total = sum((s.total_amount or 0) for s in db.query(Settlement).filter(Settlement.teacher_id == teacher_id).all())
@@ -673,7 +679,7 @@ def get_pending_settlement(
     course_ids = [c.id for c in courses]
     
     if not course_ids:
-        return {"teacher_id": teacher_id, "teacher_name": f"{teacher.first_name} {teacher.last_name}", "total_amount": 0, "session_count": 0, "settled_total_amount": settled_total, "earned_total_amount": settled_total, "pending_sessions": []}
+        return {"teacher_id": teacher_id, "teacher_name": teacher_name, "total_amount": 0, "session_count": 0, "settled_total_amount": settled_total, "earned_total_amount": settled_total, "pending_sessions": []}
         
     # 3. پیدا کردن تمام جلسات برگزار شده در این کلاس‌ها
     # FIX H3-B3: boundaries may be Jalali or Gregorian — parse and filter in Python
@@ -723,8 +729,9 @@ def get_pending_settlement(
         if sess.id not in pending_sessions:
             pending_sessions[sess.id] = {
                 "session_id": sess.id,
-                "date": sess.date,
-                "class_title": cls.title,
+                "date": sess.date or "",
+                # FIX(null-data): Course.title legacy ممکن است NULL باشد — فال‌بک مناسب به‌جای null.
+                "class_title": cls.title or "کلاس بدون عنوان",
                 # FIX: H6(A2) - طلب معلم از جلسه = مبلغ قراردادی + جریمه‌ی غایبین غیرموجه.
                 "amount": (sess.final_teacher_cost or 0) + (sess.absent_penalty_teacher or 0),
                 "present_count": 0,
@@ -739,8 +746,9 @@ def get_pending_settlement(
             _cls = course_map[_sess.course_id]
             pending_sessions[_sid] = {
                 "session_id": _sid,
-                "date": _sess.date,
-                "class_title": _cls.title,
+                "date": _sess.date or "",
+                # FIX(null-data): Course.title legacy ممکن است NULL باشد — فال‌بک مناسب به‌جای null.
+                "class_title": _cls.title or "کلاس بدون عنوان",
                 "amount": (_sess.final_teacher_cost or 0) + (_sess.absent_penalty_teacher or 0),
                 "present_count": 0,
                 "penalty_only": True,
@@ -751,7 +759,7 @@ def get_pending_settlement(
     
     return {
         "teacher_id": teacher_id,
-        "teacher_name": f"{teacher.first_name} {teacher.last_name}",
+        "teacher_name": teacher_name,
         "total_amount": total_amount,
         "session_count": len(session_list),
         "settled_total_amount": settled_total,

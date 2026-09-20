@@ -25,7 +25,7 @@ object RetrofitClient {
             warnedHttpUrl = url
             android.util.Log.w("RetrofitClient", "HTTP server configured: traffic is not encrypted")
             Handler(Looper.getMainLooper()).post {
-                Toast.makeText(context.applicationContext, getString(R.string.rcli_http_warn), Toast.LENGTH_LONG).show()
+                Toast.makeText(context.applicationContext, context.getString(R.string.rcli_http_warn), Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -38,7 +38,7 @@ object RetrofitClient {
         } catch (error: Exception) {
             // FIX: A malformed old setting must not crash every Activity that constructs Retrofit.
             Handler(Looper.getMainLooper()).post {
-                Toast.makeText(context.applicationContext, getString(R.string.rcli_addr_invalid), Toast.LENGTH_LONG).show()
+                Toast.makeText(context.applicationContext, context.getString(R.string.rcli_addr_invalid), Toast.LENGTH_LONG).show()
             }
             ServerAddress.DEFAULT_ADDRESS
         }
@@ -85,14 +85,14 @@ object RetrofitClient {
                     SessionExpiry.signal()
                     SecureLoginStore.clearToken(appContext)
                     Handler(Looper.getMainLooper()).post {
-                        Toast.makeText(appContext, getString(R.string.rcli_session_exp), Toast.LENGTH_SHORT).show()
+                        Toast.makeText(appContext, appContext.getString(R.string.rcli_session_exp), Toast.LENGTH_SHORT).show()
                     }
                 }
                 
                 // مدیریت خودکار خطای ۴۰۳ (عدم دسترسی) کلاینت‌ساید
                 if (response.code() == 403) {
                     Handler(Looper.getMainLooper()).post {
-                        Toast.makeText(appContext, getString(R.string.rcli_no_access), Toast.LENGTH_LONG).show()
+                        Toast.makeText(appContext, appContext.getString(R.string.rcli_no_access), Toast.LENGTH_LONG).show()
                     }
                 }
                 response

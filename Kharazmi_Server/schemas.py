@@ -39,6 +39,8 @@ class StudentCreate(NationalCodeRequest):
     address: str
     study_status: str
     gender: str
+    # FIX(branch): اختیاری — اگر ارسال نشود، سیاست resolve_creation_branch تصمیم می‌گیرد.
+    branch_id: Optional[int] = None
 
 # FIX: Bug 22 - apply the national-code checksum to this write path.
 class TeacherCreate(NationalCodeRequest):
@@ -71,6 +73,8 @@ class CourseCreate(BaseModel):
     rule_prepay_teacher: bool = False
     rule_calc_absent: bool = True
     bg_color: str = "#FFFFFF"
+    # FIX(branch): اختیاری — اگر ارسال نشود، سیاست resolve_creation_branch تصمیم می‌گیرد.
+    branch_id: Optional[int] = None
 
 class InstallmentCreate(BaseModel):
     # FIX (F-T1/F-T2): همان اعتبارسنجی مرکزی مسیر مستقل قسط — مبلغ صحیح مثبت + تاریخ شمسی موجود.
@@ -166,9 +170,18 @@ class StudentProfileInfo(BaseModel):
     address: str
     is_suspended: bool = False
 
+class StudentActiveEnrollment(BaseModel):
+    # FIX(invoice): enrollment فعال با شناسه‌های واقعی — برای صدور فیش بدون حدس از نام کلاس
+    enrollment_id: int
+    course_id: int
+    title: str = ""
+    code: str = ""
+    branch_id: Optional[int] = None
+
 class FullStudentProfile(BaseModel):
     info: StudentProfileInfo
     classes: List[str]
+    enrollments: List[StudentActiveEnrollment] = []
     transactions: List[str]
     total_debt: int
 
@@ -384,6 +397,8 @@ class StudentRegisterAndEnrollRequest(NationalCodeRequest):
     register_date: Optional[str] = "1404/09/01"
     shift: Optional[str] = "عصر"
     installments: Optional[List[InstallmentCreate]] = None
+    # FIX(branch): اختیاری — اگر ارسال نشود، سیاست resolve_creation_branch تصمیم می‌گیرد.
+    branch_id: Optional[int] = None
 
 class BulkSmsRequest(BaseModel):
     student_ids: List[int]

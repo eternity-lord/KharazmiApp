@@ -220,7 +220,9 @@ def get_current_user(authorization: Optional[str] = Header(None), db: Session = 
     return user
 
 def get_enrollment_tuition_and_discount(enroll):
-    base_tuition = enroll.total_tuition
+    # FIX(null-data): total_tuition legacy ممکن است NULL باشد — مثل 0 حساب می‌شود
+    # (صرفاً در محاسبه/نمایش؛ مقدار ذخیره‌شده در دیتابیس دست نمی‌خورد).
+    base_tuition = enroll.total_tuition or 0
     discount_amount = 0
     d_type = getattr(enroll, "discount_type", "none") or "none"
     d_val = getattr(enroll, "discount_value", 0) or 0
@@ -230,6 +232,82 @@ def get_enrollment_tuition_and_discount(enroll):
         discount_amount = d_val
     final_tuition = max(0, base_tuition - discount_amount)
     return final_tuition, discount_amount
+
+
+def get_active_branch(db: Session, branch_id: Optional[int]):
+    """شعبه‌ی فعال با شناسه‌ی داده‌شده؛ اگر وجود نداشته باشد یا غیرفعال باشد None."""
+    if branch_id is None:
+        return None
+    branch = db.query(models.Branch).filter(models.Branch.id == branch_id).first()
+    if branch and branch.active:
+        return branch
+    return None
+
+
+def resolve_creation_branch(
+    db: Session,
+    *,
+    user: Optional[User] = None,
+    teacher: Optional[Teacher] = None,
+    requested_branch_id: Optional[int] = None,
+    fallback_branch_id: Optional[int] = None,
+) -> int:
+    """سیاست مرکزی و شفاف تعیین branch_id برای مسیرهای نوشتن (ثبت شاگرد، ساخت کلاس، ...).
+
+    ترتیب تصمیم‌گیری (به‌دنبال هم):
+      1) branch صریح ارسالی — فقط اگر فراخوان مجاز به استفاده از آن باشد:
+         - کارمند (ادمین/منشی) که خود branch دارد: فقط branch خودش (وگرنه 403 — branch isolation).
+         - کارمند بدون branch (مدیر کل): هر branch فعالی (وگرنه 400).
+         - معلم: فقط branch خودش (ارزش ارسالی معلم هرگز به‌صورت کورکورانه قبول نمی‌شود).
+         - فراخوان عمومی (بدون هویت، مثلاً /students/register): فقط branch فعال (وگرنه 400).
+      2) branch خودِ فراخوان (user.branch_id یا teacher.branch_id) — فقط اگر فعال باشد.
+         اگر branch خودِ کاربر غیرفعال/حذف شده باشد، به branch دیگر «لغزیده» نمی‌شود (400).
+      3) branch مشتق‌شده از شیء تجاری مربوطه (fallback_branch_id — مثلاً branch همان کلاسی
+         که دانش‌آموز در آن ثبت‌نام می‌کند) — فقط اگر فعال باشد. این تخمین کورکورانه نیست،
+         چون دقیقاً شعبه‌ی جایی است که ثبت‌نام/معامله در آن اتفاق می‌افتد (منطق H7).
+      4) اگر در کل سیستم دقیقاً یک branch فعال وجود دارد — فقط در همین حالت از آن استفاده می‌شود.
+      5) چند branch فعال بدون منبع قابل‌اعتماد → 400 با پیام واضح (تخمین کورکورانه ممنوع).
+
+    همیشه int برمی‌گرداند (هرگز None) و هرگز داده نمی‌سازد/تغییر نمی‌دهد — فقط تصمیم می‌گیرد.
+    """
+    # 1) branch صریح
+    if requested_branch_id is not None:
+        branch = get_active_branch(db, requested_branch_id)
+        if branch is None:
+            raise HTTPException(status_code=400, detail="شعبه‌ی ارسالی نامعتبر است (وجود ندارد یا غیرفعال است).")
+        if teacher is not None:
+            if teacher.branch_id != branch.id:
+                raise HTTPException(status_code=403, detail="شما فقط می‌توانید در شعبه‌ی خودتان داده ثبت کنید.")
+        elif user is not None and user.branch_id is not None:
+            if user.branch_id != branch.id:
+                raise HTTPException(status_code=403, detail="شما مجاز به ایجاد داده در شعبه‌ی دیگر نیستید.")
+        return branch.id
+
+    # 2) branch خودِ فراخوان
+    own_branch_id = teacher.branch_id if teacher is not None else (user.branch_id if user is not None else None)
+    if own_branch_id is not None:
+        branch = get_active_branch(db, own_branch_id)
+        if branch is not None:
+            return branch.id
+        raise HTTPException(status_code=400, detail="شعبه‌ی شما غیرفعال یا حذف شده است؛ برای ادامه با مدیریت تماس بگیرید.")
+
+    # 3) branch مشتق‌شده از شیء تجاری (مثلاً کلاسِ انتخاب‌شده در register_and_enroll)
+    if fallback_branch_id is not None:
+        branch = get_active_branch(db, fallback_branch_id)
+        if branch is not None:
+            return branch.id
+
+    # 4) تک‌شعبه‌ی فعال در کل سیستم
+    active_branches = db.query(models.Branch).filter(models.Branch.active == True).all()
+    if len(active_branches) == 1:
+        return active_branches[0].id
+
+    # 5) مبهم — تخمین ممنوع
+    raise HTTPException(
+        status_code=400,
+        detail="شعبه مشخص نیست: سیستم چند شعبه‌ی فعال دارد و شعبه‌ی قابل‌اعتمادی برای این داده پیدا نشد. لطفاً branch_id معتبر ارسال کنید یا شعبه‌ی کاربر/معلم را تنظیم کنید.",
+    )
+
 
 def perform_delete_enrollment(enrollment, db: Session, forgive_session_charges: bool = True):
     # FIX: Bug 13 - archive once; never detach or delete historical enrollment links.

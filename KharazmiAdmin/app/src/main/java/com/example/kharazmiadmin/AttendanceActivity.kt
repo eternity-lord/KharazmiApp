@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -21,10 +22,12 @@ import com.google.android.material.button.MaterialButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import retrofit2.HttpException
 import retrofit2.http.Body
 import retrofit2.http.POST
 import retrofit2.http.GET
 import retrofit2.http.PUT
+import java.io.IOException
 import kotlin.math.abs
 
 // API داخلی برای ثبت جلسه (بقیه از فایل ApiInterfaces خوانده می‌شوند)
@@ -71,6 +74,7 @@ class AttendanceActivity : BaseActivity() {
 
     private lateinit var apiDetails: InvoiceApi // ✅ استفاده از اینترفیس عمومی
     private lateinit var apiSubmit: AttendanceSubmitApi
+    private lateinit var classApi: ClassApi // FIX(null-class): انتخابگر کلاس در مسیر منو
     private lateinit var rv: RecyclerView
 
     private val attendanceMap = HashMap<Int, String>() // ID -> Status
@@ -109,11 +113,16 @@ class AttendanceActivity : BaseActivity() {
         val retrofit = RetrofitClient.getInstance(this)
         apiDetails = retrofit.create(InvoiceApi::class.java)
         apiSubmit = retrofit.create(AttendanceSubmitApi::class.java)
+        classApi = retrofit.create(ClassApi::class.java)
 
         if (mode == "EDIT_SESSION") {
             loadSessionDetailsForEdit()
-        } else {
+        } else if (classId > 0) {
             fetchStudents()
+        } else {
+            // FIX(null-class): مسیر منوی اصلی بدون class ID — هرگز با -1 به سرور نمی‌رویم؛
+            // به‌جای آن انتخابگر کلاس معتبر باز می‌شود.
+            showClassPickerDialog()
         }
 
         findViewById<MaterialButton>(R.id.btnFinishSession).setOnClickListener {
@@ -405,12 +414,34 @@ class AttendanceActivity : BaseActivity() {
     private fun loadSessionDetailsForEdit() {
         // FIX: Bug 19 - cancel screen work when this Activity is destroyed.
         lifecycleScope.launch(Dispatchers.IO) {
+            // مرحله‌ی ۱: پیدا کردن خودِ جلسه — اگر جلسه نباشد اصلاً سراغ کلاس نمی‌رویم.
+            val details: SessionDetailsResponse = try {
+                apiSubmit.getSessionDetails(targetSessionCode)
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                Log.e("AttendanceActivity", "loadSessionDetailsForEdit: session lookup failed (code=$targetSessionCode)", e)
+                withContext(Dispatchers.Main) {
+                    val msg = if (e is HttpException && e.code() == 404) getString(R.string.attendance_session_not_found) else describeApiError(e)
+                    Toast.makeText(this@AttendanceActivity, msg, Toast.LENGTH_LONG).show()
+                    if (!isFinishing) finish()
+                }
+                return@launch
+            }
+
+            classId = details.course_id
+            editSessionDate = details.date // FIX (audit-v2/#13): حفظ تاریخ اصلی جلسه برای پس‌فرستادن
+
+            // FIX(null-class): کلاس جلسه باید قبل از هر درخواست معتبر باشد.
+            if (classId <= 0) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@AttendanceActivity, getString(R.string.attendance_class_deleted), Toast.LENGTH_LONG).show()
+                    if (!isFinishing) finish()
+                }
+                return@launch
+            }
+
+            // مرحله‌ی ۲: لود و نمایش لیست دانش‌آموزان از روی کلاس متناظر
             try {
-                val details = apiSubmit.getSessionDetails(targetSessionCode)
-                classId = details.course_id
-                editSessionDate = details.date // FIX (audit-v2/#13): حفظ تاریخ اصلی برای پس‌فرستادن
-                
-                // لود و پایش لیست دانش‌آموزان از روی کلاس متناظر
                 val classResponse = apiDetails.getClassDetails(classId)
                 studentList = classResponse.students
 
@@ -426,17 +457,24 @@ class AttendanceActivity : BaseActivity() {
                     rv.adapter = AttendanceAdapter(studentList, attendanceMap, excusedMap)
                 }
             } catch (e: Exception) {
-                // FIX: Bug 19 - cancellation is not a network/UI error.
-                if (e is kotlinx.coroutines.CancellationException) throw e;
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                // FIX(null-class): پیام مشخص برای کلاس حذف‌شده + لاگ کامل خطا.
+                Log.e("AttendanceActivity", "loadSessionDetailsForEdit: class details failed (classId=$classId)", e)
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(this@AttendanceActivity, getString(R.string.attendance_history_error), Toast.LENGTH_SHORT).show()
-                    finish()
+                    val msg = if (e is HttpException && e.code() == 404) getString(R.string.attendance_class_deleted) else describeApiError(e)
+                    Toast.makeText(this@AttendanceActivity, msg, Toast.LENGTH_LONG).show()
+                    if (!isFinishing) finish()
                 }
             }
         }
     }
 
     private fun fetchStudents() {
+        // FIX(null-class): classId=-1/0 هرگز به سرور فرستاده نمی‌شود (جلوگیری از GET /classes/-1/details).
+        if (classId <= 0) {
+            showClassPickerDialog()
+            return
+        }
         // FIX: Bug 19 - cancel screen work when this Activity is destroyed.
         lifecycleScope.launch(Dispatchers.IO) {
             try {
@@ -456,8 +494,91 @@ class AttendanceActivity : BaseActivity() {
             } catch (e: Exception) {
                 // FIX: Bug 19 - cancellation is not a network/UI error.
                 if (e is kotlinx.coroutines.CancellationException) throw e;
+                // FIX(null-class): لاگ کامل (با stack trace) + پیام تفکیک‌شده بر اساس نوع خطا.
+                Log.e("AttendanceActivity", "fetchStudents failed (classId=$classId)", e)
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(this@AttendanceActivity, getString(R.string.attendance_class_list_error), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@AttendanceActivity, describeApiError(e), Toast.LENGTH_LONG).show()
+                    // خطای قطعی (ناموجود/بدون‌دسترسی/منقضی‌شده): ماندن روی صفحه‌ی خالی معنا ندارد.
+                    if (e is HttpException && e.code() in setOf(401, 403, 404) && !isFinishing) finish()
+                }
+            }
+        }
+    }
+
+    // FIX(null-class): تفکیک انواع خطا و نمایش پیام قابل فهم (401/403/404/5xx/شبکه).
+    private fun describeApiError(e: Throwable): String {
+        return when (e) {
+            is HttpException -> {
+                val detail = e.response()?.errorBody()?.string()?.let { body ->
+                    try {
+                        val value = org.json.JSONObject(body).optString("detail")
+                        value.ifBlank { null }
+                    } catch (ignored: Exception) { null }
+                }
+                when (e.code()) {
+                    401 -> getString(R.string.attendance_unauthorized)
+                    403 -> getString(R.string.attendance_no_permission)
+                    404 -> detail ?: getString(R.string.attendance_not_found)
+                    else -> getString(R.string.attendance_server_error, e.code(), detail ?: "")
+                }
+            }
+            is IOException -> getString(R.string.attendance_network_error)
+            else -> getString(R.string.attendance_class_list_error)
+        }
+    }
+
+    // FIX(null-class): انتخابگر کلاس — ورود از منوی اصلی بدون کلاس؛ کلاس معتبر قبل از هر درخواست انتخاب می‌شود.
+    private fun showClassPickerDialog() {
+        val loading = AlertDialog.Builder(this)
+            .setTitle(R.string.attendance_select_class_title)
+            .setMessage(R.string.attendance_class_missing)
+            .setCancelable(false)
+            .show()
+        lifecycleScope.launch(Dispatchers.IO) {
+            val classes = try {
+                classApi.getAllClasses()
+            } catch (e: Throwable) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                Log.e("AttendanceActivity", "showClassPickerDialog: class list load failed", e)
+                withContext(Dispatchers.Main) {
+                    loading.dismiss()
+                    if (!isFinishing) {
+                        Toast.makeText(this@AttendanceActivity, describeApiError(e), Toast.LENGTH_LONG).show()
+                        finish()
+                    }
+                }
+                return@launch
+            }
+            withContext(Dispatchers.Main) {
+                loading.dismiss()
+                if (isFinishing || isDestroyed) return@withContext
+                if (classes.isEmpty()) {
+                    Toast.makeText(this@AttendanceActivity, getString(R.string.attendance_classes_empty), Toast.LENGTH_LONG).show()
+                    finish()
+                    return@withContext
+                }
+                try {
+                    val labels = classes.map { c ->
+                        val title = c.title.ifBlank { getString(R.string.attendance_class_without_title) }
+                        title + " (" + c.code.ifBlank { "-" } + ")"
+                    }
+                    AlertDialog.Builder(this@AttendanceActivity)
+                        .setTitle(R.string.attendance_select_class_title)
+                        .setItems(labels.toTypedArray()) { _, which ->
+                            classId = classes[which].id
+                            findViewById<TextView>(R.id.tvPageTitle).text = getString(
+                                R.string.attendance_title_class,
+                                classes[which].title.ifBlank { getString(R.string.attendance_class_without_title) }
+                            )
+                            fetchStudents()
+                        }
+                        .setNegativeButton(R.string.btn_dismiss) { _, _ -> if (!isFinishing) finish() }
+                        .show()
+                } catch (e: Exception) {
+                    // تله‌ی نهایی: داده‌ی غیرمنتظره‌ی فهرست کلاس نباید اپ را crash کند.
+                    Log.e("AttendanceActivity", "showClassPickerDialog: rendering class list failed", e)
+                    Toast.makeText(this@AttendanceActivity, getString(R.string.attendance_class_list_error), Toast.LENGTH_LONG).show()
+                    if (!isFinishing) finish()
                 }
             }
         }

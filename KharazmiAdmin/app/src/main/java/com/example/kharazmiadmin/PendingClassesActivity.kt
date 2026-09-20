@@ -137,10 +137,10 @@ class PendingClassAdapter(
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = list[position]
         holder.title.text = item.title
-        holder.code.text = getString(R.string.pcls_code_row, item.id) // یا item.code
-        holder.teacher.text = getString(R.string.pcls_teacher_row, item.teacher_name)
-        holder.price.text = getString(R.string.pcls_price_row, String.format("%,d", item.teacher_price))
-        holder.schedule.text = getString(R.string.pcls_sched_row, item.days, item.time)
+        holder.code.text = holder.itemView.context.getString(R.string.pcls_code_row, item.id) // یا item.code
+        holder.teacher.text = holder.itemView.context.getString(R.string.pcls_teacher_row, item.teacher_name)
+        holder.price.text = holder.itemView.context.getString(R.string.pcls_price_row, String.format("%,d", item.teacher_price))
+        holder.schedule.text = holder.itemView.context.getString(R.string.pcls_sched_row, item.days, item.time)
 
         // ✅ کلیک روی دکمه تایید (سبز) -> رفتن به صفحه جزئیات
         holder.btnApprove.setOnClickListener {

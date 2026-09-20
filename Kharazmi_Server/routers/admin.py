@@ -311,6 +311,21 @@ def get_student_full_profile(id: int, authorization: Optional[str] = Header(None
         if en.course and not en.is_deleted:
             classes.append(f"{en.course.title} (کد: {en.course.code})")
 
+    # FIX(invoice): enrollmentهای فعال با شناسه‌های واقعی — کلاینت (صدور فیش) enrollment درست را
+    # انتخاب/می‌فرستد؛ دیگر حدس از روی نام نمایشی کلاس لازم نیست و backend مجبور به حدس‌زدن
+    # برای دانش‌آموز چندکلاسه نمی‌شود (400 «چند ثبت‌نام فعال» فقط واقعاً مبهم می‌ماند).
+    enrollments_list = [
+        {
+            "enrollment_id": en.id,
+            "course_id": en.course_id,
+            "title": en.course.title or "",
+            "code": en.course.code or "",
+            "branch_id": en.branch_id,
+        }
+        for en in st.enrollments
+        if not en.is_deleted and en.course is not None
+    ]
+
     # لیست تراکنش‌ها
     trans = (
         # FIX: Bug 12 - exclude archived Transaction rows from this active view.
@@ -414,6 +429,8 @@ def get_student_full_profile(id: int, authorization: Optional[str] = Header(None
             "student_code": st.student_code,
         },
         "classes": classes,
+        # FIX(invoice): شناسه‌های واقعی enrollmentهای فعال (سازگار با عقب: کلاینت‌های قدیمی این کلید را نمی‌خوانند)
+        "enrollments": enrollments_list,
         "transactions": trans_list,
         "total_debt": total_d,
         "debt_teacher": debt_t,  # ✅ مقدار واقعی از دیتابیس
@@ -1532,9 +1549,10 @@ def search_admin_students(query: Optional[str] = None, db: Session = Depends(get
     return [
         PersonListItem(
             id=s.id,
-            name=f"{s.first_name} {s.last_name}",
-            national_code=s.national_code,
-            mobile=s.student_mobile,
+            # FIX(null-data): هم‌سان با جستجوی معلمان — یک رکورد ناقص نباید کل لیست را 500 کند.
+            name=f"{s.first_name or ''} {s.last_name or ''}".strip() or "نامشخص",
+            national_code=s.national_code or "",
+            mobile=s.student_mobile or "",
             role="student",
             is_suspended=s.is_suspended if s.is_suspended is not None else False
         )
@@ -1561,9 +1579,11 @@ def search_admin_teachers(query: Optional[str] = None, db: Session = Depends(get
     return [
         PersonListItem(
             id=t.id,
-            name=f"{t.first_name} {t.last_name}",
-            national_code=t.national_code,
-            mobile=t.mobile,
+            # FIX(null-data): فیلدهای legacy ممکن است NULL باشند — پاسخ امن به‌جای ValidationError/500
+            # (یک رکورد ناقص نباید کل لیست مربیان/افراد را خراب کند).
+            name=f"{t.first_name or ''} {t.last_name or ''}".strip() or "نامشخص",
+            national_code=t.national_code or "",
+            mobile=t.mobile or "",
             role="teacher",
             is_suspended=t.is_suspended if t.is_suspended is not None else False
         )

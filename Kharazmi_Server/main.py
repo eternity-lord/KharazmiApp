@@ -178,8 +178,21 @@ def auto_patch_database():
         # Check & Add 'sub_role' in 'users' table
         if not column_exists('users', 'sub_role'):
             print("🔧 Auto-patching database: Adding 'sub_role' to 'users' table...")
-            db.execute(text("ALTER TABLE users ADD COLUMN sub_role VARCHAR DEFAULT 'admin';"))
-            db.execute(text("UPDATE users SET sub_role = 'admin' WHERE sub_role IS NULL;"))
+            # FIX(A1): ستون بدون DEFAULT ساخته می‌شود تا ردیف‌های legacy با NULL بمانند و
+            # بتوان نقش واقعی‌شان را تعیین کرد (DEFAULT 'admin' همه را مدیر می‌کرد).
+            db.execute(text("ALTER TABLE users ADD COLUMN sub_role VARCHAR;"))
+            # FIX(A1): بک‌فیل نقش‌آگاه — هر کاربر نقش واقعی خودش را می‌گیرد و فقط کاربرانی که
+            # role آن‌ها خالی/«admin» است ادمین می‌مانند (سازگاری با ادمین‌های legacy).
+            # پیش‌تر همهٔ ردیف‌ها «admin» می‌شدند ⇒ سایهٔ معلم/شاگرد/ولی به سطح دسترسی مدیر ارتقا می‌یافت.
+            db.execute(text(
+                "UPDATE users SET sub_role = CASE "
+                "WHEN role IN ('teacher', 'student', 'parent', 'secretary') THEN role "
+                "WHEN username LIKE 'teacher:%' THEN 'teacher' "
+                "WHEN username LIKE 'student:%' THEN 'student' "
+                "WHEN username LIKE 'parent:%' THEN 'parent' "
+                "ELSE 'admin' END "
+                "WHERE sub_role IS NULL OR TRIM(sub_role) = ''"
+            ))
             db.commit()
 
         # Check & Add 'profile_image' in 'students' table

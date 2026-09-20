@@ -140,6 +140,27 @@ def get_db():
     finally:
         db.close()
 
+def resolve_effective_sub_role(user) -> str:
+    """نقش مؤثر کاربر با سیاست «کمترین سطح دسترسی» (A1).
+
+    پیش‌تر هر کاربری که `sub_role` نداشت (رکوردهای legacy) در همهٔ گاردها **ادمین** فرض
+    می‌شد؛ یعنی سایهٔ معلم/شاگرد/ولی ساخته‌شده پیش از افزوده‌شدن ستون `sub_role` می‌توانست
+    به سطح دسترسی مدیر برسد. اکنون:
+
+    - `sub_role` ست‌شده ⇒ همان (شامل مقادیر ویژه مثل `temp_parent:...`).
+    - `sub_role` خالی/NULL ⇒ از ستون `role` استفاده می‌شود؛ و فقط اگر `role` هم خالی یا
+      `admin` باشد «admin» فرض می‌شود (سازگاری با ادمین‌های legacy که فقط role=admin دارند).
+    - نقش ناشناخته ⇒ همان مقدار `role` برمی‌گردد؛ در گاردها اجازهٔ عبور نمی‌گیرد (fail-closed).
+    """
+    sub = (getattr(user, "sub_role", None) or "").strip()
+    if sub:
+        return sub
+    role = (getattr(user, "role", None) or "").strip()
+    if role in ("", "admin"):
+        return "admin"
+    return role
+
+
 def check_admin_access(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
     # FIX: use signed token verification
     if not authorization:
@@ -154,7 +175,8 @@ def check_admin_access(authorization: Optional[str] = Header(None), db: Session 
     user = db.query(User).filter(User.id == session.user_id).first()
     if not user:
         raise HTTPException(status_code=401, detail="کاربر یافت نشد")
-    sub_role = user.sub_role if user.sub_role else "admin"
+    # FIX(A1): نقش با سیاست کمترین سطح دسترسی (بدون فرض «admin» برای رکورد بی‌نقش)
+    sub_role = resolve_effective_sub_role(user)
     if sub_role != "admin":
         raise HTTPException(status_code=403, detail="شما دسترسی لازم برای این عملیات را ندارید")
     return sub_role
@@ -173,7 +195,8 @@ def check_admin_or_secretary_access(authorization: Optional[str] = Header(None),
     user = db.query(User).filter(User.id == session.user_id).first()
     if not user:
         raise HTTPException(status_code=401, detail="کاربر یافت نشد")
-    sub_role = user.sub_role if user.sub_role else "admin"
+    # FIX(A1): همان سیاست نقش (fail-closed)
+    sub_role = resolve_effective_sub_role(user)
     if sub_role not in ["admin", "secretary"]:
         raise HTTPException(status_code=403, detail="شما دسترسی لازم برای این عملیات را ندارید")
     return sub_role
@@ -192,7 +215,8 @@ def check_user_login(authorization: Optional[str] = Header(None), db: Session = 
     user = db.query(User).filter(User.id == session.user_id).first()
     if not user:
         raise HTTPException(status_code=401, detail="کاربر یافت نشد")
-    sub_role = user.sub_role if user.sub_role else "admin"
+    # FIX(A1): همان سیاست نقش — معلمِ legacy بدون sub_role هم به گیت تعلیق معلمان می‌رسد
+    sub_role = resolve_effective_sub_role(user)
     if sub_role == "teacher":
         settings = db.query(InstituteSettings).first()
         if settings and not settings.teachers_active:

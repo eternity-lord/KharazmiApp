@@ -60,7 +60,11 @@ class User(Base):
     password = Column(String)
     full_name = Column(String)
     role = Column(String)
-    sub_role = Column(String, default="admin")  # "admin" or "secretary"
+    # FIX(A1): پیش‌فرض «admin» حذف شد — هر کاربری که نقشش صریحاً تعیین نشود، دیگر
+    # به‌طور خودکار مدیر نمی‌شود. نقش مؤثر (fail-closed) در dependencies.resolve_effective_sub_role
+    # محاسبه می‌شود: sub_role ست‌شده ⇒ همان؛ در غیر این‌صورت از ستون role و فقط برای
+    # role خالی/«admin» ⇒ admin. (همهٔ مسیرهای ساخت کاربر در کد صریح‌اند.)
+    sub_role = Column(String)  # "admin" | "secretary" | "teacher" | "student" | "parent"
     branch_id = Column(Integer, ForeignKey("branches.id"), nullable=True)
 
 

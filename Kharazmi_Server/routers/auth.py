@@ -57,7 +57,10 @@ def login_user(request: Request, req: LoginRequest, db: Session = Depends(get_db
                     if _t.is_suspended:
                         raise HTTPException(status_code=403, detail="حساب شما توسط مدیر معلق شده است. لطفاً با آموزشگاه تماس بگیرید")
             # FIX: توکن امضادار JWT به جای uuid
-            sub_role = admin.sub_role if admin.sub_role else "admin"
+            # FIX(A1): نقش با سیاست کمترین سطح دسترسی — سایهٔ معلمِ legacy بدون sub_role
+            # دیگر توکن «admin» نمی‌گیرد.
+            from dependencies import resolve_effective_sub_role
+            sub_role = resolve_effective_sub_role(admin)
             token = create_jwt_token(user_id=admin.id, sub_role=sub_role)
             new_session = UserSession(
                 token=token,

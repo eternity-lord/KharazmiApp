@@ -17,7 +17,7 @@ from models import (
 from schemas import (
     HistoryRequest, LoginRequest, TeacherInfo, FullTeacherProfile, StudentCreate, TeacherCreate, CourseCreate, EnrollmentCreate, GradeCreate, GradeItem, AttendanceLogRequest, AttendanceItem, AttendanceSubmitData, SmsSendRequest, ChangePasswordRequest, StudentProfileInfo, FullStudentProfile, TeacherProfileInfo, FullTeacherProfile, ClassReportInfo, ClassStudentData, ClassSessionHistory, FullClassReport, ShareConfigModel, StudentUpdate, TeacherUpdate, PersonListItem, TransactionUpdate, StudentAttendanceHistoryRequest, AdvancedSearchItem, FinanceSubmitData, PrintReceiptRequest, TransactionTestData
 )
-from dependencies import get_db, check_admin_access, check_admin_or_secretary_access, check_user_login, check_student_access, get_enrollment_tuition_and_discount, SESSION_EXPIRY_DAYS
+from dependencies import get_db, check_admin_access, check_admin_or_secretary_access, check_user_login, check_student_access, get_enrollment_tuition_and_discount, SESSION_EXPIRY_DAYS, resolve_effective_sub_role
 
 # FIX: Bug 16 - share the tuition-minus-payment debt calculation across financial views.
 from financial_calculations import calculate_student_debt
@@ -156,7 +156,9 @@ def get_chart_data(
             if session:
                 user = db.query(User).filter(User.id == session.user_id).first()
                 if user:
-                    sub_role = user.sub_role if user.sub_role else "admin"
+                    # FIX(A1): نقش با سیاست کمترین سطح دسترسی (سهم معلم/آموزشگاه
+                    # فقط برای ادمین واقعی نمایش داده می‌شود، نه رکورد بی‌نقش).
+                    sub_role = resolve_effective_sub_role(user)
 
     shares_chart = None
     if sub_role == "admin":

@@ -355,6 +355,19 @@
     <string name="main_trash_row">%1$s (کد: %2$s)</string>
     <string name="main_trash_title">کلاس‌های حذفی (آرشیو ادمین)</string>
     <string name="main_trash_error">خطا در دریافت لیست آرشیو حذفی</string>
+    <!-- FIX(archive): ردیف و جزئیات غنی‌تر آرشیو کلاس‌ها (null-safe) -->
+    <string name="main_trash_row_rich">%1$s (کد: %2$s) — معلم: %3$s | شعبه: %4$s | دانش‌آموز: %5$d | حذف: %6$s</string>
+    <string name="main_trash_no_date">بدون تاریخ</string>
+    <string name="main_trash_d_code">کد کلاس: %1$s</string>
+    <string name="main_trash_d_teacher">معلم: %1$s</string>
+    <string name="main_trash_d_branch">شعبه: %1$s</string>
+    <string name="main_trash_d_time">زمان برگزاری: %1$s — %2$s</string>
+    <string name="main_trash_d_students">دانش‌آموزان (تاریخی): %1$d</string>
+    <string name="main_trash_d_sessions">جلسات (تاریخی): %1$d</string>
+    <string name="main_trash_d_tx">تراکنش‌های تاریخی: %1$d — جمع مبلغ: %2$d تومان</string>
+    <string name="main_trash_d_deleted_at">تاریخ حذف: %1$s</string>
+    <string name="main_trash_d_forgive">ابطال هزینه‌ی جلسات در زمان حذف: %1$s</string>
+    <string name="main_trash_detail_error">خطا در دریافت جزئیات کلاس آرشیوشده</string>
     <string name="main_session_code_hint">کد ۶ رقمی جلسه (مثال: 100001)</string>
     <string name="main_edit_session_title">اصلاح جلسه قبلی</string>
     <string name="main_edit_session_go">ورود به صفحه اصلاح</string>

@@ -120,6 +120,56 @@ data class PendingClassItem(
 
 data class ClassDetailsResponse(val students: List<StudentItem>)
 
+// FIX(archive): آرشیو کلاس‌های حذف‌شده پاسخ متفاوتی از «کلاس‌های در انتظار» دارد
+// (teacher_price/days/time/base_institute_share در آرشیو نیست و title/code می‌توانند null باشند؛
+// مدل قبلی PendingClassItem همین‌ها را non-null می‌خواست ⇒ نمایش اشتباه/خالی).
+data class ArchivedClassItem(
+    val id: Int,
+    @SerializedName("title") val title: String? = null,
+    @SerializedName("code") val code: String? = null,
+    @SerializedName("teacher_id") val teacherId: Int? = null,
+    @SerializedName("teacher_name") val teacherName: String? = null,
+    @SerializedName("branch_id") val branchId: Int? = null,
+    @SerializedName("branch_name") val branchName: String? = null,
+    @SerializedName("grade_level") val gradeLevel: String? = null,
+    @SerializedName("days_of_week") val daysOfWeek: String? = null,
+    @SerializedName("class_time") val classTime: String? = null,
+    @SerializedName("students_count") val studentsCount: Int = 0,
+    @SerializedName("students_active_count") val studentsActiveCount: Int = 0,
+    @SerializedName("sessions_count") val sessionsCount: Int = 0,
+    @SerializedName("transactions_count") val transactionsCount: Int = 0,
+    @SerializedName("deleted_at") val deletedAt: String? = null,
+    @SerializedName("forgive_session_charges") val forgiveSessionCharges: Boolean = false,
+    @SerializedName("is_suspended") val isSuspended: Boolean = false,
+    @SerializedName("bg_color") val bgColor: String? = null
+)
+
+data class ArchivedClassDetail(
+    val id: Int,
+    @SerializedName("title") val title: String? = null,
+    @SerializedName("code") val code: String? = null,
+    @SerializedName("grade_level") val gradeLevel: String? = null,
+    @SerializedName("days_of_week") val daysOfWeek: String? = null,
+    @SerializedName("class_time") val classTime: String? = null,
+    @SerializedName("is_suspended") val isSuspended: Boolean = false,
+    @SerializedName("teacher_id") val teacherId: Int? = null,
+    @SerializedName("teacher_name") val teacherName: String? = null,
+    @SerializedName("branch_id") val branchId: Int? = null,
+    @SerializedName("branch_name") val branchName: String? = null,
+    @SerializedName("students_count") val studentsCount: Int = 0,
+    @SerializedName("students_active_count") val studentsActiveCount: Int = 0,
+    @SerializedName("archived_enrollments_count") val archivedEnrollmentsCount: Int = 0,
+    @SerializedName("sessions_count") val sessionsCount: Int = 0,
+    @SerializedName("archived_sessions_count") val archivedSessionsCount: Int = 0,
+    @SerializedName("transactions_count") val transactionsCount: Int = 0,
+    @SerializedName("transactions_total") val transactionsTotal: Long = 0,
+    @SerializedName("deleted_at") val deletedAt: String? = null,
+    @SerializedName("has_deletion_record") val hasDeletionRecord: Boolean = false,
+    @SerializedName("forgive_session_charges") val forgiveSessionCharges: Boolean = false,
+    @SerializedName("requested_by_role") val requestedByRole: String? = null,
+    @SerializedName("admin_note") val adminNote: String? = null
+)
+
 // ==========================================
 // 6. مالی و ثبت نام (Financial & Enrollment)
 // ==========================================

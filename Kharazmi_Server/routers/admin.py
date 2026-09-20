@@ -1488,23 +1488,253 @@ async def upload_institute_logo(file: UploadFile = File(...), db: Session = Depe
         "url": f"uploads/profiles/{unique_filename}"
     }
 
+# ==========================================
+# آرشیو کلاس‌های حذف‌شده (فقط ادمین) — فقط خواندنی + branch isolation
+# ==========================================
+def _fmt_datetime(dt) -> str:
+    """قالب تاریخ پروژه؛ None → رشته‌ی خالی (هیچ تاریخی حدس زده نمی‌شود)."""
+    return dt.strftime("%Y/%m/%d %H:%M") if dt else ""
+
+
+def _safe_person_name(obj) -> str:
+    """نام legacy ممکن است NULL باشد — هرگز «None None» برنگردان."""
+    if obj is None:
+        return ""
+    return f"{obj.first_name or ''} {obj.last_name or ''}".strip()
+
+
+def _archived_deletion_meta(db: Session, course_ids: List[int]) -> dict:
+    """متادیتای حذف از جدول ClassDeletionRequest (بدون تاریخ حدسی).
+
+    `Course` ستون تاریخ حذف **ندارد**؛ هر دو مسیر حذف (حذف مستقیم ادمین در classes.py و
+    تایید درخواست) یک ردیف `approved` با `decided_at` ثبت می‌کنند. کلاس‌های legacy که پیش از
+    این جدول حذف شده‌اند تاریخ ندارند و مقدارشان خالی می‌ماند.
+    """
+    if not course_ids:
+        return {}
+    rows = (
+        db.query(models.ClassDeletionRequest)
+        .filter(
+            models.ClassDeletionRequest.course_id.in_(course_ids),
+            models.ClassDeletionRequest.status == "approved",
+        )
+        .order_by(models.ClassDeletionRequest.id)
+        .all()
+    )
+    meta: dict = {}
+    for r in rows:  # آخرین ردیف (بیشترین id) متادیتا را می‌دهد؛ اولین تاریخ موجود حفظ می‌شود.
+        ts = r.decided_at or r.created_at
+        entry = meta.get(r.course_id)
+        if entry is None:
+            meta[r.course_id] = {
+                "deleted_at": ts,
+                "forgive_session_charges": bool(r.forgive_session_charges),
+                "requested_by_role": r.requested_by_role,
+                "admin_note": r.admin_note,
+            }
+        else:
+            if entry["deleted_at"] is None and ts is not None:
+                entry["deleted_at"] = ts
+            entry["forgive_session_charges"] = bool(r.forgive_session_charges)
+            entry["requested_by_role"] = r.requested_by_role
+            entry["admin_note"] = r.admin_note
+    return meta
+
+
+def _archived_class_aggregates(db: Session, course_ids: List[int]) -> dict:
+    """شمارش تاریخی ثبت‌نام/جلسه/تراکنش هر کلاس با کوئری گروهی (بدون N+1).
+
+    همه‌ی ردیف‌ها شمرده می‌شوند (آرشیوشده‌ها هم) چون آرشیو باید **تاریخچه** را نشان دهد؛
+    `Course.is_deleted`/`Enrollment.is_deleted` هیچ ردیفی را حذف نمی‌کنند.
+    """
+    stats: dict = {cid: {"students_total": 0, "students_active": 0, "sessions_total": 0,
+                         "sessions_archived": 0, "transactions_count": 0, "transactions_total": 0}
+                   for cid in course_ids}
+    if not course_ids:
+        return stats
+    for cid, is_deleted, cnt in (
+        db.query(Enrollment.course_id, Enrollment.is_deleted, func.count(Enrollment.id))
+        .filter(Enrollment.course_id.in_(course_ids))
+        .group_by(Enrollment.course_id, Enrollment.is_deleted)
+        .all()
+    ):
+        if cid not in stats:
+            continue
+        stats[cid]["students_total"] += cnt
+        # is_deleted=None برای ردیف‌های legacy یعنی «آرشیو نشده» (سیاست موجود پروژه).
+        if not is_deleted:
+            stats[cid]["students_active"] += cnt
+    for cid, is_deleted, cnt in (
+        db.query(SessionLog.course_id, SessionLog.is_deleted, func.count(SessionLog.id))
+        .filter(SessionLog.course_id.in_(course_ids))
+        .group_by(SessionLog.course_id, SessionLog.is_deleted)
+        .all()
+    ):
+        if cid not in stats:
+            continue
+        stats[cid]["sessions_total"] += cnt
+        if is_deleted:
+            stats[cid]["sessions_archived"] += cnt
+    for cid, cnt, total in (
+        db.query(
+            Transaction.course_id,
+            func.count(Transaction.id),
+            func.coalesce(func.sum(Transaction.amount), 0),
+        )
+        .filter(Transaction.course_id.in_(course_ids))
+        .group_by(Transaction.course_id)
+        .all()
+    ):
+        if cid not in stats:
+            continue
+        stats[cid]["transactions_count"] = cnt
+        stats[cid]["transactions_total"] = total or 0
+    return stats
+
+
 @router.get("/admin/deleted_classes")
-def get_deleted_classes(db: Session = Depends(get_db), _: str = Depends(check_admin_access)):
-    # کلاس‌های حذف‌شده (بخش آرشیو کلاس‌ها مخصوص ادمین)
-    courses = db.query(Course).filter(Course.is_deleted == True).all()
+def get_deleted_classes(
+    query: Optional[str] = None,
+    branch_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    authorization: Optional[str] = Header(None),
+    _: str = Depends(check_admin_access),
+):
+    """آرشیو کلاس‌های حذف‌شده — فقط ادمین، با branch isolation و اطلاعات کامل.
+
+    تغییرات نسبت به نسخه‌ی قبلی: فیلدهای branch/تعداد دانش‌آموز/جلسه/تراکنش و تاریخ حذف
+    اضافه شده، جست‌وجو ممکن است و ترتیب قطعی است. کلیدهای قبلی (id/title/code/teacher_name/
+    grade_level/bg_color) دست‌نخورده مانده‌اند تا کلاینت قدیمی نشکند.
+    """
+    # الگوی branch isolation پروژه (analytics/crm/exports) — ادمینِ شعبه‌دار فقط شعبه‌ی خودش.
+    from routers.analytics import get_user_branch_filter  # lazy: جلوگیری از import چرخه‌ای
+    resolved_branch = get_user_branch_filter(db, authorization, branch_id)
+
+    # FIX(null-data): is_deleted=True صریح؛ ردیف‌های legacy با NULL «فعال» حساب می‌شوند و
+    # طبق سیاست موجود پروژه در آرشیو نمی‌آیند (لیست عادی و آرشیو قاطی نمی‌شوند).
+    q = db.query(Course).filter(Course.is_deleted == True)  # noqa: E712
+    if resolved_branch is not None:
+        q = q.filter(Course.branch_id == resolved_branch)
+    if query and query.strip():
+        like = f"%{query.strip()}%"
+        q = q.outerjoin(Teacher, Teacher.id == Course.teacher_id).filter(
+            or_(
+                Course.title.ilike(like),
+                Course.code.ilike(like),
+                Teacher.first_name.ilike(like),
+                Teacher.last_name.ilike(like),
+            )
+        )
+    courses = q.all()
+    course_ids = [c.id for c in courses]
+
+    meta_map = _archived_deletion_meta(db, course_ids)
+    stats_map = _archived_class_aggregates(db, course_ids)
+
+    teacher_ids = {c.teacher_id for c in courses if c.teacher_id is not None}
+    branch_ids = {c.branch_id for c in courses if c.branch_id is not None}
+    teachers = {t.id: t for t in db.query(Teacher).filter(Teacher.id.in_(teacher_ids)).all()} if teacher_ids else {}
+    branches = {b.id: b for b in db.query(models.Branch).filter(models.Branch.id.in_(branch_ids)).all()} if branch_ids else {}
+
+    # ترتیب قطعی: تازه‌ترین حذف اول؛ کلاس‌های بدون تاریخ حذف آخر (شناسه نزولی).
+    courses.sort(
+        key=lambda c: (meta_map.get(c.id, {}).get("deleted_at") or datetime.datetime.min, c.id),
+        reverse=True,
+    )
+
     result = []
     for c in courses:
-        teacher = db.query(Teacher).filter(Teacher.id == c.teacher_id).first()
-        t_name = f"{teacher.first_name} {teacher.last_name}" if teacher else "نامشخص"
+        st = stats_map.get(c.id, {})
+        meta = meta_map.get(c.id, {})
         result.append({
             "id": c.id,
-            "title": c.title,
-            "code": c.code,
-            "teacher_name": t_name,
-            "grade_level": c.grade_level,
+            # FIX(null-data): فیلدهای legacy می‌توانند NULL باشند — رشته‌ی خالی می‌رود و
+            # فال‌بک نمایش در اپ انجام می‌شود (نه «None/null» در UI).
+            "title": c.title or "",
+            "code": c.code or "",
+            "teacher_id": c.teacher_id,
+            "teacher_name": _safe_person_name(teachers.get(c.teacher_id)) or "نامشخص",
+            "branch_id": c.branch_id,
+            "branch_name": (branches.get(c.branch_id).name if branches.get(c.branch_id) else "") or "",
+            "grade_level": c.grade_level or "",
+            "days_of_week": c.days_of_week or "",
+            "class_time": c.class_time or "",
+            "students_count": st.get("students_total", 0),
+            "students_active_count": st.get("students_active", 0),
+            "sessions_count": st.get("sessions_total", 0),
+            "transactions_count": st.get("transactions_count", 0),
+            "deleted_at": _fmt_datetime(meta.get("deleted_at")),
+            "forgive_session_charges": bool(meta.get("forgive_session_charges", False)),
+            "is_suspended": bool(c.is_suspended),
             "bg_color": c.bg_color or "#FFFFFF",
         })
     return result
+
+
+@router.get("/admin/deleted_classes/{course_id}")
+def get_deleted_class_detail(
+    course_id: int,
+    db: Session = Depends(get_db),
+    authorization: Optional[str] = Header(None),
+    _: str = Depends(check_admin_access),
+):
+    """جزئیات کنترول‌شده‌ی یک کلاس آرشیوشده (فقط ادمین + همان شعبه).
+
+    فقط کلاسِ آرشیوشده سرو می‌شود؛ کلاس فعال، ناموجود و متعلق به شعبه‌ی دیگر همه 404
+    می‌گیرند (بدون نشت وجود رکورد). خروجی dict تعریف‌شده است، نه dump خام ORM.
+    """
+    from routers.analytics import get_user_branch_filter  # lazy: جلوگیری از import چرخه‌ای
+    resolved_branch = get_user_branch_filter(db, authorization, None)
+
+    course = (
+        db.query(Course)
+        .filter(Course.id == course_id, Course.is_deleted == True)  # noqa: E712
+        .first()
+    )
+    if not course or (resolved_branch is not None and course.branch_id != resolved_branch):
+        raise HTTPException(status_code=404, detail="کلاس آرشیوشده یافت نشد")
+
+    meta = _archived_deletion_meta(db, [course.id]).get(course.id, {})
+    stats = _archived_class_aggregates(db, [course.id]).get(course.id, {})
+    teacher = db.query(Teacher).filter(Teacher.id == course.teacher_id).first() if course.teacher_id else None
+    branch = db.query(models.Branch).filter(models.Branch.id == course.branch_id).first() if course.branch_id else None
+    archived_enrollments = db.query(Enrollment).filter(
+        Enrollment.course_id == course.id, Enrollment.is_deleted == True  # noqa: E712
+    ).count()
+    archived_sessions = db.query(SessionLog).filter(
+        SessionLog.course_id == course.id, SessionLog.is_deleted == True  # noqa: E712
+    ).count()
+
+    return {
+        # مشخصات پایه (همه null-safe)
+        "id": course.id,
+        "title": course.title or "",
+        "code": course.code or "",
+        "grade_level": course.grade_level or "",
+        "days_of_week": course.days_of_week or "",
+        "class_time": course.class_time or "",
+        "is_suspended": bool(course.is_suspended),
+        "bg_color": course.bg_color or "#FFFFFF",
+        # معلم / شعبه
+        "teacher_id": course.teacher_id,
+        "teacher_name": _safe_person_name(teacher) or "نامشخص",
+        "branch_id": course.branch_id,
+        "branch_name": (branch.name if branch else "") or "",
+        # تاریخچه (حفظ‌شده — چیزی حذف نمی‌شود)
+        "students_count": stats.get("students_total", 0),
+        "students_active_count": stats.get("students_active", 0),
+        "archived_enrollments_count": archived_enrollments,
+        "sessions_count": stats.get("sessions_total", 0),
+        "archived_sessions_count": archived_sessions,
+        "transactions_count": stats.get("transactions_count", 0),
+        "transactions_total": stats.get("transactions_total", 0),
+        # اطلاعات حذف (از ClassDeletionRequest؛ بدون تاریخ حدسی)
+        "deleted_at": _fmt_datetime(meta.get("deleted_at")),
+        "has_deletion_record": bool(meta),
+        "forgive_session_charges": bool(meta.get("forgive_session_charges", False)),
+        "requested_by_role": meta.get("requested_by_role") or "",
+        "admin_note": meta.get("admin_note") or "",
+    }
 
 
 @router.get("/admin/pricing_table")

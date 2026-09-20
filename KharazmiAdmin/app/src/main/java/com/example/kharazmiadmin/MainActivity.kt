@@ -21,6 +21,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import retrofit2.http.GET
+import retrofit2.http.Path
 import retrofit2.http.Query
 
 // ==========================================
@@ -32,8 +33,12 @@ interface DashboardSettingsApi {
 }
 
 interface DeletedClassesApi {
+    // FIX(archive): مدل درست آرشیو (ArchivedClassItem) + جست‌وجو + جزئیات کنترول‌شده.
     @GET("admin/deleted_classes")
-    suspend fun getDeletedClasses(): List<PendingClassItem>
+    suspend fun getDeletedClasses(@Query("query") query: String? = null): List<ArchivedClassItem>
+
+    @GET("admin/deleted_classes/{id}")
+    suspend fun getArchivedClassDetail(@Path("id") id: Int): ArchivedClassDetail
 }
 
 interface MeApi {
@@ -624,10 +629,25 @@ class MainActivity : BaseActivity() {
                         return@withContext
                     }
 
-                    val names = list.map { getString(R.string.main_trash_row, it.title, it.code) }.toTypedArray()
+                    // FIX(archive): ردیف آرشیو حالا معلم/شعبه/تعداد دانش‌آموز و تاریخ حذف را نشان می‌دهد
+                    // و رکورد ناقص (title/teacher/branch خالی) هم امن رندر می‌شود (بدون «null»).
+                    val unknownClass = getString(R.string.common_unknown_class)
+                    val unknownPerson = getString(R.string.common_person_unknown)
+                    val noDate = getString(R.string.main_trash_no_date)
+                    val labels = list.map { item ->
+                        getString(
+                            R.string.main_trash_row_rich,
+                            item.title?.takeIf { it.isNotBlank() } ?: unknownClass,
+                            item.code ?: "",
+                            item.teacherName?.takeIf { it.isNotBlank() } ?: unknownPerson,
+                            item.branchName?.takeIf { it.isNotBlank() } ?: unknownPerson,
+                            item.studentsCount,
+                            item.deletedAt?.takeIf { it.isNotBlank() } ?: noDate
+                        )
+                    }.toTypedArray()
                     AlertDialog.Builder(this@MainActivity)
                         .setTitle(getString(R.string.main_trash_title))
-                        .setItems(names, null)
+                        .setItems(labels, { _, which -> showArchivedClassDetail(list[which].id) })
                         .setPositiveButton(getString(R.string.btn_dismiss), null)
                         .show()
                 }
@@ -636,6 +656,47 @@ class MainActivity : BaseActivity() {
                 if (e is kotlinx.coroutines.CancellationException) throw e;
                 withContext(Dispatchers.Main) {
                     Toast.makeText(this@MainActivity, getString(R.string.main_trash_error), Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    private fun showArchivedClassDetail(courseId: Int) {
+        val retrofit = RetrofitClient.getInstance(this)
+        val api = retrofit.create(DeletedClassesApi::class.java)
+
+        // FIX: Bug 19 - cancel screen work when this Activity is destroyed.
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val detail = api.getArchivedClassDetail(courseId)
+                withContext(Dispatchers.Main) {
+                    // FIX(archive): جزئیات کنترول‌شده‌ی کلاس آرشیوشده — همه‌ی فیلدها null-safe
+                    // (رکورد legacy نباید باعث «null» در متن یا crash شود).
+                    val unknownClass = getString(R.string.common_unknown_class)
+                    val unknownPerson = getString(R.string.common_person_unknown)
+                    val lines = listOf(
+                        getString(R.string.main_trash_d_code, detail.code?.takeIf { it.isNotBlank() } ?: "-"),
+                        getString(R.string.main_trash_d_teacher, detail.teacherName?.takeIf { it.isNotBlank() } ?: unknownPerson),
+                        getString(R.string.main_trash_d_branch, detail.branchName?.takeIf { it.isNotBlank() } ?: unknownPerson),
+                        getString(R.string.main_trash_d_time, detail.daysOfWeek?.takeIf { it.isNotBlank() } ?: "-", detail.classTime?.takeIf { it.isNotBlank() } ?: "-"),
+                        getString(R.string.main_trash_d_students, detail.studentsCount),
+                        getString(R.string.main_trash_d_sessions, detail.sessionsCount),
+                        getString(R.string.main_trash_d_tx, detail.transactionsCount, detail.transactionsTotal),
+                        getString(R.string.main_trash_d_deleted_at, detail.deletedAt?.takeIf { it.isNotBlank() } ?: getString(R.string.main_trash_no_date)),
+                        getString(R.string.main_trash_d_forgive, if (detail.forgiveSessionCharges) getString(R.string.common_yes) else getString(R.string.common_no))
+                    )
+                    AlertDialog.Builder(this@MainActivity)
+                        .setTitle(detail.title?.takeIf { it.isNotBlank() } ?: unknownClass)
+                        .setMessage(lines.joinToString("\n"))
+                        .setPositiveButton(getString(R.string.btn_dismiss), null)
+                        .show()
+                }
+            } catch (e: Exception) {
+                // FIX: Bug 19 - cancellation is not a network/UI error.
+                if (e is kotlinx.coroutines.CancellationException) throw e;
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@MainActivity, getString(R.string.main_trash_detail_error), Toast.LENGTH_SHORT).show()
                 }
             }
         }

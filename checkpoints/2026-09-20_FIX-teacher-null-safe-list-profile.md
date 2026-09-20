@@ -3,8 +3,11 @@
 برنچ: `arena/01a0bf8d-kharazmiapp` | نوع تسک: **null-safety داده‌ی legacy** — صفر تغییر منطق مالی،
 صفر تغییر permission/نقش‌ها، صفر تغییر نام کلیدها یا مسیرها (قرارداد API دست‌نخورده: فقط به‌جای `NULL` مقدار امن).
 
-> این checkpoint در commit جداگانه‌ای پس از commit کد ثبت شده است (قواعد: amend/rebase/force-push ممنوع).
-> SHA کد: `c5462c0` — پایه‌ی آن: `0133d80`.
+> **یادداشت ساختار (audit-history):** این checkpoint توسط task اول ثبت شد و SHA آن **قبل از قانون
+> «checkpoint داخل همان commit کد»** ساخته شده است؛ بنابراین در commit جداگانه‌ی `8f48590` نشسته و
+> commit کد آن `c5462c0` است. از task دوم به بعد، checkpoint و کد **در یک commit** قرار می‌گیرند و طبق
+> قانون جدید، فیلد SHA داخل checkpoint نمی‌نویسد («در گزارش نهایی پس از commit ثبت می‌شود»).
+> پایه‌ی هر دو commit: `0133d80`.
 
 ---
 
@@ -113,9 +116,12 @@
 
 | مورد | مقدار |
 |---|---|
-| commit کد | **`c5462c081d5d8c59eadc81ee4d10918fce297818`** — `fix: make teacher data handling null-safe` |
-| commit این checkpoint | در گزارش نهایی همین task ثبت شده |
-| push | ✅ `origin arena/01a0bf8d-kharazmiapp` (branch جدید روی ریموت ایجاد شد) |
-| لینک commit | https://github.com/eternity-lord/KharazmiApp/commit/c5462c081d5d8c59eadc81ee4d10918fce297818 |
+| commit کد (task اول) | `c5462c081d5d8c59eadc81ee4d10918fce297818` — `fix: make teacher data handling null-safe` |
+| commit این checkpoint | `8f4859058af2dd8a4720726dc1c32a172a7e7966` — `docs(checkpoint): ثبت checkpoint فیکس null-safe داده‌های مربی` |
+| **Commit SHA (این task)** | **در گزارش نهایی پس از commit ثبت می‌شود؛ SHA داخل همان commit قابل درج نیست** |
+| push | ✅ `origin arena/01a0bf8d-kharazmiapp` (هر دو commit آپلود شده) |
+| لینک commit کد | https://github.com/eternity-lord/KharazmiApp/commit/c5462c081d5d8c59eadc81ee4d10918fce297818 |
+| لینک commit checkpoint | https://github.com/eternity-lord/KharazmiApp/commit/8f4859058af2dd8a4720726dc1c32a172a7e7966 |
 | لینک branch | https://github.com/eternity-lord/KharazmiApp/tree/arena/01a0bf8d-kharazmiapp |
-| PR به برنچ کاری | https://github.com/eternity-lord/KharazmiApp/pull/1 (OPEN, MERGEABLE, CLEAN) |
+| ZIP دانلود (branch) | https://github.com/eternity-lord/KharazmiApp/archive/refs/heads/arena/01a0bf8d-kharazmiapp.zip |
+| PR به برنچ کاری | https://github.com/eternity-lord/KharazmiApp/pull/1 (OPEN — بدون دستور کاربر merge/close نشد) |

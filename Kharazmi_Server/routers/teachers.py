@@ -29,7 +29,8 @@ from validation import is_valid_iranian_national_code
 
 @router.post("/teachers/register")
 @limiter.limit("5/hour")
-def register_teacher(request: Request, teacher: TeacherCreate, db: Session = Depends(get_db)):
+def register_teacher(request: Request, teacher: TeacherCreate, db: Session = Depends(get_db),
+                     authorization: Optional[str] = Header(None)):
     if not is_valid_iranian_national_code(teacher.national_code):
         raise HTTPException(status_code=400, detail="کد ملی وارد شده معتبر نیست")
 
@@ -52,10 +53,38 @@ def register_teacher(request: Request, teacher: TeacherCreate, db: Session = Dep
     _READABLE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"  # بدون 0/O/1/l/I
     initial_password = "".join(secrets.choice(_READABLE_ALPHABET) for _ in range(8))
 
+    # FIX(teacher-approval/branch): شعبه‌ی معلم با سیاست مرکزی پروژه تعیین می‌شود تا رکورد
+    # تازه «بدون شعبه» (NULL) رها نشود و صف تایید قابل scope شدن باشد.
+    # - branch_id صریح در بدنه: نامعتبر/غیرمجاز → خطای همان سیاست (400/403).
+    # - بدون ارسال صریح: از هویت فراخوان (توکن ادمین/منشی اپ) حل می‌شود؛ اگر قابل‌تعیین نبود
+    #   (چند شعبه‌ی فعال و کاربر بدون شعبه) مقدار NULL می‌ماند — تخمین کورکورانه و رد ثبت‌نام ممنوع.
+    from dependencies import get_session_from_token, resolve_creation_branch  # lazy، مثل بقیه‌ی مسیرها
+    _caller_user = None
+    if authorization:
+        try:
+            _parts = authorization.split()
+            _token = _parts[1] if len(_parts) == 2 and _parts[0].lower() == "bearer" else None
+            if _token:
+                _sess, _ = get_session_from_token(db, _token)
+                if _sess is not None:
+                    _caller_user = db.query(User).filter(User.id == _sess.user_id).first()
+        except Exception:
+            _caller_user = None
+    _requested_branch_id = teacher.branch_id
+    try:
+        _resolved_branch_id = resolve_creation_branch(
+            db, user=_caller_user, requested_branch_id=_requested_branch_id
+        )
+    except HTTPException:
+        if _requested_branch_id is not None:
+            raise  # درخواست صریح نامعتبر باید خطا بدهد
+        _resolved_branch_id = None  # بدون منبع قابل‌اعتماد ⇒ همان رفتار قبلی (بدون شعبه)
+
     teacher_data = teacher.dict()
     teacher_data["teacher_code"] = next_code
     teacher_data["mobile"] = teacher_mobile
     teacher_data["password"] = hash_password(initial_password) # رمز عبور به صورت هش شده ذخیره می‌شود
+    teacher_data["branch_id"] = _resolved_branch_id
 
     new_teacher = Teacher(**teacher_data, is_approved=False)
     db.add(new_teacher)

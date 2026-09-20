@@ -54,6 +54,16 @@
                     android:layout_marginTop="4dp"
                     android:text="0912..."
                     android:textColor="?android:attr/textColorSecondary" />
+
+                <!-- FIX(teacher-approval): شعبه‌ی درخواست (رکورد بدون انتساب → «بدون شعبه») -->
+                <TextView
+                    android:id="@+id/tvBranch"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/ptch_no_branch"
+                    android:textColor="?android:attr/textColorSecondary"
+                    android:textSize="12sp" />
             </LinearLayout>
         </LinearLayout>
 

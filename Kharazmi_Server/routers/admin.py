@@ -15,7 +15,7 @@ from models import (
     Attendance, Course, Enrollment, Grade, InstituteShare, SessionLog, SmsLog, Student, Teacher, Transaction, User, UserSession, InstituteSettings, ActivityLog, Notification, DeviceToken, Room, Conversation, ConversationParticipant, Message, Exam, ExamQuestion, ExamAttempt, Lead
 )
 from schemas import (
-    HistoryRequest, LoginRequest, TeacherInfo, FullTeacherProfile, StudentCreate, TeacherCreate, CourseCreate, EnrollmentCreate, GradeCreate, GradeItem, AttendanceLogRequest, AttendanceItem, AttendanceSubmitData, SmsSendRequest, ChangePasswordRequest, StudentProfileInfo, FullStudentProfile, TeacherProfileInfo, FullTeacherProfile, ClassReportInfo, ClassStudentData, ClassSessionHistory, FullClassReport, ShareConfigModel, StudentUpdate, TeacherUpdate, PersonListItem, TransactionUpdate, StudentAttendanceHistoryRequest, AdvancedSearchItem, FinanceSubmitData, PrintReceiptRequest, TransactionTestData, BulkSmsRequest, BulkSuspendRequest, InstituteSettingsModel, PricingTableUpdateModel, TeacherListItem, SmsHistoryItem
+    HistoryRequest, LoginRequest, TeacherInfo, FullTeacherProfile, StudentCreate, TeacherCreate, CourseCreate, EnrollmentCreate, GradeCreate, GradeItem, AttendanceLogRequest, AttendanceItem, AttendanceSubmitData, SmsSendRequest, ChangePasswordRequest, StudentProfileInfo, FullStudentProfile, TeacherProfileInfo, FullTeacherProfile, ClassReportInfo, ClassStudentData, ClassSessionHistory, FullClassReport, ShareConfigModel, StudentUpdate, TeacherUpdate, PersonListItem, TransactionUpdate, StudentAttendanceHistoryRequest, AdvancedSearchItem, FinanceSubmitData, PrintReceiptRequest, TransactionTestData, BulkSmsRequest, BulkSuspendRequest, InstituteSettingsModel, PricingTableUpdateModel, TeacherListItem, SmsHistoryItem, PendingTeacherItem
 )
 from dependencies import get_db, check_admin_access, check_admin_or_secretary_access, check_user_login, check_student_access, get_enrollment_tuition_and_discount, SESSION_EXPIRY_DAYS, get_current_user, hash_password, verify_password, get_next_sequence_value, normalize_mobile
 
@@ -194,12 +194,46 @@ def get_sms_history(db: Session = Depends(get_db), _: str = Depends(check_admin_
 # ==========================================
 
 
-@router.get("/teachers/pending", response_model=List[TeacherListItem])
-def get_pending_teachers(db: Session = Depends(get_db), _: str = Depends(check_admin_or_secretary_access)):  # FIX (audit-v2/#11): لیست درانتظار (حاوی موبایل) فقط ادمین/منشی
+@router.get("/teachers/pending", response_model=List[PendingTeacherItem])
+def get_pending_teachers(
+    branch_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    authorization: Optional[str] = Header(None),
+    _: str = Depends(check_admin_or_secretary_access),  # FIX (audit-v2/#11): لیست درانتظار (حاوی موبایل) فقط ادمین/منشی
+):
+    """صف «درخواست‌های تایید معلم» — در انتظار (is_approved=False) و حذف‌نشده.
+
+    FIX(teacher-approval):
+      • این مسیر قبلاً با route سایه‌شده مواجه بود (GET /teachers/{teacher_id} در teachers.router
+        زودتر ثبت می‌شد) و عملاً هرگز اجرا نمی‌شد؛ ترتیب include در main.py اصلاح شد.
+      • branch isolation: کاربرِ شعبه‌دار فقط معلم‌های شعبه‌ی خودش **و** رکوردهای بدون شعبه
+        (branch_id IS NULL = ثبت‌شده‌ی بدون انتساب، متعلق به هیچ شعبه‌ای نیست) را می‌بیند؛
+        رکورد شعبه‌ی دیگر هرگز دیده نمی‌شود. ادمین کل (بدون شعبه) همه را می‌بیند.
+      • `branch_id` صریح = فیلتر **دقیق** روی همان شعبه (بدون رکوردهای بدون‌شعبه)؛ برای کاربرِ
+        شعبه‌دار، شعبه‌ی خودش بر پارامتر غلبه می‌کند (branch isolation قابل دورزدن با query نیست).
+      • ترتیب قطعی (id صعودی) و متادیتای شعبه در پاسخ برای UI ادمین.
+    """
+    from routers.analytics import get_user_branch_filter  # lazy: جلوگیری از import چرخه‌ای
+    resolved_branch = get_user_branch_filter(db, authorization, branch_id)
+    explicit_filter = branch_id is not None
+
+    q = db.query(Teacher).filter(Teacher.is_deleted == False, Teacher.is_approved == False)  # noqa: E712
+    if resolved_branch is not None:
+        if explicit_filter:
+            q = q.filter(Teacher.branch_id == resolved_branch)      # فیلتر صریح: فقط همان شعبه
+        else:
+            q = q.filter(or_(Teacher.branch_id == resolved_branch, Teacher.branch_id.is_(None)))
+    teachers = q.order_by(Teacher.id).all()
+
+    branch_ids = {t.branch_id for t in teachers if t.branch_id is not None}
+    branch_names = {
+        b.id: (b.name or "")
+        for b in (db.query(models.Branch).filter(models.Branch.id.in_(branch_ids)).all() if branch_ids else [])
+    }
+
     # FIX(security): هرگز ORM خام برنگردان — فقط فیلدهای غیرحساس (بدون password/card_number/national_code).
-    teachers = db.query(Teacher).filter(Teacher.is_deleted == False).filter(Teacher.is_approved == False).all()
     return [
-        TeacherListItem(
+        PendingTeacherItem(
             id=t.id,
             first_name=t.first_name or "",
             last_name=t.last_name or "",
@@ -208,15 +242,33 @@ def get_pending_teachers(db: Session = Depends(get_db), _: str = Depends(check_a
             profile_image=t.profile_image,
             is_approved=bool(t.is_approved),
             is_suspended=bool(t.is_suspended),
+            branch_id=t.branch_id,
+            branch_name=branch_names.get(t.branch_id, ""),
         )
         for t in teachers
     ]
 
 
+def _teacher_in_scope(db: Session, teacher, authorization: Optional[str]) -> bool:
+    """آیا این معلم در دامنه‌ی کاربرِ فراخوان است؟ (همان policy لیست pending)
+
+    ادمین کل (بدون شعبه) → همه. کاربر شعبه‌دار → فقط شعبه‌ی خودش + رکوردهای بدون شعبه
+    (branch_id IS NULL = بدون انتساب، متعلق به هیچ شعبه‌ای نیست). رکورد شعبه‌ی دیگر → خارج از دامنه.
+    """
+    from routers.analytics import get_user_branch_filter  # lazy: جلوگیری از import چرخه‌ای
+    resolved_branch = get_user_branch_filter(db, authorization, None)
+    if resolved_branch is None:
+        return True
+    return teacher.branch_id == resolved_branch or teacher.branch_id is None
+
+
 @router.post("/teachers/approve/{teacher_id}")
-def approve_teacher(teacher_id: int, db: Session = Depends(get_db), _: str = Depends(check_admin_or_secretary_access)):  # FIX H10-S2: تایید فقط ادمین/منشی (الگوی C1/H10-S)
+def approve_teacher(teacher_id: int, db: Session = Depends(get_db),
+                    authorization: Optional[str] = Header(None),
+                    _: str = Depends(check_admin_or_secretary_access)):  # FIX H10-S2: تایید فقط ادمین/منشی (الگوی C1/H10-S)
     teacher = db.query(Teacher).filter(Teacher.id == teacher_id, Teacher.is_deleted == False).first()
-    if not teacher:
+    # FIX(teacher-approval): کاربر شعبه‌دار نباید درخواست شعبه‌ی دیگر را تایید کند (404 بدون نشت وجود رکورد).
+    if not teacher or not _teacher_in_scope(db, teacher, authorization):
         raise HTTPException(status_code=404, detail="معلم یافت نشد")
     teacher.is_approved = True
     db.commit()
@@ -224,9 +276,12 @@ def approve_teacher(teacher_id: int, db: Session = Depends(get_db), _: str = Dep
 
 
 @router.delete("/teachers/reject/{teacher_id}")
-def reject_teacher(teacher_id: int, db: Session = Depends(get_db), _: str = Depends(check_admin_access)):
+def reject_teacher(teacher_id: int, db: Session = Depends(get_db),
+                   authorization: Optional[str] = Header(None),
+                   _: str = Depends(check_admin_access)):
     teacher = db.query(Teacher).filter(Teacher.id == teacher_id, Teacher.is_deleted == False).first()
-    if not teacher:
+    # FIX(teacher-approval): همان policy دامنه‌ی شعبه برای رد کردن (404 بدون نشت وجود رکورد).
+    if not teacher or not _teacher_in_scope(db, teacher, authorization):
         raise HTTPException(status_code=404, detail="معلم یافت نشد")
 
     # سافت‌دیلیت: ردیف حفظ می‌شود (تاریخچه + جلوگیری از ثبت‌نام تکراری با همان کد ملی/موبایل)

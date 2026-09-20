@@ -57,6 +57,9 @@ class TeacherCreate(NationalCodeRequest):
     employment_type: str
     card_number: str
     profile_image: Optional[str] = None
+    # FIX(teacher-approval): شعبه‌ی معلم هنگام ثبت — اختیاری و سازگار با اپ فعلی (که نمی‌فرستد).
+    # اعتبارسنجی و تصمیم‌گیری با سیاست مرکزی resolve_creation_branch است (بدون حدس).
+    branch_id: Optional[int] = None
 
 class CourseCreate(BaseModel):
     title: str
@@ -308,6 +311,13 @@ class TeacherListItem(BaseModel):
     profile_image: Optional[str] = None
     is_approved: bool = False
     is_suspended: bool = False
+
+
+# FIX(teacher-approval): آیتم صف «درخواست‌های تایید معلم» — افزودنی و سازگار با TeacherListItem
+# (کلاینت قدیمی فیلدهای اضافه را نادیده می‌گیرد) تا ادمین شعبه‌ی هر درخواست را ببیند.
+class PendingTeacherItem(TeacherListItem):
+    branch_id: Optional[int] = None
+    branch_name: Optional[str] = None
 
 
 # FIX(security): آیتم امن تاریخچه پیامک — message_text باید قبل از ساخت، ماسک شده باشد (کدهای OTP).

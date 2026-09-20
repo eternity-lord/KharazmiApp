@@ -640,14 +640,19 @@ except Exception as _e:
     print(f"⚠️ خطا در راه‌اندازی worker کلاس زنده: {_e}")
 
 # Include Routers
+# FIX(route-shadowing): ترتیب include تعیین‌کننده است (Starlette: اولین تطبیق برنده می‌شود).
+# admin.router مسیرهای literal مثل GET /teachers/pending دارد؛ اگر teachers.router (که
+# GET /teachers/{teacher_id} را دارد) زودتر ثبت شود، «/teachers/pending» به آن می‌خورد و
+# رکوئست با خطای 422 (int parsing روی "pending") رد می‌شود ⇒ لیست درخواست‌های تایید معلم
+# هرگز بارگذاری نمی‌شد. با ترتیب زیر (admin قبل از teachers) هیچ مسیری سایه نمی‌شود.
 app.include_router(auth.router)
 app.include_router(students.router)
+app.include_router(admin.router)
 app.include_router(teachers.router)
 app.include_router(classes.router)
 app.include_router(finance.router)
 app.include_router(reports.router)
 app.include_router(attendance.router)
-app.include_router(admin.router)
 app.include_router(parent.router)
 app.include_router(homework.router)
 app.include_router(calendar.router)

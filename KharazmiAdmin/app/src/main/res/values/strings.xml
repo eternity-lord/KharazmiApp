@@ -1175,6 +1175,10 @@
     <string name="ptch_empty">هیچ درخواستی وجود ندارد</string>
     <string name="ptch_op_error">خطا در عملیات</string>
     <string name="ptch_del_error">خطا در حذف درخواست</string>
+    <!-- FIX(teacher-approval): خطای بارگذاری صف تایید + خط شعبه در کارت درخواست -->
+    <string name="ptch_load_error">خطا در دریافت درخواست‌های تایید معلم</string>
+    <string name="ptch_branch_row">شعبه: %1$s</string>
+    <string name="ptch_no_branch">بدون شعبه</string>
     <string name="rexp_no_page">برای دریافت گزارش، یک صفحهٔ فعال لازم است</string>
     <string name="rexp_share_title">اشتراک‌گذاری و باز کردن فایل Excel</string>
     <string name="rexp_server_error">خطا در اتصال به سرور</string>

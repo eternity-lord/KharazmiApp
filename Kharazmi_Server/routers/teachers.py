@@ -408,12 +408,15 @@ def get_teacher_profile(teacher_id: int, db: Session = Depends(get_db), authoriz
         raise HTTPException(status_code=404, detail="معلم یافت نشد")
     return {
         "id": teacher.id,
-        "first_name": teacher.first_name,
-        "last_name": teacher.last_name,
+        # FIX(null-data): رکوردهای legacy ممکن است NULL باشند و مدل اپ (TeacherRawProfile) این چهار
+        # فیلد را non-null می‌داند؛ مقدار امن (رشتهٔ خالی) برمی‌گردد تا یک رکورد ناقص پروفایل/لیست را
+        # نشکند. کلیدها و بقیهٔ فیلدها بدون تغییر می‌مانند (قرارداد API حفظ می‌شود).
+        "first_name": teacher.first_name or "",
+        "last_name": teacher.last_name or "",
         "father_name": teacher.father_name,
-        "national_code": teacher.national_code,
+        "national_code": teacher.national_code or "",
         "birth_date": teacher.birth_date,
-        "mobile": teacher.mobile,
+        "mobile": teacher.mobile or "",
         "home_phone": teacher.home_phone,
         "marital_status": teacher.marital_status,
         "gender": teacher.gender,
@@ -599,7 +602,8 @@ def get_teachers_excel(db: Session = Depends(get_db), _: str = Depends(check_adm
     row_num = 2
     for t in teachers:
         courses = db.query(Course).filter(Course.teacher_id == t.id).all()
-        course_titles = ", ".join([c.title for c in courses]) if courses else "ندارد"
+        # FIX(null-data): عنوان legacy ممکن است NULL باشد — join روی None قبلاً TypeError/500 می‌داد.
+        course_titles = ", ".join([(c.title or "کلاس بدون عنوان") for c in courses]) if courses else "ندارد"
         
         course_ids = [c.id for c in courses]
         total_rev = 0
@@ -611,7 +615,8 @@ def get_teachers_excel(db: Session = Depends(get_db), _: str = Depends(check_adm
 
         row_data = [
             t.id,
-            f"{t.first_name} {t.last_name}",
+            # FIX(null-data): نام legacy ممکن است NULL باشد — «None None» در خروجی اکسل حذف شد.
+            f"{t.first_name or ''} {t.last_name or ''}".strip() or "نامشخص",
             t.national_code,
             t.mobile,
             t.home_phone or "",
@@ -704,7 +709,9 @@ def get_pending_settlement(
     session_ids = list(session_map.keys())
     
     if not session_ids:
-        return {"teacher_id": teacher_id, "teacher_name": f"{teacher.first_name} {teacher.last_name}", "total_amount": 0, "session_count": 0, "settled_total_amount": settled_total, "earned_total_amount": settled_total, "pending_sessions": []}
+        # FIX(null-data): مثل شاخهٔ بالا از teacher_name امن استفاده می‌شود — قبلاً f-string خام
+        # با نام NULL نتیجهٔ «None None» می‌داد (ناهم‌خوانی دو مسیر خروج زودهنگام).
+        return {"teacher_id": teacher_id, "teacher_name": teacher_name, "total_amount": 0, "session_count": 0, "settled_total_amount": settled_total, "earned_total_amount": settled_total, "pending_sessions": []}
         
     # 4. پیدا کردن تمام حضور و غیاب‌های تسویه نشده دانش‌آموزان حاضر/تاخیر در این جلسات
     attendances = (

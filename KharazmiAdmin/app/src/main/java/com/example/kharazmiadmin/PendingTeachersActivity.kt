@@ -26,9 +26,11 @@ import retrofit2.http.Path
 // مدل داده معلم
 data class TeacherPending(
     val id: Int,
-    val first_name: String,
-    val last_name: String,
-    val mobile: String,
+    // FIX(null-data): لیست «در انتظار تایید» برای معلم بدون موبایل/نام ناقص null برمی‌گرداند —
+    // null‌پذیر تا یک رکورد ناقص کل لیست را نشکند (fallback در adapter).
+    val first_name: String? = null,
+    val last_name: String? = null,
+    val mobile: String? = null,
     val profile_image: String?
 )
 
@@ -158,8 +160,11 @@ class PendingAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = list[position]
-        holder.name.text = "${item.first_name} ${item.last_name}"
-        holder.mobile.text = item.mobile
+        // FIX(null-data): نام/موبایل ناقص نباید «null» نشان دهد یا binding را بشکند.
+        val displayName = "${item.first_name ?: ""} ${item.last_name ?: ""}".trim()
+            .ifEmpty { holder.itemView.context.getString(R.string.common_person_unknown) }
+        holder.name.text = displayName
+        holder.mobile.text = item.mobile ?: ""
 
         if (item.profile_image != null) {
             try {

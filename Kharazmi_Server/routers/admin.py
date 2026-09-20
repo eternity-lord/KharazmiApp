@@ -1614,9 +1614,11 @@ def get_teacher_credentials(id: int, db: Session = Depends(get_db), _: str = Dep
         raise HTTPException(status_code=404, detail="معلم یافت نشد")
     return TeacherCredentialsResponse(
         id=teacher.id,
-        name=f"{teacher.first_name} {teacher.last_name}",
-        national_code=teacher.national_code,
-        mobile=teacher.mobile,
+        # FIX(null-data): این response_model فیلدهای str اجباری دارد و رکورد legacy با
+        # mobile/national_code/نام NULL قبلاً ValidationError/500 می‌داد؛ الان مقدار امن برمی‌گردد.
+        name=f"{teacher.first_name or ''} {teacher.last_name or ''}".strip() or "نامشخص",
+        national_code=teacher.national_code or "",
+        mobile=teacher.mobile or "",
         teacher_code=teacher.teacher_code,
         password=teacher.password or "",
         card_number=teacher.card_number
@@ -1659,7 +1661,7 @@ def reset_teacher_password(id: int, db: Session = Depends(get_db), current_user 
         admin_username=current_user.username,
         action="reset_teacher_password",
         target_id=teacher.id,
-        target_name=f"{teacher.first_name} {teacher.last_name}",
+        target_name=f"{teacher.first_name or ''} {teacher.last_name or ''}".strip() or "نامشخص",
         details=f"تغییر رمز از {old_code}/{old_password} to {new_code}"
     )
     db.add(log_entry)
@@ -1711,7 +1713,7 @@ def update_teacher_credentials(id: int, data: TeacherCredentialsUpdateRequest, d
         admin_username=current_user.username,
         action="update_teacher_credentials",
         target_id=teacher.id,
-        target_name=f"{teacher.first_name} {teacher.last_name}",
+        target_name=f"{teacher.first_name or ''} {teacher.last_name or ''}".strip() or "نامشخص",
         details=f"موبایل: {old_mobile}->{new_mobile} | شماره کارت: {old_card}->{data.card_number}"
     )
     db.add(log_entry)

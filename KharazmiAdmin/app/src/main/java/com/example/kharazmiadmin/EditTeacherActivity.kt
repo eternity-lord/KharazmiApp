@@ -72,12 +72,14 @@ class EditTeacherActivity : BaseActivity() {
                 val profile = api.getTeacherProfile(teacherId)
                 withContext(Dispatchers.Main) {
                     currentVersion = profile.version
-                    etFirstName.setText(profile.first_name)
-                    etLastName.setText(profile.last_name)
+                    // FIX(null-data): فیلدهای ناقص نباید null به ویوها بدهند (fallback = رشته‌ی خالی
+                    // تا فرم ویرایش مربی باز شود؛ اعتبارسنجی سمت کلاینت مثل قبل باقی می‌ماند).
+                    etFirstName.setText(profile.first_name ?: "")
+                    etLastName.setText(profile.last_name ?: "")
                     etFatherName.setText(profile.father_name ?: "")
-                    etNationalCode.setText(profile.national_code)
+                    etNationalCode.setText(profile.national_code ?: "")
                     etBirthDate.setText(profile.birth_date ?: "")
-                    etMobile.setText(profile.mobile)
+                    etMobile.setText(profile.mobile ?: "")
                     etHomePhone.setText(profile.home_phone ?: "")
                     etMaritalStatus.setText(profile.marital_status ?: "")
                     etGender.setText(profile.gender ?: "")

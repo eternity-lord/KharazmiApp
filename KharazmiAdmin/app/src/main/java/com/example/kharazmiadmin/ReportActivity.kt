@@ -57,8 +57,10 @@ data class SearchStudentItem(
 
 data class TeacherItem(
     val id: Int,
-    val first_name: String,
-    val last_name: String
+    // FIX(null-data): نام legacy ممکن است null باشد — null‌پذیر تا فیلتر گزارش (لیست مربیان)
+    // با یک رکورد ناقص نشکند؛ فال‌بک در محل نمایش.
+    val first_name: String? = null,
+    val last_name: String? = null
 )
 
 interface ReportNewApi {
@@ -263,7 +265,11 @@ class ReportActivity : BaseActivity() {
                 val list = api.getTeachersList()
                 teachersList = list
                 withContext(Dispatchers.Main) {
-                    val teacherNames = list.map { "${it.first_name} ${it.last_name} (${it.id})" }
+                    // FIX(null-data): نام ناقص/خالی نباید «null» یا ردیف خالی در فیلتر معلم بدهد.
+                    val fallbackName = getString(R.string.common_person_unknown)
+                    val teacherNames = list.map {
+                        "${it.first_name ?: ""} ${it.last_name ?: ""}".trim().ifEmpty { fallbackName } + " (${it.id})"
+                    }
                     val teacherAdapter = ArrayAdapter(this@ReportActivity, android.R.layout.simple_dropdown_item_1line, teacherNames)
                     acTeacherFilter.setAdapter(teacherAdapter)
 

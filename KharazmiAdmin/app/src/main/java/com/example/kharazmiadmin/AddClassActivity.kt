@@ -100,7 +100,10 @@ class AddClassActivity : BaseActivity() {
         lifecycleScope.launch(Dispatchers.IO) {
             try {
                 teachersList = api.getTeachers()
-                val names = teachersList.map { "${it.first_name} ${it.last_name}" }
+                // FIX(null-data): نام ناقص/خالی نه «null» نشان می‌دهد و نه ردیف خالی می‌سازد؛
+                // همان تبدیل در هر دو جای این تابع استفاده می‌شود تا انتخاب معلم همچنان تطبیق کند.
+                val fallbackName = getString(R.string.common_person_unknown)
+                val names = teachersList.map { "${it.first_name ?: ""} ${it.last_name ?: ""}".trim().ifEmpty { fallbackName } }
 
                 withContext(Dispatchers.Main) {
                     val acTeacher = findViewById<AutoCompleteTextView>(R.id.acTeacher)
@@ -109,7 +112,7 @@ class AddClassActivity : BaseActivity() {
 
                     acTeacher.setOnItemClickListener { _, _, position, _ ->
                         val selectedName = adapter.getItem(position)
-                        val teacher = teachersList.find { "${it.first_name} ${it.last_name}" == selectedName }
+                        val teacher = teachersList.find { "${it.first_name ?: ""} ${it.last_name ?: ""}".trim().ifEmpty { fallbackName } == selectedName }
                         if (teacher != null) selectedTeacherId = teacher.id
                     }
                 }

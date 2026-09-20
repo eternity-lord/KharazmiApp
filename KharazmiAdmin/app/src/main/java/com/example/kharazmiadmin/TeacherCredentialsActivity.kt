@@ -26,9 +26,11 @@ import retrofit2.http.Query
 // models
 data class TeacherCredentialsResponse(
     val id: Int,
-    val name: String,
-    val national_code: String,
-    val mobile: String,
+    // FIX(null-data): سرور برای رکورد legacy بدون موبایل/کد ملی/نام (قبل از فیکس) null می‌داد —
+    // null‌پذیر تا صفحه‌ی پروفایل/مشخصات مربی با یک رکورد ناقص نشکند (fallback در نمایش).
+    val name: String? = null,
+    val national_code: String? = null,
+    val mobile: String? = null,
     val teacher_code: Int?,
     val password: String,
     val card_number: String?
@@ -165,9 +167,10 @@ class TeacherCredentialsActivity : BaseActivity() {
                 val creds = api.getCredentials(selectedTeacherId)
                 withContext(Dispatchers.Main) {
                     llContainer.visibility = View.VISIBLE
-                    tvName.text = creds.name
+                    // FIX(null-data): فیلدهای ناقص نباید «null» نشان دهند یا به ویو null برسد.
+                    tvName.text = creds.name ?: getString(R.string.common_person_unknown)
                     tvCode.text = getString(R.string.tcred_code_row, creds.teacher_code ?: getString(R.string.tcred_unset))
-                    etMobile.setText(creds.mobile)
+                    etMobile.setText(creds.mobile ?: "")
                     etCardNumber.setText(creds.card_number ?: "")
                     tvCurrentPassword.text = creds.password
                 }
@@ -281,8 +284,13 @@ class CredentialsSearchAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = list[position]
-        holder.title.text = holder.itemView.context.getString(R.string.common_person_row, item.name)
-        holder.subtitle.text = holder.itemView.context.getString(R.string.tcred_sub_row, item.national_code, item.mobile)
+        // FIX(null-data): رکورد ناقص (نام/کد ملی/موبایل null) نباید «null» در ردیف جستجو نشان دهد.
+        val ctx = holder.itemView.context
+        holder.title.text = ctx.getString(
+            R.string.common_person_row,
+            item.name ?: ctx.getString(R.string.common_person_unknown)
+        )
+        holder.subtitle.text = ctx.getString(R.string.tcred_sub_row, item.national_code ?: "", item.mobile ?: "")
         holder.itemView.setOnClickListener { onClick(item) }
     }
 

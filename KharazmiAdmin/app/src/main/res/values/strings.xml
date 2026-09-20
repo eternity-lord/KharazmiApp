@@ -970,6 +970,8 @@
     <string name="common_deleted_msg">🗑️ %1$s</string>
     <string name="common_mobile_row">📱 %1$s</string>
     <string name="common_person_row">👤 %1$s</string>
+    <!-- FIX(null-data): جای‌گزین نام ناقص/خالی مربی در لیست‌ها و فیلترها -->
+    <string name="common_person_unknown">نامشخص</string>
     <string name="common_announce_row">📣 %1$s (%2$s)\n%3$s</string>
     <string name="common_course_status_row">%1$s: %2$s ➔ %3$s</string>
     <string name="common_bullet_row">• %1$s</string>

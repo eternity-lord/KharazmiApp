@@ -14,8 +14,10 @@ from models import (
     Base, Branch, Course, Enrollment, Student, Teacher, User, UserSession,
     SessionLog, Attendance,
 )
-from routers.admin import search_admin_teachers, search_admin_students
-from routers.teachers import get_teacher_full_profile, get_pending_settlement
+from routers.admin import (search_admin_teachers, search_admin_students,
+                            get_pending_teachers, get_teacher_credentials)
+from routers.teachers import (get_teacher_full_profile, get_pending_settlement,
+                              get_all_teachers, get_teacher_profile, get_teachers_excel)
 
 
 class TestTeacherNullData(unittest.TestCase):
@@ -257,6 +259,163 @@ class TestTeacherNullData(unittest.TestCase):
         pending = get_pending_settlement(teacher_id=teacher.id, db=self.db, authorization="Bearer admin-token", sub_role="admin")
         self.assertEqual(pending["teacher_name"], "نامشخص")
         self.assertEqual(pending["session_count"], 0)
+
+    # ------------------------------------------------------------------
+    # 4. لیست مربیان / پروفایل خام مربی / credentials — شکاف‌های باقی‌مانده
+    # ------------------------------------------------------------------
+    def _teacher_list_rows(self):
+        # تماس مستقیم با اندپوینت لیست: skip/limit صریح پاس می‌شوند (پیش‌فرضِ Query فقط در
+        # مسیر HTTP resolve می‌شود و در تماس مستقیم باید مقدار واقعی داده شود).
+        return get_all_teachers(
+            db=self.db, authorization="Bearer admin-token", sub_role="admin", skip=0, limit=None
+        )
+
+    def test_teacher_list_null_mobile_national_code_and_blank_name(self):
+        # بدترین حالت لیست مربیان: نام/موبایل/کد ملی همه NULL.
+        bad = Teacher(first_name=None, last_name=None, mobile=None, national_code=None,
+                      password="x", is_approved=True, is_deleted=False)
+        self.db.add(bad)
+        self.db.commit()
+
+        rows = self._teacher_list_rows()
+        # لیست باید 200 بدهد (نه 500) و شناسه‌ی واقعی رکورد ناقص حفظ شود.
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].id, bad.id)
+        self.assertEqual(rows[0].first_name, "")
+        self.assertEqual(rows[0].last_name, "")
+        # mobile در قرارداد این پاسخ Optional است — رکورد ناقص نباید ValidationError بدهد.
+        self.assertIsNone(rows[0].mobile)
+
+    def test_teacher_list_mixed_good_and_bad_rows_keeps_real_ids(self):
+        good = Teacher(first_name="مریم", last_name="تست", mobile="09120000011",
+                       national_code="0012345601", password="x", is_approved=True, is_deleted=False)
+        bad = Teacher(first_name=None, last_name="ناقص", mobile=None, national_code=None,
+                      password="x", is_approved=True, is_deleted=False)
+        self.db.add_all([good, bad])
+        self.db.commit()
+
+        rows = self._teacher_list_rows()
+        # یک رکورد ناقص نه کل لیست را می‌شکند و نه شناسه‌ها را جابه‌جا می‌کند.
+        self.assertEqual([r.id for r in rows], [good.id, bad.id])
+        self.assertEqual(rows[0].first_name, "مریم")
+        self.assertEqual(rows[0].mobile, "09120000011")
+        self.assertEqual(rows[1].last_name, "ناقص")
+
+    def test_teacher_profile_null_fields_do_not_leak_none(self):
+        teacher = Teacher(first_name=None, last_name=None, mobile=None, national_code=None,
+                          password="x", is_approved=True, is_deleted=False)
+        self.db.add(teacher)
+        self.db.commit()
+
+        profile = get_teacher_profile(
+            teacher_id=teacher.id, db=self.db, authorization="Bearer admin-token", sub_role="admin"
+        )
+        # مدل اپ (TeacherRawProfile) این چهار فیلد را non-null می‌خواند: نباید null نشت کند.
+        self.assertEqual(profile["id"], teacher.id)
+        self.assertEqual(profile["first_name"], "")
+        self.assertEqual(profile["last_name"], "")
+        self.assertEqual(profile["mobile"], "")
+        self.assertEqual(profile["national_code"], "")
+        self.assertNotIn(None, [profile["first_name"], profile["last_name"],
+                                profile["mobile"], profile["national_code"]])
+        self.assertEqual(profile["version"], 1)
+
+    def test_pending_settlement_null_name_with_courses_but_no_sessions(self):
+        # مسیر خروج زودهنگام دوم (کلاس دارد، جلسه ندارد) قبلاً «None None» برمی‌گرداند.
+        teacher = Teacher(first_name=None, last_name=None, mobile="09120000012",
+                          national_code="0012345602", password="x", is_approved=True, is_deleted=False)
+        self.db.add(teacher)
+        self.db.flush()
+        course = Course(title="ریاضی", code="200010", teacher_id=teacher.id, is_admin_approved=True,
+                        is_deleted=False, grade_level="دهم", class_time="16:00-17:30",
+                        days_of_week="شنبه", teacher_session_price=100000)
+        self.db.add(course)
+        self.db.commit()
+
+        pending = get_pending_settlement(
+            teacher_id=teacher.id, db=self.db, authorization="Bearer admin-token", sub_role="admin"
+        )
+        self.assertEqual(pending["teacher_name"], "نامشخص")
+        self.assertEqual(pending["session_count"], 0)
+        self.assertNotIn("None", pending["teacher_name"])
+
+    def test_pending_settlement_null_session_date_does_not_crash(self):
+        teacher = Teacher(first_name="مریم", last_name="تست", mobile="09120000013",
+                          national_code="0012345603", password="x", is_approved=True, is_deleted=False)
+        student = Student(first_name="علی", last_name="تست", national_code="0012345604",
+                          student_mobile="09121111113", wallet_teacher=0, wallet_institute=0, wallet_balance=0)
+        self.db.add_all([teacher, student])
+        self.db.flush()
+        course = Course(title=None, code="200011", teacher_id=teacher.id, is_admin_approved=True,
+                        is_deleted=False, grade_level=None, class_time="16:00-17:30",
+                        days_of_week="شنبه", teacher_session_price=100000)
+        self.db.add(course)
+        self.db.flush()
+        session_log = SessionLog(course_id=course.id, date=None, time="16:00", final_teacher_cost=100000,
+                                 final_institute_share=50000, cost_per_student=150000, attendee_count=1,
+                                 status="Finished", is_deleted=False)
+        self.db.add(session_log)
+        self.db.flush()
+        self.db.add(Attendance(session_id=session_log.id, student_id=student.id, status="Present",
+                               is_billed=False, excused=False, is_deleted=False))
+        self.db.commit()
+
+        pending = get_pending_settlement(
+            teacher_id=teacher.id, db=self.db, authorization="Bearer admin-token", sub_role="admin"
+        )
+        # بدون crash: قرارداد پاسخ کامل است و هیچ مقدار null در ردیف‌ها نیست
+        # (جلسهٔ بی‌تاریخ طبق منطق موجودِ فیلتر تاریخ کنار گذاشته می‌شود — رفتار مالی تغییر نکرد).
+        self.assertEqual(set(pending.keys()), {
+            "teacher_id", "teacher_name", "total_amount", "session_count",
+            "settled_total_amount", "earned_total_amount", "pending_sessions",
+        })
+        self.assertNotIn("None", pending["teacher_name"])
+        for row in pending["pending_sessions"]:
+            self.assertNotIn(None, row.values())
+
+    def test_pending_teachers_list_null_mobile(self):
+        teacher = Teacher(first_name=None, last_name=None, mobile=None, national_code=None,
+                          password="x", is_approved=False, is_deleted=False)
+        self.db.add(teacher)
+        self.db.commit()
+
+        rows = get_pending_teachers(db=self.db, _="admin")
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].id, teacher.id)
+        self.assertEqual(rows[0].first_name, "")
+        self.assertIsNone(rows[0].mobile)
+
+    def test_teacher_credentials_null_mobile_and_national_code(self):
+        # قبلاً response_model با فیلدهای str اجباری، ValidationError/500 می‌داد.
+        teacher = Teacher(first_name=None, last_name=None, mobile=None, national_code=None,
+                          password=None, is_approved=True, is_deleted=False)
+        self.db.add(teacher)
+        self.db.commit()
+
+        creds = get_teacher_credentials(id=teacher.id, db=self.db, _="admin")
+        self.assertEqual(creds.id, teacher.id)
+        self.assertEqual(creds.name, "نامشخص")
+        self.assertEqual(creds.national_code, "")
+        self.assertEqual(creds.mobile, "")
+        self.assertEqual(creds.password, "")
+
+    def test_teachers_excel_null_course_title_and_name(self):
+        # قبلاً TypeError: sequence item 0: expected str instance, NoneType found (500).
+        teacher = Teacher(first_name=None, last_name=None, mobile=None, national_code=None,
+                          password="x", is_approved=True, is_deleted=False)
+        self.db.add(teacher)
+        self.db.flush()
+        course = Course(title=None, code=None, teacher_id=teacher.id, is_admin_approved=True,
+                        is_deleted=False, grade_level=None, class_time="16:00-17:30",
+                        days_of_week="شنبه", teacher_session_price=100000)
+        self.db.add(course)
+        self.db.commit()
+
+        response = get_teachers_excel(db=self.db, _="admin")
+        self.assertEqual(
+            response.media_type,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
 
 
 if __name__ == "__main__":

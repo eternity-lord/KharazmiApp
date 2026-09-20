@@ -49,7 +49,13 @@ data class TeacherRegisterData(
     val profile_image: String? = null
 )
 
-data class TeacherSimple(val id: Int, val first_name: String, val last_name: String)
+// FIX(null-data): نام legacy ممکن است null/خالی باشد — null‌پذیر تا یک رکورد ناقص
+// لیست مربیان (انتخاب معلم در کلاس) را نشکند؛ فال‌بک در محل نمایش.
+data class TeacherSimple(
+    val id: Int,
+    val first_name: String? = null,
+    val last_name: String? = null
+)
 
 // ==========================================
 // 4. دانش‌آموزان (Students)
@@ -227,12 +233,14 @@ data class StudentRawProfile(
 
 data class TeacherRawProfile(
     val id: Int,
-    val first_name: String,
-    val last_name: String,
+    // FIX(null-data): رکوردهای legacy ممکن است این چهار فیلد را NULL داشته باشند و
+    // پاسخ خام سرور قبلاً null می‌داد — null‌پذیر + فال‌بک امن در پروفایل/فرم ویرایش مربی.
+    val first_name: String? = null,
+    val last_name: String? = null,
     val father_name: String?,
-    val national_code: String,
+    val national_code: String? = null,
     val birth_date: String?,
-    val mobile: String,
+    val mobile: String? = null,
     val home_phone: String?,
     val marital_status: String?,
     val gender: String?,

@@ -721,15 +721,38 @@ def get_pending_settlement(
     from today_summary import parse_project_date  # lazy, same pattern as routers/analytics.py
     start_day = parse_project_date(start_date) if start_date else None
     end_day = parse_project_date(end_date) if end_date else None
+
+    def _parsed(value):
+        try:
+            return parse_project_date(value)
+        except Exception:
+            return None
+
     def _in_range(value):
-        parsed = parse_project_date(value)
+        # FIX(undated-sessions): قبلاً این تابع برای هر مقدارِ غیرقابل‌parse — از جمله date=NULL —
+        # `return False` می‌داد و جلسه بی‌صدا حذف می‌شد؛ حتی وقتی کاربر هیچ بازه‌ای درخواست نکرده
+        # بود (start/end هر دو None). نتیجه: طلب و تعداد جلسات معلم کمتر از واقع نمایش داده می‌شد.
+        # این endpoint فهرست «طلبِ تسویه‌نشده» است، نه گزارش تقویمی؛ تاریخِ نامعلوم دلیلِ حذف یک
+        # طلب باز نیست. پس:
+        #   • بدون بازه ⇒ همه‌ی جلسه‌ها (با تاریخ و بی‌تاریخ) می‌آیند.
+        #   • با بازه ⇒ فقط جلسه‌های دارای تاریخِ معتبر با بازه محدود می‌شوند؛ بی‌تاریخ/نامعتبر
+        #     می‌ماند (نمی‌توان اثبات کرد بیرون بازه است) و هیچ تاریخ جعلی تولید نمی‌شود.
+        parsed = _parsed(value)
         if parsed is None:
-            return False
+            return True
         if start_day is not None and parsed < start_day:
             return False
         if end_day is not None and parsed > end_day:
             return False
         return True
+
+    def _api_date(value):
+        """تاریخِ قابل‌نمایش در API: تاریخ معتبر ⇒ همان مقدار ذخیره‌شده؛ بدون تاریخ/نامعتبر ⇒ \"\".
+
+        هرگز تاریخ جعلی (امروز/پیش‌فرض) ساخته نمی‌شود و مقدار ذخیره‌شده هم دست‌کاری نمی‌شود.
+        """
+        return value if _parsed(value) is not None else ""
+
     # FIX: Bug 14 - exclude archived SessionLog rows from this active view.
     q_sessions = db.query(SessionLog).filter(SessionLog.is_deleted == False).filter(SessionLog.course_id.in_(course_ids))
 
@@ -765,7 +788,9 @@ def get_pending_settlement(
         if sess.id not in pending_sessions:
             pending_sessions[sess.id] = {
                 "session_id": sess.id,
-                "date": sess.date or "",
+                # FIX(undated-sessions): تاریخ نامعتبر/NULL به "" نگاشت می‌شود (بدون تاریخ جعلی)
+                # تا کلاینت بتواند «تاریخ نامشخص» نشان دهد و ردیف از لیست حذف نشود.
+                "date": _api_date(sess.date),
                 # FIX(null-data): Course.title legacy ممکن است NULL باشد — فال‌بک مناسب به‌جای null.
                 "class_title": cls.title or "کلاس بدون عنوان",
                 # FIX: H6(A2) - طلب معلم از جلسه = مبلغ قراردادی + جریمه‌ی غایبین غیرموجه.
@@ -782,7 +807,8 @@ def get_pending_settlement(
             _cls = course_map[_sess.course_id]
             pending_sessions[_sid] = {
                 "session_id": _sid,
-                "date": _sess.date or "",
+                # FIX(undated-sessions): همان قرارداد تاریخ (معتبر ⇒ همان مقدار، نامعلوم ⇒ "")
+                "date": _api_date(_sess.date),
                 # FIX(null-data): Course.title legacy ممکن است NULL باشد — فال‌بک مناسب به‌جای null.
                 "class_title": _cls.title or "کلاس بدون عنوان",
                 "amount": (_sess.final_teacher_cost or 0) + (_sess.absent_penalty_teacher or 0),
@@ -800,7 +826,10 @@ def get_pending_settlement(
         "session_count": len(session_list),
         "settled_total_amount": settled_total,
         "earned_total_amount": settled_total + total_amount,
-        "pending_sessions": sorted(session_list, key=lambda x: x["date"], reverse=True)
+        # FIX(undated-sessions): ترتیب قطعی (deterministic) — تاریخ نزولی و در تاریخِ یکسان،
+        # session_id نزولی به‌عنوان tie-breaker؛ قبلاً ترتیبِ ردیف‌های هم‌تاریخ به ترتیب
+        # بازگشتی دیتابیس وابسته بود. ردیف‌های بی‌تاریخ (date="") در انتهای لیست می‌آیند.
+        "pending_sessions": sorted(session_list, key=lambda x: (x["date"], x["session_id"]), reverse=True)
     }
 
 

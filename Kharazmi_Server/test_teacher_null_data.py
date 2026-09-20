@@ -363,8 +363,10 @@ class TestTeacherNullData(unittest.TestCase):
         pending = get_pending_settlement(
             teacher_id=teacher.id, db=self.db, authorization="Bearer admin-token", sub_role="admin"
         )
-        # بدون crash: قرارداد پاسخ کامل است و هیچ مقدار null در ردیف‌ها نیست
-        # (جلسهٔ بی‌تاریخ طبق منطق موجودِ فیلتر تاریخ کنار گذاشته می‌شود — رفتار مالی تغییر نکرد).
+        # بدون crash: قرارداد پاسخ کامل است و هیچ مقدار null در ردیف‌ها نیست.
+        # FIX(undated-sessions): جلسهٔ بی‌تاریخ دیگر توسط فیلتر تاریخ کنار گذاشته نمی‌شود؛
+        # با date="" در لیست و در total_amount/session_count می‌آید (تست اختصاصی آن در
+        # test_undated_pending_settlement.py است). assertionهای ساختاری این تست دست‌نخورده‌اند.
         self.assertEqual(set(pending.keys()), {
             "teacher_id", "teacher_name", "total_amount", "session_count",
             "settled_total_amount", "earned_total_amount", "pending_sessions",

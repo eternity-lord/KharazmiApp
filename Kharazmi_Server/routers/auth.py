@@ -16,7 +16,7 @@ from models import (
 from schemas import (
     HistoryRequest, LoginRequest, TeacherInfo, FullTeacherProfile, StudentCreate, TeacherCreate, CourseCreate, EnrollmentCreate, GradeCreate, GradeItem, AttendanceLogRequest, AttendanceItem, AttendanceSubmitData, SmsSendRequest, ChangePasswordRequest, StudentProfileInfo, FullStudentProfile, TeacherProfileInfo, FullTeacherProfile, ClassReportInfo, ClassStudentData, ClassSessionHistory, FullClassReport, ShareConfigModel, StudentUpdate, TeacherUpdate, PersonListItem, TransactionUpdate, StudentAttendanceHistoryRequest, AdvancedSearchItem, FinanceSubmitData, PrintReceiptRequest, TransactionTestData
 )
-from dependencies import get_db, check_admin_access, check_user_login, get_enrollment_tuition_and_discount, SESSION_EXPIRY_DAYS, limiter, get_current_user, hash_password, verify_password, ROLE_PERMISSIONS, create_jwt_token, ensure_student_shadow_users, get_session_student, get_session_parent, normalize_mobile
+from dependencies import get_db, check_admin_access, check_user_login, get_enrollment_tuition_and_discount, SESSION_EXPIRY_DAYS, limiter, get_current_user, hash_password, verify_password, ROLE_PERMISSIONS, create_jwt_token, ensure_student_shadow_users, get_session_student, get_session_parent, normalize_mobile, resolve_notification_role
 
 router = APIRouter()
 
@@ -611,10 +611,10 @@ def register_device_token(req: DeviceTokenRequest, db: Session = Depends(get_db)
 
 @router.get("/notifications")
 def get_notifications(db: Session = Depends(get_db), current_user = Depends(get_current_user), _: str = Depends(check_user_login)):
-    role = current_user.sub_role or "student"
-    if role.startswith("temp_parent:"):
-        role = "parent"
-        
+    # FIX(admin-notifications): نقش با helper مشترک resolve می‌شود (نه `sub_role or "student"`)
+    # تا ادمینِ legacy با sub_role خالی هم اعلان‌های نقش admin خودش را ببیند.
+    role = resolve_notification_role(current_user)
+
     notifs = (
         db.query(Notification)
         .filter(Notification.recipient_user_id == current_user.id, Notification.recipient_role == role)
@@ -627,30 +627,55 @@ def get_notifications(db: Session = Depends(get_db), current_user = Depends(get_
             "type": n.type,
             "title": n.title,
             "body": n.body,
-            "is_read": n.is_read,
-            "created_at": n.created_at.strftime("%Y/%m/%d %H:%M")
+            # FIX(admin-notifications): is_read می‌تواند NULL باشد (رکورد legacy) — به boolean واقعی
+            # نرمال می‌شود تا پاسخ هیچ‌وقت null به کلاینت ندهد (کلاینت هم جداگانه null-safe است).
+            "is_read": bool(n.is_read),
+            # FIX(admin-notifications): created_at در رکوردهای legacy می‌تواند NULL باشد و
+            # `None.strftime(...)` کل لیست را ۵۰۰ می‌کرد (AttributeError) ⇒ کل صندوق ادمین
+            # با یک رکورد قدیمی از کار می‌افتاد. حالا رشته‌ی خالی برمی‌گردد.
+            "created_at": n.created_at.strftime("%Y/%m/%d %H:%M") if n.created_at else ""
         }
         for n in notifs
     ]
 
+
+@router.get("/notifications/unread_count")
+def get_unread_notifications_count(db: Session = Depends(get_db), current_user = Depends(get_current_user), _: str = Depends(check_user_login)):
+    """FIX(admin-notifications): شمارش اعلان‌های خوانده‌نشده‌ی خودِ کاربر (قبلاً چنین endpointی وجود نداشت).
+
+    همین فیلترِ لیست اعمال می‌شود (recipient_user_id + role کانونیکال) ⇒ هیچ شمارش/داده‌ی
+    کاربر دیگر برنمی‌گردد. is_read=NULL (رکورد legacy) خوانده‌نشده حساب می‌شود.
+    """
+    role = resolve_notification_role(current_user)
+    base = db.query(Notification).filter(
+        Notification.recipient_user_id == current_user.id,
+        Notification.recipient_role == role,
+    )
+    total = base.count()
+    unread = base.filter(or_(Notification.is_read.is_(None), Notification.is_read == False)).count()  # noqa: E712
+    return {"unread": unread, "total": total}
+
+
 @router.post("/notifications/{id}/read")
 def mark_notification_read(id: int, db: Session = Depends(get_db), current_user = Depends(get_current_user), _: str = Depends(check_user_login)):
-    role = current_user.sub_role or "student"
-    if role.startswith("temp_parent:"):
-        role = "parent"
-        
+    # FIX(admin-notifications): همان نقش کانونیکال لیست (وگرنه اعلانِ دیده‌شده هرگز read نمی‌شد).
+    role = resolve_notification_role(current_user)
+
     notif = db.query(Notification).filter(Notification.id == id, Notification.recipient_user_id == current_user.id, Notification.recipient_role == role).first()
-    if notif:
-        notif.is_read = True
-        db.commit()
+    if not notif:
+        # FIX(admin-notifications): قبلاً ۲۰۰ با پیام موفقیت برمی‌گشت (no-op خاموش) و کاربر
+        # فکر می‌کرد اعلان خوانده شده؛ حالا خطای controlled و بدون نشت وجود رکورد کاربر دیگر.
+        raise HTTPException(status_code=404, detail="اعلان یافت نشد")
+    notif.is_read = True
+    db.commit()
     return {"message": "اعلان به عنوان خوانده شده ثبت شد"}
+
 
 @router.post("/notifications/read_all")
 def mark_all_notifications_read(db: Session = Depends(get_db), current_user = Depends(get_current_user), _: str = Depends(check_user_login)):
-    role = current_user.sub_role or "student"
-    if role.startswith("temp_parent:"):
-        role = "parent"
-        
+    # FIX(admin-notifications): همان نقش کانونیکال (فقط اعلان‌های خودِ کاربر).
+    role = resolve_notification_role(current_user)
+
     db.query(Notification).filter(Notification.recipient_user_id == current_user.id, Notification.recipient_role == role).update({"is_read": True})
     db.commit()
     return {"message": "تمامی اعلان‌ها خوانده شدند"}

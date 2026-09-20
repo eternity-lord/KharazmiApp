@@ -1085,6 +1085,12 @@
     <string name="lcls_end_msg">آیا از پایان این کلاس زنده و ثبت نهایی حضور و غیاب (با محاسبه‌ی شهریه) اطمینان دارید؟</string>
     <string name="lcls_done_msg">✅ جلسه ثبت شد. سهم معلم: %1$s | سهم آموزشگاه: %2$s</string>
     <string name="lcls_end_error">خطا در پایان کلاس: %1$s</string>
+    <!-- FIX(admin-notifications): ورودی منو + حالت خالی + شمارش خوانده‌نشده + عنوان نامشخص -->
+    <string name="nav_notifications">اعلان‌ها</string>
+    <string name="notif_unread_count">%1$d اعلان خوانده‌نشده</string>
+    <string name="notif_empty">هیچ اعلانی وجود ندارد</string>
+    <string name="notif_empty_filter">اعلانی با این فیلتر وجود ندارد</string>
+    <string name="notif_untitled">اعلان بدون عنوان</string>
     <string name="notif_readall_title">تایید خوانده شدن همه</string>
     <string name="notif_readall_msg">آیا از علامت‌گذاری تمامی اعلان‌ها به عنوان خوانده شده اطمینان دارید؟</string>
     <string name="notif_list_error">خطا در دریافت لیست اعلان‌ها</string>

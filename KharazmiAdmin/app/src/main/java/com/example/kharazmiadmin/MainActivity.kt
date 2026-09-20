@@ -169,6 +169,9 @@ class MainActivity : BaseActivity() {
                 R.id.nav_chart -> startActivity(Intent(this, ChartActivity::class.java))
                 R.id.nav_sms -> startActivity(Intent(this, SmsActivity::class.java))
                 R.id.nav_settings -> startActivity(Intent(this, SettingsActivity::class.java))
+                // FIX(admin-notifications): ورودیِ گمشده‌ی «مرکز اعلان‌ها» — قبلاً هیچ‌جای اپ این
+                // صفحه را باز نمی‌کرد (فقط در AndroidManifest ثبت بود) ⇒ اعلان ادمین هرگز دیده نمی‌شد.
+                R.id.nav_notifications -> startActivity(Intent(this, NotificationCenterActivity::class.java))
                 R.id.nav_institute_settings -> startActivity(Intent(this, InstituteSettingsActivity::class.java))
                 R.id.nav_deleted_classes -> showDeletedClassesDialog()
                 R.id.nav_audit_radar -> {

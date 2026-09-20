@@ -744,6 +744,26 @@ def resolve_notification_recipient(db: Session, subject_id: int, role: str) -> O
     return subject_id
 
 
+# FIX(admin-notifications): نقش کانونیکالِ notification — تنها مرجعِ مشترک بین «نوشتن»
+# (recipient_role هنگام ساخت) و «خواندن» (فیلتر get_notifications/mark-read/read_all).
+# قبلاً خواندن از `sub_role or "student"` استفاده می‌کرد ولی بقیه‌ی پروژه (login،
+# check_admin_access، check_user_login) `sub_role or "admin"` داشت ⇒ برای ادمینِ legacy
+# (رکوردی که sub_role آن NULL است و role="admin") اعلان‌های نقش admin ساخته می‌شد
+# ولی هرگز نمایش داده نمی‌شد. حالا fallback به role و در نهایت "student" است تا هم
+# ادمینِ قدیمی اعلانش را ببیند و هم رفتار فعلی شاگرد/ولی تغییر نکند.
+STAFF_NOTIFICATION_ROLES = ("admin", "secretary")
+
+
+def resolve_notification_role(user) -> str:
+    """نقش کانونیکال کاربر برای notification (همان رشته‌ای که در recipient_role ذخیره می‌شود)."""
+    if user is None:
+        return "student"
+    role = (user.sub_role or "").strip() or (getattr(user, "role", None) or "").strip() or "student"
+    if role.startswith("temp_parent:"):
+        return "parent"
+    return role
+
+
 ROLE_PERMISSIONS = {
     "admin": ["*"],
     "secretary": [
@@ -944,3 +964,45 @@ class NotificationService:
         if commit:
             db.commit()
         return new_notification
+
+    # ------------------------------------------------------------------
+    # FIX(admin-notifications): گیرندگان اعلانِ کارکنان — همیشه از فضای User.id.
+    # ------------------------------------------------------------------
+    @staticmethod
+    def get_staff_recipients(db: Session, branch_id: Optional[int] = None):
+        """لیست (user_id, role) کارکنانِ مجاز برای دریافت اعلان ادمینی.
+
+        - منبعِ شناسه: جدول users (User.id) — هرگز Student.id/Teacher.id.
+        - رکورد legacy با sub_role خالی: role جایگزین می‌شود (coalesce/nullif) — همان قرارداد
+          resolve_notification_role؛ وگرنه ادمینِ قدیمی هیچ اعلانی نمی‌گرفت.
+        - branch_id مشخص: کارکنانِ همان شعبه + کارکنانِ بدون شعبه (ادمین کل) — آینه‌ی policy
+          «شعبه‌ی خودم + بدون‌شعبه» که در مسیرهای ادمین استفاده می‌شود ⇒ شعبه‌ی دیگر نمی‌بیند.
+        - branch_id نامشخص (None): همه‌ی کارکنان (اعلان بی‌صاحب رها نمی‌شود).
+        """
+        from sqlalchemy import func, or_
+        canonical = func.lower(func.coalesce(
+            func.nullif(User.sub_role, ""), func.nullif(User.role, ""), "student"
+        ))
+        q = db.query(User).filter(canonical.in_(STAFF_NOTIFICATION_ROLES))
+        if branch_id is not None:
+            q = q.filter(or_(User.branch_id == branch_id, User.branch_id.is_(None)))
+        return [(u.id, resolve_notification_role(u)) for u in q.order_by(User.id).all()]
+
+    @staticmethod
+    def send_to_staff(db: Session, *, type: str, title: str, body: str,
+                      data: Optional[dict] = None, branch_id: Optional[int] = None,
+                      priority: int = 1):
+        """ارسال اعلان به کارکنانِ مجاز (ادمین/منشی) — شناسه‌ها از فضای User.id.
+
+        جایگزین الگوی غلط `trigger_notification_action(..., 1, "admin", ...)` که اعلان را
+        همیشه به کاربرِ شماره ۱ می‌فرستاد (معمولاً ادمین نبود ⇒ اعلان هیچ‌وقت دیده نمی‌شد).
+        """
+        created = []
+        for user_id, role in NotificationService.get_staff_recipients(db, branch_id=branch_id):
+            created.append(NotificationService.send_notification(
+                db, recipient_user_id=user_id, recipient_role=role,
+                type=type, title=title, body=body, data=data,
+                priority=priority, commit=False,  # یک commit واحد برای کل fan-out
+            ))
+        db.commit()
+        return created

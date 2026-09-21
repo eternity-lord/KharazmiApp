@@ -72,7 +72,8 @@ def create_exam(
     db.refresh(new_exam)
     
     # Automation: Notify all students enrolled
-    enrolls = db.query(Enrollment).filter(Enrollment.course_id == req.course_id).all()
+    enrolls = db.query(Enrollment).filter(Enrollment.course_id == req.course_id,
+                                         Enrollment.is_deleted == False).all()  # O-04: فقط ثبت‌نام‌های فعال — شاگرد حذف‌شده نباید اعلان بگیرد
     for en in enrolls:
         st = db.query(Student).filter(Student.id == en.student_id).first()
         if st is None:
@@ -133,7 +134,8 @@ def get_student_exams_list(
         raise HTTPException(status_code=401, detail="نشست معتبر نیست؛ لطفاً دوباره وارد شوید")
     student_id = own.id
 
-    enrolls = db.query(Enrollment).filter(Enrollment.student_id == student_id).all()
+    enrolls = db.query(Enrollment).filter(Enrollment.student_id == student_id,
+                                         Enrollment.is_deleted == False).all()  # O-04: لیست آزمون/کارنامه فقط از ثبت‌نام‌های فعال
     course_ids = [en.course_id for en in enrolls if en.course]
 
     exams = db.query(Exam).filter(Exam.course_id.in_(course_ids)).all()
@@ -186,7 +188,8 @@ def start_exam_attempt(
         raise HTTPException(status_code=404, detail="آزمون یافت نشد")
     enrollment = db.query(Enrollment).filter(
         Enrollment.student_id == student_id,
-        Enrollment.course_id == exam.course_id
+        Enrollment.course_id == exam.course_id,
+        Enrollment.is_deleted == False,  # O-04: شرکت در آزمون فقط با ثبت‌نام فعال
     ).first()
     if not enrollment:
         raise HTTPException(status_code=403, detail="شما در کلاس مربوط به این آزمون ثبت‌نام نشده‌اید")
@@ -327,7 +330,8 @@ def get_student_report_card(
     if not student:
         raise HTTPException(status_code=404, detail="دانش‌آموز یافت نشد")
         
-    enrolls = db.query(Enrollment).filter(Enrollment.student_id == student_id).all()
+    enrolls = db.query(Enrollment).filter(Enrollment.student_id == student_id,
+                                         Enrollment.is_deleted == False).all()  # O-04: لیست آزمون/کارنامه فقط از ثبت‌نام‌های فعال
     
     courses_details = []
     total_scores = []

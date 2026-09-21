@@ -87,6 +87,7 @@ class HomeworkExamWorld(unittest.TestCase):
         self.db.add_all([
             models.UserSession(token="tok-teacher", user_id=51, teacher_id=51, sub_role="teacher",
                                created_at=now),
+            models.UserSession(token="tok-admin", user_id=101, sub_role="admin", created_at=now),
             models.UserSession(token="tok-student", user_id=201, sub_role="student", created_at=now),
             models.UserSession(token="tok-student2", user_id=203, sub_role="student", created_at=now),
             models.UserSession(token="tok-parent", user_id=202, sub_role="parent", created_at=now),
@@ -138,20 +139,17 @@ class TestHomeworkFlow(HomeworkExamWorld):
         self.assertEqual(len(notes), 1, "دانش‌آموزِ ثبت‌نام‌شده باید اعلان تکلیف بگیرد")
         self.assertEqual(notes[0].type, "homework")
 
-    def test_2_archived_enrollment_still_receives_homework_notification_bug(self):
-        """🐞 باگ (نشت اعلان به دانش‌آموزِ خارج‌شده از کلاس):
+    def test_2_archived_enrollment_gets_no_homework_notification(self):
+        """O-04 (رفع‌شده): اعلان «تکلیف جدید» فقط برای ثبت‌نام‌های **فعال** ارسال می‌شود.
 
-        در `routers/homework.py:94` اعلان تکلیف برای **همهٔ** ردیف‌های ثبت‌نام ارسال می‌شود:
-            enrolls = db.query(Enrollment).filter(Enrollment.course_id == req.course_id).all()
-        فیلترِ `Enrollment.is_deleted == False` وجود ندارد ⇒ دانش‌آموزی که از کلاس حذف/خارج شده
-        هم اعلان «تکلیف جدید» می‌گیرد (و تکلیف در لیست او دیده می‌شود).
-        این تست رفتار فعلی را مستند می‌کند؛ بعد از رفع باید آگاهانه به‌روزرسانی شود.
+        پیش از فیکس، `routers/homework.py:94` همهٔ ردیف‌های ثبت‌نام (حتی آرشیوشده) را
+        می‌گرفت ⇒ دانش‌آموزی که از کلاس خارج شده بود هم اعلان تکلیف می‌گرفت.
         """
         self.assertEqual(self.create_homework().status_code, 200)
+        active = self.notifications(201, "student")
+        self.assertEqual(len(active), 1, "شاگردِ فعال باید اعلان بگیرد (رگرسیون)")
         leaked = self.notifications(203, "student")
-        self.assertEqual(len(leaked), 1,
-                         "❗ رفتار فعلی: دانش‌آموزِ ثبت‌نامِ آرشیوشده هم اعلان می‌گیرد")
-        self.assertEqual(leaked[0].type, "homework")
+        self.assertEqual(leaked, [], "شاگردِ حذف‌شده نباید اعلان تکلیف بگیرد")
 
     def test_3_student_lists_homework_and_submits_file(self):
         hw_id = self.create_homework().json()["id"]
@@ -267,14 +265,12 @@ class TestExamFlow(HomeworkExamWorld):
         self.assertTrue(any(n.type == "exam" for n in notes),
                         "اعلان «آزمون جدید» هم باید در زمان ساخت آزمون ارسال شده باشد")
 
-    def test_8_exam_notification_also_leaks_to_archived_enrollment_bug(self):
-        """🐞 همان باگ نشت اعلان، این بار در `routers/exams.py` (آزمون):
-        `Enrollment.course_id == req.course_id` بدون فیلتر `is_deleted` ⇒ اعلان آزمون برای
-        دانش‌آموزِ خارج‌شده از کلاس هم ارسال می‌شود.
-        """
+    def test_8_exam_notification_does_not_leak_to_archived_enrollment(self):
+        """O-04 (رفع‌شده): اعلان «آزمون جدید» هم فقط برای ثبت‌نام‌های فعال ارسال می‌شود."""
         self.assertEqual(self.create_exam().status_code, 200)
-        leaked = self.notifications(203, "student")
-        self.assertEqual(len(leaked), 1, "❗ رفتار فعلی: نشت اعلان آزمون به ثبت‌نام آرشیوشده")
+        self.assertEqual(len(self.notifications(201, "student")), 1, "شاگردِ فعال اعلان می‌گیرد")
+        self.assertEqual(self.notifications(203, "student"), [],
+                         "شاگردِ حذف‌شده نباید اعلان آزمون بگیرد")
 
     def test_9_exam_visible_in_student_portal_with_int_max_score(self):
         exam_id = self.create_exam().json()["exam_id"]
@@ -313,18 +309,12 @@ class TestRemovedStudentAccess(HomeworkExamWorld):
     (dependencies.py:382) ⇒ `Enrollment.is_deleted = True`.
     """
 
-    def test_11_removed_student_keeps_full_homework_and_exam_access_bug(self):
-        """🐞 باگ (منطق کد/دسترسی — خانوادهٔ تکالیف و آزمون):
+    def test_11_removed_student_loses_homework_and_exam_access(self):
+        """O-04 (رفع‌شده): دانش‌آموزی که ثبت‌نامش آرشیو شده، هیچ دسترسی‌ای به تکالیف/آزمون‌های
+        آن کلاس ندارد و پورتال هم (که از قبل درست فیلتر می‌کرد) چیزی نشان نمی‌دهد.
 
-        هیچ‌کدام از مسیرهای زیر `Enrollment.is_deleted == False` را فیلتر نمی‌کنند:
-            homework.py:94  → اعلان تکلیف
-            homework.py:158 → لیست تکالیف دانش‌آموز
-            homework.py:203 → مجوز تحویل فایل
-            homework.py:315 → نمای ولی
-            exams.py:75/136 → اعلان و لیست آزمون‌ها
-            exams.py:187    → مجوز شرکت در آزمون
-        ⇒ دانش‌آموزی که از کلاس حذف شده، باز هم تکلیف می‌بیند، فایل تحویل می‌دهد و
-        در آزمون شرکت می‌کند. (پورتال /students/my_profile درست عمل می‌کند — C6 فیلتر دارد.)
+        مسیر حذف: ادمین → `DELETE /enrollments/{id}` (classes.py:489) →
+        `perform_delete_enrollment` (dependencies.py:382) ⇒ `Enrollment.is_deleted = True`.
         """
         hw = self.create_homework(title="تکلیف کلاسِ ترک‌شده").json()
         exam_id = self.create_exam().json()["exam_id"]
@@ -332,28 +322,52 @@ class TestRemovedStudentAccess(HomeworkExamWorld):
             "question_text": "۱+۱؟", "type": "multiple_choice", "options": "۱,۲",
             "correct_answer": "۲", "score_weight": 20.0}, headers=hdr("tok-teacher"))
 
+        # ۱) لیست تکالیف: نباید تکلیف کلاسِ ترک‌شده را ببیند
         listing = self.client.get("/homework/student/list", headers=hdr("tok-student2"))
         self.assertEqual(listing.status_code, 200, listing.text)
-        titles = [h["title"] for h in listing.json()]
-        self.assertIn("تکلیف کلاسِ ترک‌شده", titles,
-                      "❗ رفتار فعلی: دانش‌آموزِ حذف‌شده تکلیف کلاس را می‌بیند")
+        self.assertNotIn("تکلیف کلاسِ ترک‌شده", [h["title"] for h in listing.json()],
+                         "شاگردِ حذف‌شده نباید تکلیف کلاس را ببیند")
 
+        # ۲) تحویل فایل: باید ۴۰۳ بگیرد
         submit = self.client.post(f"/homework/submissions/{hw['id']}/submit",
                                   files={"file": ("x.pdf", b"%PDF-1.4 x", "application/pdf")},
                                   headers=hdr("tok-student2"))
-        self.assertEqual(submit.status_code, 200,
-                         "❗ رفتار فعلی: تحویل تکلیف برای ثبت‌نام آرشیوشده مجاز است (باید ۴۰۳)")
+        self.assertEqual(submit.status_code, 403, submit.text)
+        self.assertIsNone(self.db.query(models.HomeworkSubmission).filter(
+            models.HomeworkSubmission.homework_id == hw["id"],
+            models.HomeworkSubmission.student_id == 42).first(),
+            "هیچ ردیف تحویلی نباید ساخته شود")
 
+        # ۳) شرکت در آزمون: باید ۴۰۳ بگیرد
         exam_start = self.client.post(f"/exams/attempts/{exam_id}/start", headers=hdr("tok-student2"))
-        self.assertEqual(exam_start.status_code, 200,
-                         "❗ رفتار فعلی: شرکت در آزمون برای ثبت‌نام آرشیوشده مجاز است (باید ۴۰۳)")
+        self.assertEqual(exam_start.status_code, 403, exam_start.text)
+        self.assertIsNone(self.db.query(models.ExamAttempt).filter(
+            models.ExamAttempt.exam_id == exam_id,
+            models.ExamAttempt.student_id == 42).first(), "هیچ تلاش آزمونی ثبت نشود")
 
+        # ۴) کارنامهٔ شاگرد (exams.py:330) هم نباید داده‌ای از کلاسِ ترک‌شده بدهد
+        report_card = self.client.get("/students/42/report_card", headers=hdr("tok-admin"))
+        self.assertEqual(report_card.status_code, 200, report_card.text)
+        self.assertEqual(report_card.json().get("exams", []), [],
+                         "کارنامه نباید آزمون کلاسِ ترک‌شده را نشان دهد")
+
+        # ۵) پورتال (از قبل درست بود — شاهد ناسازگاری قبلی)
         portal = self.client.get("/students/my_profile", headers=hdr("tok-student2"))
-        portal_titles = [h["title"] for h in portal.json()["homework"]]
-        portal_exams = [e["title"] for e in portal.json()["exams"]]
-        self.assertNotIn("تکلیف کلاسِ ترک‌شده", portal_titles,
-                         "✅ پورتال درست فیلتر می‌کند (ناسازگاری با مسیرهای بالا خودش شاهد باگ است)")
-        self.assertNotIn("آزمون فصل ۳", portal_exams)
+        self.assertNotIn("تکلیف کلاسِ ترک‌شده", [h["title"] for h in portal.json()["homework"]])
+        self.assertNotIn("آزمون فصل ۳", [e["title"] for e in portal.json()["exams"]])
+
+    def test_12_active_student_keeps_full_access(self):
+        """رگرسیون O-04: شاگردِ فعال همچنان تکلیف می‌بیند/تحویل می‌دهد و در آزمون شرکت می‌کند."""
+        hw = self.create_homework().json()
+        self.assertIn("صفحه ۲۵ تا ۳۰",
+                      [h["title"] for h in self.client.get("/homework/student/list",
+                                                           headers=hdr("tok-student")).json()])
+        self.assertEqual(self.client.post(f"/homework/submissions/{hw['id']}/submit",
+                                          files={"file": ("ok.pdf", b"%PDF-1.4 x", "application/pdf")},
+                                          headers=hdr("tok-student")).status_code, 200)
+        exam_id = self.create_exam().json()["exam_id"]
+        self.assertEqual(self.client.post(f"/exams/attempts/{exam_id}/start",
+                                          headers=hdr("tok-student")).status_code, 200)
 
 
 if __name__ == "__main__":

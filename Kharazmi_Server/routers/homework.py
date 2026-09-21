@@ -91,7 +91,8 @@ def create_homework(
     db.refresh(new_hw)
     
     # Automation: Homework Created -> Notify all enrolled students
-    enrolls = db.query(Enrollment).filter(Enrollment.course_id == req.course_id).all()
+    enrolls = db.query(Enrollment).filter(Enrollment.course_id == req.course_id,
+                                         Enrollment.is_deleted == False).all()  # O-04: فقط ثبت‌نام‌های فعال — شاگرد حذف‌شده نباید اعلان بگیرد
     for en in enrolls:
         st = db.query(Student).filter(Student.id == en.student_id).first()
         if st is None:
@@ -155,7 +156,8 @@ def get_student_homework_list(
         raise HTTPException(status_code=401, detail="نشست معتبر نیست؛ لطفاً دوباره وارد شوید")
     student_id = own.id
 
-    enrolls = db.query(Enrollment).filter(Enrollment.student_id == student_id).all()
+    enrolls = db.query(Enrollment).filter(Enrollment.student_id == student_id,
+                                         Enrollment.is_deleted == False).all()  # O-04: کلاس‌های ترک‌شده تکلیف/آزمون نشان داده نمی‌شوند
     course_ids = [en.course_id for en in enrolls if en.course]
     
     hws = db.query(Homework).filter(Homework.course_id.in_(course_ids)).order_by(desc(Homework.id)).all()
@@ -200,7 +202,9 @@ async def submit_homework_file(
     if not hw:
         raise HTTPException(status_code=404, detail="تکلیف یافت نشد")
         
-    enrolled = db.query(Enrollment).filter(Enrollment.student_id == student_id, Enrollment.course_id == hw.course_id).first()
+    enrolled = db.query(Enrollment).filter(Enrollment.student_id == student_id,
+                                           Enrollment.course_id == hw.course_id,
+                                           Enrollment.is_deleted == False).first()  # O-04: تحویل فایل فقط با ثبت‌نام فعال
     if not enrolled:
         raise HTTPException(status_code=403, detail="شما در این کلاس ثبت‌نام نکرده‌اید")
         
@@ -312,7 +316,8 @@ def get_parent_child_homework(
     elif session.sub_role not in ("admin", "secretary"):
         raise HTTPException(status_code=403, detail="شما مجاز به مشاهده تکالیف این دانش‌آموز نیستید")
         
-    enrolls = db.query(Enrollment).filter(Enrollment.student_id == student_id).all()
+    enrolls = db.query(Enrollment).filter(Enrollment.student_id == student_id,
+                                         Enrollment.is_deleted == False).all()  # O-04: کلاس‌های ترک‌شده تکلیف/آزمون نشان داده نمی‌شوند
     course_ids = [en.course_id for en in enrolls if en.course]
     
     hws = db.query(Homework).filter(Homework.course_id.in_(course_ids)).all()

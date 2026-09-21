@@ -290,5 +290,37 @@ class TestDashboardsAndReceipts(FinanceWorld):
         self.assertEqual(body["enrollment_id"], 1)
 
 
+    def test_11b_remaining_tuition_and_credit_are_sign_safe(self):
+        """O-09: «باقی‌ماندهٔ شهریه» و «اعتبار» هر دو نامنفی و بی‌ابهام‌اند.
+
+        `due_to_teacher`/`due_to_institute` قرارداد کیف‌پولی دارند و **دست‌نخورده ماندند**
+        (می‌توانند منفی باشند)؛ ولی برای «بدهی» و «مبلغ پیش‌فرض پرداخت» در اپ، دو فیلد صریح
+        اضافه شد تا اپراتور عدد منفی به‌عنوان بدهی نبیند.
+        """
+        self.client.post("/finance/pay", json=pay_payload(100000, "institute"), headers=hdr("tok-admin"))
+        body = self.client.get("/finance/student_class_status?student_id=41&course_id=71",
+                               headers=hdr("tok-admin")).json()
+        # ۵۰۰٬۰۰۰ از ۱٬۰۰۰٬۰۰۰ پرداخت شده ⇒ ۵۰۰٬۰۰۰ باقی‌مانده، صفر اعتبار
+        self.assertEqual(body["remaining_tuition"], 500000)
+        self.assertEqual(body["credit_balance"], 0)
+        # و فیلدهای قبلی بدون تغییر (قرارداد علامت کیف‌پول)
+        self.assertEqual(body["due_to_institute"], -500000)
+        self.assertEqual(body["due_to_teacher"], 0)
+        self.assertEqual(body["total_amount"], 1000000)
+
+        # پرداخت بیشتر از باقی‌مانده ⇒ باقی‌مانده صفر و مابه‌التفاوت «اعتبار» می‌شود
+        self.client.post("/finance/pay", json=pay_payload(600000, "institute"), headers=hdr("tok-admin"))
+        over = self.client.get("/finance/student_class_status?student_id=41&course_id=71",
+                               headers=hdr("tok-admin")).json()
+        self.assertEqual(over["remaining_tuition"], 0, "باقی‌مانده هرگز منفی نمی‌شود")
+        self.assertEqual(over["credit_balance"], 100000, "مازاد پرداخت = اعتبار شاگرد")
+
+        # فاکتور ثبت‌نام هم همین دو معنا را دارد (balance_due سبک قبلی خودش را حفظ کرده است)
+        invoice = self.client.get("/finance/invoice/1", headers=hdr("tok-admin")).json()
+        self.assertEqual(invoice["balance_due"], 0)
+        self.assertEqual(invoice["remaining_tuition"], 0)
+        self.assertEqual(invoice["credit_balance"], 100000)
+
+
 if __name__ == "__main__":
     unittest.main()

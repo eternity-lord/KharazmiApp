@@ -388,6 +388,7 @@
     <string name="invoice_no_enrollment">این دانش‌آموز در هیچ کلاسی ثبت‌نام نشده است</string>
     <string name="invoice_pick_class">انتخاب کلاس برای %1$s</string>
     <string name="invoice_total">شهریه قراردادی کلاس: %1$s تومان</string>
+    <string name="invoice_total_and_credit">شهریه قراردادی کلاس: %1$s تومان — اعتبار: %2$s تومان</string>
     <string name="invoice_paid_teacher">پرداخت‌شده به معلم: %1$s تومان</string>
     <string name="invoice_paid_institute">کلاس: %1$s\n(پرداخت‌شده به آموزشگاه: %2$s تومان)</string>
     <string name="invoice_due_teacher">سهم معلم (قابل پرداخت): %1$s %2$s تومان</string>

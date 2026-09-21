@@ -704,12 +704,18 @@ def get_student_class_status(student_id: int, course_id: Optional[int] = None, c
             paid_to_teacher += share_t
             paid_to_institute += share_i
     
+    # FIX O-09: دو فیلد صریح و نامنفی برای «بدهی» و «اعتبار» در اپ.
+    # چرا: `due_to_*` قرارداد کیف‌پولی دارد (due = منهای کیف) و بعد از پیش‌پرداخت جزئی
+    # منفی می‌شود ⇒ اپراتور «بدهی: -۵۰۰٬۰۰۰» می‌دید. فیلدهای قبلی دست‌نخورده ماندند.
+    paid_total = paid_to_teacher + paid_to_institute
     return {
         "total_amount": final_tuition,
         "paid_to_teacher": paid_to_teacher,
         "paid_to_institute": paid_to_institute,
         "due_to_teacher": due_to_teacher,
         "due_to_institute": due_to_institute,
+        "remaining_tuition": max(0, final_tuition - paid_total),
+        "credit_balance": max(0, paid_total - final_tuition),
         "course_id": course_id,
         # لینک دقیق ثبت‌نام فعال (همان سطری که شهریه از آن خوانده شد) برای اتصال پرداخت بعدی
         "enrollment_id": enroll.id
@@ -2309,6 +2315,9 @@ def get_invoice_details(
         "final_tuition": final_tuition,
         "total_paid": total_paid,
         "balance_due": max(0, final_tuition - total_paid),
+        # FIX O-09: همان معنا با نام صریح + اعتبار مازاد پرداخت (افزودنی؛ فیلدهای قبلی دست‌نخورده)
+        "remaining_tuition": max(0, final_tuition - total_paid),
+        "credit_balance": max(0, total_paid - final_tuition),
         "installments": [
             {
                 "id": inst.id,

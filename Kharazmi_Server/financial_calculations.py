@@ -274,7 +274,7 @@ def compute_session_shares(db: Session, course, present_count: int, absent_unexc
                     _row_t = db.query(models.PricingTable).filter(models.PricingTable.category == _cat).first()
                     if _row_t is None:
                         raise HTTPException(
-                            status_code=500,
+                            status_code=400,  # O-06: نبود تعرفه = تنظیمات ناقص (۴۰۰)، نه خرابی سرور؛ گارد H5 (خطای واضح به‌جای جلسهٔ مجانی) دست‌نخورده
                             detail="تعرفه‌ی سهم معلم برای این مقطع یافت نشد؛ لطفاً ابتدا جدول تعرفه را ثبت کنید",
                         )
                     _pen_base_t = getattr(_row_t, f"count_{_n_cap_t}", 0) // _u
@@ -285,7 +285,7 @@ def compute_session_shares(db: Session, course, present_count: int, absent_unexc
                 _share_row = db.query(models.InstituteShare).first()
                 if _share_row is None:
                     raise HTTPException(
-                        status_code=500,
+                        status_code=400,  # O-06: نبود تعرفه = تنظیمات ناقص (۴۰۰)، نه خرابی سرور؛ گارد H5 (خطای واضح به‌جای جلسهٔ مجانی) دست‌نخورده
                         detail="تنظیمات سهم آموزشگاه یافت نشد؛ لطفاً ابتدا تعرفه‌ی سهم آموزشگاه را ثبت کنید",
                     )
                 _pen_base_i = (getattr(_share_row, f"count_{_n_cap_i}", 0) or 0) // _u
@@ -337,7 +337,7 @@ def compute_session_shares(db: Session, course, present_count: int, absent_unexc
             # T_total=0 ساکت یعنی جلسه‌ی مجانی — خطای واضح به‌جای ادامه.
             if row_teacher is None:
                 raise HTTPException(
-                    status_code=500,
+                    status_code=400,  # O-06: نبود تعرفه = تنظیمات ناقص (۴۰۰)، نه خرابی سرور؛ گارد H5 (خطای واضح به‌جای جلسهٔ مجانی) دست‌نخورده
                     detail="تعرفه‌ی سهم معلم برای این مقطع یافت نشد؛ لطفاً ابتدا جدول تعرفه را ثبت کنید",
                 )
             T_total = getattr(row_teacher, f"count_{N_capped}", 0)
@@ -352,7 +352,7 @@ def compute_session_shares(db: Session, course, present_count: int, absent_unexc
         share_row = db.query(models.InstituteShare).first()
         if share_row is None:
             raise HTTPException(
-                status_code=500,
+                status_code=400,  # O-06: نبود تعرفه = تنظیمات ناقص (۴۰۰)، نه خرابی سرور؛ گارد H5 (خطای واضح به‌جای جلسهٔ مجانی) دست‌نخورده
                 detail="تنظیمات سهم آموزشگاه یافت نشد؛ لطفاً ابتدا تعرفه‌ی سهم آموزشگاه را ثبت کنید",
             )
         I_total = getattr(share_row, f"count_{N_capped_institute}", 0) or 0

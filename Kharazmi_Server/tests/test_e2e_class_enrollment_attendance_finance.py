@@ -223,26 +223,25 @@ class TestAttendanceAndFinancialEffect(ClassFlowWorld):
             models.SessionLog.course_id == self.course_id,
             models.SessionLog.is_deleted == False).count(), 1)  # noqa: E712
 
-    def test_8a_missing_institute_share_returns_500_instead_of_clear_4xx(self):
-        """یافتهٔ دیباگ (کد وضعیت نامناسب): اگر جدول تعرفهٔ سهم آموزشگاه خالی باشد،
-        ثبت جلسه با **۵۰۰ Internal Server Error** رد می‌شود، در حالی که مشکل «تنظیمات ناقص»
-        است نه خرابی سرور. ادمین در اپ به‌جای راهنمای «ابتدا تعرفه را ثبت کنید» خطای سرور می‌بیند.
+    def test_8a_missing_institute_share_is_a_clear_4xx(self):
+        """O-06 (رفع‌شده): نبودِ تعرفهٔ سهم آموزشگاه ⇒ **۴۰۰** با همان پیام راهنما (نه ۵۰۰).
 
-        این تست رفتار فعلی را مستند می‌کند (انتظار درست: ۴xx با همان پیام راهنما).
+        فلسفهٔ H5 «خطای واضح به‌جای جلسهٔ مجانی ساکت» دست‌نخورده است؛ فقط کد وضعیت از
+        «خطای سرور» به «خطای تنظیمات/درخواست» اصلاح شد تا ادمین‌ها راهنمای درست ببینند.
         """
         self.db.query(models.InstituteShare).delete()
         self.db.commit()
         resp = self.submit_session(self.course_id, [(41, "Present")], date="1405/07/05")
-        self.assertEqual(resp.status_code, 500, "❗ رفتار فعلی: خطای سرور به‌جای خطای قابل‌فهم")
+        self.assertEqual(resp.status_code, 400, resp.text)
         self.assertIn("تعرفه", resp.json()["detail"])
         self.assertEqual(self.db.query(models.SessionLog).count(), 0, "در این حالت جلسه‌ای ثبت نمی‌شود")
 
     def test_8b_class_without_session_price_needs_pricing_table(self):
-        """کلاس بدون «نرخ هر جلسه» ⇒ سهم معلم از جدول تعرفه خوانده می‌شود؛ اگر آن هم نباشد ۵۰۰."""
+        """کلاس بدون «نرخ هر جلسه» + نبود تعرفهٔ مقطعی ⇒ ۴۰۰ با پیام راهنما (O-06)."""
         plain = self.create_class(title="کلاس بدون نرخ", days="یکشنبه", time="10:00", price=0).json()["id"]
         self.enroll(plain)
         resp = self.submit_session(plain, [(41, "Present")], date="1405/07/06")
-        self.assertEqual(resp.status_code, 500, resp.text)
+        self.assertEqual(resp.status_code, 400, resp.text)
         self.assertIn("تعرفه", resp.json()["detail"])
 
     def test_8_absent_student_is_not_charged_when_excused(self):

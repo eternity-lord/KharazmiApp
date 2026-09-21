@@ -304,13 +304,64 @@ class TestAnalyticsAuditAndKpis(ReportWorld):
         self.assertEqual(set(body), {"today_revenue", "total_overdue_amount",
                                      "overdue_installments_count", "active_students_count",
                                      "suspicious_alerts_count", "dunning_pending_count"})
-        # ❗ KPI «درآمد امروز» = جمع علامت‌دارِ همهٔ تراکنش‌های امروز بدون فیلتر نوع:
-        #    ۵۰۰٬۰۰۰ (پرداخت) − ۲۰۰٬۰۰۰ (شارژ جلسه، یعنی بدهی شاگرد) = ۳۰۰٬۰۰۰
-        self.assertEqual(body["today_revenue"], 300000,
-                         "❗ شارژ جلسه از «درآمد امروز» کم می‌شود (فیلتر نوع/کیف پول ندارد)")
+        # O-08 (رفع شد): «درآمد امروز» = **وصولی نقدی امروز به حساب آموزشگاه**، دقیقاً همان
+        # تعریف گزارش‌ها (`calculate_institute_collected_revenue`) ⇒ فقط ۵۰۰٬۰۰۰ (deposit به
+        # کیف آموزشگاه با تاریخ امروز). شارژ جلسه (بدهی شاگرد) و واریزی بی‌تاریخ شمرده نمی‌شوند.
+        self.assertEqual(body["today_revenue"], 500000,
+                         "درآمد امروز باید فقط وصولی نقدی مؤسسه باشد")
         self.assertEqual(body["overdue_installments_count"], 1)
         self.assertEqual(body["total_overdue_amount"], 300000)
         self.assertEqual(body["active_students_count"], 3)
+
+    def test_14b_today_revenue_counts_only_cash_collected_today(self):
+        """O-08: معنای درست KPI «درآمد امروز» — سه سناریوی حاشیه‌ای.
+
+        پیش از فیکس، این عدد «جمع علامت‌دارِ همهٔ تراکنش‌های امروز» بود (با LIKE روی تاریخ):
+        شارژ جلسه از آن **کم** می‌شد، واریزیِ آموزشگاه با تاریخ میلادی **دیده نمی‌شد** و
+        واریزی بی‌تاریخ هم از قلم می‌افتاد.
+        """
+        import routers.dashboard as dash
+        today_iso = datetime.date.today().isoformat()          # «امروز» به تقویم میلادی
+        self.db.add_all([
+            # واریزی آموزشگاه با تاریخ میلادی (نقطهٔ کورِ LIKE روی تاریخ شمسی)
+            models.Transaction(id=911, student_id=42, enrollment_id=2, course_id=71, branch_id=1,
+                               amount=700000, payment_method="کارت", date=today_iso, type="deposit",
+                               target_wallet="institute", description="وصولی میلادی امروز"),
+            # واریزی امروز به کیف **معلم** — پول آموزشگاه نیست
+            models.Transaction(id=912, student_id=42, enrollment_id=2, course_id=71, branch_id=1,
+                               amount=900000, payment_method="کارت", date=jalali_today(), type="deposit",
+                               target_wallet="teacher", description="سهم معلم"),
+            # شارژ جلسهٔ امروز (بدهی شاگرد، عددِ منفی) — نباید از وصولی کم شود
+            models.Transaction(id=913, student_id=42, enrollment_id=2, course_id=71, branch_id=1,
+                               amount=-400000, payment_method="System", date=jalali_today(),
+                               type="session_charge", share_teacher=300000, share_institute=100000,
+                               description="هزینه جلسه امروز"),
+            # واریزی بی‌تاریخ (فیکس A3: ردیف می‌ماند ولی وصولی امروز نیست)
+            models.Transaction(id=914, student_id=42, enrollment_id=2, course_id=71, branch_id=1,
+                               amount=120000, payment_method=None, date="", type="deposit",
+                               target_wallet="institute", description="بی‌تاریخ"),
+        ])
+        self.db.commit()
+        dash._dashboard_cache.clear()
+
+        expected = 500000 + 700000  # deposit امروزِ آموزشگاه (شمسی + میلادی)
+        body = self.client.get("/dashboard/kpis", headers=hdr("tok-admin")).json()
+        self.assertEqual(body["today_revenue"], expected,
+                         "فقط وصولی نقدی امروزِ آموزشگاه باید شمرده شود")
+
+        # بی‌اثری: تعریف داشبورد و تعریف گزارش‌ها یکی است
+        from financial_calculations import calculate_institute_collected_revenue
+        self.assertEqual(body["today_revenue"],
+                         calculate_institute_collected_revenue(self.db, jalali_today(), jalali_today()))
+
+        # و شارژ جلسه/کیف معلم/بی‌تاریخ هیچ‌کدام عدد را تغییر ندادند:
+        before = body["today_revenue"]
+        self.db.query(models.Transaction).filter(models.Transaction.id.in_([912, 913, 914])).delete(
+            synchronize_session=False)
+        self.db.commit()
+        dash._dashboard_cache.clear()
+        self.assertEqual(self.client.get("/dashboard/kpis", headers=hdr("tok-admin")).json()["today_revenue"],
+                         before, "حذف شارژ جلسه/سهم معلم/بی‌تاریخ نباید عدد را عوض کند")
 
     def test_15_audit_trail_and_suspicious_patterns_are_admin_only(self):
         logs = self.client.get("/audit-trail/logs?entity_type=transaction&action=create",

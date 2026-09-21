@@ -35,7 +35,7 @@ PREVIOUSLY_CWD_DEPENDENT = [
     "test_audit.py::TestAuditRadar::test_joinedload_used_for_nplus1",
     "test_audit.py::TestAuditRadar::test_finance_uses_central_installment_validation",
     "test_dashboard.py::TestDashboardKPIs::test_dashboard_isolated_no_finance_touch",
-    "test_dashboard_performance.py::TestDashboardPerformance::test_uses_count_queries_not_all",
+    "test_dashboard_performance.py::TestDashboardPerformance::test_uses_sql_counts_and_the_shared_revenue_definition",
 ]
 
 # مسیر نسبیِ وابسته به cwd: open("Kharazmi_Server/...") یا Path('./Kharazmi_Server/...')

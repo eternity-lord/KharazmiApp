@@ -1258,7 +1258,7 @@
     <string name="dashboard_error">خطا در دریافت داشبورد: %1$s</string>
     <string name="dashboard_no_data">داده‌ای برای داشبورد یافت نشد</string>
     <string name="dashboard_refresh">بروزرسانی داشبورد</string>
-    <string name="dashboard_today_revenue_sub">مجموع تراکنش‌های امروز</string>
+    <string name="dashboard_today_revenue_sub">وصولی نقدی امروز</string>
     <string name="dashboard_overdue_sub">%1$d قسط • %2$s تومان</string>
     <string name="dashboard_students_sub">فعال در سیستم</string>
     <string name="dashboard_alerts_sub">نیاز به بررسی</string>

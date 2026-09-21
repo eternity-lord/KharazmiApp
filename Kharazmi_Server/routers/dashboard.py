@@ -11,12 +11,14 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from sqlalchemy import func, or_
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from models import Installment, Student, Transaction
+from models import Installment, Student
 from dependencies import get_db, check_admin_access
 from today_summary import jalali_date_string
+# FIX O-08: تعریف واحد «وصولی نقدی» از لایهٔ محاسبات مالی — همان تابعی که گزارش‌ها می‌خوانند.
+from financial_calculations import calculate_institute_collected_revenue
 
 router = APIRouter()
 
@@ -40,24 +42,6 @@ class DashboardKPIs(BaseModel):
     dunning_pending_count: int
 
 
-def _today_revenue_sql(db: Session, today_jalali: str) -> int:
-    """SQL-level SUM for today's revenue via Jalali string prefix (LIKE)."""
-    try:
-        rev = (
-            db.query(func.coalesce(func.sum(Transaction.amount), 0))
-            .filter(
-                or_(Transaction.is_deleted == False, Transaction.is_deleted.is_(None)),
-                or_(Transaction.is_reversed == False, Transaction.is_reversed.is_(None)),
-                Transaction.date.like(f"{today_jalali}%"),
-            )
-            .scalar()
-        )
-        return int(rev or 0)
-    except Exception as e:
-        print(f"[Dashboard] today_revenue SQL failed: {e}")
-        return 0
-
-
 @router.get("/kpis", response_model=DashboardKPIs)
 def get_dashboard_kpis(
     db: Session = Depends(get_db),
@@ -78,8 +62,14 @@ def get_dashboard_kpis(
     today = datetime.date.today()
     today_jalali = jalali_date_string(today)  # e.g., "1405/06/16"
 
-    # 1. Today's Revenue — SQL LIKE on Jalali prefix
-    today_revenue = _today_revenue_sql(db, today_jalali)
+    # 1. Today's Revenue — FIX O-08: پیش‌تر SUM با LIKE روی تاریخ شمسی بود ⇒ شارژ جلسه
+    #    (عدد منفی) از وصولی کم می‌شد، واریزی با تاریخ میلادی/بی‌تاریخ دیده نمی‌شد و عدد با
+    #    گزارش‌های مالی نمی‌خواند. اکنون همان تعریف گزارش‌ها: وصولی نقدی امروز به کیف آموزشگاه.
+    try:
+        today_revenue = int(calculate_institute_collected_revenue(db, today_jalali, today_jalali) or 0)
+    except Exception as e:
+        print(f"[Dashboard] today_revenue failed: {e}")
+        today_revenue = 0
 
     # 2 & 3. Overdue installments — SQL string comparison (YYYY/MM/DD) — single query for COUNT+SUM
     # Since due_date is stored as Jalali "YYYY/MM/DD", string comparison works.

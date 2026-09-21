@@ -128,21 +128,41 @@ class TestDashboardKPIs(unittest.TestCase):
         self.assertEqual(data["today_revenue"], 0)
         self.assertEqual(data["overdue_installments_count"], 0)
 
-    def test_kpi_today_revenue_aggregated_jalali(self):
+    def test_kpi_today_revenue_is_cash_collected_for_the_institute(self):
+        """O-08 (به‌روزرسانی آگاهانهٔ این گارد): «درآمد امروز» = وصولی نقدی امروزِ **آموزشگاه**.
+
+        پیش‌تر این تست جمع همهٔ تراکنش‌های امروز (هر نوع/کیفی) را قفل می‌کرد؛ حالا فقط
+        `deposit` به کیف آموزشگاه شمرده می‌شود — با هر قالب تاریخی (شمسی یا میلادی) —
+        و شارژ جلسه/سهم معلم/ردیف‌های حذف‌شده یا برگشتی شمرده نمی‌شوند.
+        """
         today_str = jalali_date_string(datetime.date.today())
-        # 2 transactions today, 1 deleted, 1 reversed should be ignored
-        t1 = Transaction(student_id=1, course_id=1, amount=50000, payment_method="cash", date=today_str, description="pay1", type="tuition", is_deleted=False, is_reversed=False)
-        t2 = Transaction(student_id=1, course_id=1, amount=75000, payment_method="cash", date=today_str + " 12:30", description="pay2", type="tuition", is_deleted=False, is_reversed=False)
-        t3 = Transaction(student_id=1, course_id=1, amount=100000, payment_method="cash", date=today_str, description="deleted", type="tuition", is_deleted=True, is_reversed=False)
-        t4 = Transaction(student_id=1, course_id=1, amount=200000, payment_method="cash", date=today_str, description="reversed", type="tuition", is_deleted=False, is_reversed=True)
+        today_iso = datetime.date.today().isoformat()  # واریزیِ امروز با تاریخ میلادی (نقطهٔ کورِ LIKE قدیمی)
+        t1 = Transaction(student_id=1, course_id=1, amount=50000, payment_method="cash", date=today_str,
+                         description="pay1", type="deposit", target_wallet="institute", is_deleted=False, is_reversed=False)
+        t2 = Transaction(student_id=1, course_id=1, amount=75000, payment_method="cash", date=today_str + " 12:30",
+                         description="pay2", type="deposit", target_wallet="institute", is_deleted=False, is_reversed=False)
+        t3 = Transaction(student_id=1, course_id=1, amount=100000, payment_method="cash", date=today_str,
+                         description="deleted", type="deposit", target_wallet="institute", is_deleted=True, is_reversed=False)
+        t4 = Transaction(student_id=1, course_id=1, amount=200000, payment_method="cash", date=today_str,
+                         description="reversed", type="deposit", target_wallet="institute", is_deleted=False, is_reversed=True)
         # Different date should not count
         other = jalali_date_string(datetime.date.today() - datetime.timedelta(days=1))
-        t5 = Transaction(student_id=1, course_id=1, amount=99999, payment_method="cash", date=other, description="other day", type="tuition", is_deleted=False, is_reversed=False)
-        self.db.add_all([t1, t2, t3, t4, t5])
+        t5 = Transaction(student_id=1, course_id=1, amount=99999, payment_method="cash", date=other,
+                         description="other day", type="deposit", target_wallet="institute", is_deleted=False, is_reversed=False)
+        # پول معلم و بدهی شاگرد، هیچ‌کدام وصولی آموزشگاه نیستند
+        t6 = Transaction(student_id=1, course_id=1, amount=90000, payment_method="cash", date=today_str,
+                         description="teacher share", type="deposit", target_wallet="teacher", is_deleted=False, is_reversed=False)
+        t7 = Transaction(student_id=1, course_id=1, amount=-200000, payment_method="System", date=today_str,
+                         description="session charge", type="session_charge", share_teacher=150000,
+                         share_institute=50000, is_deleted=False, is_reversed=False)
+        t8 = Transaction(student_id=1, course_id=1, amount=30000, payment_method="cash", date=today_iso,
+                         description="pay3 (Gregorian date)", type="deposit", target_wallet="institute",
+                         is_deleted=False, is_reversed=False)
+        self.db.add_all([t1, t2, t3, t4, t5, t6, t7, t8])
         self.db.commit()
         r = self.client.get("/dashboard/kpis", headers={"Authorization": "Bearer tok_admin"})
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()["today_revenue"], 125000, f"expected 125000 but got {r.json()}")
+        self.assertEqual(r.json()["today_revenue"], 155000, f"expected 155000 but got {r.json()}")
 
     def test_kpi_overdue_via_parse(self):
         # Overdue installments: due_date < today, jalali

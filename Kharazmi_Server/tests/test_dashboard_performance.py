@@ -168,8 +168,14 @@ class TestDashboardPerformance(unittest.TestCase):
         self.assertEqual(r2.status_code, 200)
         self.assertLess(elapsed2, 100, f"Cached call should be <100ms but took {elapsed2:.2f}ms")
 
-    def test_uses_count_queries_not_all(self):
-        """Verify dashboard.py uses SQL COUNT/SUM and string comparison, not Python loops."""
+    def test_uses_sql_counts_and_the_shared_revenue_definition(self):
+        """Verify dashboard.py uses SQL COUNT/SUM and the shared revenue definition, not Python loops.
+
+        O-08 (به‌روزرسانی آگاهانهٔ این گارد): الگوی قبلیِ «LIKE روی پیشوند تاریخ شمسی» برای
+        «درآمد امروز» عمداً حذف شد — آن SUM بدون فیلتر نوع/کیف، شارژ جلسه را منفی می‌شمرد و
+        واریزی با تاریخ میلادی/بی‌تاریخ را از دست می‌داد. اکنون عدد از همان تابعی می‌آید که
+        گزارش‌های مالی می‌خوانند.
+        """
         with open(_server_file("routers", "dashboard.py"), encoding="utf-8") as f:
             content = f.read()
 
@@ -177,7 +183,10 @@ class TestDashboardPerformance(unittest.TestCase):
         self.assertIn("due_date < today_jalali", content, "Should use string comparison due_date < today_jalali")
         self.assertIn("func.count", content, "Should use func.count for COUNT queries")
         self.assertIn("func.sum", content, "Should use func.sum for SUM queries")
-        self.assertIn('like(f"{today_jalali}%"', content, "Should use LIKE for today revenue Jalali prefix")
+        self.assertNotIn('like(f"{today_jalali}%"', content,
+                         "LIKE روی تاریخ شمسی برای درآمد امروز باید حذف شده باشد (O-08)")
+        self.assertIn("calculate_institute_collected_revenue", content,
+                      "درآمد امروز باید از تعریف واحد لایهٔ مالی بیاید (O-08)")
         self.assertIn("jalali_date_string", content, "Should convert today to Jalali string")
         # Must NOT load all installments and loop with parse_project_date for overdue
         # The old bug was: db.query(Installment).filter(...).all() then for inst in unpaid: parse_project_date(due) < today

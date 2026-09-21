@@ -4,6 +4,7 @@ Covers: 401/403/200, 6 KPIs aggregated, jalali prefix, overdue parse, student co
 Isolated: sqlite memory, no modification to finance/timeline/audit/dunning routers
 """
 import datetime
+import os
 import unittest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -15,6 +16,18 @@ from models import Base, User, UserSession, Student, Teacher, Course, Enrollment
 from main import app
 from dependencies import get_db, hash_password
 from today_summary import jalali_date_string, parse_project_date
+
+
+# FIX(B1): مسیر فایل‌های سرور مستقل از پوشهٔ اجرا — نسبت به محل همین فایل تست، نه cwd.
+# الگوی قدیمی `open("Kharazmi_Server/routers/x.py")` فقط وقتی کار می‌کرد که سوئیت از ریشهٔ ریپو
+# اجرا شود و از داخل `Kharazmi_Server/` (یا هر پوشهٔ دیگر) با FileNotFoundError می‌شکست.
+_SERVER_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def _server_file(*parts):
+    """مسیر مطلق یک فایل داخل Kharazmi_Server (مستقل از cwd)."""
+    return os.path.join(_SERVER_DIR, *parts)
+
 try:
     from routers.dashboard import _clear_dashboard_cache
     _HAS_CLEAR = True
@@ -187,7 +200,7 @@ class TestDashboardKPIs(unittest.TestCase):
         self.assertEqual(count_before, count_after)
 
     def test_dashboard_isolated_no_finance_touch(self):
-        with open("Kharazmi_Server/routers/dashboard.py", encoding="utf-8") as f:
+        with open(_server_file("routers", "dashboard.py"), encoding="utf-8") as f:
             c = f.read()
         self.assertIn("check_admin_access", c)
         self.assertIn("DashboardKPIs", c)

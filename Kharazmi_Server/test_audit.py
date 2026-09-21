@@ -4,6 +4,7 @@ Isolated read-only tests - does not modify finance/classes/students/auth routers
 Covers: 403/200, 3 patterns, N+1 fix, midnight crossover, rapid <1h + 30d via ActivityLog, no silent pass
 """
 import datetime
+import os
 import unittest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -14,6 +15,18 @@ import models
 from models import Base, User, UserSession, Student, Teacher, Course, SessionLog, Attendance, Transaction, Branch, ActivityLog
 from main import app
 from dependencies import get_db, hash_password
+
+
+# FIX(B1): مسیر فایل‌های سرور مستقل از پوشهٔ اجرا — نسبت به محل همین فایل تست، نه cwd.
+# الگوی قدیمی `open("Kharazmi_Server/routers/x.py")` فقط وقتی کار می‌کرد که سوئیت از ریشهٔ ریپو
+# اجرا شود و از داخل `Kharazmi_Server/` (یا هر پوشهٔ دیگر) با FileNotFoundError می‌شکست.
+_SERVER_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def _server_file(*parts):
+    """مسیر مطلق یک فایل داخل Kharazmi_Server (مستقل از cwd)."""
+    return os.path.join(_SERVER_DIR, *parts)
+
 
 
 class TestAuditRadar(unittest.TestCase):
@@ -253,14 +266,14 @@ class TestAuditRadar(unittest.TestCase):
         self.assertEqual(wb_before, s_after.wallet_balance)
 
     def test_no_silent_except_pass(self):
-        with open("Kharazmi_Server/routers/audit.py", encoding="utf-8") as f:
+        with open(_server_file("routers", "audit.py"), encoding="utf-8") as f:
             content = f.read()
         self.assertNotIn("except Exception:\n        pass", content, "Silent except: pass still exists, should log")
         self.assertIn("logger.error", content, "Should log errors via logger.error")
         self.assertIn("print", content, "Should print/log errors")
 
     def test_joinedload_used_for_nplus1(self):
-        with open("Kharazmi_Server/routers/audit.py", encoding="utf-8") as f:
+        with open(_server_file("routers", "audit.py"), encoding="utf-8") as f:
             content = f.read()
         self.assertIn("joinedload", content, "N+1 fix must use joinedload or selectinload")
         self.assertIn("joinedload(SessionLog.course)", content, "Should use joinedload(SessionLog.course)")
@@ -270,7 +283,7 @@ class TestAuditRadar(unittest.TestCase):
         اصلاحِ تأییدشده‌ی F-T2 (که کدش در finance.py است) منقضی شد؛ به‌جای آن یک invariant پایدار
         بررسی می‌شود: اعتبارسنجی مبلغ/سررسید قسط در finance.py باید از قاعده‌ی مرکزی بیاید، نه regex شکلی.
         """
-        with open("Kharazmi_Server/routers/finance.py", encoding="utf-8") as f:
+        with open(_server_file("routers", "finance.py"), encoding="utf-8") as f:
             content = f.read()
         self.assertIn("from validation import", content, "finance.py باید اعتبارسنجی مرکزی را import کند")
         self.assertIn("validate_jalali_due_date", content, "سررسید قسط باید با تقویم پروژه سنجیده شود")

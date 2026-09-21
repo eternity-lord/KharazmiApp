@@ -2,6 +2,7 @@
 Dashboard Performance Test — 10,000 installments, <100ms, COUNT queries verification
 """
 import datetime
+import os
 import time
 import unittest
 from fastapi.testclient import TestClient
@@ -14,6 +15,18 @@ from models import Base, User, UserSession, Student, Teacher, Course, Enrollment
 from main import app
 from dependencies import get_db, hash_password
 from today_summary import jalali_date_string
+
+
+# FIX(B1): مسیر فایل‌های سرور مستقل از پوشهٔ اجرا — نسبت به محل همین فایل تست، نه cwd.
+# الگوی قدیمی `open("Kharazmi_Server/routers/x.py")` فقط وقتی کار می‌کرد که سوئیت از ریشهٔ ریپو
+# اجرا شود و از داخل `Kharazmi_Server/` (یا هر پوشهٔ دیگر) با FileNotFoundError می‌شکست.
+_SERVER_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def _server_file(*parts):
+    """مسیر مطلق یک فایل داخل Kharazmi_Server (مستقل از cwd)."""
+    return os.path.join(_SERVER_DIR, *parts)
+
 
 try:
     from routers.dashboard import _clear_dashboard_cache
@@ -156,7 +169,7 @@ class TestDashboardPerformance(unittest.TestCase):
 
     def test_uses_count_queries_not_all(self):
         """Verify dashboard.py uses SQL COUNT/SUM and string comparison, not Python loops."""
-        with open("Kharazmi_Server/routers/dashboard.py", encoding="utf-8") as f:
+        with open(_server_file("routers", "dashboard.py"), encoding="utf-8") as f:
             content = f.read()
 
         # Must use Jalali string comparison for overdue
@@ -180,11 +193,11 @@ class TestDashboardPerformance(unittest.TestCase):
         self.assertIn("time.time()", content, "Should use time.time() for cache TTL")
 
         # Verify audit and dunning helpers exist
-        with open("Kharazmi_Server/routers/audit.py", encoding="utf-8") as f:
+        with open(_server_file("routers", "audit.py"), encoding="utf-8") as f:
             audit_content = f.read()
         self.assertIn("def count_suspicious_patterns", audit_content, "audit.py should have count_suspicious_patterns")
 
-        with open("Kharazmi_Server/routers/dunning.py", encoding="utf-8") as f:
+        with open(_server_file("routers", "dunning.py"), encoding="utf-8") as f:
             dunning_content = f.read()
         self.assertIn("def count_dunning_pending", dunning_content, "dunning.py should have count_dunning_pending")
 

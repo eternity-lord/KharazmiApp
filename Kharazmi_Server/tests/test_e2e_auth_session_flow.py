@@ -358,34 +358,60 @@ class TestAndroidClientGaps(AuthFlowWorld):
     # ------------------------------------------------------------------
     # ۹) ⚠️ گارد سند: سرور آماده است ولی **اپ اندروید** از این قابلیت‌ها استفاده نمی‌کند
     # ------------------------------------------------------------------
-    def test_9_android_client_never_registers_device_token_or_calls_logout(self):
-        """یافتهٔ فاز دیباگ (سمت اندروید):
+    def test_9_android_client_logs_out_on_server_but_never_registers_device_token(self):
+        """وضعیت اپ اندروید پس از رفع O-03:
 
-        • **Push عملاً مرده است:** سرور `POST /auth/device_token` دارد و C2 ارسال Push را
-          پیاده کرده، ولی **هیچ‌جای پروژهٔ اندروید** (کد Kotlin یا Gradle) نه Firebase و نه
-          `device_token` وجود دارد ⇒ جدول `device_tokens` همیشه خالی می‌ماند ⇒ هیچ اعلانی به
-          گوشی نمی‌رسد. (شاهد مستقل: سنجش B5 روی DB واقعی = صفر ردیف `device_tokens`.)
-        • **دکمهٔ خروج فقط اپ را می‌بندد:** `SettingsActivity.kt:79-88` تنها `finishAffinity()`
-          صدا می‌زند؛ نه `POST /auth/logout` را می‌فرستد و نه توکن ذخیره‌شده را پاک می‌کند
-          ⇒ نشست سرور تا انقضای JWT زنده می‌ماند.
-
-        این تست مثل گاردهای قبلی پروژه عمداً «نبودِ» این فراخوانی‌ها را قفل می‌کند: به‌محض
-        افزودن Firebase/ثبت توکن یا فراخوانی logout در اپ، این تست می‌شکند تا آگاهانه
-        به‌روزرسانی شود.
+        • **O-03 رفع شد:** دکمهٔ خروج در `SettingsActivity` هنگام تأیید، `POST /auth/logout` را
+          صدا می‌زند (سقف ۳ ثانیه) و سپس توکن ذخیره‌شده را با `SecureLoginStore.clearToken` پاک
+          می‌کند ⇒ نشست سرور دیگر تا انقضای JWT زنده نمی‌ماند و خروج هم به شبکه وابسته نیست.
+        • **Push همچنان مرده است (باز):** اپ نه Firebase دارد و نه `/auth/device_token` را صدا
+          می‌زند ⇒ `device_tokens` روی نصب واقعی خالی می‌ماند. اگر روزی به اپ اضافه شد، این
+          گارد باید آگاهانه به‌روزرسانی شود.
         """
+        texts = {}
         kt_files = []
         for root, _dirs, files in os.walk(ANDROID_JAVA_DIR):
             kt_files.extend(os.path.join(root, f) for f in files if f.endswith(".kt"))
         self.assertGreater(len(kt_files), 20, f"مسیر کد اندروید پیدا نشد: {ANDROID_JAVA_DIR}")
-
-        patterns = ("device_token", "firebase", "firebasemessaging", "auth/logout", "gms.")
-        offenders = []
         for path in kt_files:
             with open(path, encoding="utf-8") as handle:
-                text = handle.read().lower()
+                texts[os.path.basename(path)] = handle.read()
+
+        # ۱) خروج سروری واقعاً سیم‌کشی شده است (O-03)
+        settings = texts.get("SettingsActivity.kt", "")
+        self.assertIn(".logout()", settings, "دکمهٔ خروج باید متد logout سرور را صدا بزند")
+        self.assertIn("SecureLoginStore.clearToken", settings,
+                      "خروج باید توکن ذخیره‌شده را پاک کند (clearToken، نه clear چه چیزی را پاک می‌کند)")
+        login_api = texts.get("LoginActivity.kt", "")
+        self.assertRegex(login_api, r'@POST\("auth/logout"\)',
+                         "قرارداد logout باید در AuthApi تعریف شده باشد")
+
+        # ۲) گارد Push: اپ هنوز نه Firebase دارد و نه ثبت توکن دستگاه
+        patterns = ("device_token", "firebase", "firebasemessaging", "gms.")
+        offenders = []
+        for name, text in texts.items():
+            lowered = text.lower()
             for needle in patterns:
-                if needle in text:
-                    offenders.append(f"{os.path.basename(path)} ⇒ {needle}")
+                if needle in lowered:
+                    offenders.append(f"{name} ⇒ {needle}")
+        self.assertEqual(offenders, [],
+                         "❗ کد اندروید ثبت توکن دستگاه/فایربیس را شروع کرده است — "
+                         "این تست باید آگاهانه به‌روزرسانی شود:\n" + "\n".join(offenders))
+
+        gradle_text = ""
+        for name in ("build.gradle.kts", os.path.join("app", "build.gradle.kts")):
+            path = os.path.join(REPO_ROOT, "KharazmiAdmin", name)
+            if os.path.isfile(path):
+                with open(path, encoding="utf-8") as handle:
+                    gradle_text += handle.read().lower()
+        self.assertNotIn("firebase", gradle_text, "❗ وابستگی Firebase به اپ اضافه شده است")
+
+        # ۳) سرور طرفِ دیگر قرارداد آماده است (مشکل کلاینت بود، نه سرور)
+        paths = app.openapi()["paths"]
+        for endpoint in ("/auth/device_token", "/auth/logout", "/auth/student/request_otp",
+                         "/auth/student/login"):
+            self.assertIn(endpoint, paths, f"اندپوینت {endpoint} روی سرور باید موجود باشد")
+
         self.assertEqual(offenders, [],
                          "❗ کد اندروید شروع به استفاده از ثبت توکن/خروج سرور کرده است — "
                          "این تست باید آگاهانه به‌روزرسانی شود:\n" + "\n".join(offenders))

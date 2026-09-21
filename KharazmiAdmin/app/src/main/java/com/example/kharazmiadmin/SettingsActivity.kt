@@ -12,6 +12,7 @@ import androidx.lifecycle.lifecycleScope
 import com.google.android.material.textfield.TextInputEditText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.withContext
 import retrofit2.http.Body
 import retrofit2.http.POST
@@ -81,7 +82,20 @@ class SettingsActivity : BaseActivity() {
                 .setTitle(getString(R.string.set_logout_title))
                 .setMessage(getString(R.string.set_logout_msg))
                 .setPositiveButton(getString(R.string.common_yes)) { _, _ ->
-                    finishAffinity() // بستن کامل برنامه
+                    // O-03: خروج واقعی — ابتدا نشست سرور باطل می‌شود (تا انقضای JWT زنده نماند)،
+                    // بعد توکن ذخیره‌شده پاک و اپ بسته می‌شود. خروج به شبکه وابسته نیست:
+                    // اگر logout شکست بخورد یا کند باشد (سقف ۳ ثانیه) باز هم خارج می‌شویم.
+                    lifecycleScope.launch {
+                        try {
+                            withTimeoutOrNull(3000) {
+                                RetrofitClient.getInstance(this@SettingsActivity)
+                                    .create(AuthApi::class.java).logout()
+                            }
+                        } catch (ignored: Exception) {
+                        }
+                        SecureLoginStore.clearToken(this@SettingsActivity)
+                        finishAffinity() // بستن کامل برنامه
+                    }
                 }
                 .setNegativeButton(getString(R.string.common_no), null)
                 .show()

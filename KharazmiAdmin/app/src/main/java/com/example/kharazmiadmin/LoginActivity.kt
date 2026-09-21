@@ -32,6 +32,11 @@ import java.util.concurrent.Executor
 interface AuthApi {
     @POST("auth/login")
     suspend fun login(@Body req: LoginRequest): LoginResponse
+
+    // O-03: خروج واقعی از سرور؛ هدر Authorization را RetrofitClient خودکار تزریق می‌کند.
+    // بدون شناسهٔ دیوایس صدا زده می‌شود (اپ هنوز Push ندارد ⇒ توکن Push سرور عمداً پاک نمی‌شود).
+    @POST("auth/logout")
+    suspend fun logout()
 }
 
 class LoginActivity : BaseActivity() {

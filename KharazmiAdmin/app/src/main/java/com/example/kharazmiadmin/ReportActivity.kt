@@ -24,7 +24,11 @@ data class FinancialSummaryResponse(
     val year: Int,
     val month: Int,
     val monthly: FinancialMetrics,
-    val yearly: FinancialMetrics
+    val yearly: FinancialMetrics,
+    // O-10: پرداخت‌های بی‌تاریخ در جمع‌های ماه/سال نمی‌آیند؛ این دو فیلد آن‌ها را آشکار می‌کنند.
+    // nullable با پیش‌فرض تا اپ با پاسخ سرورِ قدیمی هم نشکند.
+    val undated_count: Int? = null,
+    val undated_amount: Long? = null
 )
 
 data class FinancialMetrics(
@@ -57,8 +61,10 @@ data class SearchStudentItem(
 
 data class TeacherItem(
     val id: Int,
-    val first_name: String,
-    val last_name: String
+    // FIX(null-data): نام legacy ممکن است null باشد — null‌پذیر تا فیلتر گزارش (لیست مربیان)
+    // با یک رکورد ناقص نشکند؛ فال‌بک در محل نمایش.
+    val first_name: String? = null,
+    val last_name: String? = null
 )
 
 interface ReportNewApi {
@@ -97,6 +103,8 @@ class ReportActivity : BaseActivity() {
     private lateinit var acYearFilter: AutoCompleteTextView
     private lateinit var acMonthFilter: AutoCompleteTextView
     private lateinit var btnFetchFinancialSummary: Button
+    // O-10: خط هشدار پول بی‌تاریخ (nullable: اگر چیدمان قدیمی بود، اپ نباید بشکند)
+    private var tvUndatedWarning: TextView? = null
 
     // مقادیر خروجی آمار مالی
     private lateinit var tvMonthlyTitle: TextView
@@ -139,6 +147,7 @@ class ReportActivity : BaseActivity() {
         acYearFilter = findViewById(R.id.acYearFilter)
         acMonthFilter = findViewById(R.id.acMonthFilter)
         btnFetchFinancialSummary = findViewById(R.id.btnFetchFinancialSummary)
+        tvUndatedWarning = findViewById(R.id.tvUndatedWarning)
 
         tvMonthlyTitle = findViewById(R.id.tvMonthlyTitle)
         tvMonthlyTotal = findViewById(R.id.tvMonthlyTotal)
@@ -263,7 +272,11 @@ class ReportActivity : BaseActivity() {
                 val list = api.getTeachersList()
                 teachersList = list
                 withContext(Dispatchers.Main) {
-                    val teacherNames = list.map { "${it.first_name} ${it.last_name} (${it.id})" }
+                    // FIX(null-data): نام ناقص/خالی نباید «null» یا ردیف خالی در فیلتر معلم بدهد.
+                    val fallbackName = getString(R.string.common_person_unknown)
+                    val teacherNames = list.map {
+                        "${it.first_name ?: ""} ${it.last_name ?: ""}".trim().ifEmpty { fallbackName } + " (${it.id})"
+                    }
                     val teacherAdapter = ArrayAdapter(this@ReportActivity, android.R.layout.simple_dropdown_item_1line, teacherNames)
                     acTeacherFilter.setAdapter(teacherAdapter)
 
@@ -309,6 +322,22 @@ class ReportActivity : BaseActivity() {
                     tvMonthlyTotal.text = getString(R.string.common_toman_format, summary.monthly.total)
                     tvMonthlyCollected.text = getString(R.string.common_toman_format, summary.monthly.collected)
                     tvMonthlyUncollected.text = getString(R.string.common_toman_format, summary.monthly.uncollected)
+
+                    // O-10: هشدار «پول بی‌تاریخ» — مبلغی که در جمع‌های ماه/سالِ بالا نیست.
+                    val undatedAmount = summary.undated_amount ?: 0L
+                    val undatedCount = summary.undated_count ?: 0
+                    tvUndatedWarning?.let { warning ->
+                        if (undatedAmount > 0) {
+                            warning.text = getString(
+                                R.string.rpt_undated_warning,
+                                String.format("%,d", undatedCount),
+                                String.format("%,d", undatedAmount)
+                            )
+                            warning.visibility = View.VISIBLE
+                        } else {
+                            warning.visibility = View.GONE
+                        }
+                    }
 
                     if (scope == "teacher") {
                         cardYearlySummary.visibility = View.VISIBLE

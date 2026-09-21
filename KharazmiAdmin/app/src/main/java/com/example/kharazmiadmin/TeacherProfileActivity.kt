@@ -658,7 +658,14 @@ class PendingSessionsAdapter(private val list: List<PendingSettlementSession>) :
         try {
             val codeStr = if (item.session_code != null) holder.itemView.context.getString(R.string.tprof_code2, item.session_code) else ""
             holder.tvClassTitle.text = holder.itemView.context.getString(R.string.tprof_row, item.class_title ?: "", codeStr, item.present_count)
-            holder.tvSessionDate.text = holder.itemView.context.getString(R.string.tprof_date, item.date ?: "")
+            // FIX(undated-sessions): سرور برای جلسه‌ی بدون تاریخ "" برمی‌گرداند (هیچ تاریخ جعلی‌ای
+            // ساخته نمی‌شود) — به‌جای خط خالی، «تاریخ نامشخص» نمایش داده می‌شود.
+            val sessionDate = item.date?.takeIf { it.isNotBlank() }
+            holder.tvSessionDate.text = if (sessionDate != null) {
+                holder.itemView.context.getString(R.string.tprof_date, sessionDate)
+            } else {
+                holder.itemView.context.getString(R.string.tprof_date_unknown)
+            }
             val amt = item.amount ?: 0L
             holder.tvSessionAmount.text = holder.itemView.context.getString(R.string.portal_money, String.format(java.util.Locale.US, "%,d", amt))
         } catch (e: Exception) {

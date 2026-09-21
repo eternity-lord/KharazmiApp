@@ -25,6 +25,7 @@ app = FastAPI(
 from slowapi.errors import RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
 from dependencies import limiter, check_user_login
+from storage import storage_dir, resolve_existing
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
@@ -83,7 +84,9 @@ app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(audit_trail.AuditContextMiddleware)
 
 # FIX M3: پوشه‌ی آپلود نگه داشته می‌شود ولی سرو عمومی StaticFiles حذف شد.
-os.makedirs("uploads/profiles", exist_ok=True)
+# FIX(storage): پوشهٔ آپلود با مسیر مطلقِ مستقل از cwd ساخته می‌شود (قبلاً "uploads/profiles"
+# یعنی بسته به پوشهٔ اجرای سرور، فایل‌ها جای دیگری می‌رفتند و سرو شدنشان ۴۰۴ می‌شد).
+storage_dir("profiles")
 
 
 # FIX M3: سرو فایل آپلودی فقط برای لاگین‌کرده‌ها (به‌جای StaticFiles عمومی).
@@ -95,8 +98,9 @@ def serve_upload(filename: str, _: str = Depends(check_user_login)):
     safe = os.path.basename(filename)
     if not safe or safe.startswith("."):
         raise HTTPException(status_code=400, detail="نام فایل معتبر نیست")
-    path = os.path.join("uploads/profiles", safe)
-    if not os.path.isfile(path):
+    # FIX(storage): اول ریشهٔ فعلی، بعد مسیرهای قدیمی (سازگاری عقب‌رو ⇒ عکس‌های قدیمی ۴۰۴ نمی‌شوند)
+    path = resolve_existing("profiles", safe)
+    if not path or not os.path.isfile(path):
         raise HTTPException(status_code=404, detail="فایل یافت نشد")
     return FileResponse(path)
 
@@ -178,8 +182,21 @@ def auto_patch_database():
         # Check & Add 'sub_role' in 'users' table
         if not column_exists('users', 'sub_role'):
             print("🔧 Auto-patching database: Adding 'sub_role' to 'users' table...")
-            db.execute(text("ALTER TABLE users ADD COLUMN sub_role VARCHAR DEFAULT 'admin';"))
-            db.execute(text("UPDATE users SET sub_role = 'admin' WHERE sub_role IS NULL;"))
+            # FIX(A1): ستون بدون DEFAULT ساخته می‌شود تا ردیف‌های legacy با NULL بمانند و
+            # بتوان نقش واقعی‌شان را تعیین کرد (DEFAULT 'admin' همه را مدیر می‌کرد).
+            db.execute(text("ALTER TABLE users ADD COLUMN sub_role VARCHAR;"))
+            # FIX(A1): بک‌فیل نقش‌آگاه — هر کاربر نقش واقعی خودش را می‌گیرد و فقط کاربرانی که
+            # role آن‌ها خالی/«admin» است ادمین می‌مانند (سازگاری با ادمین‌های legacy).
+            # پیش‌تر همهٔ ردیف‌ها «admin» می‌شدند ⇒ سایهٔ معلم/شاگرد/ولی به سطح دسترسی مدیر ارتقا می‌یافت.
+            db.execute(text(
+                "UPDATE users SET sub_role = CASE "
+                "WHEN role IN ('teacher', 'student', 'parent', 'secretary') THEN role "
+                "WHEN username LIKE 'teacher:%' THEN 'teacher' "
+                "WHEN username LIKE 'student:%' THEN 'student' "
+                "WHEN username LIKE 'parent:%' THEN 'parent' "
+                "ELSE 'admin' END "
+                "WHERE sub_role IS NULL OR TRIM(sub_role) = ''"
+            ))
             db.commit()
 
         # Check & Add 'profile_image' in 'students' table
@@ -640,14 +657,19 @@ except Exception as _e:
     print(f"⚠️ خطا در راه‌اندازی worker کلاس زنده: {_e}")
 
 # Include Routers
+# FIX(route-shadowing): ترتیب include تعیین‌کننده است (Starlette: اولین تطبیق برنده می‌شود).
+# admin.router مسیرهای literal مثل GET /teachers/pending دارد؛ اگر teachers.router (که
+# GET /teachers/{teacher_id} را دارد) زودتر ثبت شود، «/teachers/pending» به آن می‌خورد و
+# رکوئست با خطای 422 (int parsing روی "pending") رد می‌شود ⇒ لیست درخواست‌های تایید معلم
+# هرگز بارگذاری نمی‌شد. با ترتیب زیر (admin قبل از teachers) هیچ مسیری سایه نمی‌شود.
 app.include_router(auth.router)
 app.include_router(students.router)
+app.include_router(admin.router)
 app.include_router(teachers.router)
 app.include_router(classes.router)
 app.include_router(finance.router)
 app.include_router(reports.router)
 app.include_router(attendance.router)
-app.include_router(admin.router)
 app.include_router(parent.router)
 app.include_router(homework.router)
 app.include_router(calendar.router)

@@ -60,7 +60,11 @@ class User(Base):
     password = Column(String)
     full_name = Column(String)
     role = Column(String)
-    sub_role = Column(String, default="admin")  # "admin" or "secretary"
+    # FIX(A1): پیش‌فرض «admin» حذف شد — هر کاربری که نقشش صریحاً تعیین نشود، دیگر
+    # به‌طور خودکار مدیر نمی‌شود. نقش مؤثر (fail-closed) در dependencies.resolve_effective_sub_role
+    # محاسبه می‌شود: sub_role ست‌شده ⇒ همان؛ در غیر این‌صورت از ستون role و فقط برای
+    # role خالی/«admin» ⇒ admin. (همهٔ مسیرهای ساخت کاربر در کد صریح‌اند.)
+    sub_role = Column(String)  # "admin" | "secretary" | "teacher" | "student" | "parent"
     branch_id = Column(Integer, ForeignKey("branches.id"), nullable=True)
 
 
@@ -913,6 +917,26 @@ if __name__ == "__main__":
             print(f"⚠️ نکته: {e}")
 
     print("✅ دیتابیس آپدیت شد (اطلاعات قبلی حفظ شد).")
+
+
+class ClassRestoreLog(Base):
+    """FIX(D1): دفتر بازیابی کلاس آرشیوشده — «چه کسی، چه زمانی، با چه دلیلی و در چه حالتی».
+
+    چرا جدول جدا (نه تغییر وضعیت ClassDeletionRequest): وضعیت آن رکورد معنای «تصمیم حذف»
+    دارد (pending/approved/rejected) و بازنویسی‌اش تاریخچهٔ تصمیم را از بین می‌برد.
+    دامنهٔ فاز ۱ فقط متادیتا است؛ `pre_state_json` برای حسابرسی نگه داشته می‌شود که
+    وضعیت پیش از بازیابی (کلاس/شمارش ردیف‌های آرشیوی) قابل بازبینی باشد.
+    """
+    __tablename__ = "class_restore_logs"
+    id = Column(Integer, primary_key=True, index=True)
+    course_id = Column(Integer, ForeignKey("courses.id"), nullable=False, index=True)
+    mode = Column(String, default="metadata_only")  # فاز ۱ فقط metadata_only
+    reason = Column(String, nullable=True)
+    actor_user_id = Column(Integer, nullable=True)
+    actor_name = Column(String, nullable=True)
+    pre_state_json = Column(Text, nullable=True)
+    finance_touched = Column(Boolean, default=False, nullable=False)
+    restored_at = Column(DateTime, default=datetime.datetime.now)
 
 
 class ClassDeletionRequest(Base):

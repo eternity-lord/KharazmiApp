@@ -49,7 +49,13 @@ data class TeacherRegisterData(
     val profile_image: String? = null
 )
 
-data class TeacherSimple(val id: Int, val first_name: String, val last_name: String)
+// FIX(null-data): نام legacy ممکن است null/خالی باشد — null‌پذیر تا یک رکورد ناقص
+// لیست مربیان (انتخاب معلم در کلاس) را نشکند؛ فال‌بک در محل نمایش.
+data class TeacherSimple(
+    val id: Int,
+    val first_name: String? = null,
+    val last_name: String? = null
+)
 
 // ==========================================
 // 4. دانش‌آموزان (Students)
@@ -113,6 +119,75 @@ data class PendingClassItem(
 )
 
 data class ClassDetailsResponse(val students: List<StudentItem>)
+
+// FIX(archive): آرشیو کلاس‌های حذف‌شده پاسخ متفاوتی از «کلاس‌های در انتظار» دارد
+// (teacher_price/days/time/base_institute_share در آرشیو نیست و title/code می‌توانند null باشند؛
+// مدل قبلی PendingClassItem همین‌ها را non-null می‌خواست ⇒ نمایش اشتباه/خالی).
+data class ArchivedClassItem(
+    val id: Int,
+    @SerializedName("title") val title: String? = null,
+    @SerializedName("code") val code: String? = null,
+    @SerializedName("teacher_id") val teacherId: Int? = null,
+    @SerializedName("teacher_name") val teacherName: String? = null,
+    @SerializedName("branch_id") val branchId: Int? = null,
+    @SerializedName("branch_name") val branchName: String? = null,
+    @SerializedName("grade_level") val gradeLevel: String? = null,
+    @SerializedName("days_of_week") val daysOfWeek: String? = null,
+    @SerializedName("class_time") val classTime: String? = null,
+    @SerializedName("students_count") val studentsCount: Int = 0,
+    @SerializedName("students_active_count") val studentsActiveCount: Int = 0,
+    @SerializedName("sessions_count") val sessionsCount: Int = 0,
+    @SerializedName("transactions_count") val transactionsCount: Int = 0,
+    @SerializedName("deleted_at") val deletedAt: String? = null,
+    @SerializedName("forgive_session_charges") val forgiveSessionCharges: Boolean = false,
+    @SerializedName("is_suspended") val isSuspended: Boolean = false,
+    @SerializedName("bg_color") val bgColor: String? = null
+)
+
+data class ArchivedClassDetail(
+    val id: Int,
+    @SerializedName("title") val title: String? = null,
+    @SerializedName("code") val code: String? = null,
+    @SerializedName("grade_level") val gradeLevel: String? = null,
+    @SerializedName("days_of_week") val daysOfWeek: String? = null,
+    @SerializedName("class_time") val classTime: String? = null,
+    @SerializedName("is_suspended") val isSuspended: Boolean = false,
+    @SerializedName("teacher_id") val teacherId: Int? = null,
+    @SerializedName("teacher_name") val teacherName: String? = null,
+    @SerializedName("branch_id") val branchId: Int? = null,
+    @SerializedName("branch_name") val branchName: String? = null,
+    @SerializedName("students_count") val studentsCount: Int = 0,
+    @SerializedName("students_active_count") val studentsActiveCount: Int = 0,
+    @SerializedName("archived_enrollments_count") val archivedEnrollmentsCount: Int = 0,
+    @SerializedName("sessions_count") val sessionsCount: Int = 0,
+    @SerializedName("archived_sessions_count") val archivedSessionsCount: Int = 0,
+    @SerializedName("transactions_count") val transactionsCount: Int = 0,
+    @SerializedName("transactions_total") val transactionsTotal: Long = 0,
+    @SerializedName("deleted_at") val deletedAt: String? = null,
+    @SerializedName("has_deletion_record") val hasDeletionRecord: Boolean = false,
+    @SerializedName("forgive_session_charges") val forgiveSessionCharges: Boolean = false,
+    @SerializedName("requested_by_role") val requestedByRole: String? = null,
+    @SerializedName("admin_note") val adminNote: String? = null
+)
+
+// FIX(D1): بازیابی «فقط متادیتا» کلاس آرشیوشده — درخواست/پاسخ پنل ادمین.
+// mode اجباری است (سرور فقط metadata_only را می‌پذیرد) و reason اختیاری برای حسابرسی.
+data class ClassRestoreRequest(
+    @SerializedName("mode") val mode: String = "metadata_only",
+    @SerializedName("reason") val reason: String? = null
+)
+
+data class ClassRestoreResponse(
+    @SerializedName("message") val message: String? = null,
+    @SerializedName("id") val id: Int? = null,
+    @SerializedName("title") val title: String? = null,
+    @SerializedName("mode") val mode: String? = null,
+    @SerializedName("finances_untouched") val financesUntouched: Boolean = false,
+    @SerializedName("note") val note: String? = null,
+    // O-13: هشدارهای سرور دربارهٔ بازیابی (مثلاً «معلم این کلاس آرشیو شده است») — nullable و
+    // با default تا با سرور قدیمی هم سازگار باشد.
+    @SerializedName("warnings") val warnings: List<String>? = null
+)
 
 // ==========================================
 // 6. مالی و ثبت نام (Financial & Enrollment)
@@ -227,12 +302,14 @@ data class StudentRawProfile(
 
 data class TeacherRawProfile(
     val id: Int,
-    val first_name: String,
-    val last_name: String,
+    // FIX(null-data): رکوردهای legacy ممکن است این چهار فیلد را NULL داشته باشند و
+    // پاسخ خام سرور قبلاً null می‌داد — null‌پذیر + فال‌بک امن در پروفایل/فرم ویرایش مربی.
+    val first_name: String? = null,
+    val last_name: String? = null,
     val father_name: String?,
-    val national_code: String,
+    val national_code: String? = null,
     val birth_date: String?,
-    val mobile: String,
+    val mobile: String? = null,
     val home_phone: String?,
     val marital_status: String?,
     val gender: String?,

@@ -290,7 +290,9 @@
     <string name="attendance_queue_save_failed">❌ اتصال قطع شد و ذخیره محلی هم ناموفق بود؛ اطلاعات این صفحه را نگه دارید و دوباره «ثبت» را بزنید.</string>
     <string name="attendance_already_registered">این جلسه قبلاً ثبت شده است</string>
     <string name="attendance_validation_check">خطای اعتبارسنجی؛ ورودی‌ها را بررسی کنید</string>
-    <string name="attendance_server_error">❌ خطای سرور (%1$d)؛ لطفاً دوباره تلاش کنید.</string>
+    <!-- FIX(build): این پیام تک‌آرگومانی است و کلید جدا لازم دارد؛ قبلاً هم‌نام با پیام دوعملوندی بالا بود
+         و mergeDebugResources با «Found item String/attendance_server_error more than one time» می‌شکست. -->
+    <string name="attendance_server_error_retry">❌ خطای سرور (%1$d)؛ لطفاً دوباره تلاش کنید.</string>
     <string name="attendance_http_fallback">❌ خطای %1$d؛ %2$s</string>
     <string name="attendance_submit_failed">❌ ثبت جلسه ناموفق بود (%1$s)؛ دوباره تلاش کنید.</string>
     <string name="attendance_html_title">فرم حضور و غیاب در آموزشگاه خوارزمی و نیلوفر</string>
@@ -355,6 +357,26 @@
     <string name="main_trash_row">%1$s (کد: %2$s)</string>
     <string name="main_trash_title">کلاس‌های حذفی (آرشیو ادمین)</string>
     <string name="main_trash_error">خطا در دریافت لیست آرشیو حذفی</string>
+    <!-- FIX(archive): ردیف و جزئیات غنی‌تر آرشیو کلاس‌ها (null-safe) -->
+    <string name="main_trash_row_rich">%1$s (کد: %2$s) — معلم: %3$s | شعبه: %4$s | دانش‌آموز: %5$d | حذف: %6$s</string>
+    <string name="main_trash_no_date">بدون تاریخ</string>
+    <string name="main_trash_d_code">کد کلاس: %1$s</string>
+    <string name="main_trash_d_teacher">معلم: %1$s</string>
+    <string name="main_trash_d_branch">شعبه: %1$s</string>
+    <string name="main_trash_d_time">زمان برگزاری: %1$s — %2$s</string>
+    <string name="main_trash_d_students">دانش‌آموزان (تاریخی): %1$d</string>
+    <string name="main_trash_d_sessions">جلسات (تاریخی): %1$d</string>
+    <string name="main_trash_d_tx">تراکنش‌های تاریخی: %1$d — جمع مبلغ: %2$d تومان</string>
+    <string name="main_trash_d_deleted_at">تاریخ حذف: %1$s</string>
+    <string name="main_trash_d_forgive">ابطال هزینه‌ی جلسات در زمان حذف: %1$s</string>
+    <string name="main_trash_detail_error">خطا در دریافت جزئیات کلاس آرشیوشده</string>
+    <!-- FIX(D1): بازیابی «فقط متادیتا» کلاس آرشیوشده از پنل ادمین -->
+    <string name="main_trash_restore">بازیابی</string>
+    <string name="main_trash_restore_confirm_title">بازیابی کلاس حذف‌شده؟</string>
+    <string name="main_trash_restore_confirm_msg">کلاس به لیست کلاس‌ها برمی‌گردد؛ اما ثبت‌نام‌ها و سابقه‌ی مالی (پرداخت‌ها، بدهی و طلب معلم) بازیابی نمی‌شود. برای ادامه‌ی کلاس، ثبت‌نام‌های جدید بسازید.</string>
+    <string name="main_trash_restore_ok">کلاس بازیابی شد (بدون بازگرداندن سابقه‌ی مالی)</string>
+    <string name="main_trash_restore_fail">بازیابی انجام نشد؛ کلاس از قبل فعال است یا دسترسی مجاز نیست</string>
+    <string name="main_trash_restore_warnings_title">کلاس بازیابی شد — نکته‌های مهم</string>
     <string name="main_session_code_hint">کد ۶ رقمی جلسه (مثال: 100001)</string>
     <string name="main_edit_session_title">اصلاح جلسه قبلی</string>
     <string name="main_edit_session_go">ورود به صفحه اصلاح</string>
@@ -369,6 +391,7 @@
     <string name="invoice_no_enrollment">این دانش‌آموز در هیچ کلاسی ثبت‌نام نشده است</string>
     <string name="invoice_pick_class">انتخاب کلاس برای %1$s</string>
     <string name="invoice_total">شهریه قراردادی کلاس: %1$s تومان</string>
+    <string name="invoice_total_and_credit">شهریه قراردادی کلاس: %1$s تومان — اعتبار: %2$s تومان</string>
     <string name="invoice_paid_teacher">پرداخت‌شده به معلم: %1$s تومان</string>
     <string name="invoice_paid_institute">کلاس: %1$s\n(پرداخت‌شده به آموزشگاه: %2$s تومان)</string>
     <string name="invoice_due_teacher">سهم معلم (قابل پرداخت): %1$s %2$s تومان</string>
@@ -656,6 +679,10 @@
     <string name="tprof_code2">" [کد جلسه: %1$s]"</string>
     <string name="tprof_row">%1$s%2$s (حاضرین: %3$s نفر)</string>
     <string name="tprof_date">📅 تاریخ برگزاری: %1$s</string>
+    <!-- FIX(undated-sessions): جلسه‌ی بدون تاریخ (سرور "" برمی‌گرداند) به‌جای خط خالی -->
+    <!-- FIX(A3): برچسب محور نمودار برای جلسه‌ی بدون تاریخ (سرور "" برمی‌گرداند) -->
+    <string name="chart_date_unknown">تاریخ نامشخص</string>
+    <string name="tprof_date_unknown">📅 تاریخ برگزاری: نامشخص</string>
     <string name="tprof_sessions">%1$s جلسه</string>
     <string name="tprof_settled_date">📅 تاریخ تسویه: %1$s</string>
     <string name="cdetail_excel_downloading">شروع دانلود فایل Excel کلاس...</string>
@@ -901,7 +928,7 @@
     <string name="chart_att_empty">دیتای حضور و غیاب کافی برای این بازه یافت نشد</string>
     <string name="chart_money_empty">دیتای مالی کافی برای تفکیک سهم‌ها در این بازه یافت نشد</string>
     <string name="chart_stats_error">خطا در دریافت اطلاعات آمار</string>
-    <string name="chart_ds_income">درآمد کل بازه (تومان)</string>
+    <string name="chart_ds_income">وصولی نقدی بازه (تومان)</string>
     <string name="chart_pie_all">کل دانش‌آموزان</string>
     <string name="chart_line_att">درصد حضور در کلاس</string>
     <string name="chart_pie_teacher">سهم معلم</string>
@@ -970,6 +997,8 @@
     <string name="common_deleted_msg">🗑️ %1$s</string>
     <string name="common_mobile_row">📱 %1$s</string>
     <string name="common_person_row">👤 %1$s</string>
+    <!-- FIX(null-data): جای‌گزین نام ناقص/خالی مربی در لیست‌ها و فیلترها -->
+    <string name="common_person_unknown">نامشخص</string>
     <string name="common_announce_row">📣 %1$s (%2$s)\n%3$s</string>
     <string name="common_course_status_row">%1$s: %2$s ➔ %3$s</string>
     <string name="common_bullet_row">• %1$s</string>
@@ -978,7 +1007,8 @@
     <string name="rpt_pick_tutor">لطفاً یک مربی را انتخاب کنید</string>
     <string name="rpt_monthly_title">آمار مالی ماهانه (%1$s/%2$s)</string>
     <string name="rpt_yearly_title">آمار مالی سالانه مربی (%1$s)</string>
-    <string name="rpt_calc_error">خطا در محاسبات آمار مالی از سرور</string>
+        <string name="rpt_undated_warning">%1$s پرداخت بی‌تاریخ (%2$s تومان) در جمع‌های بالا نیامده است</string>
+<string name="rpt_calc_error">خطا در محاسبات آمار مالی از سرور</string>
     <string name="rpt_enter_name">لطفاً نام دانش‌آموز را وارد کنید</string>
     <string name="rpt_student_nf">دانش‌آموزی با این مشخصات یافت نشد</string>
     <string name="rpt_search_error">خطا در سرچ دانش‌آموز</string>
@@ -1070,6 +1100,12 @@
     <string name="lcls_end_msg">آیا از پایان این کلاس زنده و ثبت نهایی حضور و غیاب (با محاسبه‌ی شهریه) اطمینان دارید؟</string>
     <string name="lcls_done_msg">✅ جلسه ثبت شد. سهم معلم: %1$s | سهم آموزشگاه: %2$s</string>
     <string name="lcls_end_error">خطا در پایان کلاس: %1$s</string>
+    <!-- FIX(admin-notifications): ورودی منو + حالت خالی + شمارش خوانده‌نشده + عنوان نامشخص -->
+    <string name="nav_notifications">اعلان‌ها</string>
+    <string name="notif_unread_count">%1$d اعلان خوانده‌نشده</string>
+    <string name="notif_empty">هیچ اعلانی وجود ندارد</string>
+    <string name="notif_empty_filter">اعلانی با این فیلتر وجود ندارد</string>
+    <string name="notif_untitled">اعلان بدون عنوان</string>
     <string name="notif_readall_title">تایید خوانده شدن همه</string>
     <string name="notif_readall_msg">آیا از علامت‌گذاری تمامی اعلان‌ها به عنوان خوانده شده اطمینان دارید؟</string>
     <string name="notif_list_error">خطا در دریافت لیست اعلان‌ها</string>
@@ -1160,6 +1196,10 @@
     <string name="ptch_empty">هیچ درخواستی وجود ندارد</string>
     <string name="ptch_op_error">خطا در عملیات</string>
     <string name="ptch_del_error">خطا در حذف درخواست</string>
+    <!-- FIX(teacher-approval): خطای بارگذاری صف تایید + خط شعبه در کارت درخواست -->
+    <string name="ptch_load_error">خطا در دریافت درخواست‌های تایید معلم</string>
+    <string name="ptch_branch_row">شعبه: %1$s</string>
+    <string name="ptch_no_branch">بدون شعبه</string>
     <string name="rexp_no_page">برای دریافت گزارش، یک صفحهٔ فعال لازم است</string>
     <string name="rexp_share_title">اشتراک‌گذاری و باز کردن فایل Excel</string>
     <string name="rexp_server_error">خطا در اتصال به سرور</string>
@@ -1223,7 +1263,7 @@
     <string name="dashboard_error">خطا در دریافت داشبورد: %1$s</string>
     <string name="dashboard_no_data">داده‌ای برای داشبورد یافت نشد</string>
     <string name="dashboard_refresh">بروزرسانی داشبورد</string>
-    <string name="dashboard_today_revenue_sub">مجموع تراکنش‌های امروز</string>
+    <string name="dashboard_today_revenue_sub">وصولی نقدی امروز</string>
     <string name="dashboard_overdue_sub">%1$d قسط • %2$s تومان</string>
     <string name="dashboard_students_sub">فعال در سیستم</string>
     <string name="dashboard_alerts_sub">نیاز به بررسی</string>

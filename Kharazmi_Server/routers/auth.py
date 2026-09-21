@@ -16,7 +16,7 @@ from models import (
 from schemas import (
     HistoryRequest, LoginRequest, TeacherInfo, FullTeacherProfile, StudentCreate, TeacherCreate, CourseCreate, EnrollmentCreate, GradeCreate, GradeItem, AttendanceLogRequest, AttendanceItem, AttendanceSubmitData, SmsSendRequest, ChangePasswordRequest, StudentProfileInfo, FullStudentProfile, TeacherProfileInfo, FullTeacherProfile, ClassReportInfo, ClassStudentData, ClassSessionHistory, FullClassReport, ShareConfigModel, StudentUpdate, TeacherUpdate, PersonListItem, TransactionUpdate, StudentAttendanceHistoryRequest, AdvancedSearchItem, FinanceSubmitData, PrintReceiptRequest, TransactionTestData
 )
-from dependencies import get_db, check_admin_access, check_user_login, get_enrollment_tuition_and_discount, SESSION_EXPIRY_DAYS, limiter, get_current_user, hash_password, verify_password, ROLE_PERMISSIONS, create_jwt_token, ensure_student_shadow_users, get_session_student, get_session_parent, normalize_mobile
+from dependencies import get_db, check_admin_access, check_user_login, get_enrollment_tuition_and_discount, SESSION_EXPIRY_DAYS, limiter, get_current_user, hash_password, verify_password, ROLE_PERMISSIONS, create_jwt_token, ensure_student_shadow_users, get_session_student, get_session_parent, normalize_mobile, resolve_notification_role, display_name, safe_person_name
 
 router = APIRouter()
 
@@ -44,20 +44,23 @@ def login_user(request: Request, req: LoginRequest, db: Session = Depends(get_db
     if _recent_fails >= 5:
         raise HTTPException(status_code=429, detail="تعداد تلاش‌های ناموفق برای این شماره زیاد است؛ لطفاً ۵ دقیقه دیگر تلاش کنید")
     # 1. بررسی مدیر
-    admin = db.query(User).filter(User.username.in_(_login_keys)).first()  # FIX H20-ESC: canonical + خام (username ادمین لزوماً موبایل نیست؛ legacy هم پوشش داده می‌شود)
+    # FIX O-01/O-21: سایهٔ معلم (role="teacher") از شاخهٔ «ادمین» کنار گذاشته می‌شود تا به شاخهٔ
+    # معلم (پایین‌تر) برسد. چرا: این lookup اول جواب می‌داد و اگر `Teacher` متناظر وجود نداشت یا
+    # حذف‌شده بود، گیت‌های H10 (تأیید/تعلیق) قابل اجرا نبودند ⇒ سایهٔ بی‌پرونده توکن می‌گرفت و
+    # سایهٔ معلم هم با `role="admin"` و `user_id=User.id` پاسخ می‌گرفت (اپ معلم را به پنل ادمین می‌برد).
+    # اگر ادمین واقعیِ هم‌نام هم وجود داشته باشد، او اولویت دارد (پس ادمین‌ها قفل نمی‌شوند).
+    _shadow_roles = ("teacher",)
+    admin = next((u for u in db.query(User).filter(User.username.in_(_login_keys)).all()
+                  if (u.role or "") not in _shadow_roles), None)  # FIX H20-ESC: canonical + خام (username ادمین لزوماً موبایل نیست؛ legacy هم پوشش داده می‌شود)
     if admin:
         if req.password and verify_password(req.password, admin.password):
-            # FIX (E2E-B1): سایه‌ی معلم (role=teacher) هم باید از گیت‌های H10 شاخه‌ی Teacher رد شود —
-            # قبلاً چون lookup سایه اول بود، معلم معلق/تاییدنشده با 200 لاگین می‌کرد و هرگز به گیت نمی‌رسید.
-            if (admin.role or "") == "teacher":
-                _t = db.query(Teacher).filter(Teacher.mobile.in_(_login_keys), Teacher.is_deleted == False).first()
-                if _t is not None:
-                    if not _t.is_approved:
-                        raise HTTPException(status_code=403, detail="حساب شما هنوز توسط مدیر تایید نشده است")
-                    if _t.is_suspended:
-                        raise HTTPException(status_code=403, detail="حساب شما توسط مدیر معلق شده است. لطفاً با آموزشگاه تماس بگیرید")
+            # (FIX E2E-B1 قبلاً همین‌جا گیت‌های H10 را برای سایهٔ معلم اجرا می‌کرد؛ حالا خودِ سایه به
+            #  شاخهٔ معلم می‌رود و همان گیت‌ها آنجا اجرا می‌شود — رفتار یکسان، بدون مسیر موازی.)
             # FIX: توکن امضادار JWT به جای uuid
-            sub_role = admin.sub_role if admin.sub_role else "admin"
+            # FIX(A1): نقش با سیاست کمترین سطح دسترسی — سایهٔ معلمِ legacy بدون sub_role
+            # دیگر توکن «admin» نمی‌گیرد.
+            from dependencies import resolve_effective_sub_role
+            sub_role = resolve_effective_sub_role(admin)
             token = create_jwt_token(user_id=admin.id, sub_role=sub_role)
             new_session = UserSession(
                 token=token,
@@ -106,6 +109,9 @@ def login_user(request: Request, req: LoginRequest, db: Session = Depends(get_db
         # این نسخه جفت را همیشه سازگار نگه می‌دارد (canonical یا legacy): دقیقِ legacy اول، heal جفت فقط
         # اگر canonical آزاد باشد، adopt سایه‌ی canonical فقط اگر مال دیگری نباشد، ساخت با جفت سازگار.
         mob_norm = normalize_mobile(teacher.mobile) or teacher.mobile
+        # FIX(A4): نام معلم یک‌بار و امن ساخته می‌شود تا ساخت/مقایسه/به‌روزرسانی full_name
+        # و پاسخ ورود همه یک مقدار بگیرند (الگوی قدیمی با نام NULL «None None» می‌ساخت).
+        _teacher_name = safe_person_name(teacher.first_name, teacher.last_name, "معلم")
         u = db.query(User).filter(User.username == teacher.mobile).with_for_update().first()
         if u is not None and (u.role or "") == "teacher" and mob_norm != teacher.mobile:
             _owner = db.query(Teacher).filter(Teacher.mobile == mob_norm, Teacher.id != teacher.id).first()
@@ -133,7 +139,7 @@ def login_user(request: Request, req: LoginRequest, db: Session = Depends(get_db
             _candidate = User(
                 username=_new_name,
                 password=teacher.password,  # از Teacher هش کپی می‌شود فقط بار اول
-                full_name=f"{teacher.first_name} {teacher.last_name}",
+                full_name=_teacher_name,
                 role="teacher",
                 sub_role="teacher",
                 branch_id=teacher.branch_id
@@ -153,16 +159,16 @@ def login_user(request: Request, req: LoginRequest, db: Session = Depends(get_db
                 if u is None:
                     raise
                 # همگام‌سازی سبک اگر برنده قدیمی باشد
-                if u.full_name != f"{teacher.first_name} {teacher.last_name}":
-                    u.full_name = f"{teacher.first_name} {teacher.last_name}"
+                if u.full_name != _teacher_name:
+                    u.full_name = _teacher_name
                 if u.branch_id != teacher.branch_id:
                     u.branch_id = teacher.branch_id
                 db.flush()
         else:
             # FIX: فقط full_name و branch_id را همگام کن، نه پسورد
             # اگر موبایل معلم عوض شده باشد، User.username قدیمی می‌ماند – برای همین teacher_id را جدا ذخیره می‌کنیم
-            if u.full_name != f"{teacher.first_name} {teacher.last_name}":
-                u.full_name = f"{teacher.first_name} {teacher.last_name}"
+            if u.full_name != _teacher_name:
+                u.full_name = _teacher_name
             if u.branch_id != teacher.branch_id:
                 u.branch_id = teacher.branch_id
             db.flush()
@@ -182,9 +188,13 @@ def login_user(request: Request, req: LoginRequest, db: Session = Depends(get_db
         return {
             "status": "success",
             "role": "teacher",
+            # FIX O-01: `sub_role` هم مثل شاخهٔ ادمین برگردانده می‌شود؛ بدون آن اپ
+            # (`LoginActivity.kt` → `USER_SUB_ROLE = response.sub_role ?: "admin"`) برای معلم
+            # «admin» ذخیره می‌کرد (دکمهٔ ویژهٔ مدیر در تنظیمات معلم نمایان می‌شد).
+            "sub_role": "teacher",
             "token": token,
             "user_id": teacher.id,  # برای سازگاری با اندروید که Teacher.id انتظار دارد
-            "name": f"{teacher.first_name} {teacher.last_name}",
+            "name": _teacher_name,
             "branch_id": teacher.branch_id,
             "message": "ورود معلم موفقیت آمیز بود",
         }
@@ -412,7 +422,7 @@ def get_me(authorization: Optional[str] = Header(None), db: Session = Depends(ge
             if user_obj:
                 teacher = db.query(Teacher).filter(Teacher.mobile == user_obj.username).first()
         if teacher:
-            user_name = f"{teacher.first_name} {teacher.last_name}"
+            user_name = display_name(teacher, "نامشخص")
             user_id = teacher.id
     elif role in ["admin", "secretary"]:
         user = db.query(User).filter(User.id == session.user_id).first()
@@ -423,13 +433,13 @@ def get_me(authorization: Optional[str] = Header(None), db: Session = Depends(ge
         student = get_session_parent(db, session)
         if not student:
             raise HTTPException(status_code=401, detail="نشست معتبر نیست؛ لطفاً دوباره وارد شوید")
-        user_name = f"ولی {student.first_name} {student.last_name}"
+        user_name = f"ولی {safe_person_name(student.first_name, student.last_name, 'دانش‌آموز')}"
         user_id = student.id
     elif role == "student":
         student = get_session_student(db, session)
         if not student:
             raise HTTPException(status_code=401, detail="نشست معتبر نیست؛ لطفاً دوباره وارد شوید")
-        user_name = f"{student.first_name} {student.last_name}"
+        user_name = display_name(student, "نامشخص")
         user_id = student.id
             
     return {
@@ -578,7 +588,7 @@ def student_login(request: Request, req: StudentLoginRequest, db: Session = Depe
     return {
         "status": "success",
         "token": token,
-        "student_name": f"{student.first_name} {student.last_name}"
+        "student_name": display_name(student, "نامشخص")
     }
 
 class DeviceTokenRequest(BaseModel):
@@ -611,10 +621,10 @@ def register_device_token(req: DeviceTokenRequest, db: Session = Depends(get_db)
 
 @router.get("/notifications")
 def get_notifications(db: Session = Depends(get_db), current_user = Depends(get_current_user), _: str = Depends(check_user_login)):
-    role = current_user.sub_role or "student"
-    if role.startswith("temp_parent:"):
-        role = "parent"
-        
+    # FIX(admin-notifications): نقش با helper مشترک resolve می‌شود (نه `sub_role or "student"`)
+    # تا ادمینِ legacy با sub_role خالی هم اعلان‌های نقش admin خودش را ببیند.
+    role = resolve_notification_role(current_user)
+
     notifs = (
         db.query(Notification)
         .filter(Notification.recipient_user_id == current_user.id, Notification.recipient_role == role)
@@ -627,30 +637,55 @@ def get_notifications(db: Session = Depends(get_db), current_user = Depends(get_
             "type": n.type,
             "title": n.title,
             "body": n.body,
-            "is_read": n.is_read,
-            "created_at": n.created_at.strftime("%Y/%m/%d %H:%M")
+            # FIX(admin-notifications): is_read می‌تواند NULL باشد (رکورد legacy) — به boolean واقعی
+            # نرمال می‌شود تا پاسخ هیچ‌وقت null به کلاینت ندهد (کلاینت هم جداگانه null-safe است).
+            "is_read": bool(n.is_read),
+            # FIX(admin-notifications): created_at در رکوردهای legacy می‌تواند NULL باشد و
+            # `None.strftime(...)` کل لیست را ۵۰۰ می‌کرد (AttributeError) ⇒ کل صندوق ادمین
+            # با یک رکورد قدیمی از کار می‌افتاد. حالا رشته‌ی خالی برمی‌گردد.
+            "created_at": n.created_at.strftime("%Y/%m/%d %H:%M") if n.created_at else ""
         }
         for n in notifs
     ]
 
+
+@router.get("/notifications/unread_count")
+def get_unread_notifications_count(db: Session = Depends(get_db), current_user = Depends(get_current_user), _: str = Depends(check_user_login)):
+    """FIX(admin-notifications): شمارش اعلان‌های خوانده‌نشده‌ی خودِ کاربر (قبلاً چنین endpointی وجود نداشت).
+
+    همین فیلترِ لیست اعمال می‌شود (recipient_user_id + role کانونیکال) ⇒ هیچ شمارش/داده‌ی
+    کاربر دیگر برنمی‌گردد. is_read=NULL (رکورد legacy) خوانده‌نشده حساب می‌شود.
+    """
+    role = resolve_notification_role(current_user)
+    base = db.query(Notification).filter(
+        Notification.recipient_user_id == current_user.id,
+        Notification.recipient_role == role,
+    )
+    total = base.count()
+    unread = base.filter(or_(Notification.is_read.is_(None), Notification.is_read == False)).count()  # noqa: E712
+    return {"unread": unread, "total": total}
+
+
 @router.post("/notifications/{id}/read")
 def mark_notification_read(id: int, db: Session = Depends(get_db), current_user = Depends(get_current_user), _: str = Depends(check_user_login)):
-    role = current_user.sub_role or "student"
-    if role.startswith("temp_parent:"):
-        role = "parent"
-        
+    # FIX(admin-notifications): همان نقش کانونیکال لیست (وگرنه اعلانِ دیده‌شده هرگز read نمی‌شد).
+    role = resolve_notification_role(current_user)
+
     notif = db.query(Notification).filter(Notification.id == id, Notification.recipient_user_id == current_user.id, Notification.recipient_role == role).first()
-    if notif:
-        notif.is_read = True
-        db.commit()
+    if not notif:
+        # FIX(admin-notifications): قبلاً ۲۰۰ با پیام موفقیت برمی‌گشت (no-op خاموش) و کاربر
+        # فکر می‌کرد اعلان خوانده شده؛ حالا خطای controlled و بدون نشت وجود رکورد کاربر دیگر.
+        raise HTTPException(status_code=404, detail="اعلان یافت نشد")
+    notif.is_read = True
+    db.commit()
     return {"message": "اعلان به عنوان خوانده شده ثبت شد"}
+
 
 @router.post("/notifications/read_all")
 def mark_all_notifications_read(db: Session = Depends(get_db), current_user = Depends(get_current_user), _: str = Depends(check_user_login)):
-    role = current_user.sub_role or "student"
-    if role.startswith("temp_parent:"):
-        role = "parent"
-        
+    # FIX(admin-notifications): همان نقش کانونیکال (فقط اعلان‌های خودِ کاربر).
+    role = resolve_notification_role(current_user)
+
     db.query(Notification).filter(Notification.recipient_user_id == current_user.id, Notification.recipient_role == role).update({"is_read": True})
     db.commit()
     return {"message": "تمامی اعلان‌ها خوانده شدند"}

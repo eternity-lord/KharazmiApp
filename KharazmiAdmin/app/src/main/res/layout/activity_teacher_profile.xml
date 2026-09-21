@@ -411,6 +411,8 @@
                         android:gravity="center"
                         android:padding="20dp">
                         <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
                             android:text="کل بدهی تسویه نشده به این معلم:"
                             android:textAppearance="@style/TextAppearance.Kharazmi.SectionTitle"
                             android:textColor="@color/gold_primary" />

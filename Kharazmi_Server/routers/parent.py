@@ -8,15 +8,21 @@ import random
 import uuid
 
 import models
-from models import Student, Enrollment, Course, Grade, Installment, SessionLog, Attendance, SmsLog, ParentOTP, UserSession, User
+from models import Student, Enrollment, Course, Grade, Installment, SessionLog, Attendance, SmsLog, ParentOTP, UserSession, User, Notification
 from schemas import ParentOtpRequest, ParentLoginRequest, ChildSelectRequest
-from dependencies import get_db, limiter, normalize_mobile
+from dependencies import get_db, limiter, normalize_mobile, resolve_notification_role
+# FIX(C6): خواندن واقعی تکالیف/آزمون‌ها/برنامهٔ هفتگی برای پورتال‌ها (بدون کد تکراری).
+from portal_data import build_portal_activity
 from fastapi import Request
 
 # FIX: Bug 16 - share the tuition-minus-payment debt calculation across financial views.
 from financial_calculations import calculate_student_debt
 
 router = APIRouter()
+
+# FIX(C1): سقف اعلان‌های نمایش‌داده‌شده در پورتال ولی (جدیدترین‌ها اول) — 
+# جلوگیری از پاسخ سنگین برای ولی‌ای که ماه‌ها اعلان انبار کرده است.
+PORTAL_NOTIFICATIONS_LIMIT = 50
 
 # ==========================================
 # 1. درخواست کد یک‌بارمصرف اولیا (OTP)
@@ -254,6 +260,42 @@ def parent_select_child(req: ChildSelectRequest, db: Session = Depends(get_db)):
 # ==========================================
 # ۴. اندپوینت امن دریافت کل سوابق فرزند (بدون دریافت آیدی شاگرد از فرانت)
 # ==========================================
+def _portal_notifications(db: Session, student: Student) -> list:
+    """اعلان‌های واقعیِ ولیِ همین فرزند (جدیدترین اول) — FIX(C1).
+
+    - منبع: جدول `notifications` با کلید `recipient_user_id` (فضای User.id) و `recipient_role`.
+    - نقش با همان helper مشترک resolve می‌شود تا رکورد legacy/نقش temp_parent هم درست نگاشت شود.
+    - `created_at` می‌تواند NULL باشد (رکورد legacy): تاریخ به رشتهٔ خالی تبدیل می‌شود، نه null،
+      تا مدل اندروید (`ParentNotificationItem.date: String` غیر-null) نشکند.
+    """
+    if not student or not student.parent_user_id:
+        return []
+    parent_user = db.query(User).filter(User.id == student.parent_user_id).first()
+    if parent_user is None:
+        return []
+    role = resolve_notification_role(parent_user)
+    rows = (
+        db.query(Notification)
+        .filter(Notification.recipient_user_id == parent_user.id,
+                Notification.recipient_role == role)
+        .order_by(Notification.created_at.desc().nullslast(), Notification.id.desc())
+        .limit(PORTAL_NOTIFICATIONS_LIMIT)
+        .all()
+    )
+    from today_summary import jalali_date_string  # lazy، مثل سایر تاریخ‌های شمسی پورتال
+    return [
+        {
+            "id": n.id,
+            "type": n.type,
+            "title": n.title,
+            "body": n.body,
+            "date": jalali_date_string(n.created_at.date()) if n.created_at else "",
+            "is_read": bool(n.is_read),
+        }
+        for n in rows
+    ]
+
+
 @router.get("/parent/child_profile")
 def get_parent_child_profile(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
     if not authorization:
@@ -358,37 +400,23 @@ def get_parent_child_profile(authorization: Optional[str] = Header(None), db: Se
     # FIX: Bug 16 - student/parent financial views must agree with tuition debtor reports.
     total_debt = calculate_student_debt(db, student)
 
-    # و) تکالیف، آزمون‌ها، جلسات پیش‌رو و اعلان‌ها برای ردیف‌های دانش‌آموز (داینامیک بر اساس کلاس‌ها)
-    homework_list = []
-    exams_list = []
-    upcoming_list = []
+    # و) تکالیف، آزمون‌ها، جلسات پیش‌رو و اعلان‌ها برای ردیف‌های دانش‌آموز
+    # FIX(C6): این سه لیست قبلاً **قالب ثابت جعلی** بودند (تکلیف «فصل ۲» با سررسید
+    # ۱۴۰۵/۰۶/۰۵، آزمون «هماهنگ مستمر» با تاریخ ۱۴۰۵/۰۶/۱۰ و جلسهٔ «شنبه و دوشنبه‌ها
+    # ۱۶:۰۰ الی ۱۷:۳۰») برای هر خانواده مستقل از واقعیت. حالا داده‌ی واقعیِ همان
+    # دانش‌آموز (تکالیف و آزمون‌های ثبت‌شده + برنامهٔ هفتگی خود کلاس) خوانده می‌شود.
+    portal_activity = build_portal_activity(db, student)
+    homework_list = portal_activity["homework"]
+    exams_list = portal_activity["exams"]
+    upcoming_list = portal_activity["upcoming_sessions"]
     notifications_list = []
-    
-    for en in enrollments:
-        if en.course:
-            c_title = en.course.title
-            homework_list.append({
-                "course_title": c_title,
-                "title": f"تمرین‌ها و حل مسائل فصل ۲ کتاب {c_title}",
-                "due_date": "۱۴۰۵/۰۶/۰۵",
-                "status": "در انتظار تحویل"
-            })
-            exams_list.append({
-                "course_title": c_title,
-                "title": f"آزمون هماهنگ مستمر کلاسی {c_title}",
-                "date": "۱۴۰۵/۰۶/۱۰",
-                "max_score": 20
-            })
-            upcoming_list.append({
-                "course_title": c_title,
-                "date": "شنبه و دوشنبه‌ها",
-                "time": "ساعت ۱۶:۰۰ الی ۱۷:۳۰"
-            })
-            
-    notifications_list = [
-        {"title": "اطلاعیه شروع ترم تحصیلی جدید", "body": "کلاس‌های پاییزه آموزشگاه علمی خوارزمی از ابتدای مهرماه به طور رسمی آغاز خواهد شد.", "date": "۱۴۰۵/۰۶/۰۱"},
-        {"title": "تعطیلی موقت به علت سرما", "body": "به اطلاع اولیای گرامی می‌رساند کلاس‌های فردا نوبت عصر به صورت غیرحضوری برگزار خواهد شد.", "date": "۱۴۰۵/۰۶/۰۲"}
-    ]
+
+    # FIX(C1): اعلان‌های واقعیِ ولی از جدول `notifications` (به‌جای دو اعلان جعلیِ ثابت).
+    # قبلاً هر ولی — مستقل از واقعیت — دو پیام نمایشی («شروع ترم»، «تعطیلی سرما») می‌دید و
+    # اعلان‌های واقعی (پرداخت فرزند، یادآوری قسط، ...) هرگز به پورتال ولی نمی‌رسید.
+    # فیلتر دقیقاً مثل اندپوینت /notifications است: recipient_user_id = کاربرِ سایه‌ی ولی
+    # + نقشِ کانونیکال (resolve_notification_role) ⇒ هیچ اعلانِ کاربر دیگری دیده نمی‌شود.
+    notifications_list = _portal_notifications(db, student)
 
     return {
         "info": {

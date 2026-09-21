@@ -17,7 +17,7 @@ from models import (
 from schemas import (
     HistoryRequest, LoginRequest, TeacherInfo, FullTeacherProfile, StudentCreate, TeacherCreate, CourseCreate, EnrollmentCreate, GradeCreate, GradeItem, AttendanceLogRequest, AttendanceItem, AttendanceSubmitData, SmsSendRequest, ChangePasswordRequest, StudentProfileInfo, FullStudentProfile, TeacherProfileInfo, FullTeacherProfile, ClassReportInfo, ClassStudentData, ClassSessionHistory, FullClassReport, ShareConfigModel, StudentUpdate, TeacherUpdate, PersonListItem, TransactionUpdate, StudentAttendanceHistoryRequest, AdvancedSearchItem, FinanceSubmitData, PrintReceiptRequest, TransactionTestData
 )
-from dependencies import get_db, check_admin_access, check_admin_or_secretary_access, check_user_login, check_student_access, get_enrollment_tuition_and_discount, SESSION_EXPIRY_DAYS
+from dependencies import get_db, check_admin_access, check_admin_or_secretary_access, check_user_login, check_student_access, get_enrollment_tuition_and_discount, SESSION_EXPIRY_DAYS, resolve_effective_sub_role, display_name, safe_person_name
 
 # FIX: Bug 16 - share the tuition-minus-payment debt calculation across financial views.
 from financial_calculations import calculate_student_debt
@@ -27,10 +27,73 @@ router = APIRouter()
 from financial_calculations import (
     calculate_institute_session_revenue,
     calculate_institute_collected_revenue,
+    count_undated_payments,
+    collected_revenue_rows,
     calculate_total_turnover,
     calculate_teacher_session_revenue,
     calculate_teacher_collected_revenue
 )
+from today_summary import jalali_date_string  # FIX O-07: برچسب قلم‌های زمانی نمودار، شمسی
+
+
+def _income_chart_buckets(rows, start_day, end_day):
+    """قلم‌های زمانی نمودار وصولی (FIX O-07).
+
+    • بازهٔ ≤ ۳۱ روز ⇒ قلم **روزانه** با برچسب تاریخ شمسی («1405/06/30»)
+    • بازهٔ بلندتر ⇒ قلم **ماهانهٔ شمسی** با برچسب «1405/06»
+    • بی‌تاریخ‌ها قلم زمانی ندارند ⇒ در نمودار نمی‌آیند (ولی در گزارش‌ها می‌مانند — فیکس A3)
+    • همیشه حداقل یک قلم برمی‌گردد (روی برنامهٔ اندروید `setupBarChart` دادهٔ خالی = نمودار خالی؛
+      یک قلم صفر ایمن‌تر و صادقانه‌تر است: «امروز: صفر»)
+    قرارداد خروجی برای Kotlin (`IncomeData(day:String, amount:Float)`): `{"day": str, "amount": int}`.
+    """
+    # FIX(A3) روی نمودار: ردیف بی‌تاریخ/نامعتبر حذف نمی‌شود و تاریخ جعلی هم نمی‌گیرد؛
+    # در قلم آخر با برچسب «بی‌تاریخ» می‌آید تا پول واقعیِ بی‌تاریخ از چشم مدیر نیفتد.
+    dated_rows, undated_total = [], 0
+    for amount, raw in rows:
+        parsed_day = _parsed_project_date(raw)
+        if parsed_day is None:
+            undated_total += amount
+        else:
+            dated_rows.append((parsed_day, amount))
+    parsed = dated_rows
+
+    window_start, window_end = start_day, end_day
+    if window_start is None or window_end is None:
+        # بازهٔ نامشخص ⇒ پیش‌فرض «۳۰ روز اخیر» (همان فیلتر پیش‌فرض ChartActivity: «ماه اخیر»)
+        # تا قلم‌بندی قطعی باشد و اسکن بی‌بازه/بی‌پایان رخ ندهد.
+        _today = datetime.date.today()
+        window_start = window_start if window_start is not None else _today - datetime.timedelta(days=29)
+        window_end = window_end if window_end is not None else _today
+    if window_end < window_start:
+        window_start, window_end = window_end, window_start
+
+    span_days = (window_end - window_start).days + 1
+    if span_days <= 31:
+        labels = [jalali_date_string(window_start + datetime.timedelta(days=offset))
+                  for offset in range(span_days)]
+        key_of = lambda day: jalali_date_string(day)  # noqa: E731
+    else:
+        start_key = jalali_date_string(window_start)[:7]
+        end_key = jalali_date_string(window_end)[:7]
+        labels = []
+        year, month = int(start_key[:4]), int(start_key[5:7])
+        end_year, end_month = int(end_key[:4]), int(end_key[5:7])
+        while (year, month) <= (end_year, end_month):
+            labels.append(f"{year:04d}/{month:02d}")
+            month += 1
+            if month == 13:
+                year, month = year + 1, 1
+        key_of = lambda day: jalali_date_string(day)[:7]  # noqa: E731
+
+    index = {label: position for position, label in enumerate(labels)}
+    buckets = [{"day": label, "amount": 0} for label in labels]
+    for day, amount in parsed:
+        position = index.get(key_of(day))
+        if position is not None:
+            buckets[position]["amount"] += amount
+    if undated_total:
+        buckets.append({"day": "بی‌تاریخ", "amount": undated_total})
+    return buckets
 
 def get_user_branch_filter(db: Session, authorization: Optional[str], branch_id: Optional[int]) -> Optional[int]:
     # FIX: JWT-aware + teacher_id handling
@@ -55,6 +118,47 @@ def get_user_branch_filter(db: Session, authorization: Optional[str], branch_id:
         pass
     return branch_id
 
+def _parsed_project_date(value):
+    """تاریخ (شمسی/میلادی) را parse می‌کند؛ مقدار نامعلوم/نامعتبر ⇒ None (بدون استثنا)."""
+    from today_summary import parse_project_date  # lazy، الگوی موجود پروژه
+    try:
+        return parse_project_date(value)
+    except Exception:
+        return None
+
+
+def _date_in_range(value, start_day, end_day) -> bool:
+    """فیلتر بازهٔ تاریخ با سیاست «هیچ ردیف مالی بی‌صدا حذف نشود» (FIX A3).
+
+    پیش‌تر این تابع در `reports.py` برای هر مقدار غیرقابل‌parse — از جمله `date = NULL` —
+    `return False` می‌داد و ردیف از گزارش‌ها (نمودار درآمد، روند حضور، چارت سهم‌ها و گزارش
+    مالی) حذف می‌شد؛ حتی وقتی کاربر هیچ بازه‌ای درخواست نکرده بود. نتیجه: جمع مالی آموزشگاه
+    کمتر از واقع نمایش داده می‌شد. (همان باگی که در «طلب تسویه‌نشدهٔ معلم» رفع شد.)
+
+    سیاست فعلی:
+      • بدون بازه ⇒ همهٔ ردیف‌ها می‌آیند (تاریخ‌دار و بی‌تاریخ).
+      • با بازه ⇒ فقط ردیف‌های دارای تاریخِ معتبر محدود می‌شوند؛ ردیف بی‌تاریخ/نامعتبر
+        می‌ماند (نمی‌توان اثبات کرد بیرون بازه است) و هیچ تاریخ جعلی ساخته نمی‌شود.
+    """
+    parsed = _parsed_project_date(value)
+    if parsed is None:
+        return True
+    if start_day is not None and parsed < start_day:
+        return False
+    if end_day is not None and parsed > end_day:
+        return False
+    return True
+
+
+def _api_date_or_blank(value) -> str:
+    """تاریخِ قابل‌نمایش در API: تاریخ معتبر ⇒ همان مقدار ذخیره‌شده؛ نامعلوم ⇒ "".
+
+    کلاینت‌ها (اپ اندروید) مدل `String` غیر-null دارند؛ فرستادن `null` یا تاریخ جعلی
+    ممنوع است. مقدار خام دیتابیس هم دست‌کاری نمی‌شود.
+    """
+    return value if _parsed_project_date(value) is not None else ""
+
+
 @router.get("/reports/chart-data")
 def get_chart_data(
     class_id: Optional[int] = None,
@@ -66,35 +170,25 @@ def get_chart_data(
 ):
     # FIX H3-B3: boundaries may be Jalali (app ranges) or Gregorian; Transaction.date mixes both
     # by row type, so SQL string ranges can't bound it — parse and filter in Python.
-    from today_summary import parse_project_date  # lazy, same pattern as routers/analytics.py
-    start_day = parse_project_date(start_date) if start_date else None
-    end_day = parse_project_date(end_date) if end_date else None
-    def _in_range(value):
-        parsed = parse_project_date(value)
-        if parsed is None:
-            return False
-        if start_day is not None and parsed < start_day:
-            return False
-        if end_day is not None and parsed > end_day:
-            return False
-        return True
+    # FIX(A3): فیلتر/نمایش تاریخ از helper مشترک ماژول می‌آید (ردیف بی‌تاریخ حذف نمی‌شود).
+    start_day = _parsed_project_date(start_date) if start_date else None
+    end_day = _parsed_project_date(end_date) if end_date else None
 
-    # 1. Income Chart (existing + filters)
-    # FIX: Bug 12 - exclude archived Transaction rows from this active view.
-    q_income = db.query(Transaction).filter(Transaction.is_deleted == False, Transaction.is_reversed == False)
-    if class_id:
-        q_income = q_income.filter(Transaction.course_id == class_id)
+    def _in_range(value):  # سازگاری با فراخوانی‌های همین تابع
+        return _date_in_range(value, start_day, end_day)
 
-    incomes = [t for t in q_income.all() if _in_range(t.date)]
-    total_income = sum(t.amount for t in incomes)
-
-    income_data = [
-        {"day": "شنبه", "amount": total_income // 5},
-        {"day": "یکشنبه", "amount": total_income // 4},
-        {"day": "دوشنبه", "amount": total_income // 3},
-        {"day": "سه‌شنبه", "amount": total_income // 2},
-        {"day": "چهارشنبه", "amount": total_income},
-    ]
+    # 1. Income Chart — FIX O-07: پیش‌تر ۵ میلهٔ **ساختگی** بود (کل مبلغ تقسیم بر ۵/۴/۳/۲ با
+    # برچسب روزهای هفته) ⇒ جمع ستون‌ها ۲٫۲۸ برابر «درآمد» می‌شد و هیچ روز/ماهی از دادهٔ واقعی
+    # نمی‌آمد. حالا همان تعریف واحد وصولی (O-08) در قلم‌های زمانی واقعی.
+    # FIX: Bug 12 - ردیف‌های آرشیوشده/برگشتی در این نمای فعال نمی‌آیند (داخل helper).
+    _chart_today = datetime.date.today()
+    _chart_start = start_day if start_day is not None else _chart_today - datetime.timedelta(days=29)
+    _chart_end = end_day if end_day is not None else _chart_today
+    if _chart_end < _chart_start:
+        _chart_start, _chart_end = _chart_end, _chart_start
+    _income_rows = collected_revenue_rows(db, _chart_start.isoformat(), _chart_end.isoformat(),
+                                          course_id=class_id, include_undated=True)
+    income_data = _income_chart_buckets(_income_rows, _chart_start, _chart_end)
 
     # 2. Student Chart (existing)
     boys = db.query(Student).filter(Student.gender == "آقا").count()
@@ -107,7 +201,13 @@ def get_chart_data(
     if class_id:
         q_sessions = q_sessions.filter(SessionLog.course_id == class_id)
 
-    sessions = [s for s in q_sessions.order_by(SessionLog.date.asc()).all() if _in_range(s.date)]
+    sessions = [s for s in q_sessions.all() if _in_range(s.date)]
+    # FIX(A3): ترتیب قطعی (deterministic) — تاریخ معتبر صعودی، ردیف‌های بی‌تاریخ در انتها و
+    # در تاریخ یکسان، id صعودی. پیش‌تر ترتیب به رفتار دیتابیس در NULL وابسته بود (در SQLite
+    # اول، در PostgreSQL آخر) ⇒ خروجی بین محیط‌ها تفاوت داشت.
+    sessions.sort(key=lambda s: (_parsed_project_date(s.date) is None,
+                                 _parsed_project_date(s.date) or datetime.date.min,
+                                 s.id))
     session_ids = [s.id for s in sessions]
     attendance_trend = []
     
@@ -139,7 +239,8 @@ def get_chart_data(
             total = present + absent
             pct = (present / total * 100) if total > 0 else 100.0
             attendance_trend.append({
-                "date": s.date,
+                # FIX(A3): مقدار نامعلوم ⇒ "" (بدون تاریخ جعلی و بدون null برای کلاینت)
+                "date": _api_date_or_blank(s.date),
                 "present": present,
                 "absent": absent,
                 "percentage": round(pct, 1)
@@ -156,7 +257,9 @@ def get_chart_data(
             if session:
                 user = db.query(User).filter(User.id == session.user_id).first()
                 if user:
-                    sub_role = user.sub_role if user.sub_role else "admin"
+                    # FIX(A1): نقش با سیاست کمترین سطح دسترسی (سهم معلم/آموزشگاه
+                    # فقط برای ادمین واقعی نمایش داده می‌شود، نه رکورد بی‌نقش).
+                    sub_role = resolve_effective_sub_role(user)
 
     shares_chart = None
     if sub_role == "admin":
@@ -200,18 +303,12 @@ def get_financial_report(
     resolved_branch = get_user_branch_filter(db, authorization, branch_id)
     # FIX H3-B3: boundaries may be Jalali or Gregorian; Transaction.date mixes both by row type —
     # parse and filter in Python (same pattern as get_chart_data above).
-    from today_summary import parse_project_date  # lazy, same pattern as routers/analytics.py
-    start_day = parse_project_date(start_date) if start_date else None
-    end_day = parse_project_date(end_date) if end_date else None
+    # FIX(A3): همان helper مشترک — ردیف بی‌تاریخ از گزارش مالی حذف نمی‌شود.
+    start_day = _parsed_project_date(start_date) if start_date else None
+    end_day = _parsed_project_date(end_date) if end_date else None
+
     def _in_range(value):
-        parsed = parse_project_date(value)
-        if parsed is None:
-            return False
-        if start_day is not None and parsed < start_day:
-            return False
-        if end_day is not None and parsed > end_day:
-            return False
-        return True
+        return _date_in_range(value, start_day, end_day)
     # FIX: Bug 12 - exclude archived Transaction rows from this active view.
     query = db.query(Transaction).filter(Transaction.is_deleted == False, Transaction.is_reversed == False)
     if resolved_branch is not None:
@@ -227,19 +324,20 @@ def get_financial_report(
             if en:
                 st = db.query(Student).filter(Student.id == en.student_id).first()
                 if st:
-                    st_name = f"{st.first_name} {st.last_name}"
+                    st_name = display_name(st, "نامشخص")
                     student_id = st.id
         elif t.student_id:
             st = db.query(Student).filter(Student.id == t.student_id).first()
             if st:
-                st_name = f"{st.first_name} {st.last_name}"
+                st_name = display_name(st, "نامشخص")
                 student_id = st.id
         report.append(
             {
                 "student_id": student_id,
                 "student_name": st_name,
                 "amount": t.amount,
-                "date": t.date,
+                # FIX(A3): تاریخ نامعلوم ⇒ "" (نه null؛ نه تاریخ جعلی)
+                "date": _api_date_or_blank(t.date),
                 "description": t.description,
                 "payment_method": t.payment_method,
             }
@@ -275,7 +373,7 @@ def get_debtors_report(
             res.append(
                 {
                     "student_id": student.id,
-                    "student_name": f"{student.first_name} {student.last_name}",
+                    "student_name": display_name(student, "نامشخص"),
                     "amount": total_debt,
                     "date": "-",
                     "description": "بدهی",
@@ -330,7 +428,7 @@ def get_debtors_excel(
         if total_debt > 0:
             row_data = [
                 student.id,
-                f"{student.first_name} {student.last_name}",
+                display_name(student, "نامشخص"),
                 debt_teacher,
                 debt_institute,
                 total_debt,
@@ -454,10 +552,17 @@ def get_financial_summary(
         collected_y = calculate_institute_collected_revenue(db, start_year_date, end_year_date, resolved_branch)
         uncollected_y = max(0, total_y - collected_y)
 
+        # FIX O-10: پول بی‌تاریخ در جمع‌های ماه/سال نمی‌آید (تصمیم E1) — این دو شمارنده آن را
+        # آشکار می‌کنند تا مدیر فکر نکند پولی گم شده است. جمع‌های بالا دست‌نخورده‌اند.
+        undated_count, undated_amount = count_undated_payments(db, target_wallet="institute",
+                                                              branch_id=resolved_branch)
+
         return {
             "user_type": "institute",
             "year": year,
             "month": month,
+            "undated_count": int(undated_count),
+            "undated_amount": int(undated_amount),
             "monthly": {
                 "total": int(total_m),
                 "collected": int(collected_m),
@@ -487,12 +592,19 @@ def get_financial_summary(
         collected_y = calculate_teacher_collected_revenue(db, teacher_id, start_year_date, end_year_date)
         uncollected_y = max(0, total_y - collected_y)
 
+        # FIX O-10: مثل شاخهٔ مؤسسه، ولی فقط پرداخت‌های به کیف همین معلم.
+        _teacher_course_ids = [c.id for c in db.query(Course).filter(Course.teacher_id == teacher_id).all()]
+        undated_count, undated_amount = count_undated_payments(db, target_wallet="teacher",
+                                                              course_ids=_teacher_course_ids)
+
         return {
             "user_type": "teacher",
             "teacher_id": teacher_id,
-            "teacher_name": f"{teacher.first_name} {teacher.last_name}",
+            "teacher_name": display_name(teacher, "نامشخص"),
             "year": year,
             "month": month,
+            "undated_count": int(undated_count),
+            "undated_amount": int(undated_amount),
             "monthly": {
                 "total": int(total_m),
                 "collected": int(collected_m),
@@ -538,7 +650,7 @@ def get_student_statement(
 
     return {
         "student_id": student.id,
-        "student_name": f"{student.first_name} {student.last_name}",
+        "student_name": display_name(student, "نامشخص"),
         "student_code": student.student_code or str(100000 + student.id),
         "total_paid_institute": int(total_paid_institute),
         "total_debt_institute": int(total_debt_institute),
@@ -698,7 +810,7 @@ def print_student_statement(
             
             <div class="row-info">
                 <span class="label">نام دانش‌آموز:</span>
-                <span class="value">{student.first_name} {student.last_name}</span>
+                <span class="value">{display_name(student, 'نامشخص')}</span>
             </div>
             <div class="row-info">
                 <span class="label">کد دانش‌آموزی:</span>
@@ -766,7 +878,7 @@ def print_student_profile(
             continue
         course = en.course
         teacher = db.query(Teacher).filter(Teacher.id == course.teacher_id).first()
-        teacher_name = f"{teacher.first_name} {teacher.last_name}" if teacher else "بدون معلم"
+        teacher_name = display_name(teacher, "نامشخص") if teacher else "بدون معلم"
         
         # FIX: Bug 12 - exclude archived Transaction rows from this active view.
         paid_teacher = db.query(func.sum(Transaction.amount)).filter(Transaction.is_deleted == False, Transaction.is_reversed == False).filter(
@@ -924,7 +1036,7 @@ def print_student_profile(
             <div class="section-title">مشخصات هویتی</div>
             <div class="row-info">
                 <span class="label">نام و نام خانوادگی:</span>
-                <span class="value" style="font-weight: bold;">{student.first_name} {student.last_name}</span>
+                <span class="value" style="font-weight: bold;">{display_name(student, 'نامشخص')}</span>
             </div>
             <div class="row-info">
                 <span class="label">کد دانش‌آموزی:</span>

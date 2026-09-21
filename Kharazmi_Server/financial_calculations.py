@@ -1,4 +1,5 @@
 from fastapi import HTTPException
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from typing import Optional
 import hashlib
@@ -57,15 +58,23 @@ def calculate_institute_session_revenue(db: Session, start_date: str, end_date: 
     return sum(int(share or 0) for share, date_value in query.all() if _row_date_in_range(date_value, start, end))
 
 
-def calculate_institute_collected_revenue(db: Session, start_date: str, end_date: str, branch_id: Optional[int] = None) -> int:
-    """
-    سود وصول‌شده آموزشگاه: مجموع مبالغ واریزی واقعی دانش‌آموزان به حساب آموزشگاه (deposit)
-    فیلتر استاندارد: is_deleted==False و is_reversed==False
-    FIX H3-B3: تاریخ‌ها با مبدل مرکزی parse و در پایتون فیلتر می‌شوند (ستون دو تقویمه).
+def collected_revenue_rows(db: Session, start_date: str, end_date: str,
+                           branch_id: Optional[int] = None, course_id: Optional[int] = None,
+                           include_undated: bool = False):
+    """ردیف‌های خام «وصولی نقدی آموزشگاه» در بازه — منبع یگانهٔ KPI/گزارش/نمودار (FIX O-07/O-08).
+
+    خروجی: فهرست `(amount, date)` با date **خامِ** ذخیره‌شده (ممکن است شمسی، میلادی، با ساعت،
+    یا نامعلوم باشد) تا مصرف‌کننده (نمودار) خودش با مبدل مرکزی قلم زمانی بسازد.
+    فیلترها: `type=="deposit"`، `target_wallet=="institute"`، مبلغ مثبت، حذف/برگشتی نشده،
+    و بازهٔ تاریخ (پارس در پایتون چون ستون دو تقویمه است — H3-B3).
+
+    `include_undated=True` ⇒ ردیف‌های بی‌تاریخ/نامعتبر هم برمی‌گردند (مصرف: نمودار درآمد که
+    آن‌ها را در قلم «بی‌تاریخ» نشان می‌دهد). جمع‌های مالی (KPI/گزارش) عمداً فقط تاریخ‌دارها را
+    می‌شمارند و پول بی‌تاریخ از مسیر شمارندهٔ جدا (O-10) گزارش می‌شود.
     """
     start, end = _parse_report_range(start_date, end_date)
     if start is None:
-        return 0
+        return []
     query = db.query(models.Transaction.amount, models.Transaction.date).filter(
         models.Transaction.target_wallet == "institute",
         models.Transaction.type == "deposit",
@@ -75,7 +84,53 @@ def calculate_institute_collected_revenue(db: Session, start_date: str, end_date
     )
     if branch_id is not None:
         query = query.filter(models.Transaction.branch_id == branch_id)
-    return sum(int(amount or 0) for amount, date_value in query.all() if _row_date_in_range(date_value, start, end))
+    if course_id is not None:
+        query = query.filter(models.Transaction.course_id == course_id)
+    rows = query.all()
+    if include_undated:
+        return [(int(amount or 0), date_value) for amount, date_value in rows
+                if _row_date_in_range(date_value, start, end)
+                or _parse_loose(date_value) is None]
+    return [(int(amount or 0), date_value) for amount, date_value in rows
+            if _row_date_in_range(date_value, start, end)]
+
+
+def calculate_institute_collected_revenue(db: Session, start_date: str, end_date: str, branch_id: Optional[int] = None) -> int:
+    """
+    سود وصول‌شده آموزشگاه: مجموع مبالغ واریزی واقعی دانش‌آموزان به حساب آموزشگاه (deposit)
+    فیلتر استاندارد: is_deleted==False و is_reversed==False
+    FIX H3-B3: تاریخ‌ها با مبدل مرکزی parse و در پایتون فیلتر می‌شوند (ستون دو تقویمه).
+    FIX O-07: بدنه به helper مشترک `collected_revenue_rows` منتقل شد تا نمودار درآمد هم
+    دقیقاً همان ردیف‌ها را ببیند (جمع ستون‌های نمودار == همین عدد).
+    """
+    return sum(amount for amount, _ in collected_revenue_rows(db, start_date, end_date, branch_id))
+
+
+def count_undated_payments(db: Session, target_wallet: Optional[str] = None,
+                           branch_id: Optional[int] = None, course_ids: Optional[list] = None):
+    """(تعداد، مبلغ) پرداخت‌های مثبتِ **بی‌تاریخ** — هشدار «پول بی‌تاریخ» در گزارش‌ها (FIX O-10).
+
+    «بی‌تاریخ» = تاریخی که مبدل مرکزی نمی‌تواند پارس کند (خالی/NULL/نامعتبر). این ردیف‌ها به
+    هیچ بازهٔ ماه/سالی نسبت داده نمی‌شوند، پس عمداً در جمع‌های بازه‌دار (وصولی/سود) نمی‌آیند
+    (سیاست E1: هیچ ردیفی بی‌صدا حذف نمی‌شود)؛ این شمارنده فقط آن‌ها را آشکار می‌کند.
+    """
+    query = db.query(models.Transaction.amount, models.Transaction.date).filter(
+        models.Transaction.type == "deposit",
+        models.Transaction.amount > 0,
+        models.Transaction.is_deleted == False,
+        models.Transaction.is_reversed == False
+    )
+    if target_wallet is not None:
+        query = query.filter(models.Transaction.target_wallet == target_wallet)
+    if branch_id is not None:
+        query = query.filter(models.Transaction.branch_id == branch_id)
+    if course_ids is not None:
+        # مثل منطق کارکرد معلم: هم پرداخت‌های همان کلاس‌ها، هم پرداخت‌های عمومی (بدون کلاس)
+        query = query.filter(or_(models.Transaction.course_id.in_(course_ids),
+                                 models.Transaction.course_id.is_(None)))
+    amounts = [int(amount or 0) for amount, date_value in query.all()
+               if _parse_loose(date_value) is None]
+    return len(amounts), sum(amounts)
 
 
 def calculate_total_turnover(db: Session, start_date: str, end_date: str, branch_id: Optional[int] = None) -> int:
@@ -274,7 +329,7 @@ def compute_session_shares(db: Session, course, present_count: int, absent_unexc
                     _row_t = db.query(models.PricingTable).filter(models.PricingTable.category == _cat).first()
                     if _row_t is None:
                         raise HTTPException(
-                            status_code=500,
+                            status_code=400,  # O-06: نبود تعرفه = تنظیمات ناقص (۴۰۰)، نه خرابی سرور؛ گارد H5 (خطای واضح به‌جای جلسهٔ مجانی) دست‌نخورده
                             detail="تعرفه‌ی سهم معلم برای این مقطع یافت نشد؛ لطفاً ابتدا جدول تعرفه را ثبت کنید",
                         )
                     _pen_base_t = getattr(_row_t, f"count_{_n_cap_t}", 0) // _u
@@ -285,7 +340,7 @@ def compute_session_shares(db: Session, course, present_count: int, absent_unexc
                 _share_row = db.query(models.InstituteShare).first()
                 if _share_row is None:
                     raise HTTPException(
-                        status_code=500,
+                        status_code=400,  # O-06: نبود تعرفه = تنظیمات ناقص (۴۰۰)، نه خرابی سرور؛ گارد H5 (خطای واضح به‌جای جلسهٔ مجانی) دست‌نخورده
                         detail="تنظیمات سهم آموزشگاه یافت نشد؛ لطفاً ابتدا تعرفه‌ی سهم آموزشگاه را ثبت کنید",
                     )
                 _pen_base_i = (getattr(_share_row, f"count_{_n_cap_i}", 0) or 0) // _u
@@ -337,7 +392,7 @@ def compute_session_shares(db: Session, course, present_count: int, absent_unexc
             # T_total=0 ساکت یعنی جلسه‌ی مجانی — خطای واضح به‌جای ادامه.
             if row_teacher is None:
                 raise HTTPException(
-                    status_code=500,
+                    status_code=400,  # O-06: نبود تعرفه = تنظیمات ناقص (۴۰۰)، نه خرابی سرور؛ گارد H5 (خطای واضح به‌جای جلسهٔ مجانی) دست‌نخورده
                     detail="تعرفه‌ی سهم معلم برای این مقطع یافت نشد؛ لطفاً ابتدا جدول تعرفه را ثبت کنید",
                 )
             T_total = getattr(row_teacher, f"count_{N_capped}", 0)
@@ -352,7 +407,7 @@ def compute_session_shares(db: Session, course, present_count: int, absent_unexc
         share_row = db.query(models.InstituteShare).first()
         if share_row is None:
             raise HTTPException(
-                status_code=500,
+                status_code=400,  # O-06: نبود تعرفه = تنظیمات ناقص (۴۰۰)، نه خرابی سرور؛ گارد H5 (خطای واضح به‌جای جلسهٔ مجانی) دست‌نخورده
                 detail="تنظیمات سهم آموزشگاه یافت نشد؛ لطفاً ابتدا تعرفه‌ی سهم آموزشگاه را ثبت کنید",
             )
         I_total = getattr(share_row, f"count_{N_capped_institute}", 0) or 0

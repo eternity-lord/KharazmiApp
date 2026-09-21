@@ -6,7 +6,7 @@ import datetime
 
 import models
 from models import AutomationRule, AutomationLog, Student, Teacher, Course, Enrollment, Attendance, Installment, Homework, Grade, Lead, Notification, SmsLog, SessionLog
-from dependencies import get_db, check_admin_access, check_user_login, ensure_student_shadow_users
+from dependencies import get_db, check_admin_access, check_user_login, ensure_student_shadow_users, NotificationService
 
 router = APIRouter()
 
@@ -356,8 +356,21 @@ def run_automation_engine(
                         AutomationLog.triggered_at >= datetime.datetime.utcnow() - datetime.timedelta(days=3)
                     ).first()
                     if not already:
-                        # Create notification for administrator (mock ID 1)
-                        trigger_notification_action(db, rule.id, 1, "admin", title, body, f"Lead #{ld.id} uncontacted for {days_diff} days.")
+                        # FIX(admin-notifications): قبلاً recipient_id=1 هاردکد بود و نقش admin
+                        # دست‌نخورده به Notification می‌رفت ⇒ اعلان به کاربرِ شماره ۱ (که معمولاً
+                        # ادمین نیست) می‌رفت و ادمینِ واقعی هیچ‌وقت آن را نمی‌دید. حالا گیرندگان
+                        # از فضای User.id و بر اساس شعبه‌ی سرنخ resolve می‌شوند (ادمین‌ها + منشی‌ها).
+                        recipients = NotificationService.send_to_staff(
+                            db, type="automation", title=title, body=body,
+                            data={"lead_id": ld.id, "branch_id": ld.branch_id},
+                            branch_id=ld.branch_id,
+                        )
+                        db.add(AutomationLog(
+                            rule_id=rule.id,
+                            triggered_at=datetime.datetime.utcnow(),
+                            details=(f"Triggered for admin staff ({len(recipients)} recipients). "
+                                     f"Lead #{ld.id} uncontacted for {days_diff} days.")
+                        ))
                         triggered_count += 1
 
     db.commit()

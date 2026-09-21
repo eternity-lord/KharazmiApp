@@ -316,16 +316,29 @@ class InvoiceActivity : BaseActivity() {
 
                     val formattedDueTeacher = String.format("%,d", abs(status.due_to_teacher))
                     val formattedDueInstitute = String.format("%,d", abs(status.due_to_institute))
+                    // O-09: اعتبار (مازاد پرداخت) صریح نمایش داده می‌شود تا «بدهی منفی» گمراه‌کننده نباشد.
+                    val credit = status.credit_balance ?: 0L
 
-                    tvDebt.text = getString(R.string.invoice_total, formattedTotal)
+                    tvDebt.text = if (credit > 0)
+                        getString(R.string.invoice_total_and_credit, formattedTotal,
+                                  String.format("%,d", credit))
+                    else
+                        getString(R.string.invoice_total, formattedTotal)
                     tvUnpaid.text = getString(R.string.invoice_paid_teacher, formattedPaidTeacher)
                     tvStClass.text = getString(R.string.invoice_paid_institute, className, formattedPaidInstitute)
 
                     tvDebtTeacher.text = getString(R.string.invoice_due_teacher, signTeacher, formattedDueTeacher)
                     tvDebtInstitute.text = getString(R.string.invoice_due_institute, signInstitute, formattedDueInstitute)
 
-                    // انتخاب مقدار پیش‌فرض روی بدهی
-                    val defaultPay = if (status.due_to_teacher > 0) status.due_to_teacher else if (status.due_to_institute > 0) status.due_to_institute else 0L
+                    // O-09: مقدار پیش‌فرض روی **باقی‌ماندهٔ شهریه** (نامنفی)؛ اگر سرور نفرستاده باشد
+                    // به همان منطق قبلی (due) برمی‌گردیم تا اپ با پاسخ قدیمی هم کار کند.
+                    val remaining = status.remaining_tuition
+                    val defaultPay = when {
+                        remaining != null -> remaining
+                        status.due_to_teacher > 0 -> status.due_to_teacher
+                        status.due_to_institute > 0 -> status.due_to_institute
+                        else -> 0L
+                    }
                     etAmount.setText(if (defaultPay > 0) defaultPay.toString() else "")
                 }
             } catch (e: Exception) {

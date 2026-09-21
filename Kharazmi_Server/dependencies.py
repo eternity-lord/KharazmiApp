@@ -110,6 +110,30 @@ def get_session_from_token(db: Session, token: str):
             return None, None
         return sess, None
 
+def resolve_actor_user_id(db: Session, authorization: Optional[str]) -> Optional[int]:
+    """شناسه‌ی کاربرِ عامل (actor) از هدر Authorization — برای ثبت «چه کسی این کار را کرد».
+
+    پیش‌تر این بلوک ۱۰ خطی سه بار در `routers/classes.py` کپی شده بود (حذف مستقیم، تایید، رد
+    درخواست حذف) و مسیر سومِ حذف (`/admin/reject_class`) هیچ actorی ثبت نمی‌کرد. این helper
+    منطق را یک‌جا می‌کند تا هر سه مسیر حذف کلاس رد پای حسابرسی یکسان داشته باشند.
+
+    نکته: گاردهای `check_admin_access` توکن خراب را از قبل رد می‌کنند؛ این تابع فقط برای
+    تعیین شناسه است و در هر خطا `None` برمی‌گرداند (هیچ استثنایی به بیزینس نمی‌رسد).
+    """
+    if not authorization:
+        return None
+    try:
+        from dependencies import get_session_from_token  # خودارجاع برای هم‌خوانی با الگوی ماژول
+        parts = authorization.split()
+        token = parts[1] if len(parts) == 2 and parts[0].lower() == "bearer" else None
+        session, _ = get_session_from_token(db, token) if token else (None, None)
+        if session is not None and getattr(session, "user_id", None):
+            return session.user_id
+    except Exception:
+        pass
+    return None
+
+
 def get_next_sequence_value(db: Session, name: str, start_val: int) -> int:
     # FIX: Bug 15 - atomic increments and a savepoint protect concurrent first inserts.
     from sqlalchemy import update
@@ -140,6 +164,49 @@ def get_db():
     finally:
         db.close()
 
+def resolve_effective_sub_role(user) -> str:
+    """نقش مؤثر کاربر با سیاست «کمترین سطح دسترسی» (A1).
+
+    پیش‌تر هر کاربری که `sub_role` نداشت (رکوردهای legacy) در همهٔ گاردها **ادمین** فرض
+    می‌شد؛ یعنی سایهٔ معلم/شاگرد/ولی ساخته‌شده پیش از افزوده‌شدن ستون `sub_role` می‌توانست
+    به سطح دسترسی مدیر برسد. اکنون:
+
+    - `sub_role` ست‌شده ⇒ همان (شامل مقادیر ویژه مثل `temp_parent:...`).
+    - `sub_role` خالی/NULL ⇒ از ستون `role` استفاده می‌شود؛ و فقط اگر `role` هم خالی یا
+      `admin` باشد «admin» فرض می‌شود (سازگاری با ادمین‌های legacy که فقط role=admin دارند).
+    - نقش ناشناخته ⇒ همان مقدار `role` برمی‌گردد؛ در گاردها اجازهٔ عبور نمی‌گیرد (fail-closed).
+    """
+    sub = (getattr(user, "sub_role", None) or "").strip()
+    if sub:
+        return sub
+    role = (getattr(user, "role", None) or "").strip()
+    if role in ("", "admin"):
+        return "admin"
+    return role
+
+
+def safe_person_name(first, last, fallback: str = "") -> str:
+    """نام کامل «نام + نام‌خانوادگی» با تحمل NULL — هرگز «None None»/«None» تولید نمی‌کند (FIX A4).
+
+    فیلدهای `first_name`/`last_name` در رکوردهای legacy می‌توانند NULL باشند؛ الگوی قدیمی
+    `f"{first_name} {last_name}"` در گزارش‌ها، رسیدها، پیامک‌ها و لیست‌ها «None None» چاپ می‌کرد.
+    فقط بخش‌های موجود با فاصله به هم می‌چسبند و اگر هیچ بخشی نبود، `fallback` برمی‌گردد.
+    """
+    parts = []
+    for value in (first, last):
+        text = "" if value is None else str(value).strip()
+        if text:
+            parts.append(text)
+    return " ".join(parts) if parts else fallback
+
+
+def display_name(obj, fallback: str = "") -> str:
+    """نام نمایشیِ امن یک موجودیت (Student/Teacher/User/…) — `None` ⇒ `fallback` (FIX A4)."""
+    if obj is None:
+        return fallback
+    return safe_person_name(getattr(obj, "first_name", None), getattr(obj, "last_name", None), fallback)
+
+
 def check_admin_access(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
     # FIX: use signed token verification
     if not authorization:
@@ -154,7 +221,8 @@ def check_admin_access(authorization: Optional[str] = Header(None), db: Session 
     user = db.query(User).filter(User.id == session.user_id).first()
     if not user:
         raise HTTPException(status_code=401, detail="کاربر یافت نشد")
-    sub_role = user.sub_role if user.sub_role else "admin"
+    # FIX(A1): نقش با سیاست کمترین سطح دسترسی (بدون فرض «admin» برای رکورد بی‌نقش)
+    sub_role = resolve_effective_sub_role(user)
     if sub_role != "admin":
         raise HTTPException(status_code=403, detail="شما دسترسی لازم برای این عملیات را ندارید")
     return sub_role
@@ -173,10 +241,66 @@ def check_admin_or_secretary_access(authorization: Optional[str] = Header(None),
     user = db.query(User).filter(User.id == session.user_id).first()
     if not user:
         raise HTTPException(status_code=401, detail="کاربر یافت نشد")
-    sub_role = user.sub_role if user.sub_role else "admin"
+    # FIX(A1): همان سیاست نقش (fail-closed)
+    sub_role = resolve_effective_sub_role(user)
     if sub_role not in ["admin", "secretary"]:
         raise HTTPException(status_code=403, detail="شما دسترسی لازم برای این عملیات را ندارید")
     return sub_role
+
+def check_admin_secretary_or_teacher_access(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    """ادمین/منشی/معلم — برای کارهایی که معلم هم باید بتواند در **حوزهٔ خودش** انجام دهد.
+
+    تفاوت با `check_admin_or_secretary_access`: معلم هم عبور می‌کند، ولی خودِ اندپوینت باید
+    مالکیت/شعبه را برای معلم محدود کند (مثلاً فقط کلاس‌های خودش). گیت‌های معلم (تعلیق کل
+    همکاران با `teachers_active`) عیناً مثل `check_user_login` اعمال می‌شود.
+    """
+    if not authorization:
+        raise HTTPException(status_code=401, detail="توکن احراز هویت یافت نشد. لطفاً مجدداً وارد شوید")
+    parts = authorization.split()
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        raise HTTPException(status_code=401, detail="قالب توکن احراز هویت معتبر نیست")
+    token = parts[1]
+    session, _ = get_session_from_token(db, token)
+    if not session:
+        raise HTTPException(status_code=401, detail="توکن معتبر نیست یا منقضی شده است")
+    user = db.query(User).filter(User.id == session.user_id).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="کاربر یافت نشد")
+    # FIX(A1): همان سیاست نقش (fail-closed)
+    sub_role = resolve_effective_sub_role(user)
+    if sub_role not in ("admin", "secretary", "teacher"):
+        raise HTTPException(status_code=403, detail="شما دسترسی لازم برای این عملیات را ندارید")
+    if sub_role == "teacher":
+        settings = db.query(InstituteSettings).first()
+        if settings and not settings.teachers_active:
+            raise HTTPException(status_code=403, detail="فعالیت همکاران محترم موقتاً توسط مدیریت آموزشگاه متوقف شده است. لطفاً بعداً تلاش فرمایید.")
+    return sub_role
+
+
+def resolve_session_teacher(db: Session, authorization: Optional[str]) -> Optional[Teacher]:
+    """پروندهٔ معلمِ همین سشن (O-22) — `None` یعنی این کاربر معلمِ دارای پرونده نیست.
+
+    ترتیب: `UserSession.teacher_id` (استاندارد جدید) وگرنه تطبیق موبایل سایهٔ کاربر.
+    """
+    if not authorization:
+        return None
+    parts = authorization.split()
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        return None
+    session, _ = get_session_from_token(db, parts[1])
+    if not session:
+        return None
+    if getattr(session, "teacher_id", None):
+        teacher = db.query(Teacher).filter(Teacher.id == session.teacher_id,
+                                           Teacher.is_deleted == False).first()
+        if teacher is not None:
+            return teacher
+    user = db.query(User).filter(User.id == session.user_id).first()
+    if not user or user.role != "teacher":
+        return None
+    return db.query(Teacher).filter(Teacher.mobile == user.username,
+                                    Teacher.is_deleted == False).first()
+
 
 def check_user_login(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
     # FIX: use signed token verification
@@ -192,7 +316,8 @@ def check_user_login(authorization: Optional[str] = Header(None), db: Session = 
     user = db.query(User).filter(User.id == session.user_id).first()
     if not user:
         raise HTTPException(status_code=401, detail="کاربر یافت نشد")
-    sub_role = user.sub_role if user.sub_role else "admin"
+    # FIX(A1): همان سیاست نقش — معلمِ legacy بدون sub_role هم به گیت تعلیق معلمان می‌رسد
+    sub_role = resolve_effective_sub_role(user)
     if sub_role == "teacher":
         settings = db.query(InstituteSettings).first()
         if settings and not settings.teachers_active:
@@ -744,6 +869,26 @@ def resolve_notification_recipient(db: Session, subject_id: int, role: str) -> O
     return subject_id
 
 
+# FIX(admin-notifications): نقش کانونیکالِ notification — تنها مرجعِ مشترک بین «نوشتن»
+# (recipient_role هنگام ساخت) و «خواندن» (فیلتر get_notifications/mark-read/read_all).
+# قبلاً خواندن از `sub_role or "student"` استفاده می‌کرد ولی بقیه‌ی پروژه (login،
+# check_admin_access، check_user_login) `sub_role or "admin"` داشت ⇒ برای ادمینِ legacy
+# (رکوردی که sub_role آن NULL است و role="admin") اعلان‌های نقش admin ساخته می‌شد
+# ولی هرگز نمایش داده نمی‌شد. حالا fallback به role و در نهایت "student" است تا هم
+# ادمینِ قدیمی اعلانش را ببیند و هم رفتار فعلی شاگرد/ولی تغییر نکند.
+STAFF_NOTIFICATION_ROLES = ("admin", "secretary")
+
+
+def resolve_notification_role(user) -> str:
+    """نقش کانونیکال کاربر برای notification (همان رشته‌ای که در recipient_role ذخیره می‌شود)."""
+    if user is None:
+        return "student"
+    role = (user.sub_role or "").strip() or (getattr(user, "role", None) or "").strip() or "student"
+    if role.startswith("temp_parent:"):
+        return "parent"
+    return role
+
+
 ROLE_PERMISSIONS = {
     "admin": ["*"],
     "secretary": [
@@ -932,8 +1077,22 @@ class NotificationService:
         db.add(new_notification)
         db.flush()
         device_tokens = db.query(DeviceToken).filter(DeviceToken.user_id == recipient_user_id, DeviceToken.role == recipient_role).all()
-        for token_record in device_tokens:
-            pass
+        if device_tokens:
+            # FIX(C2): این حلقه قبلاً **خالی** بود ⇒ هیچ اعلان سیستمی (Push) ارسال نمی‌شد و کاربری که
+            # اپ را باز نمی‌کرد، از پرداخت/قسط/غیبت/پیام بی‌خبر می‌ماند. حالا ارسال واقعی انجام می‌شود:
+            #  • گارد محیطی: تا وقتی FCM_SERVER_KEY تنظیم نشده، هیچ درخواست شبکه‌ای زده نمی‌شود (فقط لاگ شفاف).
+            #  • بدون ریسک: deliver_push هرگز exception بیرون نمی‌دهد (شکست push نباید ثبت اعلان/تراکنش را بشکند).
+            #  • commit=False ⇒ پاک‌سازی توکن‌های نامعتبر به همان commit پایانی همین تابع واگذار می‌شود
+            #    تا تراکنش مالی کالر (مثلاً ثبت جلسه) اتمیک بماند.
+            try:
+                from push_service import deliver_push  # lazy: جلوگیری از import چرخه‌ای
+                deliver_push(
+                    db, device_tokens, title=title, body=body,
+                    data={"type": type, "notification_id": getattr(new_notification, "id", None)},
+                    commit=False,
+                )
+            except Exception:  # belt-and-braces؛ deliver_push خودش استثنا بیرون نمی‌دهد
+                pass
         if type in ["attendance", "installment", "payment"]:
             db.add(SmsLog(
                 target_group=f"notif_{recipient_role}_{recipient_user_id}",
@@ -944,3 +1103,45 @@ class NotificationService:
         if commit:
             db.commit()
         return new_notification
+
+    # ------------------------------------------------------------------
+    # FIX(admin-notifications): گیرندگان اعلانِ کارکنان — همیشه از فضای User.id.
+    # ------------------------------------------------------------------
+    @staticmethod
+    def get_staff_recipients(db: Session, branch_id: Optional[int] = None):
+        """لیست (user_id, role) کارکنانِ مجاز برای دریافت اعلان ادمینی.
+
+        - منبعِ شناسه: جدول users (User.id) — هرگز Student.id/Teacher.id.
+        - رکورد legacy با sub_role خالی: role جایگزین می‌شود (coalesce/nullif) — همان قرارداد
+          resolve_notification_role؛ وگرنه ادمینِ قدیمی هیچ اعلانی نمی‌گرفت.
+        - branch_id مشخص: کارکنانِ همان شعبه + کارکنانِ بدون شعبه (ادمین کل) — آینه‌ی policy
+          «شعبه‌ی خودم + بدون‌شعبه» که در مسیرهای ادمین استفاده می‌شود ⇒ شعبه‌ی دیگر نمی‌بیند.
+        - branch_id نامشخص (None): همه‌ی کارکنان (اعلان بی‌صاحب رها نمی‌شود).
+        """
+        from sqlalchemy import func, or_
+        canonical = func.lower(func.coalesce(
+            func.nullif(User.sub_role, ""), func.nullif(User.role, ""), "student"
+        ))
+        q = db.query(User).filter(canonical.in_(STAFF_NOTIFICATION_ROLES))
+        if branch_id is not None:
+            q = q.filter(or_(User.branch_id == branch_id, User.branch_id.is_(None)))
+        return [(u.id, resolve_notification_role(u)) for u in q.order_by(User.id).all()]
+
+    @staticmethod
+    def send_to_staff(db: Session, *, type: str, title: str, body: str,
+                      data: Optional[dict] = None, branch_id: Optional[int] = None,
+                      priority: int = 1):
+        """ارسال اعلان به کارکنانِ مجاز (ادمین/منشی) — شناسه‌ها از فضای User.id.
+
+        جایگزین الگوی غلط `trigger_notification_action(..., 1, "admin", ...)` که اعلان را
+        همیشه به کاربرِ شماره ۱ می‌فرستاد (معمولاً ادمین نبود ⇒ اعلان هیچ‌وقت دیده نمی‌شد).
+        """
+        created = []
+        for user_id, role in NotificationService.get_staff_recipients(db, branch_id=branch_id):
+            created.append(NotificationService.send_notification(
+                db, recipient_user_id=user_id, recipient_role=role,
+                type=type, title=title, body=body, data=data,
+                priority=priority, commit=False,  # یک commit واحد برای کل fan-out
+            ))
+        db.commit()
+        return created

@@ -4,6 +4,8 @@ from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional, Union
 from sqlalchemy import desc, or_, text, func, case
 import io
+import json  # FIX(A2): snapshot_json برای رکورد حذف کلاس
+from storage import storage_dir, resolve_existing
 import uuid
 import os
 import datetime
@@ -12,10 +14,10 @@ import secrets  # FIX H12: پسورد تصادفی امن (الگوی C12)
 
 import models
 from models import (
-    Attendance, Course, Enrollment, Grade, InstituteShare, SessionLog, SmsLog, Student, Teacher, Transaction, User, UserSession, InstituteSettings, ActivityLog, Notification, DeviceToken, Room, Conversation, ConversationParticipant, Message, Exam, ExamQuestion, ExamAttempt, Lead
+    Attendance, Course, Enrollment, Grade, InstituteShare, SessionLog, SmsLog, Student, Teacher, Transaction, User, UserSession, InstituteSettings, ActivityLog, Notification, DeviceToken, Room, Conversation, ConversationParticipant, Message, Exam, ExamQuestion, ExamAttempt, Lead, ClassRestoreLog
 )
 from schemas import (
-    HistoryRequest, LoginRequest, TeacherInfo, FullTeacherProfile, StudentCreate, TeacherCreate, CourseCreate, EnrollmentCreate, GradeCreate, GradeItem, AttendanceLogRequest, AttendanceItem, AttendanceSubmitData, SmsSendRequest, ChangePasswordRequest, StudentProfileInfo, FullStudentProfile, TeacherProfileInfo, FullTeacherProfile, ClassReportInfo, ClassStudentData, ClassSessionHistory, FullClassReport, ShareConfigModel, StudentUpdate, TeacherUpdate, PersonListItem, TransactionUpdate, StudentAttendanceHistoryRequest, AdvancedSearchItem, FinanceSubmitData, PrintReceiptRequest, TransactionTestData, BulkSmsRequest, BulkSuspendRequest, InstituteSettingsModel, PricingTableUpdateModel, TeacherListItem, SmsHistoryItem
+    HistoryRequest, LoginRequest, TeacherInfo, FullTeacherProfile, StudentCreate, TeacherCreate, CourseCreate, EnrollmentCreate, GradeCreate, GradeItem, AttendanceLogRequest, AttendanceItem, AttendanceSubmitData, SmsSendRequest, ChangePasswordRequest, StudentProfileInfo, FullStudentProfile, TeacherProfileInfo, FullTeacherProfile, ClassReportInfo, ClassStudentData, ClassSessionHistory, FullClassReport, ShareConfigModel, StudentUpdate, TeacherUpdate, PersonListItem, TransactionUpdate, StudentAttendanceHistoryRequest, AdvancedSearchItem, FinanceSubmitData, PrintReceiptRequest, TransactionTestData, BulkSmsRequest, BulkSuspendRequest, InstituteSettingsModel, PricingTableUpdateModel, TeacherListItem, SmsHistoryItem, PendingTeacherItem
 )
 from dependencies import get_db, check_admin_access, check_admin_or_secretary_access, check_user_login, check_student_access, get_enrollment_tuition_and_discount, SESSION_EXPIRY_DAYS, get_current_user, hash_password, verify_password, get_next_sequence_value, normalize_mobile
 
@@ -194,12 +196,46 @@ def get_sms_history(db: Session = Depends(get_db), _: str = Depends(check_admin_
 # ==========================================
 
 
-@router.get("/teachers/pending", response_model=List[TeacherListItem])
-def get_pending_teachers(db: Session = Depends(get_db), _: str = Depends(check_admin_or_secretary_access)):  # FIX (audit-v2/#11): لیست درانتظار (حاوی موبایل) فقط ادمین/منشی
+@router.get("/teachers/pending", response_model=List[PendingTeacherItem])
+def get_pending_teachers(
+    branch_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    authorization: Optional[str] = Header(None),
+    _: str = Depends(check_admin_or_secretary_access),  # FIX (audit-v2/#11): لیست درانتظار (حاوی موبایل) فقط ادمین/منشی
+):
+    """صف «درخواست‌های تایید معلم» — در انتظار (is_approved=False) و حذف‌نشده.
+
+    FIX(teacher-approval):
+      • این مسیر قبلاً با route سایه‌شده مواجه بود (GET /teachers/{teacher_id} در teachers.router
+        زودتر ثبت می‌شد) و عملاً هرگز اجرا نمی‌شد؛ ترتیب include در main.py اصلاح شد.
+      • branch isolation: کاربرِ شعبه‌دار فقط معلم‌های شعبه‌ی خودش **و** رکوردهای بدون شعبه
+        (branch_id IS NULL = ثبت‌شده‌ی بدون انتساب، متعلق به هیچ شعبه‌ای نیست) را می‌بیند؛
+        رکورد شعبه‌ی دیگر هرگز دیده نمی‌شود. ادمین کل (بدون شعبه) همه را می‌بیند.
+      • `branch_id` صریح = فیلتر **دقیق** روی همان شعبه (بدون رکوردهای بدون‌شعبه)؛ برای کاربرِ
+        شعبه‌دار، شعبه‌ی خودش بر پارامتر غلبه می‌کند (branch isolation قابل دورزدن با query نیست).
+      • ترتیب قطعی (id صعودی) و متادیتای شعبه در پاسخ برای UI ادمین.
+    """
+    from routers.analytics import get_user_branch_filter  # lazy: جلوگیری از import چرخه‌ای
+    resolved_branch = get_user_branch_filter(db, authorization, branch_id)
+    explicit_filter = branch_id is not None
+
+    q = db.query(Teacher).filter(Teacher.is_deleted == False, Teacher.is_approved == False)  # noqa: E712
+    if resolved_branch is not None:
+        if explicit_filter:
+            q = q.filter(Teacher.branch_id == resolved_branch)      # فیلتر صریح: فقط همان شعبه
+        else:
+            q = q.filter(or_(Teacher.branch_id == resolved_branch, Teacher.branch_id.is_(None)))
+    teachers = q.order_by(Teacher.id).all()
+
+    branch_ids = {t.branch_id for t in teachers if t.branch_id is not None}
+    branch_names = {
+        b.id: (b.name or "")
+        for b in (db.query(models.Branch).filter(models.Branch.id.in_(branch_ids)).all() if branch_ids else [])
+    }
+
     # FIX(security): هرگز ORM خام برنگردان — فقط فیلدهای غیرحساس (بدون password/card_number/national_code).
-    teachers = db.query(Teacher).filter(Teacher.is_deleted == False).filter(Teacher.is_approved == False).all()
     return [
-        TeacherListItem(
+        PendingTeacherItem(
             id=t.id,
             first_name=t.first_name or "",
             last_name=t.last_name or "",
@@ -208,15 +244,33 @@ def get_pending_teachers(db: Session = Depends(get_db), _: str = Depends(check_a
             profile_image=t.profile_image,
             is_approved=bool(t.is_approved),
             is_suspended=bool(t.is_suspended),
+            branch_id=t.branch_id,
+            branch_name=branch_names.get(t.branch_id, ""),
         )
         for t in teachers
     ]
 
 
+def _teacher_in_scope(db: Session, teacher, authorization: Optional[str]) -> bool:
+    """آیا این معلم در دامنه‌ی کاربرِ فراخوان است؟ (همان policy لیست pending)
+
+    ادمین کل (بدون شعبه) → همه. کاربر شعبه‌دار → فقط شعبه‌ی خودش + رکوردهای بدون شعبه
+    (branch_id IS NULL = بدون انتساب، متعلق به هیچ شعبه‌ای نیست). رکورد شعبه‌ی دیگر → خارج از دامنه.
+    """
+    from routers.analytics import get_user_branch_filter  # lazy: جلوگیری از import چرخه‌ای
+    resolved_branch = get_user_branch_filter(db, authorization, None)
+    if resolved_branch is None:
+        return True
+    return teacher.branch_id == resolved_branch or teacher.branch_id is None
+
+
 @router.post("/teachers/approve/{teacher_id}")
-def approve_teacher(teacher_id: int, db: Session = Depends(get_db), _: str = Depends(check_admin_or_secretary_access)):  # FIX H10-S2: تایید فقط ادمین/منشی (الگوی C1/H10-S)
+def approve_teacher(teacher_id: int, db: Session = Depends(get_db),
+                    authorization: Optional[str] = Header(None),
+                    _: str = Depends(check_admin_or_secretary_access)):  # FIX H10-S2: تایید فقط ادمین/منشی (الگوی C1/H10-S)
     teacher = db.query(Teacher).filter(Teacher.id == teacher_id, Teacher.is_deleted == False).first()
-    if not teacher:
+    # FIX(teacher-approval): کاربر شعبه‌دار نباید درخواست شعبه‌ی دیگر را تایید کند (404 بدون نشت وجود رکورد).
+    if not teacher or not _teacher_in_scope(db, teacher, authorization):
         raise HTTPException(status_code=404, detail="معلم یافت نشد")
     teacher.is_approved = True
     db.commit()
@@ -224,9 +278,12 @@ def approve_teacher(teacher_id: int, db: Session = Depends(get_db), _: str = Dep
 
 
 @router.delete("/teachers/reject/{teacher_id}")
-def reject_teacher(teacher_id: int, db: Session = Depends(get_db), _: str = Depends(check_admin_access)):
+def reject_teacher(teacher_id: int, db: Session = Depends(get_db),
+                   authorization: Optional[str] = Header(None),
+                   _: str = Depends(check_admin_access)):
     teacher = db.query(Teacher).filter(Teacher.id == teacher_id, Teacher.is_deleted == False).first()
-    if not teacher:
+    # FIX(teacher-approval): همان policy دامنه‌ی شعبه برای رد کردن (404 بدون نشت وجود رکورد).
+    if not teacher or not _teacher_in_scope(db, teacher, authorization):
         raise HTTPException(status_code=404, detail="معلم یافت نشد")
 
     # سافت‌دیلیت: ردیف حفظ می‌شود (تاریخچه + جلوگیری از ثبت‌نام تکراری با همان کد ملی/موبایل)
@@ -256,7 +313,10 @@ def delete_teacher(teacher_id: int, db: Session = Depends(get_db), _: str = Depe
         raise HTTPException(status_code=404, detail="معلم یافت نشد")
 
     # Check if teacher has any active classes
-    active_classes = db.query(Course).filter(Course.teacher_id == teacher_id).count()
+    # FIX O-11: «فعال» یعنی آرشیو نشده. قبلاً هر کلاس (حتی حذف‌شده) شمرده می‌شد و معلمی که
+    # فقط کلاس آرشیوشده داشت قابل حذف نبود؛ پیام «N کلاس فعال دارد» هم درست نبود.
+    active_classes = db.query(Course).filter(Course.teacher_id == teacher_id,
+                                             Course.is_deleted == False).count()
     if active_classes > 0:
         raise HTTPException(
             status_code=400,
@@ -273,19 +333,54 @@ def delete_teacher(teacher_id: int, db: Session = Depends(get_db), _: str = Depe
 
 
 @router.delete("/admin/reject_class/{course_id}")
-def reject_class(course_id: int, db: Session = Depends(get_db), _: str = Depends(check_admin_access)):
+def reject_class(
+    course_id: int,
+    db: Session = Depends(get_db),
+    _: str = Depends(check_admin_access),
+    authorization: Optional[str] = Header(None),
+):
+    """رد و آرشیو کلاس (مسیر «کلاس در انتظار تایید» در اپ).
+
+    FIX(A2): این مسیر سومِ حذف، قبلاً فقط ثبت‌نام‌ها را آرشیو می‌کرد و **جلسات را دست‌نخورده
+    می‌گذاشت** و هیچ ردیف حذفی ثبت نمی‌کرد. پیامدش دو چیز بود:
+      ۱) طلب معلم از کلاسی که دیگر وجود ندارد، همچنان در «طلبتسویهنشده» باز می‌ماند
+         (پرداخت برای کلاس ناموجود ⇒ خطای مالی)،
+      ۲) تاریخ حذف و عاملِ آن در تاریخچه‌ی حسابرسی گم می‌شد (نمای آرشیو: deleted_at خالی).
+    اکنون هر سه مسیر حذف کلاس (حذف مستقیم ادمین، تایید درخواست، رد کلاس) دقیقاً یک اثر
+    یکسان دارند: آرشیو کلاس + ثبت‌نام‌ها + جلسات + ثبت رکورد `ClassDeletionRequest` با
+    snapshot و شناسه‌ی عامل. (`forgive_session_charges=True` — همان پیش‌فرض مسیر حذف مستقیم
+    و همان رفتاری که `perform_delete_enrollment` قبلاً در همین مسیر داشت.)
+    """
+    # FIX(A2): lazy import — admin پیش از classes در main.py include می‌شود (جلوگیری از import چرخه‌ای).
+    from routers.classes import _apply_class_deletion, _build_class_deletion_snapshot
+
     c = db.query(Course).filter(Course.id == course_id).first()
     if not c:
         raise HTTPException(status_code=404, detail="کلاس یافت نشد")
 
-    # حذف کلاس و تصحیح حساب مبالغ تمامی دانش‌آموزان ثبت‌نام شده
-    enrollments = db.query(Enrollment).filter(Enrollment.course_id == c.id).all()
-    from dependencies import perform_delete_enrollment
-    for en in enrollments:
-        perform_delete_enrollment(en, db)
-        
-    # FIX: Bug 13 - archived enrollments/transactions must retain a valid course reference.
-    c.is_deleted = True
+    snapshot = _build_class_deletion_snapshot(db, c)
+    # idempotent: اعمال دوباره بی‌اثر است (حذف‌های نرم، claim اتمیک در perform_delete_enrollment)
+    _apply_class_deletion(db, c, True)
+
+    # FIX(A2): رکورد حسابرسی — فقط اگر قبلاً رکورد تاییدشده‌ای برای این کلاس نباشد
+    # (الگوی «بدون تکرار» تا فراخوانی دوباره، تاریخچه را شلوغ نکند).
+    existing = db.query(models.ClassDeletionRequest).filter(
+        models.ClassDeletionRequest.course_id == c.id,
+        models.ClassDeletionRequest.status == "approved",
+    ).first()
+    if existing is None:
+        from dependencies import resolve_actor_user_id
+        _actor_user_id = resolve_actor_user_id(db, authorization)
+        db.add(models.ClassDeletionRequest(
+            course_id=c.id,
+            requested_by_role="admin",
+            requested_by_user_id=_actor_user_id,
+            forgive_session_charges=True,
+            status="approved",
+            snapshot_json=json.dumps(snapshot, ensure_ascii=False, default=str),
+            decided_at=datetime.datetime.now(),
+            decided_by_user_id=_actor_user_id,
+        ))
     db.commit()
     return {"message": "کلاس رد و حذف شد و ترازهای مالی اصلاح گردید."}
 
@@ -1464,7 +1559,7 @@ async def upload_institute_logo(file: UploadFile = File(...), db: Session = Depe
         
     # Generate unique filename
     unique_filename = f"logo_{uuid.uuid4().hex}{file_ext}"
-    filepath = os.path.join("uploads/profiles", unique_filename)
+    filepath = os.path.join(storage_dir("profiles"), unique_filename)
     
     # Write to disk
     with open(filepath, "wb") as f_out:
@@ -1472,8 +1567,9 @@ async def upload_institute_logo(file: UploadFile = File(...), db: Session = Depe
         
     # Delete old file
     if settings.logo_path:
-        old_path = os.path.join("uploads/profiles", settings.logo_path)
-        if os.path.exists(old_path):
+        # پاک‌کردن لوگوی قبلی — حتی اگر در مسیر قدیمی (نسبت به cwd) مانده باشد
+        old_path = resolve_existing("profiles", settings.logo_path)
+        if old_path:
             try:
                 os.remove(old_path)
             except Exception:
@@ -1488,23 +1584,388 @@ async def upload_institute_logo(file: UploadFile = File(...), db: Session = Depe
         "url": f"uploads/profiles/{unique_filename}"
     }
 
+# ==========================================
+# آرشیو کلاس‌های حذف‌شده (فقط ادمین) — فقط خواندنی + branch isolation
+# ==========================================
+def _fmt_datetime(dt) -> str:
+    """قالب تاریخ پروژه؛ None → رشته‌ی خالی (هیچ تاریخی حدس زده نمی‌شود)."""
+    return dt.strftime("%Y/%m/%d %H:%M") if dt else ""
+
+
+def _safe_person_name(obj) -> str:
+    """نام legacy ممکن است NULL باشد — هرگز «None None» برنگردان."""
+    if obj is None:
+        return ""
+    return f"{obj.first_name or ''} {obj.last_name or ''}".strip()
+
+
+def _archived_deletion_meta(db: Session, course_ids: List[int]) -> dict:
+    """متادیتای حذف از جدول ClassDeletionRequest (بدون تاریخ حدسی).
+
+    `Course` ستون تاریخ حذف **ندارد**؛ هر دو مسیر حذف (حذف مستقیم ادمین در classes.py و
+    تایید درخواست) یک ردیف `approved` با `decided_at` ثبت می‌کنند. کلاس‌های legacy که پیش از
+    این جدول حذف شده‌اند تاریخ ندارند و مقدارشان خالی می‌ماند.
+    """
+    if not course_ids:
+        return {}
+    rows = (
+        db.query(models.ClassDeletionRequest)
+        .filter(
+            models.ClassDeletionRequest.course_id.in_(course_ids),
+            models.ClassDeletionRequest.status == "approved",
+        )
+        .order_by(models.ClassDeletionRequest.id)
+        .all()
+    )
+    meta: dict = {}
+    for r in rows:  # آخرین ردیف (بیشترین id) متادیتا را می‌دهد؛ اولین تاریخ موجود حفظ می‌شود.
+        ts = r.decided_at or r.created_at
+        entry = meta.get(r.course_id)
+        if entry is None:
+            meta[r.course_id] = {
+                "deleted_at": ts,
+                "forgive_session_charges": bool(r.forgive_session_charges),
+                "requested_by_role": r.requested_by_role,
+                "admin_note": r.admin_note,
+            }
+        else:
+            if entry["deleted_at"] is None and ts is not None:
+                entry["deleted_at"] = ts
+            entry["forgive_session_charges"] = bool(r.forgive_session_charges)
+            entry["requested_by_role"] = r.requested_by_role
+            entry["admin_note"] = r.admin_note
+    return meta
+
+
+def _archived_class_aggregates(db: Session, course_ids: List[int]) -> dict:
+    """شمارش تاریخی ثبت‌نام/جلسه/تراکنش هر کلاس با کوئری گروهی (بدون N+1).
+
+    همه‌ی ردیف‌ها شمرده می‌شوند (آرشیوشده‌ها هم) چون آرشیو باید **تاریخچه** را نشان دهد؛
+    `Course.is_deleted`/`Enrollment.is_deleted` هیچ ردیفی را حذف نمی‌کنند.
+    """
+    stats: dict = {cid: {"students_total": 0, "students_active": 0, "sessions_total": 0,
+                         "sessions_archived": 0, "transactions_count": 0, "transactions_total": 0}
+                   for cid in course_ids}
+    if not course_ids:
+        return stats
+    for cid, is_deleted, cnt in (
+        db.query(Enrollment.course_id, Enrollment.is_deleted, func.count(Enrollment.id))
+        .filter(Enrollment.course_id.in_(course_ids))
+        .group_by(Enrollment.course_id, Enrollment.is_deleted)
+        .all()
+    ):
+        if cid not in stats:
+            continue
+        stats[cid]["students_total"] += cnt
+        # is_deleted=None برای ردیف‌های legacy یعنی «آرشیو نشده» (سیاست موجود پروژه).
+        if not is_deleted:
+            stats[cid]["students_active"] += cnt
+    for cid, is_deleted, cnt in (
+        db.query(SessionLog.course_id, SessionLog.is_deleted, func.count(SessionLog.id))
+        .filter(SessionLog.course_id.in_(course_ids))
+        .group_by(SessionLog.course_id, SessionLog.is_deleted)
+        .all()
+    ):
+        if cid not in stats:
+            continue
+        stats[cid]["sessions_total"] += cnt
+        if is_deleted:
+            stats[cid]["sessions_archived"] += cnt
+    for cid, cnt, total in (
+        db.query(
+            Transaction.course_id,
+            func.count(Transaction.id),
+            func.coalesce(func.sum(Transaction.amount), 0),
+        )
+        .filter(Transaction.course_id.in_(course_ids))
+        .group_by(Transaction.course_id)
+        .all()
+    ):
+        if cid not in stats:
+            continue
+        stats[cid]["transactions_count"] = cnt
+        stats[cid]["transactions_total"] = total or 0
+    return stats
+
+
+class ClassRestoreRequest(BaseModel):
+    """ورودی بازیابی کلاس آرشیوشده (فاز ۱ — فقط متادیتا)."""
+    mode: str
+    reason: Optional[str] = None
+
+
 @router.get("/admin/deleted_classes")
-def get_deleted_classes(db: Session = Depends(get_db), _: str = Depends(check_admin_access)):
-    # کلاس‌های حذف‌شده (بخش آرشیو کلاس‌ها مخصوص ادمین)
-    courses = db.query(Course).filter(Course.is_deleted == True).all()
+def get_deleted_classes(
+    query: Optional[str] = None,
+    branch_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    authorization: Optional[str] = Header(None),
+    _: str = Depends(check_admin_access),
+):
+    """آرشیو کلاس‌های حذف‌شده — فقط ادمین، با branch isolation و اطلاعات کامل.
+
+    تغییرات نسبت به نسخه‌ی قبلی: فیلدهای branch/تعداد دانش‌آموز/جلسه/تراکنش و تاریخ حذف
+    اضافه شده، جست‌وجو ممکن است و ترتیب قطعی است. کلیدهای قبلی (id/title/code/teacher_name/
+    grade_level/bg_color) دست‌نخورده مانده‌اند تا کلاینت قدیمی نشکند.
+    """
+    # الگوی branch isolation پروژه (analytics/crm/exports) — ادمینِ شعبه‌دار فقط شعبه‌ی خودش.
+    from routers.analytics import get_user_branch_filter  # lazy: جلوگیری از import چرخه‌ای
+    resolved_branch = get_user_branch_filter(db, authorization, branch_id)
+
+    # FIX(null-data): is_deleted=True صریح؛ ردیف‌های legacy با NULL «فعال» حساب می‌شوند و
+    # طبق سیاست موجود پروژه در آرشیو نمی‌آیند (لیست عادی و آرشیو قاطی نمی‌شوند).
+    q = db.query(Course).filter(Course.is_deleted == True)  # noqa: E712
+    if resolved_branch is not None:
+        q = q.filter(Course.branch_id == resolved_branch)
+    if query and query.strip():
+        like = f"%{query.strip()}%"
+        q = q.outerjoin(Teacher, Teacher.id == Course.teacher_id).filter(
+            or_(
+                Course.title.ilike(like),
+                Course.code.ilike(like),
+                Teacher.first_name.ilike(like),
+                Teacher.last_name.ilike(like),
+            )
+        )
+    courses = q.all()
+    course_ids = [c.id for c in courses]
+
+    meta_map = _archived_deletion_meta(db, course_ids)
+    stats_map = _archived_class_aggregates(db, course_ids)
+
+    teacher_ids = {c.teacher_id for c in courses if c.teacher_id is not None}
+    branch_ids = {c.branch_id for c in courses if c.branch_id is not None}
+    teachers = {t.id: t for t in db.query(Teacher).filter(Teacher.id.in_(teacher_ids)).all()} if teacher_ids else {}
+    branches = {b.id: b for b in db.query(models.Branch).filter(models.Branch.id.in_(branch_ids)).all()} if branch_ids else {}
+
+    # ترتیب قطعی: تازه‌ترین حذف اول؛ کلاس‌های بدون تاریخ حذف آخر (شناسه نزولی).
+    courses.sort(
+        key=lambda c: (meta_map.get(c.id, {}).get("deleted_at") or datetime.datetime.min, c.id),
+        reverse=True,
+    )
+
     result = []
     for c in courses:
-        teacher = db.query(Teacher).filter(Teacher.id == c.teacher_id).first()
-        t_name = f"{teacher.first_name} {teacher.last_name}" if teacher else "نامشخص"
+        st = stats_map.get(c.id, {})
+        meta = meta_map.get(c.id, {})
         result.append({
             "id": c.id,
-            "title": c.title,
-            "code": c.code,
-            "teacher_name": t_name,
-            "grade_level": c.grade_level,
+            # FIX(null-data): فیلدهای legacy می‌توانند NULL باشند — رشته‌ی خالی می‌رود و
+            # فال‌بک نمایش در اپ انجام می‌شود (نه «None/null» در UI).
+            "title": c.title or "",
+            "code": c.code or "",
+            "teacher_id": c.teacher_id,
+            "teacher_name": _safe_person_name(teachers.get(c.teacher_id)) or "نامشخص",
+            "branch_id": c.branch_id,
+            "branch_name": (branches.get(c.branch_id).name if branches.get(c.branch_id) else "") or "",
+            "grade_level": c.grade_level or "",
+            "days_of_week": c.days_of_week or "",
+            "class_time": c.class_time or "",
+            "students_count": st.get("students_total", 0),
+            "students_active_count": st.get("students_active", 0),
+            "sessions_count": st.get("sessions_total", 0),
+            "transactions_count": st.get("transactions_count", 0),
+            "deleted_at": _fmt_datetime(meta.get("deleted_at")),
+            "forgive_session_charges": bool(meta.get("forgive_session_charges", False)),
+            "is_suspended": bool(c.is_suspended),
             "bg_color": c.bg_color or "#FFFFFF",
         })
     return result
+
+
+@router.get("/admin/deleted_classes/{course_id}")
+def get_deleted_class_detail(
+    course_id: int,
+    db: Session = Depends(get_db),
+    authorization: Optional[str] = Header(None),
+    _: str = Depends(check_admin_access),
+):
+    """جزئیات کنترول‌شده‌ی یک کلاس آرشیوشده (فقط ادمین + همان شعبه).
+
+    فقط کلاسِ آرشیوشده سرو می‌شود؛ کلاس فعال، ناموجود و متعلق به شعبه‌ی دیگر همه 404
+    می‌گیرند (بدون نشت وجود رکورد). خروجی dict تعریف‌شده است، نه dump خام ORM.
+    """
+    from routers.analytics import get_user_branch_filter  # lazy: جلوگیری از import چرخه‌ای
+    resolved_branch = get_user_branch_filter(db, authorization, None)
+
+    course = (
+        db.query(Course)
+        .filter(Course.id == course_id, Course.is_deleted == True)  # noqa: E712
+        .first()
+    )
+    if not course or (resolved_branch is not None and course.branch_id != resolved_branch):
+        raise HTTPException(status_code=404, detail="کلاس آرشیوشده یافت نشد")
+
+    meta = _archived_deletion_meta(db, [course.id]).get(course.id, {})
+    stats = _archived_class_aggregates(db, [course.id]).get(course.id, {})
+    teacher = db.query(Teacher).filter(Teacher.id == course.teacher_id).first() if course.teacher_id else None
+    branch = db.query(models.Branch).filter(models.Branch.id == course.branch_id).first() if course.branch_id else None
+    archived_enrollments = db.query(Enrollment).filter(
+        Enrollment.course_id == course.id, Enrollment.is_deleted == True  # noqa: E712
+    ).count()
+    archived_sessions = db.query(SessionLog).filter(
+        SessionLog.course_id == course.id, SessionLog.is_deleted == True  # noqa: E712
+    ).count()
+
+    return {
+        # مشخصات پایه (همه null-safe)
+        "id": course.id,
+        "title": course.title or "",
+        "code": course.code or "",
+        "grade_level": course.grade_level or "",
+        "days_of_week": course.days_of_week or "",
+        "class_time": course.class_time or "",
+        "is_suspended": bool(course.is_suspended),
+        "bg_color": course.bg_color or "#FFFFFF",
+        # معلم / شعبه
+        "teacher_id": course.teacher_id,
+        "teacher_name": _safe_person_name(teacher) or "نامشخص",
+        "branch_id": course.branch_id,
+        "branch_name": (branch.name if branch else "") or "",
+        # تاریخچه (حفظ‌شده — چیزی حذف نمی‌شود)
+        "students_count": stats.get("students_total", 0),
+        "students_active_count": stats.get("students_active", 0),
+        "archived_enrollments_count": archived_enrollments,
+        "sessions_count": stats.get("sessions_total", 0),
+        "archived_sessions_count": archived_sessions,
+        "transactions_count": stats.get("transactions_count", 0),
+        "transactions_total": stats.get("transactions_total", 0),
+        # اطلاعات حذف (از ClassDeletionRequest؛ بدون تاریخ حدسی)
+        "deleted_at": _fmt_datetime(meta.get("deleted_at")),
+        "has_deletion_record": bool(meta),
+        "forgive_session_charges": bool(meta.get("forgive_session_charges", False)),
+        "requested_by_role": meta.get("requested_by_role") or "",
+        "admin_note": meta.get("admin_note") or "",
+    }
+
+
+@router.post("/admin/deleted_classes/{course_id}/restore")
+def restore_deleted_class(
+    course_id: int,
+    data: ClassRestoreRequest,
+    db: Session = Depends(get_db),
+    authorization: Optional[str] = Header(None),
+    _: str = Depends(check_admin_access),
+):
+    """FIX(D1) — بازیابی **فقط متادیتا** کلاس آرشیوشده (فاز ۱ طراحیِ ممیزی‌شده).
+
+    چرا فقط متادیتا؟ در ممیزی `checkpoints/2026-09-20-archived-class-restore-audit.md`
+    ثابت شد restore کامل امروز **امن نیست**: هنگام حذف، پول جابه‌جا می‌شود (وجه جلسات از
+    کیف پول شاگرد کسر و طلب معلم باز می‌شود) ولی هیچ دفتر کلّی از آن حرکت وجود ندارد؛
+    فلپ کردن `is_deleted` ردیف‌های قدیمی ⇒ بستانکاری کیف پول + زنده‌شدن مجدد هزینه‌ها
+    (Double-count)، احیای ردیف‌های برگشت‌خورده، و تضاد ایندکس یکتای جلسه (`IntegrityError`)
+    را به همراه دارد. بنابراین فاز ۱ فقط پوستهٔ کلاس را برمی‌گرداند:
+
+      • `Course.is_deleted = False` (کلاس در `/classes/list` و لیست‌های ادمین برمی‌گردد)
+      • ثبت رد پای حسابرسی در جدول جدید `ClassRestoreLog` (actor/reason/pre_state)
+      • **صفر اثر مالی**: `Enrollment`، `SessionLog` و `Transaction` آرشیوشده دست‌نخورده
+        می‌مانند ⇒ بدهی، کیف پول و طلب معلم دقیقاً بی‌تغییر.
+
+    پیامد عمدی و مستندشده: کلاس بازیابی‌شده در ابتدا **بدون شاگرد فعال** دیده می‌شود
+    (`students_active_count = 0`) و ادمین برای ادامه، ثبت‌نام جدید می‌سازد — این تنها
+    گزینه‌ای است که «منطق مالی» را دست‌نخورده نگه می‌دارد (شرط صریح کاربر).
+
+    کدهای خطا (مطابق طراحی ممیزی‌شده): 400 (mode نامعتبر) · 404 (شناسه وجود ندارد **یا**
+    کلاس شعبه‌ی دیگر است — مثل نمای آرشیو، بدون نشت وجود رکورد) · 409 (کلاس از قبل فعال است؛
+    مثلاً دو ادمین هم‌زمان روی یک ردیف کلیک کنند ⇒ پیام دوستانه به‌جای خطا یا بازیابی دوباره).
+    """
+    if (data.mode or "").strip() != "metadata_only":
+        raise HTTPException(
+            status_code=400,
+            detail="mode نامعتبر؛ در این نسخه فقط \"metadata_only\" پشتیبانی می‌شود (بازیابی کامل عمداً غیرفعال است)",
+        )
+
+    from routers.analytics import get_user_branch_filter  # lazy: جلوگیری از import چرخه‌ای
+    resolved_branch = get_user_branch_filter(db, authorization, None)
+
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="کلاس آرشیوشده یافت نشد")
+
+    # همان سیاست نمای آرشیو: ردیف شعبه‌ی دیگر «ناموجود» است (بدون نشت وجود رکورد).
+    if resolved_branch is not None and course.branch_id != resolved_branch:
+        raise HTTPException(status_code=404, detail="کلاس آرشیوشده یافت نشد")
+
+    if course.is_deleted is not True:  # noqa: E712 — فقط ردیف‌های صریحاً آرشیوشده
+        # 409 = «کاری برای انجام نیست»، نه خطای کاربر: کلاس زنده است (بدون تغییر داده).
+        raise HTTPException(status_code=409, detail="این کلاس از قبل فعال است و نیازی به بازیابی ندارد")
+
+    # وضعیت پیش از بازیابی (حسابرسی) — بدون حدس زدن تاریخی که ثبت نشده.
+    pre_state = {
+        "is_deleted": True,
+        "is_suspended": bool(course.is_suspended),
+        "archived_enrollments": db.query(Enrollment).filter(
+            Enrollment.course_id == course.id, Enrollment.is_deleted == True  # noqa: E712
+        ).count(),
+        "archived_sessions": db.query(SessionLog).filter(
+            SessionLog.course_id == course.id, SessionLog.is_deleted == True  # noqa: E712
+        ).count(),
+        "archived_transactions": db.query(Transaction).filter(
+            Transaction.course_id == course.id, Transaction.is_deleted == True  # noqa: E712
+        ).count(),
+        "wallet_debit": 0,  # فاز ۱ به کیف پول دست نمی‌زند
+    }
+    meta = _archived_deletion_meta(db, [course.id]).get(course.id, {})
+
+    actor_user_id, actor_name = None, ""
+    try:
+        from dependencies import resolve_actor_user_id
+        actor_user_id = resolve_actor_user_id(db, authorization)
+        if actor_user_id:
+            actor = db.query(User).filter(User.id == actor_user_id).first()
+            actor_name = (actor.full_name or actor.username) if actor else ""
+    except Exception:
+        actor_user_id, actor_name = None, ""
+
+    # FIX(D5): اگر معلمِ کلاس خودش آرشیو (حذف) شده باشد، بازیابی جواب می‌دهد ولی ادمین باید
+    # بداند کلاسِ برگشته **معلم فعال ندارد** (هشدار در پاسخ — بدون هیچ تغییر خودکارِ داده).
+    teacher = db.query(Teacher).filter(Teacher.id == course.teacher_id).first() if course.teacher_id else None
+    teacher_archived = bool(teacher is not None and teacher.is_deleted is True)
+    warnings = []
+    if teacher_archived:
+        warnings.append("معلم این کلاس آرشیو (حذف) شده است؛ کلاس بدون معلم فعال برمی‌گردد.")
+    elif teacher is None:
+        warnings.append("این کلاس معلم ثبت‌شده ندارد؛ پس از بازیابی بدون معلم فعال است.")
+
+    course.is_deleted = False
+    db.add(ClassRestoreLog(
+        course_id=course.id,
+        mode="metadata_only",
+        reason=(data.reason or "").strip() or None,
+        actor_user_id=actor_user_id,
+        actor_name=actor_name or None,
+        pre_state_json=json.dumps(pre_state, ensure_ascii=False),
+        finance_touched=False,
+    ))
+    try:
+        db.add(ActivityLog(
+            admin_username=actor_name or "admin",
+            action="restore_class_metadata",
+            target_id=course.id,
+            target_name=course.title or "",
+            details=f"restore metadata_only — دلیل: {(data.reason or '').strip() or 'ثبت نشده'}",
+        ))
+    except Exception:
+        pass  # رد پای اصلی در ClassRestoreLog است؛ نبود ActivityLog نباید بازیابی را بشکند
+
+    db.commit()
+    db.refresh(course)
+    return {
+        "message": "کلاس بازیابی شد (فقط متادیتا) — ثبت‌نام‌ها و سابقهٔ مالی دست‌نخورده است",
+        "id": course.id,
+        "title": course.title or "",
+        "code": course.code or "",
+        "is_deleted": bool(course.is_deleted),
+        "is_suspended": bool(course.is_suspended),
+        "mode": "metadata_only",
+        "finances_untouched": True,
+        # FIX(D5): هشدارهای عملیاتی برای ادمین (مثلاً معلم آرشیوشده) — بدون تغییر در داده.
+        "teacher_archived": teacher_archived,
+        "warnings": warnings,
+        "note": "برای ادامهٔ کلاس، ثبت‌نام‌های جدید بسازید؛ سابقهٔ مالی قبلی عمداً بازیابی نشده است.",
+        "deleted_at_was": _fmt_datetime(meta.get("deleted_at")),
+        "reason": (data.reason or "").strip() or "",
+    }
 
 
 @router.get("/admin/pricing_table")
@@ -1614,9 +2075,11 @@ def get_teacher_credentials(id: int, db: Session = Depends(get_db), _: str = Dep
         raise HTTPException(status_code=404, detail="معلم یافت نشد")
     return TeacherCredentialsResponse(
         id=teacher.id,
-        name=f"{teacher.first_name} {teacher.last_name}",
-        national_code=teacher.national_code,
-        mobile=teacher.mobile,
+        # FIX(null-data): این response_model فیلدهای str اجباری دارد و رکورد legacy با
+        # mobile/national_code/نام NULL قبلاً ValidationError/500 می‌داد؛ الان مقدار امن برمی‌گردد.
+        name=f"{teacher.first_name or ''} {teacher.last_name or ''}".strip() or "نامشخص",
+        national_code=teacher.national_code or "",
+        mobile=teacher.mobile or "",
         teacher_code=teacher.teacher_code,
         password=teacher.password or "",
         card_number=teacher.card_number
@@ -1659,7 +2122,7 @@ def reset_teacher_password(id: int, db: Session = Depends(get_db), current_user 
         admin_username=current_user.username,
         action="reset_teacher_password",
         target_id=teacher.id,
-        target_name=f"{teacher.first_name} {teacher.last_name}",
+        target_name=f"{teacher.first_name or ''} {teacher.last_name or ''}".strip() or "نامشخص",
         details=f"تغییر رمز از {old_code}/{old_password} to {new_code}"
     )
     db.add(log_entry)
@@ -1711,7 +2174,7 @@ def update_teacher_credentials(id: int, data: TeacherCredentialsUpdateRequest, d
         admin_username=current_user.username,
         action="update_teacher_credentials",
         target_id=teacher.id,
-        target_name=f"{teacher.first_name} {teacher.last_name}",
+        target_name=f"{teacher.first_name or ''} {teacher.last_name or ''}".strip() or "نامشخص",
         details=f"موبایل: {old_mobile}->{new_mobile} | شماره کارت: {old_card}->{data.card_number}"
     )
     db.add(log_entry)

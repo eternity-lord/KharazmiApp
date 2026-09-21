@@ -60,6 +60,17 @@
             android:layout_marginStart="6dp" />
     </LinearLayout>
 
+    <!-- FIX(admin-notifications): شمارش اعلان‌های خوانده‌نشده (روی پاسخ /notifications/unread_count) -->
+    <TextView
+        android:id="@+id/tvUnreadCount"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="@dimen/spacing_normal"
+        android:layout_marginBottom="@dimen/spacing_small"
+        android:textAppearance="@style/TextAppearance.Kharazmi.Caption"
+        android:textColor="?attr/colorPrimary"
+        android:visibility="gone" />
+
     <!-- FIX: Use the declared Widget.Kharazmi.Card.Gold style; remove repeated suffixes. -->
     <com.google.android.material.card.MaterialCardView
         style="@style/Widget.Kharazmi.Card.Gold"
@@ -68,12 +79,30 @@
         app:cardCornerRadius="20dp"
         android:layout_margin="@dimen/spacing_normal">
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/rvNotifications"
+        <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:padding="@dimen/spacing_small"
-            android:layoutAnimation="@anim/layout_animation_fall_down"/>
+            android:layout_height="match_parent">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvNotifications"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:padding="@dimen/spacing_small"
+                android:layoutAnimation="@anim/layout_animation_fall_down"/>
+
+            <!-- FIX(admin-notifications): حالت خالی روشن — قبلاً لیست خالی/خطا هیچ پیامی نداشت -->
+            <TextView
+                android:id="@+id/tvNotifEmpty"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:gravity="center"
+                android:padding="@dimen/spacing_normal"
+                android:text="@string/notif_empty"
+                android:textAppearance="@style/TextAppearance.Kharazmi.Body"
+                android:textColor="?android:attr/textColorSecondary"
+                android:visibility="gone" />
+        </FrameLayout>
     </com.google.android.material.card.MaterialCardView>
 
 </LinearLayout>

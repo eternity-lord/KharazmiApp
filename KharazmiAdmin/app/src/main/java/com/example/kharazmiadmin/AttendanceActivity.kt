@@ -673,7 +673,7 @@ class AttendanceActivity : BaseActivity() {
                         when (e.code()) {
                             409 -> getString(R.string.common_err_with_detail, serverMsg ?: getString(R.string.attendance_already_registered))
                             400, 404, 422 -> getString(R.string.common_err_with_detail, serverMsg ?: getString(R.string.attendance_validation_check))
-                            in 500..599 -> getString(R.string.attendance_server_error, e.code())
+                            in 500..599 -> getString(R.string.attendance_server_error_retry, e.code())
                             else -> getString(R.string.attendance_http_fallback, e.code(), serverMsg ?: getString(R.string.common_retry_later))
                         }
                     }

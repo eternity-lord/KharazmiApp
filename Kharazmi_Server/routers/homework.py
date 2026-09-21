@@ -10,13 +10,15 @@ from sqlalchemy import desc
 
 import models
 from models import Homework, HomeworkSubmission, Course, Enrollment, Student, Teacher
+from storage import storage_dir
 from dependencies import get_db, check_user_login, require_permission, NotificationService, get_session_student, get_session_parent, ensure_student_shadow_users
 
 router = APIRouter()
 
 # Secure Storage Configuration
-UPLOAD_DIR = "/home/user/uploads/homework"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+# FIX(storage): مسیر پیش‌فرض داخلی پروژه (قابل تغییر با KHARAZMI_UPLOAD_ROOT) —
+# الگوی قبلی مسیر مطلق ماشین توسعه‌دهنده بود و در CI/سرور دیگر import را می‌شکست.
+UPLOAD_DIR = storage_dir("homework")
 
 # Size limit: 10 MB
 MAX_FILE_SIZE = 10 * 1024 * 1024
@@ -89,7 +91,8 @@ def create_homework(
     db.refresh(new_hw)
     
     # Automation: Homework Created -> Notify all enrolled students
-    enrolls = db.query(Enrollment).filter(Enrollment.course_id == req.course_id).all()
+    enrolls = db.query(Enrollment).filter(Enrollment.course_id == req.course_id,
+                                         Enrollment.is_deleted == False).all()  # O-04: فقط ثبت‌نام‌های فعال — شاگرد حذف‌شده نباید اعلان بگیرد
     for en in enrolls:
         st = db.query(Student).filter(Student.id == en.student_id).first()
         if st is None:
@@ -153,7 +156,8 @@ def get_student_homework_list(
         raise HTTPException(status_code=401, detail="نشست معتبر نیست؛ لطفاً دوباره وارد شوید")
     student_id = own.id
 
-    enrolls = db.query(Enrollment).filter(Enrollment.student_id == student_id).all()
+    enrolls = db.query(Enrollment).filter(Enrollment.student_id == student_id,
+                                         Enrollment.is_deleted == False).all()  # O-04: کلاس‌های ترک‌شده تکلیف/آزمون نشان داده نمی‌شوند
     course_ids = [en.course_id for en in enrolls if en.course]
     
     hws = db.query(Homework).filter(Homework.course_id.in_(course_ids)).order_by(desc(Homework.id)).all()
@@ -198,14 +202,17 @@ async def submit_homework_file(
     if not hw:
         raise HTTPException(status_code=404, detail="تکلیف یافت نشد")
         
-    enrolled = db.query(Enrollment).filter(Enrollment.student_id == student_id, Enrollment.course_id == hw.course_id).first()
+    enrolled = db.query(Enrollment).filter(Enrollment.student_id == student_id,
+                                           Enrollment.course_id == hw.course_id,
+                                           Enrollment.is_deleted == False).first()  # O-04: تحویل فایل فقط با ثبت‌نام فعال
     if not enrolled:
         raise HTTPException(status_code=403, detail="شما در این کلاس ثبت‌نام نکرده‌اید")
         
     # File upload validation
     ext = validate_file(file)
     safe_name = sanitize_filename(file.filename)
-    file_path = os.path.join(UPLOAD_DIR, safe_name)
+    # در زمان نوشتن دوباره resolve می‌شود تا override محیطی/تست معتبر باشد
+    file_path = os.path.join(storage_dir("homework"), safe_name)
     
     # Save the file securely
     contents = await file.read()
@@ -309,7 +316,8 @@ def get_parent_child_homework(
     elif session.sub_role not in ("admin", "secretary"):
         raise HTTPException(status_code=403, detail="شما مجاز به مشاهده تکالیف این دانش‌آموز نیستید")
         
-    enrolls = db.query(Enrollment).filter(Enrollment.student_id == student_id).all()
+    enrolls = db.query(Enrollment).filter(Enrollment.student_id == student_id,
+                                         Enrollment.is_deleted == False).all()  # O-04: کلاس‌های ترک‌شده تکلیف/آزمون نشان داده نمی‌شوند
     course_ids = [en.course_id for en in enrolls if en.course]
     
     hws = db.query(Homework).filter(Homework.course_id.in_(course_ids)).all()

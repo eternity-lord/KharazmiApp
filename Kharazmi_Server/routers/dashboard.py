@@ -11,12 +11,14 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from sqlalchemy import func, or_
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from models import Installment, Student, Transaction
+from models import DeviceToken, Installment, Student
 from dependencies import get_db, check_admin_access
 from today_summary import jalali_date_string
+# FIX O-08: تعریف واحد «وصولی نقدی» از لایهٔ محاسبات مالی — همان تابعی که گزارش‌ها می‌خوانند.
+from financial_calculations import calculate_institute_collected_revenue
 
 router = APIRouter()
 
@@ -31,6 +33,13 @@ def _clear_dashboard_cache():
 
 
 
+class PushStatus(BaseModel):
+    """وضعیت لایهٔ Push — O-15. فقط «تنظیم است یا نه»؛ هرگز خودِ کلید."""
+
+    fcm_configured: bool
+    device_token_count: int
+
+
 class DashboardKPIs(BaseModel):
     today_revenue: int
     total_overdue_amount: int
@@ -38,24 +47,6 @@ class DashboardKPIs(BaseModel):
     active_students_count: int
     suspicious_alerts_count: int
     dunning_pending_count: int
-
-
-def _today_revenue_sql(db: Session, today_jalali: str) -> int:
-    """SQL-level SUM for today's revenue via Jalali string prefix (LIKE)."""
-    try:
-        rev = (
-            db.query(func.coalesce(func.sum(Transaction.amount), 0))
-            .filter(
-                or_(Transaction.is_deleted == False, Transaction.is_deleted.is_(None)),
-                or_(Transaction.is_reversed == False, Transaction.is_reversed.is_(None)),
-                Transaction.date.like(f"{today_jalali}%"),
-            )
-            .scalar()
-        )
-        return int(rev or 0)
-    except Exception as e:
-        print(f"[Dashboard] today_revenue SQL failed: {e}")
-        return 0
 
 
 @router.get("/kpis", response_model=DashboardKPIs)
@@ -78,8 +69,14 @@ def get_dashboard_kpis(
     today = datetime.date.today()
     today_jalali = jalali_date_string(today)  # e.g., "1405/06/16"
 
-    # 1. Today's Revenue — SQL LIKE on Jalali prefix
-    today_revenue = _today_revenue_sql(db, today_jalali)
+    # 1. Today's Revenue — FIX O-08: پیش‌تر SUM با LIKE روی تاریخ شمسی بود ⇒ شارژ جلسه
+    #    (عدد منفی) از وصولی کم می‌شد، واریزی با تاریخ میلادی/بی‌تاریخ دیده نمی‌شد و عدد با
+    #    گزارش‌های مالی نمی‌خواند. اکنون همان تعریف گزارش‌ها: وصولی نقدی امروز به کیف آموزشگاه.
+    try:
+        today_revenue = int(calculate_institute_collected_revenue(db, today_jalali, today_jalali) or 0)
+    except Exception as e:
+        print(f"[Dashboard] today_revenue failed: {e}")
+        today_revenue = 0
 
     # 2 & 3. Overdue installments — SQL string comparison (YYYY/MM/DD) — single query for COUNT+SUM
     # Since due_date is stored as Jalali "YYYY/MM/DD", string comparison works.
@@ -146,3 +143,22 @@ def get_dashboard_kpis(
     # Cache result
     _dashboard_cache[cache_key] = (kpis, now_ts)
     return kpis
+
+
+@router.get("/push_status", response_model=PushStatus)
+def get_push_status(db: Session = Depends(get_db), _: str = Depends(check_admin_access)):
+    """وضعیت Push برای مدیر (FIX O-15) — عیب‌یابی «چرا هیچ اعلانی به گوشی نمی‌رسد».
+
+    دو پرسشِ واقعیِ مدیر را پاسخ می‌دهد، بدون افشای هیچ رازی:
+      1. آیا اعتبارنامهٔ FCM روی سرور تنظیم شده؟ (`fcm_configured` از گارد محیطی `push_service`)
+      2. چند توکن دستگاه در `device_tokens` ثبت شده؟ (`device_token_count`)
+
+    فقط‌خواندنی و بدون کش: این مقادیر باید «همین حالا» را نشان دهند؛ ضمناً هیچ کلیدی
+    خوانده/نوشته نمی‌شود و مقدار کلید در پاسخ برنمی‌گردد.
+    """
+    from push_service import fcm_configured  # import محلی: جلوگیری از وابستگی حلقه‌ای
+
+    return PushStatus(
+        fcm_configured=bool(fcm_configured()),
+        device_token_count=int(db.query(func.count(DeviceToken.id)).scalar() or 0),
+    )

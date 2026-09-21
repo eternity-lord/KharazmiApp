@@ -59,6 +59,8 @@
                     android:padding="@dimen/spacing_normal">
 
                     <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
                         android:text="➕ تعریف تکلیف کلاسی جدید"
                         android:textAppearance="@style/TextAppearance.Kharazmi.SectionTitle"
                         android:textColor="@color/gold_primary"
@@ -117,6 +119,8 @@
 
             <!-- Homework List Header -->
             <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
                 android:text="تکالیف ثبت شده"
                 android:textAppearance="@style/TextAppearance.Kharazmi.SectionTitle"
                 android:textColor="@color/gold_primary"
@@ -169,6 +173,8 @@
                         android:padding="@dimen/spacing_normal">
 
                         <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
                             android:id="@+id/tvHwDetailTitle"
                             android:text="عنوان تکلیف"
                             android:textAppearance="@style/TextAppearance.Kharazmi.SectionTitle"
@@ -176,12 +182,16 @@
                             android:textStyle="bold" />
 
                         <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
                             android:id="@+id/tvHwDetailDesc"
                             android:text="توضیحات تکمیلی..."
                             android:textAppearance="@style/TextAppearance.Kharazmi.Body"
                             android:layout_marginTop="8dp"/>
 
                         <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
                             android:id="@+id/tvHwDetailDueDate"
                             android:text="📅 سررسید: ۱۴۰۵/۰۶/۰۵"
                             android:textAppearance="@style/TextAppearance.Kharazmi.Caption"
@@ -216,6 +226,8 @@
                             android:visibility="gone">
 
                             <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
                                 android:text="📤 ارسال پاسخ تکلیف"
                                 android:textAppearance="@style/TextAppearance.Kharazmi.SectionTitle"
                                 android:textColor="@color/gold_primary"
@@ -248,6 +260,8 @@
                             android:visibility="gone">
 
                             <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
                                 android:text="👥 پاسخ‌های ارسال شده شاگردان"
                                 android:textAppearance="@style/TextAppearance.Kharazmi.SectionTitle"
                                 android:textColor="@color/gold_primary"

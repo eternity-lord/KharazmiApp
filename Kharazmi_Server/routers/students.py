@@ -10,12 +10,21 @@ import datetime
 
 import models
 from models import (
-    Attendance, Course, Enrollment, Grade, InstituteShare, SessionLog, SmsLog, Student, Teacher, Transaction, User, UserSession, Installment
+    Attendance, Course, Enrollment, Grade, InstituteShare, SessionLog, SmsLog, Student, Teacher, Transaction, User, UserSession, Installment, Notification
 )
 from schemas import (
     HistoryRequest, LoginRequest, TeacherInfo, FullTeacherProfile, StudentCreate, TeacherCreate, CourseCreate, EnrollmentCreate, GradeCreate, GradeItem, AttendanceLogRequest, AttendanceItem, AttendanceSubmitData, SmsSendRequest, ChangePasswordRequest, StudentProfileInfo, FullStudentProfile, TeacherProfileInfo, FullTeacherProfile, ClassReportInfo, ClassStudentData, ClassSessionHistory, FullClassReport, ShareConfigModel, StudentUpdate, TeacherUpdate, PersonListItem, TransactionUpdate, StudentAttendanceHistoryRequest, AdvancedSearchItem, FinanceSubmitData, PrintReceiptRequest, TransactionTestData, StudentRegisterAndEnrollRequest
 )
-from dependencies import get_db, check_admin_access, check_admin_or_secretary_access, check_user_login, check_student_access, get_enrollment_tuition_and_discount, SESSION_EXPIRY_DAYS, limiter, ensure_student_shadow_users, get_session_student, get_session_parent, normalize_mobile, validate_image_upload, require_permission
+from storage import storage_dir, resolve_existing
+from dependencies import (get_db, check_admin_access, check_admin_or_secretary_access,
+                            check_admin_secretary_or_teacher_access, resolve_session_teacher,
+                            check_user_login, check_student_access,
+                            get_enrollment_tuition_and_discount, SESSION_EXPIRY_DAYS, limiter,
+                            ensure_student_shadow_users, get_session_student, get_session_parent,
+                            normalize_mobile, validate_image_upload, require_permission,
+                            resolve_notification_role)
+# FIX(C6): خواندن واقعی تکالیف/آزمون‌ها/برنامهٔ هفتگی برای پورتال‌ها (بدون کد تکراری).
+from portal_data import build_portal_activity
 
 # FIX: Bug 16 - share the tuition-minus-payment debt calculation across financial views.
 from financial_calculations import calculate_student_debt
@@ -76,7 +85,9 @@ def register_and_enroll_student(
     req: StudentRegisterAndEnrollRequest, 
     db: Session = Depends(get_db),
     authorization: Optional[str] = Header(None),
-    _: str = Depends(check_admin_or_secretary_access)
+    # FIX O-22: معلم هم می‌تواند دانش‌آموز جدید ثبت کند (و در **کلاس خودش** ثبت‌نام کند)؛
+    # قبلاً این مسیر فقط ادمین/منشی بود و معلم ۴۰۳ می‌گرفت. منطق مالی هیچ تغییری ندارد.
+    sub_role: str = Depends(check_admin_secretary_or_teacher_access)
 ):
     # 1. بررسی صحت کد ملی و عدم تکراری بودن کدملی دانش‌آموز
     if not is_valid_iranian_national_code(req.national_code):
@@ -106,8 +117,10 @@ def register_and_enroll_student(
             _fb_course = db.query(Course).filter(Course.id == req.course_id).first()
             if _fb_course is not None:
                 fallback_branch = _fb_course.branch_id
+        # FIX O-22: برای معلم، پروندهٔ معلم پاس داده می‌شود تا سیاست شعبه دقیقاً «شعبهٔ خودش» باشد.
         branch_id = resolve_creation_branch(
-            db, user=current_user, requested_branch_id=req.branch_id, fallback_branch_id=fallback_branch
+            db, user=current_user, requested_branch_id=req.branch_id, fallback_branch_id=fallback_branch,
+            teacher=(resolve_session_teacher(db, authorization) if sub_role == "teacher" else None),
         )
 
         # 2. ثبت فیزیکی مشخصات دانش‌آموز
@@ -150,6 +163,14 @@ def register_and_enroll_student(
             course = db.query(Course).filter(Course.id == req.course_id).first()
             if not course:
                 raise HTTPException(status_code=404, detail="کلاس مورد نظر یافت نشد")
+            # FIX O-22: معلم فقط برای کلاس‌های خودش؛ کلاس دیگری ⇒ ۴۰۳ پیش از هر نوشتنی
+            # (تراکنش همین‌جا rollback می‌شود ⇒ شاگرد نیمه‌ساخته باقی نمی‌ماند).
+            if sub_role == "teacher":
+                _teacher = resolve_session_teacher(db, authorization)
+                if _teacher is None:
+                    raise HTTPException(status_code=403, detail="پروندهٔ معلم شما یافت نشد؛ با آموزشگاه تماس بگیرید")
+                if course.teacher_id != _teacher.id:
+                    raise HTTPException(status_code=403, detail="شما فقط می‌توانید برای کلاس‌های خودتان دانش‌آموز ثبت کنید")
 
             # شهریه ثبت‌نام واقعی باید مثبت باشد (ثبت بدون کلاس اصلاً وارد این شاخه نمی‌شود)
             if req.total_tuition is None or req.total_tuition <= 0:
@@ -495,6 +516,45 @@ def get_student_communication_history(
 # ==========================================
 # ۱۱. اندپوینت امن پورتال دانش‌آموزی (Student Portal) - جدید 🆕
 # ==========================================
+# FIX(C1): سقف اعلان‌های نمایش‌داده‌شده در پورتال دانش‌آموز (جدیدترین‌ها اول).
+STUDENT_PORTAL_NOTIFICATIONS_LIMIT = 50
+
+
+def _student_portal_notifications(db: Session, student: Student) -> list:
+    """اعلان‌های واقعیِ خودِ دانش‌آموز (جدیدترین اول) — FIX(C1).
+
+    قبلاً این اندپوینت دو اعلان جعلیِ ثابت برمی‌گرداند («شروع ترم»، «تعطیلی سرما») و
+    اعلان‌های واقعی (غیبت، آزمون، پیام‌ها) هرگز به پورتال دانش‌آموز نمی‌رسید.
+    فیلتر مثل /notifications: recipient_user_id = کاربرِ سایه‌ی خودِ شاگرد + نقش کانونیکال.
+    """
+    if not student or not student.user_id:
+        return []
+    shadow = db.query(User).filter(User.id == student.user_id).first()
+    if shadow is None:
+        return []
+    role = resolve_notification_role(shadow)
+    rows = (
+        db.query(Notification)
+        .filter(Notification.recipient_user_id == shadow.id,
+                Notification.recipient_role == role)
+        .order_by(Notification.created_at.desc().nullslast(), Notification.id.desc())
+        .limit(STUDENT_PORTAL_NOTIFICATIONS_LIMIT)
+        .all()
+    )
+    from today_summary import jalali_date_string  # lazy، مثل بقیه تاریخ‌های شمسی
+    return [
+        {
+            "id": n.id,
+            "type": n.type,
+            "title": n.title,
+            "body": n.body,
+            "date": jalali_date_string(n.created_at.date()) if n.created_at else "",
+            "is_read": bool(n.is_read),
+        }
+        for n in rows
+    ]
+
+
 @router.get("/students/my_profile")
 def get_student_my_profile(authorization: Optional[str] = Header(None), db: Session = Depends(get_db), _: str = Depends(check_user_login)):
     if not authorization:
@@ -596,37 +656,18 @@ def get_student_my_profile(authorization: Optional[str] = Header(None), db: Sess
     # FIX: Bug 16 - student/parent financial views must agree with tuition debtor reports.
     total_debt = calculate_student_debt(db, student)
 
-    # ۶. تکالیف، آزمون‌ها، جلسات پیش‌رو و اعلان‌ها (شبیه‌سازی پویا بر اساس کلاس‌ها)
-    homework_list = []
-    exams_list = []
-    upcoming_list = []
+    # ۶. تکالیف، آزمون‌ها، جلسات پیش‌رو و اعلان‌ها
+    # FIX(C6): قبلاً این سه لیست برای **هر** دانش‌آموز یک تکلیف و آزمون ساختگی با تاریخ‌های
+    # ثابت (۱۴۰۵/۰۶/۰۵ و ۱۴۰۵/۰۶/۱۰) و برنامهٔ هفتگیِ جعلی نشان می‌دادند. حالا همان داده‌ی
+    # واقعیِ ثبت‌شده در سیستم خوانده می‌شود (مثل پورتال ولی — یک منبع مشترک).
+    portal_activity = build_portal_activity(db, student)
+    homework_list = portal_activity["homework"]
+    exams_list = portal_activity["exams"]
+    upcoming_list = portal_activity["upcoming_sessions"]
     notifications_list = []
-    
-    for en in enrollments:
-        if en.course:
-            c_title = en.course.title
-            homework_list.append({
-                "course_title": c_title,
-                "title": f"تمرین‌ها و حل مسائل فصل ۲ کتاب {c_title}",
-                "due_date": "۱۴۰۵/۰۶/۰۵",
-                "status": "در انتظار تحویل"
-            })
-            exams_list.append({
-                "course_title": c_title,
-                "title": f"آزمون هماهنگ مستمر کلاسی {c_title}",
-                "date": "۱۴۰۵/۰۶/۱۰",
-                "max_score": 20
-            })
-            upcoming_list.append({
-                "course_title": c_title,
-                "date": "شنبه و دوشنبه‌ها",
-                "time": "ساعت ۱۶:۰۰ الی ۱۷:۳۰"
-            })
-            
-    notifications_list = [
-        {"title": "اطلاعیه شروع ترم تحصیلی جدید", "body": "کلاس‌های پاییزه آموزشگاه علمی خوارزمی از ابتدای مهرماه به طور رسمی آغاز خواهد شد.", "date": "۱۴۰۵/۰۶/۰۱"},
-        {"title": "تعطیلی موقت به علت سرما", "body": "به اطلاع اولیای گرامی می‌رساند کلاس‌های فردا نوبت عصر به صورت غیرحضوری برگزار خواهد شد.", "date": "۱۴۰۵/۰۶/۰۲"}
-    ]
+
+    # FIX(C1): اعلان‌های واقعیِ دانش‌آموز از جدول `notifications` (به‌جای دو اعلان جعلیِ ثابت).
+    notifications_list = _student_portal_notifications(db, student)
 
     return {
         "info": {
@@ -797,7 +838,7 @@ async def upload_student_photo(id: int, file: UploadFile = File(...), db: Sessio
         
     # Generate unique filename
     unique_filename = f"{uuid.uuid4().hex}{file_ext}"
-    filepath = os.path.join("uploads/profiles", unique_filename)
+    filepath = os.path.join(storage_dir("profiles"), unique_filename)
     
     # Write to disk
     with open(filepath, "wb") as f_out:
@@ -805,8 +846,9 @@ async def upload_student_photo(id: int, file: UploadFile = File(...), db: Sessio
         
     # Delete old file
     if student.profile_image:
-        old_path = os.path.join("uploads/profiles", student.profile_image)
-        if os.path.exists(old_path):
+        # پاک‌کردن فایل قبلی — حتی اگر در مسیر قدیمی (نسبت به cwd) مانده باشد
+        old_path = resolve_existing("profiles", student.profile_image)
+        if old_path:
             try:
                 os.remove(old_path)
             except Exception:

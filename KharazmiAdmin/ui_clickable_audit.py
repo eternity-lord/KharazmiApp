@@ -9,7 +9,8 @@ import re
 import glob
 from pathlib import Path
 
-BASE = Path("/home/user/KharazmiAdmin")
+# FIX(storage/paths): مسیر نسبت به محل همین فایل — ابزار روی هر ماشینی کار کند
+BASE = Path(__file__).resolve().parent
 LAYOUT_DIR = BASE / "app/src/main/res/layout"
 KT_DIR = BASE / "app/src/main/java/com/example/kharazmiadmin"
 

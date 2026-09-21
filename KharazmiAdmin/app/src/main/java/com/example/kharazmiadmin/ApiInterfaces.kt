@@ -32,7 +32,11 @@ data class StudentClassStatus(
     val due_to_teacher: Long,
     val due_to_institute: Long,
     val course_id: Int? = null,
-    val enrollment_id: Int? = null
+    val enrollment_id: Int? = null,
+    // O-09: باقی‌ماندهٔ شهریه و اعتبار (هر دو نامنفی) — nullable با پیش‌فرض تا اپ با پاسخ سرورِ
+    // قدیمی/ناقص هم نشکند؛ مبلغ پیش‌فرض پرداخت از remaining_tuition خوانده می‌شود.
+    val remaining_tuition: Long? = null,
+    val credit_balance: Long? = null
 )
 
 interface NewInvoiceApi {

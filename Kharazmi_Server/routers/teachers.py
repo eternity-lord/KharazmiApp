@@ -16,6 +16,7 @@ from models import (
 from schemas import (
     HistoryRequest, LoginRequest, TeacherInfo, FullTeacherProfile, StudentCreate, TeacherCreate, CourseCreate, EnrollmentCreate, GradeCreate, GradeItem, AttendanceLogRequest, AttendanceItem, AttendanceSubmitData, SmsSendRequest, ChangePasswordRequest, StudentProfileInfo, FullStudentProfile, TeacherProfileInfo, FullTeacherProfile, ClassReportInfo, ClassStudentData, ClassSessionHistory, FullClassReport, ShareConfigModel, StudentUpdate, TeacherUpdate, PersonListItem, TransactionUpdate, StudentAttendanceHistoryRequest, AdvancedSearchItem, FinanceSubmitData, PrintReceiptRequest, TransactionTestData, SettleRequest, TeacherListItem
 )
+from storage import storage_dir, resolve_existing
 from dependencies import get_db, check_admin_access, check_admin_or_secretary_access, check_user_login, get_enrollment_tuition_and_discount, SESSION_EXPIRY_DAYS, hash_password, verify_password, limiter, normalize_mobile, validate_image_upload
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill
@@ -29,7 +30,8 @@ from validation import is_valid_iranian_national_code
 
 @router.post("/teachers/register")
 @limiter.limit("5/hour")
-def register_teacher(request: Request, teacher: TeacherCreate, db: Session = Depends(get_db)):
+def register_teacher(request: Request, teacher: TeacherCreate, db: Session = Depends(get_db),
+                     authorization: Optional[str] = Header(None)):
     if not is_valid_iranian_national_code(teacher.national_code):
         raise HTTPException(status_code=400, detail="کد ملی وارد شده معتبر نیست")
 
@@ -52,10 +54,38 @@ def register_teacher(request: Request, teacher: TeacherCreate, db: Session = Dep
     _READABLE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"  # بدون 0/O/1/l/I
     initial_password = "".join(secrets.choice(_READABLE_ALPHABET) for _ in range(8))
 
+    # FIX(teacher-approval/branch): شعبه‌ی معلم با سیاست مرکزی پروژه تعیین می‌شود تا رکورد
+    # تازه «بدون شعبه» (NULL) رها نشود و صف تایید قابل scope شدن باشد.
+    # - branch_id صریح در بدنه: نامعتبر/غیرمجاز → خطای همان سیاست (400/403).
+    # - بدون ارسال صریح: از هویت فراخوان (توکن ادمین/منشی اپ) حل می‌شود؛ اگر قابل‌تعیین نبود
+    #   (چند شعبه‌ی فعال و کاربر بدون شعبه) مقدار NULL می‌ماند — تخمین کورکورانه و رد ثبت‌نام ممنوع.
+    from dependencies import get_session_from_token, resolve_creation_branch  # lazy، مثل بقیه‌ی مسیرها
+    _caller_user = None
+    if authorization:
+        try:
+            _parts = authorization.split()
+            _token = _parts[1] if len(_parts) == 2 and _parts[0].lower() == "bearer" else None
+            if _token:
+                _sess, _ = get_session_from_token(db, _token)
+                if _sess is not None:
+                    _caller_user = db.query(User).filter(User.id == _sess.user_id).first()
+        except Exception:
+            _caller_user = None
+    _requested_branch_id = teacher.branch_id
+    try:
+        _resolved_branch_id = resolve_creation_branch(
+            db, user=_caller_user, requested_branch_id=_requested_branch_id
+        )
+    except HTTPException:
+        if _requested_branch_id is not None:
+            raise  # درخواست صریح نامعتبر باید خطا بدهد
+        _resolved_branch_id = None  # بدون منبع قابل‌اعتماد ⇒ همان رفتار قبلی (بدون شعبه)
+
     teacher_data = teacher.dict()
     teacher_data["teacher_code"] = next_code
     teacher_data["mobile"] = teacher_mobile
     teacher_data["password"] = hash_password(initial_password) # رمز عبور به صورت هش شده ذخیره می‌شود
+    teacher_data["branch_id"] = _resolved_branch_id
 
     new_teacher = Teacher(**teacher_data, is_approved=False)
     db.add(new_teacher)
@@ -408,12 +438,15 @@ def get_teacher_profile(teacher_id: int, db: Session = Depends(get_db), authoriz
         raise HTTPException(status_code=404, detail="معلم یافت نشد")
     return {
         "id": teacher.id,
-        "first_name": teacher.first_name,
-        "last_name": teacher.last_name,
+        # FIX(null-data): رکوردهای legacy ممکن است NULL باشند و مدل اپ (TeacherRawProfile) این چهار
+        # فیلد را non-null می‌داند؛ مقدار امن (رشتهٔ خالی) برمی‌گردد تا یک رکورد ناقص پروفایل/لیست را
+        # نشکند. کلیدها و بقیهٔ فیلدها بدون تغییر می‌مانند (قرارداد API حفظ می‌شود).
+        "first_name": teacher.first_name or "",
+        "last_name": teacher.last_name or "",
         "father_name": teacher.father_name,
-        "national_code": teacher.national_code,
+        "national_code": teacher.national_code or "",
         "birth_date": teacher.birth_date,
-        "mobile": teacher.mobile,
+        "mobile": teacher.mobile or "",
         "home_phone": teacher.home_phone,
         "marital_status": teacher.marital_status,
         "gender": teacher.gender,
@@ -506,6 +539,21 @@ def update_teacher(teacher_id: int, data: TeacherUpdate, db: Session = Depends(g
                 raise HTTPException(status_code=409, detail="این شماره موبایل قبلاً در سیستم ثبت شده است")
             _shadow.username = norm_teacher_mobile
 
+    # FIX O-20: سینک سایه هنگام تغییر رمز (همان الگوی change_password / reset_teacher_password).
+    # بدون این، `User.password` سایه با هش قدیمی می‌ماند ⇒ «رمز قدیمی» بی‌اعتبار نمی‌شود و
+    # مسیرهایی که رمز را از سایه می‌سنجند (مثل /auth/change-mobile) با رمز واقعیِ کاربر ۴۰۰ می‌دهند.
+    if update_data.get("password") and str(update_data["password"]).strip():
+        _shadow_pw = db.query(User).filter(User.username == teacher.mobile, User.role == "teacher").first()
+        if _shadow_pw is None:
+            # fallback ناهماهنگی‌های قدیمی (username سایه با موبایل فعلی فرق دارد): حل از طریق سشن
+            _sess_pw = db.query(UserSession).filter(UserSession.teacher_id == teacher_id).order_by(UserSession.id.desc()).first()
+            if _sess_pw is not None:
+                _cand_pw = db.query(User).filter(User.id == _sess_pw.user_id, User.role == "teacher").first()
+                if _cand_pw is not None:
+                    _shadow_pw = _cand_pw
+        if _shadow_pw is not None:
+            _shadow_pw.password = teacher.password
+
     # افزایش نسخه به ازای ویرایش موفق
     if teacher.version is None:
         teacher.version = 1
@@ -546,7 +594,7 @@ async def upload_teacher_photo(id: int, file: UploadFile = File(...), db: Sessio
         
     # Generate unique filename
     unique_filename = f"{uuid.uuid4().hex}{file_ext}"
-    filepath = os.path.join("uploads/profiles", unique_filename)
+    filepath = os.path.join(storage_dir("profiles"), unique_filename)
     
     # Write to disk
     with open(filepath, "wb") as f_out:
@@ -554,8 +602,9 @@ async def upload_teacher_photo(id: int, file: UploadFile = File(...), db: Sessio
         
     # Delete old file
     if teacher.profile_image:
-        old_path = os.path.join("uploads/profiles", teacher.profile_image)
-        if os.path.exists(old_path):
+        # پاک‌کردن فایل قبلی — حتی اگر در مسیر قدیمی (نسبت به cwd) مانده باشد
+        old_path = resolve_existing("profiles", teacher.profile_image)
+        if old_path:
             try:
                 os.remove(old_path)
             except Exception:
@@ -599,7 +648,8 @@ def get_teachers_excel(db: Session = Depends(get_db), _: str = Depends(check_adm
     row_num = 2
     for t in teachers:
         courses = db.query(Course).filter(Course.teacher_id == t.id).all()
-        course_titles = ", ".join([c.title for c in courses]) if courses else "ندارد"
+        # FIX(null-data): عنوان legacy ممکن است NULL باشد — join روی None قبلاً TypeError/500 می‌داد.
+        course_titles = ", ".join([(c.title or "کلاس بدون عنوان") for c in courses]) if courses else "ندارد"
         
         course_ids = [c.id for c in courses]
         total_rev = 0
@@ -611,7 +661,8 @@ def get_teachers_excel(db: Session = Depends(get_db), _: str = Depends(check_adm
 
         row_data = [
             t.id,
-            f"{t.first_name} {t.last_name}",
+            # FIX(null-data): نام legacy ممکن است NULL باشد — «None None» در خروجی اکسل حذف شد.
+            f"{t.first_name or ''} {t.last_name or ''}".strip() or "نامشخص",
             t.national_code,
             t.mobile,
             t.home_phone or "",
@@ -687,15 +738,38 @@ def get_pending_settlement(
     from today_summary import parse_project_date  # lazy, same pattern as routers/analytics.py
     start_day = parse_project_date(start_date) if start_date else None
     end_day = parse_project_date(end_date) if end_date else None
+
+    def _parsed(value):
+        try:
+            return parse_project_date(value)
+        except Exception:
+            return None
+
     def _in_range(value):
-        parsed = parse_project_date(value)
+        # FIX(undated-sessions): قبلاً این تابع برای هر مقدارِ غیرقابل‌parse — از جمله date=NULL —
+        # `return False` می‌داد و جلسه بی‌صدا حذف می‌شد؛ حتی وقتی کاربر هیچ بازه‌ای درخواست نکرده
+        # بود (start/end هر دو None). نتیجه: طلب و تعداد جلسات معلم کمتر از واقع نمایش داده می‌شد.
+        # این endpoint فهرست «طلبِ تسویه‌نشده» است، نه گزارش تقویمی؛ تاریخِ نامعلوم دلیلِ حذف یک
+        # طلب باز نیست. پس:
+        #   • بدون بازه ⇒ همه‌ی جلسه‌ها (با تاریخ و بی‌تاریخ) می‌آیند.
+        #   • با بازه ⇒ فقط جلسه‌های دارای تاریخِ معتبر با بازه محدود می‌شوند؛ بی‌تاریخ/نامعتبر
+        #     می‌ماند (نمی‌توان اثبات کرد بیرون بازه است) و هیچ تاریخ جعلی تولید نمی‌شود.
+        parsed = _parsed(value)
         if parsed is None:
-            return False
+            return True
         if start_day is not None and parsed < start_day:
             return False
         if end_day is not None and parsed > end_day:
             return False
         return True
+
+    def _api_date(value):
+        """تاریخِ قابل‌نمایش در API: تاریخ معتبر ⇒ همان مقدار ذخیره‌شده؛ بدون تاریخ/نامعتبر ⇒ \"\".
+
+        هرگز تاریخ جعلی (امروز/پیش‌فرض) ساخته نمی‌شود و مقدار ذخیره‌شده هم دست‌کاری نمی‌شود.
+        """
+        return value if _parsed(value) is not None else ""
+
     # FIX: Bug 14 - exclude archived SessionLog rows from this active view.
     q_sessions = db.query(SessionLog).filter(SessionLog.is_deleted == False).filter(SessionLog.course_id.in_(course_ids))
 
@@ -704,7 +778,9 @@ def get_pending_settlement(
     session_ids = list(session_map.keys())
     
     if not session_ids:
-        return {"teacher_id": teacher_id, "teacher_name": f"{teacher.first_name} {teacher.last_name}", "total_amount": 0, "session_count": 0, "settled_total_amount": settled_total, "earned_total_amount": settled_total, "pending_sessions": []}
+        # FIX(null-data): مثل شاخهٔ بالا از teacher_name امن استفاده می‌شود — قبلاً f-string خام
+        # با نام NULL نتیجهٔ «None None» می‌داد (ناهم‌خوانی دو مسیر خروج زودهنگام).
+        return {"teacher_id": teacher_id, "teacher_name": teacher_name, "total_amount": 0, "session_count": 0, "settled_total_amount": settled_total, "earned_total_amount": settled_total, "pending_sessions": []}
         
     # 4. پیدا کردن تمام حضور و غیاب‌های تسویه نشده دانش‌آموزان حاضر/تاخیر در این جلسات
     attendances = (
@@ -729,7 +805,9 @@ def get_pending_settlement(
         if sess.id not in pending_sessions:
             pending_sessions[sess.id] = {
                 "session_id": sess.id,
-                "date": sess.date or "",
+                # FIX(undated-sessions): تاریخ نامعتبر/NULL به "" نگاشت می‌شود (بدون تاریخ جعلی)
+                # تا کلاینت بتواند «تاریخ نامشخص» نشان دهد و ردیف از لیست حذف نشود.
+                "date": _api_date(sess.date),
                 # FIX(null-data): Course.title legacy ممکن است NULL باشد — فال‌بک مناسب به‌جای null.
                 "class_title": cls.title or "کلاس بدون عنوان",
                 # FIX: H6(A2) - طلب معلم از جلسه = مبلغ قراردادی + جریمه‌ی غایبین غیرموجه.
@@ -746,7 +824,8 @@ def get_pending_settlement(
             _cls = course_map[_sess.course_id]
             pending_sessions[_sid] = {
                 "session_id": _sid,
-                "date": _sess.date or "",
+                # FIX(undated-sessions): همان قرارداد تاریخ (معتبر ⇒ همان مقدار، نامعلوم ⇒ "")
+                "date": _api_date(_sess.date),
                 # FIX(null-data): Course.title legacy ممکن است NULL باشد — فال‌بک مناسب به‌جای null.
                 "class_title": _cls.title or "کلاس بدون عنوان",
                 "amount": (_sess.final_teacher_cost or 0) + (_sess.absent_penalty_teacher or 0),
@@ -764,7 +843,10 @@ def get_pending_settlement(
         "session_count": len(session_list),
         "settled_total_amount": settled_total,
         "earned_total_amount": settled_total + total_amount,
-        "pending_sessions": sorted(session_list, key=lambda x: x["date"], reverse=True)
+        # FIX(undated-sessions): ترتیب قطعی (deterministic) — تاریخ نزولی و در تاریخِ یکسان،
+        # session_id نزولی به‌عنوان tie-breaker؛ قبلاً ترتیبِ ردیف‌های هم‌تاریخ به ترتیب
+        # بازگشتی دیتابیس وابسته بود. ردیف‌های بی‌تاریخ (date="") در انتهای لیست می‌آیند.
+        "pending_sessions": sorted(session_list, key=lambda x: (x["date"], x["session_id"]), reverse=True)
     }
 
 

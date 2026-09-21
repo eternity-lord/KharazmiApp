@@ -110,6 +110,30 @@ def get_session_from_token(db: Session, token: str):
             return None, None
         return sess, None
 
+def resolve_actor_user_id(db: Session, authorization: Optional[str]) -> Optional[int]:
+    """شناسه‌ی کاربرِ عامل (actor) از هدر Authorization — برای ثبت «چه کسی این کار را کرد».
+
+    پیش‌تر این بلوک ۱۰ خطی سه بار در `routers/classes.py` کپی شده بود (حذف مستقیم، تایید، رد
+    درخواست حذف) و مسیر سومِ حذف (`/admin/reject_class`) هیچ actorی ثبت نمی‌کرد. این helper
+    منطق را یک‌جا می‌کند تا هر سه مسیر حذف کلاس رد پای حسابرسی یکسان داشته باشند.
+
+    نکته: گاردهای `check_admin_access` توکن خراب را از قبل رد می‌کنند؛ این تابع فقط برای
+    تعیین شناسه است و در هر خطا `None` برمی‌گرداند (هیچ استثنایی به بیزینس نمی‌رسد).
+    """
+    if not authorization:
+        return None
+    try:
+        from dependencies import get_session_from_token  # خودارجاع برای هم‌خوانی با الگوی ماژول
+        parts = authorization.split()
+        token = parts[1] if len(parts) == 2 and parts[0].lower() == "bearer" else None
+        session, _ = get_session_from_token(db, token) if token else (None, None)
+        if session is not None and getattr(session, "user_id", None):
+            return session.user_id
+    except Exception:
+        pass
+    return None
+
+
 def get_next_sequence_value(db: Session, name: str, start_val: int) -> int:
     # FIX: Bug 15 - atomic increments and a savepoint protect concurrent first inserts.
     from sqlalchemy import update

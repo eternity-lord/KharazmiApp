@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional, Union
 from sqlalchemy import desc, or_, text, func, case
 import io
+import json  # FIX(A2): snapshot_json برای رکورد حذف کلاس
 import uuid
 import os
 import datetime
@@ -328,19 +329,54 @@ def delete_teacher(teacher_id: int, db: Session = Depends(get_db), _: str = Depe
 
 
 @router.delete("/admin/reject_class/{course_id}")
-def reject_class(course_id: int, db: Session = Depends(get_db), _: str = Depends(check_admin_access)):
+def reject_class(
+    course_id: int,
+    db: Session = Depends(get_db),
+    _: str = Depends(check_admin_access),
+    authorization: Optional[str] = Header(None),
+):
+    """رد و آرشیو کلاس (مسیر «کلاس در انتظار تایید» در اپ).
+
+    FIX(A2): این مسیر سومِ حذف، قبلاً فقط ثبت‌نام‌ها را آرشیو می‌کرد و **جلسات را دست‌نخورده
+    می‌گذاشت** و هیچ ردیف حذفی ثبت نمی‌کرد. پیامدش دو چیز بود:
+      ۱) طلب معلم از کلاسی که دیگر وجود ندارد، همچنان در «طلبتسویهنشده» باز می‌ماند
+         (پرداخت برای کلاس ناموجود ⇒ خطای مالی)،
+      ۲) تاریخ حذف و عاملِ آن در تاریخچه‌ی حسابرسی گم می‌شد (نمای آرشیو: deleted_at خالی).
+    اکنون هر سه مسیر حذف کلاس (حذف مستقیم ادمین، تایید درخواست، رد کلاس) دقیقاً یک اثر
+    یکسان دارند: آرشیو کلاس + ثبت‌نام‌ها + جلسات + ثبت رکورد `ClassDeletionRequest` با
+    snapshot و شناسه‌ی عامل. (`forgive_session_charges=True` — همان پیش‌فرض مسیر حذف مستقیم
+    و همان رفتاری که `perform_delete_enrollment` قبلاً در همین مسیر داشت.)
+    """
+    # FIX(A2): lazy import — admin پیش از classes در main.py include می‌شود (جلوگیری از import چرخه‌ای).
+    from routers.classes import _apply_class_deletion, _build_class_deletion_snapshot
+
     c = db.query(Course).filter(Course.id == course_id).first()
     if not c:
         raise HTTPException(status_code=404, detail="کلاس یافت نشد")
 
-    # حذف کلاس و تصحیح حساب مبالغ تمامی دانش‌آموزان ثبت‌نام شده
-    enrollments = db.query(Enrollment).filter(Enrollment.course_id == c.id).all()
-    from dependencies import perform_delete_enrollment
-    for en in enrollments:
-        perform_delete_enrollment(en, db)
-        
-    # FIX: Bug 13 - archived enrollments/transactions must retain a valid course reference.
-    c.is_deleted = True
+    snapshot = _build_class_deletion_snapshot(db, c)
+    # idempotent: اعمال دوباره بی‌اثر است (حذف‌های نرم، claim اتمیک در perform_delete_enrollment)
+    _apply_class_deletion(db, c, True)
+
+    # FIX(A2): رکورد حسابرسی — فقط اگر قبلاً رکورد تاییدشده‌ای برای این کلاس نباشد
+    # (الگوی «بدون تکرار» تا فراخوانی دوباره، تاریخچه را شلوغ نکند).
+    existing = db.query(models.ClassDeletionRequest).filter(
+        models.ClassDeletionRequest.course_id == c.id,
+        models.ClassDeletionRequest.status == "approved",
+    ).first()
+    if existing is None:
+        from dependencies import resolve_actor_user_id
+        _actor_user_id = resolve_actor_user_id(db, authorization)
+        db.add(models.ClassDeletionRequest(
+            course_id=c.id,
+            requested_by_role="admin",
+            requested_by_user_id=_actor_user_id,
+            forgive_session_charges=True,
+            status="approved",
+            snapshot_json=json.dumps(snapshot, ensure_ascii=False, default=str),
+            decided_at=datetime.datetime.now(),
+            decided_by_user_id=_actor_user_id,
+        ))
     db.commit()
     return {"message": "کلاس رد و حذف شد و ترازهای مالی اصلاح گردید."}
 

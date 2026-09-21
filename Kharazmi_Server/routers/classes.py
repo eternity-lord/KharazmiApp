@@ -876,17 +876,8 @@ def delete_class_endpoint(
     # ثبت ردیف تاییدشده برای یکدستی تاریخچه حسابرسی
     # FIX H9: شناسه‌ی تصمیم‌گیرنده باید کاربر واقعی همین درخواست باشد (الگوی H8-P2).
     # چون check_admin_access بالا توکن خراب را از قبل رد کرده، None عملاً نباید بماند (فقط safety net).
-    from dependencies import get_session_from_token  # lazy، مثل H8
-    _actor_user_id = None
-    if authorization:
-        try:
-            _parts = authorization.split()
-            _token = _parts[1] if len(_parts) == 2 and _parts[0].lower() == "bearer" else None
-            _sess, _ = get_session_from_token(db, _token) if _token else (None, None)
-            if _sess is not None and getattr(_sess, "user_id", None):
-                _actor_user_id = _sess.user_id
-        except Exception:
-            pass
+    from dependencies import resolve_actor_user_id  # FIX(A2): helper مشترک (یکدستی سه مسیر حذف)
+    _actor_user_id = resolve_actor_user_id(db, authorization)
     db.add(models.ClassDeletionRequest(
         course_id=course.id,
         requested_by_role="admin",
@@ -1074,17 +1065,8 @@ def list_class_deletion_requests(
 def approve_class_deletion(request_id: int, db: Session = Depends(get_db), _: str = Depends(check_admin_access), authorization: Optional[str] = Header(None)):
     # FIX H9: شناسه‌ی تصمیم‌گیرنده باید کاربر واقعی همین درخواست باشد (الگوی H8-P2).
     # چون check_admin_access بالا توکن خراب را از قبل رد کرده، None عملاً نباید بماند (فقط safety net).
-    from dependencies import get_session_from_token  # lazy، مثل H8
-    _actor_user_id = None
-    if authorization:
-        try:
-            _parts = authorization.split()
-            _token = _parts[1] if len(_parts) == 2 and _parts[0].lower() == "bearer" else None
-            _sess, _ = get_session_from_token(db, _token) if _token else (None, None)
-            if _sess is not None and getattr(_sess, "user_id", None):
-                _actor_user_id = _sess.user_id
-        except Exception:
-            pass
+    from dependencies import resolve_actor_user_id  # FIX(A2): helper مشترک (یکدستی سه مسیر حذف)
+    _actor_user_id = resolve_actor_user_id(db, authorization)
     req = db.query(models.ClassDeletionRequest).filter(models.ClassDeletionRequest.id == request_id).first()
     if not req:
         raise HTTPException(status_code=404, detail="درخواست یافت نشد")
@@ -1110,17 +1092,8 @@ def approve_class_deletion(request_id: int, db: Session = Depends(get_db), _: st
 def reject_class_deletion(request_id: int, data: DeletionDecisionRequest, db: Session = Depends(get_db), _: str = Depends(check_admin_access), authorization: Optional[str] = Header(None)):
     # FIX H9: شناسه‌ی تصمیم‌گیرنده باید کاربر واقعی همین درخواست باشد (الگوی H8-P2).
     # چون check_admin_access بالا توکن خراب را از قبل رد کرده، None عملاً نباید بماند (فقط safety net).
-    from dependencies import get_session_from_token  # lazy، مثل H8
-    _actor_user_id = None
-    if authorization:
-        try:
-            _parts = authorization.split()
-            _token = _parts[1] if len(_parts) == 2 and _parts[0].lower() == "bearer" else None
-            _sess, _ = get_session_from_token(db, _token) if _token else (None, None)
-            if _sess is not None and getattr(_sess, "user_id", None):
-                _actor_user_id = _sess.user_id
-        except Exception:
-            pass
+    from dependencies import resolve_actor_user_id  # FIX(A2): helper مشترک (یکدستی سه مسیر حذف)
+    _actor_user_id = resolve_actor_user_id(db, authorization)
     req = db.query(models.ClassDeletionRequest).filter(models.ClassDeletionRequest.id == request_id).first()
     if not req:
         raise HTTPException(status_code=404, detail="درخواست یافت نشد")

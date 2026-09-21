@@ -1022,8 +1022,22 @@ class NotificationService:
         db.add(new_notification)
         db.flush()
         device_tokens = db.query(DeviceToken).filter(DeviceToken.user_id == recipient_user_id, DeviceToken.role == recipient_role).all()
-        for token_record in device_tokens:
-            pass
+        if device_tokens:
+            # FIX(C2): این حلقه قبلاً **خالی** بود ⇒ هیچ اعلان سیستمی (Push) ارسال نمی‌شد و کاربری که
+            # اپ را باز نمی‌کرد، از پرداخت/قسط/غیبت/پیام بی‌خبر می‌ماند. حالا ارسال واقعی انجام می‌شود:
+            #  • گارد محیطی: تا وقتی FCM_SERVER_KEY تنظیم نشده، هیچ درخواست شبکه‌ای زده نمی‌شود (فقط لاگ شفاف).
+            #  • بدون ریسک: deliver_push هرگز exception بیرون نمی‌دهد (شکست push نباید ثبت اعلان/تراکنش را بشکند).
+            #  • commit=False ⇒ پاک‌سازی توکن‌های نامعتبر به همان commit پایانی همین تابع واگذار می‌شود
+            #    تا تراکنش مالی کالر (مثلاً ثبت جلسه) اتمیک بماند.
+            try:
+                from push_service import deliver_push  # lazy: جلوگیری از import چرخه‌ای
+                deliver_push(
+                    db, device_tokens, title=title, body=body,
+                    data={"type": type, "notification_id": getattr(new_notification, "id", None)},
+                    commit=False,
+                )
+            except Exception:  # belt-and-braces؛ deliver_push خودش استثنا بیرون نمی‌دهد
+                pass
         if type in ["attendance", "installment", "payment"]:
             db.add(SmsLog(
                 target_group=f"notif_{recipient_role}_{recipient_user_id}",

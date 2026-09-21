@@ -539,6 +539,21 @@ def update_teacher(teacher_id: int, data: TeacherUpdate, db: Session = Depends(g
                 raise HTTPException(status_code=409, detail="این شماره موبایل قبلاً در سیستم ثبت شده است")
             _shadow.username = norm_teacher_mobile
 
+    # FIX O-20: سینک سایه هنگام تغییر رمز (همان الگوی change_password / reset_teacher_password).
+    # بدون این، `User.password` سایه با هش قدیمی می‌ماند ⇒ «رمز قدیمی» بی‌اعتبار نمی‌شود و
+    # مسیرهایی که رمز را از سایه می‌سنجند (مثل /auth/change-mobile) با رمز واقعیِ کاربر ۴۰۰ می‌دهند.
+    if update_data.get("password") and str(update_data["password"]).strip():
+        _shadow_pw = db.query(User).filter(User.username == teacher.mobile, User.role == "teacher").first()
+        if _shadow_pw is None:
+            # fallback ناهماهنگی‌های قدیمی (username سایه با موبایل فعلی فرق دارد): حل از طریق سشن
+            _sess_pw = db.query(UserSession).filter(UserSession.teacher_id == teacher_id).order_by(UserSession.id.desc()).first()
+            if _sess_pw is not None:
+                _cand_pw = db.query(User).filter(User.id == _sess_pw.user_id, User.role == "teacher").first()
+                if _cand_pw is not None:
+                    _shadow_pw = _cand_pw
+        if _shadow_pw is not None:
+            _shadow_pw.password = teacher.password
+
     # افزایش نسخه به ازای ویرایش موفق
     if teacher.version is None:
         teacher.version = 1

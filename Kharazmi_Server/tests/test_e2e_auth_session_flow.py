@@ -34,7 +34,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 import models
-from dependencies import get_db, hash_password, limiter
+from dependencies import get_db, hash_password, limiter, verify_password
 from main import app
 
 SERVER_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -196,40 +196,84 @@ class TestTeacherLogin(AuthFlowWorld):
     # ------------------------------------------------------------------
     # ۴) ⚠️ باگ: ورود دوم معلم از «شاخهٔ ادمین» پاسخ می‌گیرد
     # ------------------------------------------------------------------
-    def test_4_second_teacher_login_returns_admin_role_bug(self):
-        """باگ مستندشدهٔ A4 — اثر واقعی روی اپ:
+    def test_4_second_teacher_login_still_returns_teacher_role(self):
+        """O-01 (رفع شد): ورود دومِ معلم هم باید مثل ورود اول پاسخ معلم بدهد.
 
-        در `POST /auth/login` اول روی `User.username` جست‌وجو می‌شود. چون سایهٔ معلم با
-        `username == mobile` ساخته شده، در ورودِ بعدی همان سایه پیدا می‌شود و پاسخ از شاخهٔ
-        **ادمین** برمی‌گردد: `role="admin"` و `user_id = User.id سایه` (نه `Teacher.id`).
-        پیامد در اپ (LoginActivity.kt:273-280): شرط `role == "admin"` برقرار است ⇒ معلم به
-        **پنل ادمین** (MainActivity) می‌رود، و اگر دکمهٔ پنل معلم را بزند `TEACHER_ID = سایه.id`
-        می‌شود که سرور آن را ۴۰۳ می‌کند.
-
-        این تست **رفتار فعلی** را مستند می‌کند؛ با رفع شدن، باید آگاهانه به‌روزرسانی شود.
+        چرا: `POST /auth/login` اول روی `User.username` می‌گردد و چون سایهٔ معلم با
+        `username == mobile` ساخته می‌شود، ورود دومِ همان معلم از شاخهٔ **ادمین** پاسخ می‌گرفت:
+        `role="admin"` و `user_id = User.id سایه` (نه `Teacher.id`). پیامد در اپ
+        (`LoginActivity.kt:273-280`): معلم به **پنل ادمین** می‌رفت و `TEACHER_ID` هم اشتباه می‌شد.
         """
         first = self.login(TEACHER_MOBILE, TEACHER_PASS).json()
         self.assertEqual(first["role"], "teacher")
-        shadow_id = self.db.query(models.User).filter(models.User.role == "teacher").one().id
-        self.assertNotEqual(shadow_id, self.teacher.id, "شناسهٔ سایه و معلم معمولاً یکی نیست")
+        shadow = self.db.query(models.User).filter(models.User.role == "teacher").one()
+        self.assertNotEqual(shadow.id, self.teacher.id, "شناسهٔ سایه و معلم معمولاً یکی نیست")
 
-        second = self.login(TEACHER_MOBILE, TEACHER_PASS).json()
-        self.assertEqual(second["role"], "admin", "❗ ورود دوم از شاخهٔ ادمین پاسخ می‌گیرد")
-        self.assertEqual(second["sub_role"], "teacher")
-        self.assertEqual(second["user_id"], shadow_id,
-                         "❗ user_id پاسخ، شناسهٔ کاربر سایه است نه Teacher.id")
-        token = second["token"]
+        second = self.login(TEACHER_MOBILE, TEACHER_PASS)
+        self.assertEqual(second.status_code, 200, second.text)
+        body = second.json()
+        self.assertEqual(body["role"], "teacher", "ورود دوم نباید از شاخهٔ ادمین پاسخ بگیرد")
+        self.assertEqual(body["sub_role"], "teacher")
+        self.assertEqual(body["user_id"], self.teacher.id,
+                         "user_id باید Teacher.id باشد، نه شناسهٔ سایه")
+        self.assertEqual(body["name"], "مریم تست")
 
-        # اثر ۱: اپ معلم را به MainActivity (پنل ادمین) می‌فرستد، ولی دسترسی ادمین ندارد
-        admin_call = self.client.get("/admin/deleted_classes", headers=hdr(token))
-        self.assertEqual(admin_call.status_code, 403,
-                         "توکن معلم در پنل ادمین ۴۰۳ می‌گیرد ⇒ معلم در اپی می‌افتد که کار نمی‌کند")
+        # نشست ذخیره‌شده هم باید مثل شاخهٔ معلم باشد (teacher_id برای مسیرهای معلم)
+        sessions = [row for row in self.sessions(user_id=shadow.id) if row.token == body["token"]]
+        self.assertEqual(len(sessions), 1)
+        self.assertEqual(sessions[0].sub_role, "teacher")
+        self.assertEqual(sessions[0].teacher_id, self.teacher.id,
+                         "سشن ورود معلم باید teacher_id داشته باشد (map پایدار معلم)")
 
-        # اثر ۲: اگر اپ با همان user_id سراغ پنل معلم برود، ۴۰۳ می‌گیرد (چون id برای سرور معلم نیست)
-        wrong = self.client.get(f"/teachers/{shadow_id}/classes", headers=hdr(token))
-        self.assertEqual(wrong.status_code, 403, "شناسهٔ سایه در مسیر معلم مجاز نیست")
-        right = self.client.get(f"/teachers/{self.teacher.id}/classes", headers=hdr(token))
-        self.assertEqual(right.status_code, 200, "با Teacher.id درست کار می‌کند")
+        # در دسترس بودن مسیرهای معلم با توکن ورود دوم (چیزی که اپ اکنون می‌خواند)
+        self.assertEqual(self.client.get(f"/teachers/{self.teacher.id}/classes",
+                                        headers=hdr(body["token"])).status_code, 200)
+        # و ارتقای دسترسی رخ نداده است
+        self.assertEqual(self.client.get("/admin/deleted_classes",
+                                         headers=hdr(body["token"])).status_code, 403)
+
+    def test_4b_orphan_teacher_shadow_cannot_get_a_token(self):
+        """O-21 (رفع شد): سایهٔ `User(role="teacher")` بدون `Teacher` فعال ⇒ هیچ توکنی صادر نمی‌شود.
+
+        پیش از فیکس، lookupِ اول (شاخهٔ ادمین) سایه را پیدا می‌کرد و چون `Teacher` متناظری
+        وجود نداشت، گیت‌های H10 (تأیید/تعلیق) **قابل اجرا نبودند** و بی‌عبور از هیچ گیتی
+        توکن صادر می‌شد. حالا این مسیر به شاخهٔ معلم می‌رسد و بدون Teacher فعال «کاربری یافت نشد» می‌دهد.
+        """
+        from dependencies import hash_password as _hash
+        self.db.add(models.User(id=150, username="09120000077", password=_hash("orphan-pass-123"),
+                                full_name="معلم بی‌پرونده", role="teacher", sub_role="teacher"))
+        self.db.add(models.Teacher(id=90, first_name="حذف‌شده", last_name="تست", mobile="09120000078",
+                                   national_code="0012345899", password=_hash("deleted-pass-123"),
+                                   is_approved=True, is_suspended=False, is_deleted=True, branch_id=1))
+        self.db.add(models.User(id=151, username="09120000078", password=_hash("deleted-pass-123"),
+                                full_name="حذف‌شده تست", role="teacher", sub_role="teacher"))
+        self.db.commit()
+
+        orphan = self.login("09120000077", "orphan-pass-123")
+        self.assertIn(orphan.status_code, (403, 404), f"بدون Teacher فعال نباید توکن صادر شود: {orphan.text}")
+        self.assertNotIn("token", orphan.json())
+
+        deleted = self.login("09120000078", "deleted-pass-123")
+        self.assertIn(deleted.status_code, (403, 404), f"معلم حذف‌شده نباید توکن بگیرد: {deleted.text}")
+        self.assertNotIn("token", deleted.json())
+
+        self.assertEqual(self.sessions(user_id=150), [], "سشن سایهٔ بی‌پرونده نباید ساخته شود")
+        self.assertEqual(self.sessions(user_id=151), [], "سشن سایهٔ معلم حذف‌شده نباید ساخته شود")
+
+    def test_4c_teacher_login_gates_still_apply_to_the_shadow(self):
+        """رگرسیون O-01/O-21: گیت‌های H10 (تأییدنشده/معلق) روی سایهٔ معلم دست‌نخورده است."""
+        self.teacher.is_approved = False
+        self.db.commit()
+        pending = self.login(TEACHER_MOBILE, TEACHER_PASS)
+        self.assertEqual(pending.status_code, 403, pending.text)
+        self.assertNotIn("token", pending.json())
+
+        self.teacher.is_approved = True
+        self.teacher.is_suspended = True
+        self.db.commit()
+        suspended = self.login(TEACHER_MOBILE, TEACHER_PASS)
+        self.assertEqual(suspended.status_code, 403, suspended.text)
+        self.assertNotIn("token", suspended.json())
 
 
 class TestMeEndpoint(AuthFlowWorld):
@@ -429,6 +473,50 @@ class TestAndroidClientGaps(AuthFlowWorld):
         for endpoint in ("/auth/device_token", "/auth/logout", "/auth/student/request_otp",
                          "/auth/student/login"):
             self.assertIn(endpoint, paths, f"اندپوینت {endpoint} روی سرور باید موجود باشد")
+
+
+class TestTeacherCredentialSync(AuthFlowWorld):
+    # ------------------------------------------------------------------
+    # ۱۰) O-20: رمزی که ادمین برای معلم می‌گذارد (`PUT /teachers/update/{id}`) باید سایه را هم
+    #     به‌روز کند؛ وگرنه دو «رمز» متناقض در سیستم می‌ماند.
+    # ------------------------------------------------------------------
+    NEW_PASS = "new-teacher-pass-456"
+
+    def test_10_admin_set_password_syncs_the_teacher_shadow(self):
+        admin_tok = self.login(ADMIN_MOBILE, ADMIN_PASS).json()["token"]
+        self.assertEqual(self.login(TEACHER_MOBILE, TEACHER_PASS).status_code, 200)  # ساخت سایه
+        shadow = self.db.query(models.User).filter(models.User.role == "teacher").one()
+
+        resp = self.client.put(f"/teachers/update/{self.teacher.id}",
+                               json={"password": self.NEW_PASS, "version": 1}, headers=hdr(admin_tok))
+        self.assertEqual(resp.status_code, 200, resp.text)
+
+        # ۱) ورود با رمز جدید و رد رمز قدیمی (پس از O-01 مسیر ورود، Teacher.password را می‌سنجد)
+        self.assertEqual(self.login(TEACHER_MOBILE, self.NEW_PASS).status_code, 200)
+        self.assertEqual(self.login(TEACHER_MOBILE, TEACHER_PASS).status_code, 400,
+                         "رمز قدیمی باید بی‌اعتبار شود")
+
+        # ۲) هش سایه هم باید همگام شده باشد
+        self.db.refresh(shadow)
+        self.assertTrue(verify_password(self.NEW_PASS, shadow.password),
+                        "هش سایه با رمز جدید همگام نشده است (O-20)")
+        self.assertFalse(verify_password(TEACHER_PASS, shadow.password),
+                         "رمز قدیمی نباید در سایه باقی بماند")
+
+    def test_10b_change_mobile_accepts_the_password_set_by_admin(self):
+        """اثر واقعی O-20 روی اپ: «تغییر شماره همراه» رمز را از **سایه** می‌سنجد."""
+        admin_tok = self.login(ADMIN_MOBILE, ADMIN_PASS).json()["token"]
+        self.login(TEACHER_MOBILE, TEACHER_PASS)
+        self.assertEqual(self.client.put(f"/teachers/update/{self.teacher.id}",
+                                         json={"password": self.NEW_PASS, "version": 1},
+                                         headers=hdr(admin_tok)).status_code, 200)
+
+        tok = self.login(TEACHER_MOBILE, self.NEW_PASS).json()["token"]
+        resp = self.client.post("/auth/change-mobile", json={
+            "current_mobile": TEACHER_MOBILE, "password": self.NEW_PASS, "new_mobile": "09120000099"
+        }, headers=hdr(tok))
+        self.assertEqual(resp.status_code, 200,
+                         f"با رمز درستِ جدید باید کار کند (سایه همگام نشده؟): {resp.text}")
 
 
 if __name__ == "__main__":

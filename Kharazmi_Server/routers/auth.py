@@ -44,18 +44,18 @@ def login_user(request: Request, req: LoginRequest, db: Session = Depends(get_db
     if _recent_fails >= 5:
         raise HTTPException(status_code=429, detail="تعداد تلاش‌های ناموفق برای این شماره زیاد است؛ لطفاً ۵ دقیقه دیگر تلاش کنید")
     # 1. بررسی مدیر
-    admin = db.query(User).filter(User.username.in_(_login_keys)).first()  # FIX H20-ESC: canonical + خام (username ادمین لزوماً موبایل نیست؛ legacy هم پوشش داده می‌شود)
+    # FIX O-01/O-21: سایهٔ معلم (role="teacher") از شاخهٔ «ادمین» کنار گذاشته می‌شود تا به شاخهٔ
+    # معلم (پایین‌تر) برسد. چرا: این lookup اول جواب می‌داد و اگر `Teacher` متناظر وجود نداشت یا
+    # حذف‌شده بود، گیت‌های H10 (تأیید/تعلیق) قابل اجرا نبودند ⇒ سایهٔ بی‌پرونده توکن می‌گرفت و
+    # سایهٔ معلم هم با `role="admin"` و `user_id=User.id` پاسخ می‌گرفت (اپ معلم را به پنل ادمین می‌برد).
+    # اگر ادمین واقعیِ هم‌نام هم وجود داشته باشد، او اولویت دارد (پس ادمین‌ها قفل نمی‌شوند).
+    _shadow_roles = ("teacher",)
+    admin = next((u for u in db.query(User).filter(User.username.in_(_login_keys)).all()
+                  if (u.role or "") not in _shadow_roles), None)  # FIX H20-ESC: canonical + خام (username ادمین لزوماً موبایل نیست؛ legacy هم پوشش داده می‌شود)
     if admin:
         if req.password and verify_password(req.password, admin.password):
-            # FIX (E2E-B1): سایه‌ی معلم (role=teacher) هم باید از گیت‌های H10 شاخه‌ی Teacher رد شود —
-            # قبلاً چون lookup سایه اول بود، معلم معلق/تاییدنشده با 200 لاگین می‌کرد و هرگز به گیت نمی‌رسید.
-            if (admin.role or "") == "teacher":
-                _t = db.query(Teacher).filter(Teacher.mobile.in_(_login_keys), Teacher.is_deleted == False).first()
-                if _t is not None:
-                    if not _t.is_approved:
-                        raise HTTPException(status_code=403, detail="حساب شما هنوز توسط مدیر تایید نشده است")
-                    if _t.is_suspended:
-                        raise HTTPException(status_code=403, detail="حساب شما توسط مدیر معلق شده است. لطفاً با آموزشگاه تماس بگیرید")
+            # (FIX E2E-B1 قبلاً همین‌جا گیت‌های H10 را برای سایهٔ معلم اجرا می‌کرد؛ حالا خودِ سایه به
+            #  شاخهٔ معلم می‌رود و همان گیت‌ها آنجا اجرا می‌شود — رفتار یکسان، بدون مسیر موازی.)
             # FIX: توکن امضادار JWT به جای uuid
             # FIX(A1): نقش با سیاست کمترین سطح دسترسی — سایهٔ معلمِ legacy بدون sub_role
             # دیگر توکن «admin» نمی‌گیرد.
@@ -188,6 +188,10 @@ def login_user(request: Request, req: LoginRequest, db: Session = Depends(get_db
         return {
             "status": "success",
             "role": "teacher",
+            # FIX O-01: `sub_role` هم مثل شاخهٔ ادمین برگردانده می‌شود؛ بدون آن اپ
+            # (`LoginActivity.kt` → `USER_SUB_ROLE = response.sub_role ?: "admin"`) برای معلم
+            # «admin» ذخیره می‌کرد (دکمهٔ ویژهٔ مدیر در تنظیمات معلم نمایان می‌شد).
+            "sub_role": "teacher",
             "token": token,
             "user_id": teacher.id,  # برای سازگاری با اندروید که Teacher.id انتظار دارد
             "name": _teacher_name,

@@ -8,15 +8,19 @@ import random
 import uuid
 
 import models
-from models import Student, Enrollment, Course, Grade, Installment, SessionLog, Attendance, SmsLog, ParentOTP, UserSession, User
+from models import Student, Enrollment, Course, Grade, Installment, SessionLog, Attendance, SmsLog, ParentOTP, UserSession, User, Notification
 from schemas import ParentOtpRequest, ParentLoginRequest, ChildSelectRequest
-from dependencies import get_db, limiter, normalize_mobile
+from dependencies import get_db, limiter, normalize_mobile, resolve_notification_role
 from fastapi import Request
 
 # FIX: Bug 16 - share the tuition-minus-payment debt calculation across financial views.
 from financial_calculations import calculate_student_debt
 
 router = APIRouter()
+
+# FIX(C1): سقف اعلان‌های نمایش‌داده‌شده در پورتال ولی (جدیدترین‌ها اول) — 
+# جلوگیری از پاسخ سنگین برای ولی‌ای که ماه‌ها اعلان انبار کرده است.
+PORTAL_NOTIFICATIONS_LIMIT = 50
 
 # ==========================================
 # 1. درخواست کد یک‌بارمصرف اولیا (OTP)
@@ -254,6 +258,42 @@ def parent_select_child(req: ChildSelectRequest, db: Session = Depends(get_db)):
 # ==========================================
 # ۴. اندپوینت امن دریافت کل سوابق فرزند (بدون دریافت آیدی شاگرد از فرانت)
 # ==========================================
+def _portal_notifications(db: Session, student: Student) -> list:
+    """اعلان‌های واقعیِ ولیِ همین فرزند (جدیدترین اول) — FIX(C1).
+
+    - منبع: جدول `notifications` با کلید `recipient_user_id` (فضای User.id) و `recipient_role`.
+    - نقش با همان helper مشترک resolve می‌شود تا رکورد legacy/نقش temp_parent هم درست نگاشت شود.
+    - `created_at` می‌تواند NULL باشد (رکورد legacy): تاریخ به رشتهٔ خالی تبدیل می‌شود، نه null،
+      تا مدل اندروید (`ParentNotificationItem.date: String` غیر-null) نشکند.
+    """
+    if not student or not student.parent_user_id:
+        return []
+    parent_user = db.query(User).filter(User.id == student.parent_user_id).first()
+    if parent_user is None:
+        return []
+    role = resolve_notification_role(parent_user)
+    rows = (
+        db.query(Notification)
+        .filter(Notification.recipient_user_id == parent_user.id,
+                Notification.recipient_role == role)
+        .order_by(Notification.created_at.desc().nullslast(), Notification.id.desc())
+        .limit(PORTAL_NOTIFICATIONS_LIMIT)
+        .all()
+    )
+    from today_summary import jalali_date_string  # lazy، مثل سایر تاریخ‌های شمسی پورتال
+    return [
+        {
+            "id": n.id,
+            "type": n.type,
+            "title": n.title,
+            "body": n.body,
+            "date": jalali_date_string(n.created_at.date()) if n.created_at else "",
+            "is_read": bool(n.is_read),
+        }
+        for n in rows
+    ]
+
+
 @router.get("/parent/child_profile")
 def get_parent_child_profile(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
     if not authorization:
@@ -385,10 +425,12 @@ def get_parent_child_profile(authorization: Optional[str] = Header(None), db: Se
                 "time": "ساعت ۱۶:۰۰ الی ۱۷:۳۰"
             })
             
-    notifications_list = [
-        {"title": "اطلاعیه شروع ترم تحصیلی جدید", "body": "کلاس‌های پاییزه آموزشگاه علمی خوارزمی از ابتدای مهرماه به طور رسمی آغاز خواهد شد.", "date": "۱۴۰۵/۰۶/۰۱"},
-        {"title": "تعطیلی موقت به علت سرما", "body": "به اطلاع اولیای گرامی می‌رساند کلاس‌های فردا نوبت عصر به صورت غیرحضوری برگزار خواهد شد.", "date": "۱۴۰۵/۰۶/۰۲"}
-    ]
+    # FIX(C1): اعلان‌های واقعیِ ولی از جدول `notifications` (به‌جای دو اعلان جعلیِ ثابت).
+    # قبلاً هر ولی — مستقل از واقعیت — دو پیام نمایشی («شروع ترم»، «تعطیلی سرما») می‌دید و
+    # اعلان‌های واقعی (پرداخت فرزند، یادآوری قسط، ...) هرگز به پورتال ولی نمی‌رسید.
+    # فیلتر دقیقاً مثل اندپوینت /notifications است: recipient_user_id = کاربرِ سایه‌ی ولی
+    # + نقشِ کانونیکال (resolve_notification_role) ⇒ هیچ اعلانِ کاربر دیگری دیده نمی‌شود.
+    notifications_list = _portal_notifications(db, student)
 
     return {
         "info": {

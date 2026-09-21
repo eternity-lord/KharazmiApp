@@ -10,13 +10,13 @@ import datetime
 
 import models
 from models import (
-    Attendance, Course, Enrollment, Grade, InstituteShare, SessionLog, SmsLog, Student, Teacher, Transaction, User, UserSession, Installment
+    Attendance, Course, Enrollment, Grade, InstituteShare, SessionLog, SmsLog, Student, Teacher, Transaction, User, UserSession, Installment, Notification
 )
 from schemas import (
     HistoryRequest, LoginRequest, TeacherInfo, FullTeacherProfile, StudentCreate, TeacherCreate, CourseCreate, EnrollmentCreate, GradeCreate, GradeItem, AttendanceLogRequest, AttendanceItem, AttendanceSubmitData, SmsSendRequest, ChangePasswordRequest, StudentProfileInfo, FullStudentProfile, TeacherProfileInfo, FullTeacherProfile, ClassReportInfo, ClassStudentData, ClassSessionHistory, FullClassReport, ShareConfigModel, StudentUpdate, TeacherUpdate, PersonListItem, TransactionUpdate, StudentAttendanceHistoryRequest, AdvancedSearchItem, FinanceSubmitData, PrintReceiptRequest, TransactionTestData, StudentRegisterAndEnrollRequest
 )
 from storage import storage_dir, resolve_existing
-from dependencies import get_db, check_admin_access, check_admin_or_secretary_access, check_user_login, check_student_access, get_enrollment_tuition_and_discount, SESSION_EXPIRY_DAYS, limiter, ensure_student_shadow_users, get_session_student, get_session_parent, normalize_mobile, validate_image_upload, require_permission
+from dependencies import get_db, check_admin_access, check_admin_or_secretary_access, check_user_login, check_student_access, get_enrollment_tuition_and_discount, SESSION_EXPIRY_DAYS, limiter, ensure_student_shadow_users, get_session_student, get_session_parent, normalize_mobile, validate_image_upload, require_permission, resolve_notification_role
 
 # FIX: Bug 16 - share the tuition-minus-payment debt calculation across financial views.
 from financial_calculations import calculate_student_debt
@@ -496,6 +496,45 @@ def get_student_communication_history(
 # ==========================================
 # ۱۱. اندپوینت امن پورتال دانش‌آموزی (Student Portal) - جدید 🆕
 # ==========================================
+# FIX(C1): سقف اعلان‌های نمایش‌داده‌شده در پورتال دانش‌آموز (جدیدترین‌ها اول).
+STUDENT_PORTAL_NOTIFICATIONS_LIMIT = 50
+
+
+def _student_portal_notifications(db: Session, student: Student) -> list:
+    """اعلان‌های واقعیِ خودِ دانش‌آموز (جدیدترین اول) — FIX(C1).
+
+    قبلاً این اندپوینت دو اعلان جعلیِ ثابت برمی‌گرداند («شروع ترم»، «تعطیلی سرما») و
+    اعلان‌های واقعی (غیبت، آزمون، پیام‌ها) هرگز به پورتال دانش‌آموز نمی‌رسید.
+    فیلتر مثل /notifications: recipient_user_id = کاربرِ سایه‌ی خودِ شاگرد + نقش کانونیکال.
+    """
+    if not student or not student.user_id:
+        return []
+    shadow = db.query(User).filter(User.id == student.user_id).first()
+    if shadow is None:
+        return []
+    role = resolve_notification_role(shadow)
+    rows = (
+        db.query(Notification)
+        .filter(Notification.recipient_user_id == shadow.id,
+                Notification.recipient_role == role)
+        .order_by(Notification.created_at.desc().nullslast(), Notification.id.desc())
+        .limit(STUDENT_PORTAL_NOTIFICATIONS_LIMIT)
+        .all()
+    )
+    from today_summary import jalali_date_string  # lazy، مثل بقیه تاریخ‌های شمسی
+    return [
+        {
+            "id": n.id,
+            "type": n.type,
+            "title": n.title,
+            "body": n.body,
+            "date": jalali_date_string(n.created_at.date()) if n.created_at else "",
+            "is_read": bool(n.is_read),
+        }
+        for n in rows
+    ]
+
+
 @router.get("/students/my_profile")
 def get_student_my_profile(authorization: Optional[str] = Header(None), db: Session = Depends(get_db), _: str = Depends(check_user_login)):
     if not authorization:
@@ -624,10 +663,8 @@ def get_student_my_profile(authorization: Optional[str] = Header(None), db: Sess
                 "time": "ساعت ۱۶:۰۰ الی ۱۷:۳۰"
             })
             
-    notifications_list = [
-        {"title": "اطلاعیه شروع ترم تحصیلی جدید", "body": "کلاس‌های پاییزه آموزشگاه علمی خوارزمی از ابتدای مهرماه به طور رسمی آغاز خواهد شد.", "date": "۱۴۰۵/۰۶/۰۱"},
-        {"title": "تعطیلی موقت به علت سرما", "body": "به اطلاع اولیای گرامی می‌رساند کلاس‌های فردا نوبت عصر به صورت غیرحضوری برگزار خواهد شد.", "date": "۱۴۰۵/۰۶/۰۲"}
-    ]
+    # FIX(C1): اعلان‌های واقعیِ دانش‌آموز از جدول `notifications` (به‌جای دو اعلان جعلیِ ثابت).
+    notifications_list = _student_portal_notifications(db, student)
 
     return {
         "info": {

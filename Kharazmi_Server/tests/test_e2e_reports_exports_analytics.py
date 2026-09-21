@@ -362,6 +362,33 @@ class TestAnalyticsAuditAndKpis(ReportWorld):
         self.assertEqual(self.client.get("/dashboard/kpis", headers=hdr("tok-admin")).json()["today_revenue"],
                          before, "حذف شارژ جلسه/سهم معلم/بی‌تاریخ نباید عدد را عوض کند")
 
+    def test_14c_financial_summary_surfaces_undated_payments(self):
+        """O-10: پول بی‌تاریخ در جمع‌های ماه/سال نمی‌آید (تصمیم E1) ولی باید **دیده** شود.
+
+        ردیف بی‌تاریخ به هیچ بازه‌ای نسبت داده نمی‌شود؛ پس نه در جمع ماه و نه در جمع سال هست.
+        بدون شمارنده، مدیر فکر می‌کند پولی گم شده است. برای همین `undated_count/undated_amount`
+        اضافه شد (جمع‌های فعلی دست‌نخورده).
+        """
+        body = self.client.get("/reports/financial_summary?user_type=institute",
+                               headers=hdr("tok-admin")).json()
+        # دنیای این سناریو یک واریزی بی‌تاریخ ۲۵۰٬۰۰۰ تومانی به کیف آموزشگاه دارد (ردیف ۹۰۲)
+        self.assertEqual(body["undated_count"], 1)
+        self.assertEqual(body["undated_amount"], 250000)
+        self.assertNotIn(250000, (body["monthly"]["collected"], body["yearly"]["collected"]),
+                         "پول بی‌تاریخ نباید در جمع‌های بازه‌دار بیاید")
+
+        # سهم معلم جدا شمرده می‌شود (کیف teacher، فقط ردیف‌های همان معلم)
+        self.db.add(models.Transaction(id=905, student_id=41, course_id=71, branch_id=1, amount=40000,
+                                       payment_method=None, date="", type="deposit",
+                                       target_wallet="teacher", description="بی‌تاریخ معلم"))
+        self.db.commit()
+        teacher = self.client.get("/reports/financial_summary?user_type=teacher&teacher_id=51",
+                                  headers=hdr("tok-admin")).json()
+        self.assertEqual(teacher["undated_count"], 1)
+        self.assertEqual(teacher["undated_amount"], 40000)
+        self.assertEqual(teacher["monthly"]["collected"], 0,
+                         "وصولی ماهانهٔ معلم دست‌نخورده است")
+
     def test_15_audit_trail_and_suspicious_patterns_are_admin_only(self):
         logs = self.client.get("/audit-trail/logs?entity_type=transaction&action=create",
                                headers=hdr("tok-admin"))

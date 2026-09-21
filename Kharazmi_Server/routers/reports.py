@@ -27,6 +27,7 @@ router = APIRouter()
 from financial_calculations import (
     calculate_institute_session_revenue,
     calculate_institute_collected_revenue,
+    count_undated_payments,
     collected_revenue_rows,
     calculate_total_turnover,
     calculate_teacher_session_revenue,
@@ -551,10 +552,17 @@ def get_financial_summary(
         collected_y = calculate_institute_collected_revenue(db, start_year_date, end_year_date, resolved_branch)
         uncollected_y = max(0, total_y - collected_y)
 
+        # FIX O-10: پول بی‌تاریخ در جمع‌های ماه/سال نمی‌آید (تصمیم E1) — این دو شمارنده آن را
+        # آشکار می‌کنند تا مدیر فکر نکند پولی گم شده است. جمع‌های بالا دست‌نخورده‌اند.
+        undated_count, undated_amount = count_undated_payments(db, target_wallet="institute",
+                                                              branch_id=resolved_branch)
+
         return {
             "user_type": "institute",
             "year": year,
             "month": month,
+            "undated_count": int(undated_count),
+            "undated_amount": int(undated_amount),
             "monthly": {
                 "total": int(total_m),
                 "collected": int(collected_m),
@@ -584,12 +592,19 @@ def get_financial_summary(
         collected_y = calculate_teacher_collected_revenue(db, teacher_id, start_year_date, end_year_date)
         uncollected_y = max(0, total_y - collected_y)
 
+        # FIX O-10: مثل شاخهٔ مؤسسه، ولی فقط پرداخت‌های به کیف همین معلم.
+        _teacher_course_ids = [c.id for c in db.query(Course).filter(Course.teacher_id == teacher_id).all()]
+        undated_count, undated_amount = count_undated_payments(db, target_wallet="teacher",
+                                                              course_ids=_teacher_course_ids)
+
         return {
             "user_type": "teacher",
             "teacher_id": teacher_id,
             "teacher_name": display_name(teacher, "نامشخص"),
             "year": year,
             "month": month,
+            "undated_count": int(undated_count),
+            "undated_amount": int(undated_amount),
             "monthly": {
                 "total": int(total_m),
                 "collected": int(collected_m),

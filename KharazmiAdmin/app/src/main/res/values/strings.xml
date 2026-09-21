@@ -1004,7 +1004,8 @@
     <string name="rpt_pick_tutor">لطفاً یک مربی را انتخاب کنید</string>
     <string name="rpt_monthly_title">آمار مالی ماهانه (%1$s/%2$s)</string>
     <string name="rpt_yearly_title">آمار مالی سالانه مربی (%1$s)</string>
-    <string name="rpt_calc_error">خطا در محاسبات آمار مالی از سرور</string>
+        <string name="rpt_undated_warning">%1$s پرداخت بی‌تاریخ (%2$s تومان) در جمع‌های بالا نیامده است</string>
+<string name="rpt_calc_error">خطا در محاسبات آمار مالی از سرور</string>
     <string name="rpt_enter_name">لطفاً نام دانش‌آموز را وارد کنید</string>
     <string name="rpt_student_nf">دانش‌آموزی با این مشخصات یافت نشد</string>
     <string name="rpt_search_error">خطا در سرچ دانش‌آموز</string>

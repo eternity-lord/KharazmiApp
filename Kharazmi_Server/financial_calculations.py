@@ -1,4 +1,5 @@
 from fastapi import HTTPException
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from typing import Optional
 import hashlib
@@ -103,6 +104,33 @@ def calculate_institute_collected_revenue(db: Session, start_date: str, end_date
     دقیقاً همان ردیف‌ها را ببیند (جمع ستون‌های نمودار == همین عدد).
     """
     return sum(amount for amount, _ in collected_revenue_rows(db, start_date, end_date, branch_id))
+
+
+def count_undated_payments(db: Session, target_wallet: Optional[str] = None,
+                           branch_id: Optional[int] = None, course_ids: Optional[list] = None):
+    """(تعداد، مبلغ) پرداخت‌های مثبتِ **بی‌تاریخ** — هشدار «پول بی‌تاریخ» در گزارش‌ها (FIX O-10).
+
+    «بی‌تاریخ» = تاریخی که مبدل مرکزی نمی‌تواند پارس کند (خالی/NULL/نامعتبر). این ردیف‌ها به
+    هیچ بازهٔ ماه/سالی نسبت داده نمی‌شوند، پس عمداً در جمع‌های بازه‌دار (وصولی/سود) نمی‌آیند
+    (سیاست E1: هیچ ردیفی بی‌صدا حذف نمی‌شود)؛ این شمارنده فقط آن‌ها را آشکار می‌کند.
+    """
+    query = db.query(models.Transaction.amount, models.Transaction.date).filter(
+        models.Transaction.type == "deposit",
+        models.Transaction.amount > 0,
+        models.Transaction.is_deleted == False,
+        models.Transaction.is_reversed == False
+    )
+    if target_wallet is not None:
+        query = query.filter(models.Transaction.target_wallet == target_wallet)
+    if branch_id is not None:
+        query = query.filter(models.Transaction.branch_id == branch_id)
+    if course_ids is not None:
+        # مثل منطق کارکرد معلم: هم پرداخت‌های همان کلاس‌ها، هم پرداخت‌های عمومی (بدون کلاس)
+        query = query.filter(or_(models.Transaction.course_id.in_(course_ids),
+                                 models.Transaction.course_id.is_(None)))
+    amounts = [int(amount or 0) for amount, date_value in query.all()
+               if _parse_loose(date_value) is None]
+    return len(amounts), sum(amounts)
 
 
 def calculate_total_turnover(db: Session, start_date: str, end_date: str, branch_id: Optional[int] = None) -> int:

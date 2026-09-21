@@ -57,15 +57,23 @@ def calculate_institute_session_revenue(db: Session, start_date: str, end_date: 
     return sum(int(share or 0) for share, date_value in query.all() if _row_date_in_range(date_value, start, end))
 
 
-def calculate_institute_collected_revenue(db: Session, start_date: str, end_date: str, branch_id: Optional[int] = None) -> int:
-    """
-    سود وصول‌شده آموزشگاه: مجموع مبالغ واریزی واقعی دانش‌آموزان به حساب آموزشگاه (deposit)
-    فیلتر استاندارد: is_deleted==False و is_reversed==False
-    FIX H3-B3: تاریخ‌ها با مبدل مرکزی parse و در پایتون فیلتر می‌شوند (ستون دو تقویمه).
+def collected_revenue_rows(db: Session, start_date: str, end_date: str,
+                           branch_id: Optional[int] = None, course_id: Optional[int] = None,
+                           include_undated: bool = False):
+    """ردیف‌های خام «وصولی نقدی آموزشگاه» در بازه — منبع یگانهٔ KPI/گزارش/نمودار (FIX O-07/O-08).
+
+    خروجی: فهرست `(amount, date)` با date **خامِ** ذخیره‌شده (ممکن است شمسی، میلادی، با ساعت،
+    یا نامعلوم باشد) تا مصرف‌کننده (نمودار) خودش با مبدل مرکزی قلم زمانی بسازد.
+    فیلترها: `type=="deposit"`، `target_wallet=="institute"`، مبلغ مثبت، حذف/برگشتی نشده،
+    و بازهٔ تاریخ (پارس در پایتون چون ستون دو تقویمه است — H3-B3).
+
+    `include_undated=True` ⇒ ردیف‌های بی‌تاریخ/نامعتبر هم برمی‌گردند (مصرف: نمودار درآمد که
+    آن‌ها را در قلم «بی‌تاریخ» نشان می‌دهد). جمع‌های مالی (KPI/گزارش) عمداً فقط تاریخ‌دارها را
+    می‌شمارند و پول بی‌تاریخ از مسیر شمارندهٔ جدا (O-10) گزارش می‌شود.
     """
     start, end = _parse_report_range(start_date, end_date)
     if start is None:
-        return 0
+        return []
     query = db.query(models.Transaction.amount, models.Transaction.date).filter(
         models.Transaction.target_wallet == "institute",
         models.Transaction.type == "deposit",
@@ -75,7 +83,26 @@ def calculate_institute_collected_revenue(db: Session, start_date: str, end_date
     )
     if branch_id is not None:
         query = query.filter(models.Transaction.branch_id == branch_id)
-    return sum(int(amount or 0) for amount, date_value in query.all() if _row_date_in_range(date_value, start, end))
+    if course_id is not None:
+        query = query.filter(models.Transaction.course_id == course_id)
+    rows = query.all()
+    if include_undated:
+        return [(int(amount or 0), date_value) for amount, date_value in rows
+                if _row_date_in_range(date_value, start, end)
+                or _parse_loose(date_value) is None]
+    return [(int(amount or 0), date_value) for amount, date_value in rows
+            if _row_date_in_range(date_value, start, end)]
+
+
+def calculate_institute_collected_revenue(db: Session, start_date: str, end_date: str, branch_id: Optional[int] = None) -> int:
+    """
+    سود وصول‌شده آموزشگاه: مجموع مبالغ واریزی واقعی دانش‌آموزان به حساب آموزشگاه (deposit)
+    فیلتر استاندارد: is_deleted==False و is_reversed==False
+    FIX H3-B3: تاریخ‌ها با مبدل مرکزی parse و در پایتون فیلتر می‌شوند (ستون دو تقویمه).
+    FIX O-07: بدنه به helper مشترک `collected_revenue_rows` منتقل شد تا نمودار درآمد هم
+    دقیقاً همان ردیف‌ها را ببیند (جمع ستون‌های نمودار == همین عدد).
+    """
+    return sum(amount for amount, _ in collected_revenue_rows(db, start_date, end_date, branch_id))
 
 
 def calculate_total_turnover(db: Session, start_date: str, end_date: str, branch_id: Optional[int] = None) -> int:

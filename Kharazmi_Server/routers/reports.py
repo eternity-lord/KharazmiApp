@@ -27,10 +27,72 @@ router = APIRouter()
 from financial_calculations import (
     calculate_institute_session_revenue,
     calculate_institute_collected_revenue,
+    collected_revenue_rows,
     calculate_total_turnover,
     calculate_teacher_session_revenue,
     calculate_teacher_collected_revenue
 )
+from today_summary import jalali_date_string  # FIX O-07: برچسب قلم‌های زمانی نمودار، شمسی
+
+
+def _income_chart_buckets(rows, start_day, end_day):
+    """قلم‌های زمانی نمودار وصولی (FIX O-07).
+
+    • بازهٔ ≤ ۳۱ روز ⇒ قلم **روزانه** با برچسب تاریخ شمسی («1405/06/30»)
+    • بازهٔ بلندتر ⇒ قلم **ماهانهٔ شمسی** با برچسب «1405/06»
+    • بی‌تاریخ‌ها قلم زمانی ندارند ⇒ در نمودار نمی‌آیند (ولی در گزارش‌ها می‌مانند — فیکس A3)
+    • همیشه حداقل یک قلم برمی‌گردد (روی برنامهٔ اندروید `setupBarChart` دادهٔ خالی = نمودار خالی؛
+      یک قلم صفر ایمن‌تر و صادقانه‌تر است: «امروز: صفر»)
+    قرارداد خروجی برای Kotlin (`IncomeData(day:String, amount:Float)`): `{"day": str, "amount": int}`.
+    """
+    # FIX(A3) روی نمودار: ردیف بی‌تاریخ/نامعتبر حذف نمی‌شود و تاریخ جعلی هم نمی‌گیرد؛
+    # در قلم آخر با برچسب «بی‌تاریخ» می‌آید تا پول واقعیِ بی‌تاریخ از چشم مدیر نیفتد.
+    dated_rows, undated_total = [], 0
+    for amount, raw in rows:
+        parsed_day = _parsed_project_date(raw)
+        if parsed_day is None:
+            undated_total += amount
+        else:
+            dated_rows.append((parsed_day, amount))
+    parsed = dated_rows
+
+    window_start, window_end = start_day, end_day
+    if window_start is None or window_end is None:
+        # بازهٔ نامشخص ⇒ پیش‌فرض «۳۰ روز اخیر» (همان فیلتر پیش‌فرض ChartActivity: «ماه اخیر»)
+        # تا قلم‌بندی قطعی باشد و اسکن بی‌بازه/بی‌پایان رخ ندهد.
+        _today = datetime.date.today()
+        window_start = window_start if window_start is not None else _today - datetime.timedelta(days=29)
+        window_end = window_end if window_end is not None else _today
+    if window_end < window_start:
+        window_start, window_end = window_end, window_start
+
+    span_days = (window_end - window_start).days + 1
+    if span_days <= 31:
+        labels = [jalali_date_string(window_start + datetime.timedelta(days=offset))
+                  for offset in range(span_days)]
+        key_of = lambda day: jalali_date_string(day)  # noqa: E731
+    else:
+        start_key = jalali_date_string(window_start)[:7]
+        end_key = jalali_date_string(window_end)[:7]
+        labels = []
+        year, month = int(start_key[:4]), int(start_key[5:7])
+        end_year, end_month = int(end_key[:4]), int(end_key[5:7])
+        while (year, month) <= (end_year, end_month):
+            labels.append(f"{year:04d}/{month:02d}")
+            month += 1
+            if month == 13:
+                year, month = year + 1, 1
+        key_of = lambda day: jalali_date_string(day)[:7]  # noqa: E731
+
+    index = {label: position for position, label in enumerate(labels)}
+    buckets = [{"day": label, "amount": 0} for label in labels]
+    for day, amount in parsed:
+        position = index.get(key_of(day))
+        if position is not None:
+            buckets[position]["amount"] += amount
+    if undated_total:
+        buckets.append({"day": "بی‌تاریخ", "amount": undated_total})
+    return buckets
 
 def get_user_branch_filter(db: Session, authorization: Optional[str], branch_id: Optional[int]) -> Optional[int]:
     # FIX: JWT-aware + teacher_id handling
@@ -114,22 +176,18 @@ def get_chart_data(
     def _in_range(value):  # سازگاری با فراخوانی‌های همین تابع
         return _date_in_range(value, start_day, end_day)
 
-    # 1. Income Chart (existing + filters)
-    # FIX: Bug 12 - exclude archived Transaction rows from this active view.
-    q_income = db.query(Transaction).filter(Transaction.is_deleted == False, Transaction.is_reversed == False)
-    if class_id:
-        q_income = q_income.filter(Transaction.course_id == class_id)
-
-    incomes = [t for t in q_income.all() if _in_range(t.date)]
-    total_income = sum(t.amount for t in incomes)
-
-    income_data = [
-        {"day": "شنبه", "amount": total_income // 5},
-        {"day": "یکشنبه", "amount": total_income // 4},
-        {"day": "دوشنبه", "amount": total_income // 3},
-        {"day": "سه‌شنبه", "amount": total_income // 2},
-        {"day": "چهارشنبه", "amount": total_income},
-    ]
+    # 1. Income Chart — FIX O-07: پیش‌تر ۵ میلهٔ **ساختگی** بود (کل مبلغ تقسیم بر ۵/۴/۳/۲ با
+    # برچسب روزهای هفته) ⇒ جمع ستون‌ها ۲٫۲۸ برابر «درآمد» می‌شد و هیچ روز/ماهی از دادهٔ واقعی
+    # نمی‌آمد. حالا همان تعریف واحد وصولی (O-08) در قلم‌های زمانی واقعی.
+    # FIX: Bug 12 - ردیف‌های آرشیوشده/برگشتی در این نمای فعال نمی‌آیند (داخل helper).
+    _chart_today = datetime.date.today()
+    _chart_start = start_day if start_day is not None else _chart_today - datetime.timedelta(days=29)
+    _chart_end = end_day if end_day is not None else _chart_today
+    if _chart_end < _chart_start:
+        _chart_start, _chart_end = _chart_end, _chart_start
+    _income_rows = collected_revenue_rows(db, _chart_start.isoformat(), _chart_end.isoformat(),
+                                          course_id=class_id, include_undated=True)
+    income_data = _income_chart_buckets(_income_rows, _chart_start, _chart_end)
 
     # 2. Student Chart (existing)
     boys = db.query(Student).filter(Student.gender == "آقا").count()

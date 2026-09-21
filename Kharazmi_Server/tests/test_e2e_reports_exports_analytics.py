@@ -266,26 +266,25 @@ class TestExports(ReportWorld):
 
 
 class TestAnalyticsAuditAndKpis(ReportWorld):
-    def test_12_chart_data_income_chart_is_fabricated_bug(self):
-        """🐞 باگ (گزارش/تحلیل — دادهٔ ساختگی):
+    def test_12_chart_data_income_chart_is_real_cash_collection(self):
+        """O-07 (رفع شد): نمودار درآمد = وصولی نقدی واقعی در قلم‌های زمانی، نه تقسیم ساختگی.
 
-        `routers/reports.py:127-133` نمودار درآمد را با تقسیم‌های دلبخواه می‌سازد:
-            [total//5, total//4, total//3, total//2, total]
-        یعنی «درآمد هر روز هفته» هیچ‌ربطی به تراکنش‌های واقعی ندارد و جمعش ≈ ۲.۲۸ برابر درآمد واقعی است.
-        این تست رفتار فعلی را قفل می‌کند (انتظار درست: جمع = درآمد واقعی یا حذف نمودار).
+        پیش‌تر `reports.py:127-133` میله‌ها را `[total//5, total//4, total//3, total//2, total]`
+        می‌ساخت («درآمد هر روز هفته» بی‌ربط به داده) و «درآمد» را هم جمع علامت‌دارِ همهٔ
+        تراکنش‌ها می‌گرفت (۵۰۰٬۰۰۰ + ۲۵۰٬۰۰۰ − ۲۰۰٬۰۰۰ = ۵۵۰٬۰۰۰).
+        اکنون: برچسب‌ها قلم زمانی واقعی‌اند و عدد = وصولی نقدی مؤسسه.
         """
-        resp = self.client.get("/reports/chart-data", headers=hdr("tok-admin"))
-        self.assertEqual(resp.status_code, 200, resp.text)
-        chart = resp.json()["income_chart"]
-        amounts = [d["amount"] for d in chart]
-        # «درآمد» = جمع *همهٔ* تراکنش‌ها بدون فیلتر نوع/کیف پول:
-        # ۵۰۰٬۰۰۰ + ۲۵۰٬۰۰۰ (پرداخت‌ها) − ۲۰۰٬۰۰۰ (شارژ جلسه) = ۵۵۰٬۰۰۰
-        self.assertEqual(amounts, [110000, 137500, 183333, 275000, 550000],
-                         "❗ الگوی ساختگی: total//5 / //4 / //3 / //2 / total")
-        self.assertGreater(sum(amounts), 2 * 550000,
-                           "❗ جمع نمودار بیش از دو برابر «درآمد» است")
-        self.assertEqual(amounts[-1], 550000,
-                         "❗ شارژ منفی جلسه هم به‌عنوان «درآمد» جمع شده است")
+        chart = self.client.get("/reports/chart-data", headers=hdr("tok-admin")).json()["income_chart"]
+        labels = [b["day"] for b in chart]
+        dated = [b for b in chart if b["day"] != "بی‌تاریخ"]
+        self.assertEqual(len(dated), 30, "بدون بازه، پیش‌فرض «۳۰ روز اخیر» است (مثل فیلتر ماه اخیر اپ)")
+        self.assertEqual(dated[-1]["day"], jalali_today(), "آخرین قلم زمانی باید امروز باشد")
+        self.assertEqual(dated[-1]["amount"], 500000, "امروز: فقط واریزی ۵۰۰٬۰۰۰ آموزشگاه")
+        self.assertEqual(chart[-1], {"day": "بی‌تاریخ", "amount": 250000},
+                         "واریزی بی‌تاریخ در قلم خودش دیده می‌شود (تصمیم E1) و شارژ منفی جلسه نمی‌آید")
+        for bucket in chart:
+            self.assertEqual(set(bucket), {"day", "amount"}, "قرارداد Kotlin دست‌نخورده")
+        self.assertNotIn("شنبه", labels, "میله‌های ساختگی روزهای هفته حذف شده‌اند")
 
     def test_13_shares_chart_is_admin_only(self):
         admin = self.client.get("/reports/chart-data", headers=hdr("tok-admin")).json()

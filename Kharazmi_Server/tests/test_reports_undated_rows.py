@@ -15,6 +15,13 @@
 # می‌کند؛ ردیف بی‌تاریخ/نامعتبر حذف نمی‌شود و تاریخش در API کنترل‌شده `""` است (بدون null و
 # بدون تاریخ جعلی) چون کلاینت اندروید مدل `String` غیر-null دارد.
 #
+# ⚠ به‌روزرسانی آگاهانه (O-07): «درآمد» نمودار از جمع علامت‌دار همهٔ تراکنش‌ها به **وصولی نقدی
+# آموزشگاه** تغییر کرد و قلم‌های نمودار، زمانی شدند. ردیف بی‌تاریخ هم مثل قبل حذف نمی‌شود،
+# ولی چون قلم زمانی ندارد در یک قلم جدا با برچسب «بی‌تاریخ» (آخرین ستون) نمایش داده می‌شود —
+# نه با تاریخ جعلی و نه مخلوط در یک میلهٔ روزانه. جمع‌های مالیِ بازه‌دار (KPI «درآمد امروز» و
+# `calculate_institute_collected_revenue`) عمداً فقط ردیف‌های تاریخ‌دار را می‌شمارند و پول
+# بی‌تاریخ از مسیر شمارندهٔ اختصاصی خودش (O-10) گزارش می‌شود.
+#
 # اجرا (از ریشهٔ ریپو — روش مستند پروژه):
 #   DATABASE_URL=sqlite:////tmp/a3_reports.db JWT_SECRET_KEY=<hex> \
 #     python3 -m pytest Kharazmi_Server/test_reports_undated_rows.py -q
@@ -85,10 +92,14 @@ class ReportsUndatedWorld(unittest.TestCase):
 
     # ---------------- کارخانه‌ی داده ----------------
     def add_transaction(self, date_value, amount=100000, share_teacher=40000, share_institute=60000,
-                        ttype="tuition", branch_id=1, is_deleted=False, is_reversed=False):
+                        ttype="deposit", wallet="institute", branch_id=1, is_deleted=False,
+                        is_reversed=False):
+        # O-07: نوع/کیف پیش‌فرض «deposit/institute» است چون این فایل موضوعش «درآمد» است و تعریف
+        # درآمد = وصولی نقدی آموزشگاه؛ (پیش‌تر `tuition` بود چون نمودار همهٔ نوع‌ها را جمع می‌کرد).
         self._txn_id += 1
         t = models.Transaction(id=self._txn_id, student_id=1, course_id=1, branch_id=branch_id,
                                enrollment_id=None, amount=amount, type=ttype, date=date_value,
+                               target_wallet=wallet,
                                description="تست", share_teacher=share_teacher,
                                share_institute=share_institute,
                                is_deleted=is_deleted, is_reversed=is_reversed)
@@ -123,36 +134,61 @@ class ReportsUndatedWorld(unittest.TestCase):
 
     @staticmethod
     def total_income(chart_body):
-        return chart_body["income_chart"][-1]["amount"]  # آخرین میله = کل درآمد
+        """جمع قلم‌های **تاریخ‌دار** نمودار (هم‌ارز `calculate_institute_collected_revenue`).
+
+        O-07: پیش‌تر «آخرین میله = کل درآمد» بود؛ حالا میله‌ها واقعی‌اند و ردیف بی‌تاریخ در
+        قلم جداگانهٔ «بی‌تاریخ» می‌آید، پس جدا حساب می‌شود.
+        """
+        return sum(row["amount"] for row in chart_body["income_chart"] if row["day"] != "بی‌تاریخ")
+
+    @staticmethod
+    def undated_income(chart_body):
+        for row in chart_body["income_chart"]:
+            if row["day"] == "بی‌تاریخ":
+                return row["amount"]
+        return 0
 
 
 class TestChartDataUndatedRows(ReportsUndatedWorld):
     def test_valid_dated_transaction_behaves_as_before(self):
         self.add_transaction(VALID_DAY, amount=100000)
-        self.assertEqual(self.total_income(self.chart()), 100000)
+        body = self.chart()
+        self.assertEqual(self.total_income(body), 100000)
+        self.assertEqual(self.undated_income(body), 0, "بدون ردیف بی‌تاریخ، قلم «بی‌تاریخ» ساخته نمی‌شود")
+        self.assertEqual([row["day"] for row in body["income_chart"]][-1].count("/"), 2,
+                         "آخرین قلم، برچسب تاریخ شمسی است")
 
-    def test_undated_transaction_is_counted(self):
+    def test_undated_transaction_is_still_counted_in_its_own_bucket(self):
         self.add_transaction(None, amount=250000)
         body = self.chart()
-        self.assertEqual(self.total_income(body), 250000,
-                         "تراکنش بدون تاریخ نباید از جمع درآمد حذف شود")
+        self.assertEqual(self.undated_income(body), 250000,
+                         "تراکنش بدون تاریخ نباید از نمودار حذف شود (تصمیم E1)")
+        self.assertEqual(self.total_income(body), 0,
+                         "و نباید در قلم روزانهٔ ساختگی جمع شود")
 
     def test_mixed_valid_and_undated_total(self):
         self.add_transaction(VALID_DAY, amount=100000)
         self.add_transaction(None, amount=250000)
         self.add_transaction("1405/06/05", amount=50000)
-        self.assertEqual(self.total_income(self.chart()), 400000)
+        body = self.chart()
+        self.assertEqual(self.total_income(body), 150000, "جمع قلم‌های تاریخ‌دار")
+        self.assertEqual(self.undated_income(body), 250000, "پول بی‌تاریخ جدا ولی دیده‌شدنی")
 
     def test_invalid_non_null_date_is_counted_without_fake_value(self):
         self.add_transaction("999/99/99", amount=70000)
-        self.assertEqual(self.total_income(self.chart()), 70000)
+        body = self.chart()
+        self.assertEqual(self.undated_income(body), 70000)
+        self.assertNotIn("999/99/99", [row["day"] for row in body["income_chart"]],
+                         "تاریخ نامعتبر نباید به‌عنوان برچسب زمانی بیاید")
 
     def test_range_filter_limits_only_dated_rows(self):
         self.add_transaction("1405/06/01", amount=100000)   # قبل از بازه
         self.add_transaction("1405/06/04", amount=200000)   # داخل بازه
         self.add_transaction(None, amount=300000)           # بی‌تاریخ ⇒ می‌ماند (تصمیم E1)
         body = self.chart(start_date="1405/06/03", end_date="1405/06/05")
-        self.assertEqual(self.total_income(body), 500000, "۳۰۰٬۰۰۰ بی‌تاریخ + ۲۰۰٬۰۰۰ داخل بازه")
+        self.assertEqual(self.total_income(body), 200000, "فقط ردیف تاریخ‌دارِ داخل بازه")
+        self.assertEqual(self.undated_income(body), 300000,
+                         "ردیف بی‌تاریخ بیرون از قاعدهٔ بازه می‌ماند (E1)")
 
     def test_attendance_trend_includes_undated_session_with_blank_date(self):
         self.add_session(VALID_DAY)
@@ -167,6 +203,9 @@ class TestChartDataUndatedRows(ReportsUndatedWorld):
         self.add_transaction(None, amount=1000)
         self.add_session(None)
         body = self.chart()
+        for row in body["income_chart"]:
+            self.assertNotIn(None, row.values(), row)
+            self.assertIsInstance(row["day"], str, row)
         for row in body["attendance_trend"]:
             self.assertNotIn(None, row.values(), row)
         self.assertNotIn(None, body["shares_chart"].values() if body["shares_chart"] else {})
@@ -184,6 +223,7 @@ class TestChartDataUndatedRows(ReportsUndatedWorld):
     def test_shares_chart_includes_undated_for_admin(self):
         self.add_transaction(VALID_DAY, share_teacher=40000, share_institute=60000)
         self.add_transaction(None, share_teacher=10000, share_institute=20000)
+        # شاخص سهم‌ها جدولِ جداگانه است و مثل قبل ردیف بی‌تاریخ را هم می‌بیند (O-07 فقط نمودار درآمد را عوض کرد).
         shares = self.chart(token="tok-global")["shares_chart"]
         self.assertEqual(shares, {"teacher": 50000, "institute": 80000})
 
@@ -197,15 +237,23 @@ class TestChartDataUndatedRows(ReportsUndatedWorld):
         body = self.chart()
         self.assertEqual(set(body.keys()), {"income_chart", "student_chart", "attendance_trend",
                                            "shares_chart"})
-        self.assertEqual(len(body["income_chart"]), 5)
-        self.assertEqual([row["day"] for row in body["income_chart"]][-1], "چهارشنبه")
+        self.assertGreater(len(body["income_chart"]), 0, "نمودار هرگز خالی برنمی‌گردد")
+        for row in body["income_chart"]:
+            self.assertEqual(set(row), {"day", "amount"}, row)
+            self.assertIsInstance(row["day"], str, row)
+            self.assertIsInstance(row["amount"], (int, float), row)
+        self.assertNotIn("چهارشنبه", [row["day"] for row in body["income_chart"]],
+                         "میله‌های ساختگی روزهای هفته باید حذف شده باشند (O-07)")
 
     def test_archived_and_reversed_transactions_stay_excluded(self):
         self.add_transaction(VALID_DAY, amount=100000)
         self.add_transaction(None, amount=999000, is_deleted=True)
         self.add_transaction(None, amount=888000, is_reversed=True)
-        self.assertEqual(self.total_income(self.chart()), 100000,
-                         "ردیف آرشیوشده/برگشتی در هر حالتی نباید وارد گزارش شود")
+        body = self.chart()
+        self.assertEqual(self.total_income(body), 100000,
+                         "ردیف آرشیوشده/برگشتی در هیچ قلمی نباید وارد شود")
+        self.assertEqual(self.undated_income(body), 0,
+                         "ردیف بی‌تاریخِ آرشیوشده/برگشتی هم نباید در قلم «بی‌تاریخ» بیاید")
 
     def test_permissions_unchanged(self):
         self.assertEqual(self.client.get("/reports/chart-data").status_code, 401)

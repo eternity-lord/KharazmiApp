@@ -924,7 +924,7 @@
     <string name="chart_att_empty">دیتای حضور و غیاب کافی برای این بازه یافت نشد</string>
     <string name="chart_money_empty">دیتای مالی کافی برای تفکیک سهم‌ها در این بازه یافت نشد</string>
     <string name="chart_stats_error">خطا در دریافت اطلاعات آمار</string>
-    <string name="chart_ds_income">درآمد کل بازه (تومان)</string>
+    <string name="chart_ds_income">وصولی نقدی بازه (تومان)</string>
     <string name="chart_pie_all">کل دانش‌آموزان</string>
     <string name="chart_line_att">درصد حضور در کلاس</string>
     <string name="chart_pie_teacher">سهم معلم</string>

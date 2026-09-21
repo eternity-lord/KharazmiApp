@@ -16,6 +16,7 @@
 #   python3 -m pytest Kharazmi_Server/test_class_restore_metadata.py -q
 import datetime
 import json
+import os
 import unittest
 
 from fastapi.testclient import TestClient
@@ -332,6 +333,40 @@ class TestClassRestoreMetadata(unittest.TestCase):
         self.assertEqual((row.is_deleted, row.title), before)
         self.assertEqual(self._financial_fingerprint(), before_finance)
         self.assertEqual(self.db.query(ClassRestoreLog).count(), 0)
+
+    # ------------------------------------------------------------------
+    # O-13 — نمایش هشدارهای بازیابی در اپ ادمین (گارد static؛ اپ اندروید در سندباکس کامپایل نمی‌شود)
+    # ------------------------------------------------------------------
+    def test_13_android_client_surfaces_restore_warnings(self):
+        """سرور `warnings` را برمی‌گرداند (test_12b)، ولی اپ ادمین فقط `message` را Toast می‌کرد
+        ⇒ هشدار مهم (مثلاً «کلاس بدون معلم فعال برمی‌گردد») به مدیر نمی‌رسید.
+
+        چون اپ اندروید در این سندباکس کامپایل/اجرا نمی‌شود، قرارداد با اسکن متنی کد کاتلین قفل
+        می‌شود: مدل پاسخ باید `warnings` را بگیرد و مسیر بازیابی باید آن را در یک دیالوگ نشان دهد.
+        """
+        repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        java_dir = os.path.join(repo_root, "KharazmiAdmin", "app", "src", "main", "java",
+                                "com", "example", "kharazmiadmin")
+        self.assertTrue(os.path.isdir(java_dir), f"مسیر کد اندروید پیدا نشد: {java_dir}")
+
+        with open(os.path.join(java_dir, "AppModels.kt"), encoding="utf-8") as handle:
+            models_src = handle.read()
+        with open(os.path.join(java_dir, "MainActivity.kt"), encoding="utf-8") as handle:
+            main_src = handle.read()
+
+        # ۱) مدل پاسخ بازیابی، فیلد warnings را از JSON می‌گیرد (nullable/default ⇒ سازگار با سرور قدیمی)
+        self.assertRegex(
+            models_src,
+            r'@SerializedName\("warnings"\)\s*val\s+warnings\s*:\s*List<String>\?\s*=\s*null',
+            "ClassRestoreResponse باید فیلد warnings داشته باشد",
+        )
+
+        # ۲) مسیر بازیابی کلاس، warnings را می‌خواند و در دیالوگ به مدیر نشان می‌دهد
+        restore_fn = main_src[main_src.index("private fun restoreArchivedClass") :]
+        self.assertIn("warnings", restore_fn, "مسیر بازیابی باید warnings را بخواند")
+        self.assertIn("AlertDialog", restore_fn,
+                      "warnings باید در یک دیالوگ ساده نشان داده شود، نه فقط Toast پیام موفقیت")
+
 
 
 if __name__ == "__main__":

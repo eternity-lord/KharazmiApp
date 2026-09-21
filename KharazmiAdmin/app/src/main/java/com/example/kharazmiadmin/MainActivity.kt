@@ -740,9 +740,20 @@ class MainActivity : BaseActivity() {
             try {
                 val result = api.restoreArchivedClass(courseId, ClassRestoreRequest())
                 withContext(Dispatchers.Main) {
-                    val msg = result.message?.takeIf { it.isNotBlank() }
-                        ?: getString(R.string.main_trash_restore_ok)
-                    Toast.makeText(this@MainActivity, msg, Toast.LENGTH_LONG).show()
+                    // O-13: هشدارهای سرور (مثل «معلم این کلاس آرشیو شده است؛ کلاس بدون معلم فعال
+                    // برمی‌گردد») قبلاً نادیده گرفته می‌شد و مدیر فقط Toast موفقیت می‌دید.
+                    val warnings = result.warnings.orEmpty().filter { it.isNotBlank() }
+                    if (warnings.isNotEmpty()) {
+                        AlertDialog.Builder(this@MainActivity)
+                            .setTitle(R.string.main_trash_restore_warnings_title)
+                            .setMessage(warnings.joinToString("\n\n") { "• $it" })
+                            .setPositiveButton(R.string.common_ok, null)
+                            .show()
+                    } else {
+                        val msg = result.message?.takeIf { it.isNotBlank() }
+                            ?: getString(R.string.main_trash_restore_ok)
+                        Toast.makeText(this@MainActivity, msg, Toast.LENGTH_LONG).show()
+                    }
                 }
             } catch (e: Exception) {
                 // FIX: Bug 19 - cancellation is not a network/UI error.

@@ -183,7 +183,10 @@ data class ClassRestoreResponse(
     @SerializedName("title") val title: String? = null,
     @SerializedName("mode") val mode: String? = null,
     @SerializedName("finances_untouched") val financesUntouched: Boolean = false,
-    @SerializedName("note") val note: String? = null
+    @SerializedName("note") val note: String? = null,
+    // O-13: هشدارهای سرور دربارهٔ بازیابی (مثلاً «معلم این کلاس آرشیو شده است») — nullable و
+    // با default تا با سرور قدیمی هم سازگار باشد.
+    @SerializedName("warnings") val warnings: List<String>? = null
 )
 
 // ==========================================

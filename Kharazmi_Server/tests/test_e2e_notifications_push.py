@@ -256,6 +256,44 @@ class TestPushDelivery(NotificationWorld):
         self.assertGreaterEqual(self.db.query(models.SmsLog).count(), 1,
                                 "یادآوری مالی باید پیامک هم بسازد")
 
+    def test_11_push_status_endpoint_tells_admin_whether_push_can_work(self):
+        """O-15: مدیر باید از خود API بفهمد «چرا Push نمی‌رسد» — بدون دست‌زدن به کلید.
+
+        قرارداد `GET /dashboard/push_status` (ادمین‌فقط):
+            {"fcm_configured": bool, "device_token_count": int}
+        نکتهٔ امنیتی: خودِ کلید FCM هرگز در پاسخ نمی‌آید؛ فقط «تنظیم است / نیست».
+        """
+        self.db.add_all([
+            models.DeviceToken(id=1, user_id=201, role="student", token="dev-1"),
+            models.DeviceToken(id=2, user_id=51, role="teacher", token="dev-2"),
+        ])
+        self.db.commit()
+
+        # ۱) بدون اعتبارنامه: باید صریحاً False بدهد و تعداد واقعی توکن‌های ثبت‌شده را بگوید
+        resp = self.client.get("/dashboard/push_status", headers=hdr("tok-admin"))
+        self.assertEqual(resp.status_code, 200, resp.text)
+        self.assertEqual(resp.json(), {"fcm_configured": False, "device_token_count": 2})
+
+        # ۲) با اعتبارنامه: فقط «تنظیم است» گزارش می‌شود و کلید لو نمی‌رود
+        secret = "AAA:super-secret-fcm-key"
+        os.environ["FCM_SERVER_KEY"] = secret
+        try:
+            configured = self.client.get("/dashboard/push_status", headers=hdr("tok-admin"))
+        finally:
+            os.environ.pop("FCM_SERVER_KEY", None)
+        self.assertEqual(configured.status_code, 200, configured.text)
+        self.assertTrue(configured.json()["fcm_configured"])
+        self.assertNotIn(secret, configured.text, "کلید FCM نباید در پاسخ بیاید")
+
+        # ۳) ادمین‌فقط: منشی/معلم/شاگرد ⇒ ۴۰۳ · بدون توکن ⇒ ۴۰۱
+        # نکته: ۴۰۳ برای نقش غیرادمین با سشن معتبر (منشی/شاگرد) و ۴۰۱ وقتی سشن/کاربر معتبر نیست
+        # (در این دنیای آزمایشی سشن معلم به کاربر بدون رکورد User وصل است ⇒ بی‌اعتبار).
+        for tok in ("tok-secretary", "tok-teacher", "tok-student"):
+            status = self.client.get("/dashboard/push_status", headers=hdr(tok)).status_code
+            self.assertIn(status, (401, 403), f"{tok} نباید وضعیت Push را ببیند (status={status})")
+        self.assertEqual(self.client.get("/dashboard/push_status").status_code, 401)
+
+
 
 if __name__ == "__main__":
     unittest.main()

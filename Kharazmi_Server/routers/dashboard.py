@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from models import Installment, Student
+from models import DeviceToken, Installment, Student
 from dependencies import get_db, check_admin_access
 from today_summary import jalali_date_string
 # FIX O-08: تعریف واحد «وصولی نقدی» از لایهٔ محاسبات مالی — همان تابعی که گزارش‌ها می‌خوانند.
@@ -31,6 +31,13 @@ def _clear_dashboard_cache():
     """For tests: clear in-memory TTL cache."""
     _dashboard_cache.clear()
 
+
+
+class PushStatus(BaseModel):
+    """وضعیت لایهٔ Push — O-15. فقط «تنظیم است یا نه»؛ هرگز خودِ کلید."""
+
+    fcm_configured: bool
+    device_token_count: int
 
 
 class DashboardKPIs(BaseModel):
@@ -136,3 +143,22 @@ def get_dashboard_kpis(
     # Cache result
     _dashboard_cache[cache_key] = (kpis, now_ts)
     return kpis
+
+
+@router.get("/push_status", response_model=PushStatus)
+def get_push_status(db: Session = Depends(get_db), _: str = Depends(check_admin_access)):
+    """وضعیت Push برای مدیر (FIX O-15) — عیب‌یابی «چرا هیچ اعلانی به گوشی نمی‌رسد».
+
+    دو پرسشِ واقعیِ مدیر را پاسخ می‌دهد، بدون افشای هیچ رازی:
+      1. آیا اعتبارنامهٔ FCM روی سرور تنظیم شده؟ (`fcm_configured` از گارد محیطی `push_service`)
+      2. چند توکن دستگاه در `device_tokens` ثبت شده؟ (`device_token_count`)
+
+    فقط‌خواندنی و بدون کش: این مقادیر باید «همین حالا» را نشان دهند؛ ضمناً هیچ کلیدی
+    خوانده/نوشته نمی‌شود و مقدار کلید در پاسخ برنمی‌گردد.
+    """
+    from push_service import fcm_configured  # import محلی: جلوگیری از وابستگی حلقه‌ای
+
+    return PushStatus(
+        fcm_configured=bool(fcm_configured()),
+        device_token_count=int(db.query(func.count(DeviceToken.id)).scalar() or 0),
+    )

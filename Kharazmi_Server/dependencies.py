@@ -247,6 +247,61 @@ def check_admin_or_secretary_access(authorization: Optional[str] = Header(None),
         raise HTTPException(status_code=403, detail="شما دسترسی لازم برای این عملیات را ندارید")
     return sub_role
 
+def check_admin_secretary_or_teacher_access(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    """ادمین/منشی/معلم — برای کارهایی که معلم هم باید بتواند در **حوزهٔ خودش** انجام دهد.
+
+    تفاوت با `check_admin_or_secretary_access`: معلم هم عبور می‌کند، ولی خودِ اندپوینت باید
+    مالکیت/شعبه را برای معلم محدود کند (مثلاً فقط کلاس‌های خودش). گیت‌های معلم (تعلیق کل
+    همکاران با `teachers_active`) عیناً مثل `check_user_login` اعمال می‌شود.
+    """
+    if not authorization:
+        raise HTTPException(status_code=401, detail="توکن احراز هویت یافت نشد. لطفاً مجدداً وارد شوید")
+    parts = authorization.split()
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        raise HTTPException(status_code=401, detail="قالب توکن احراز هویت معتبر نیست")
+    token = parts[1]
+    session, _ = get_session_from_token(db, token)
+    if not session:
+        raise HTTPException(status_code=401, detail="توکن معتبر نیست یا منقضی شده است")
+    user = db.query(User).filter(User.id == session.user_id).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="کاربر یافت نشد")
+    # FIX(A1): همان سیاست نقش (fail-closed)
+    sub_role = resolve_effective_sub_role(user)
+    if sub_role not in ("admin", "secretary", "teacher"):
+        raise HTTPException(status_code=403, detail="شما دسترسی لازم برای این عملیات را ندارید")
+    if sub_role == "teacher":
+        settings = db.query(InstituteSettings).first()
+        if settings and not settings.teachers_active:
+            raise HTTPException(status_code=403, detail="فعالیت همکاران محترم موقتاً توسط مدیریت آموزشگاه متوقف شده است. لطفاً بعداً تلاش فرمایید.")
+    return sub_role
+
+
+def resolve_session_teacher(db: Session, authorization: Optional[str]) -> Optional[Teacher]:
+    """پروندهٔ معلمِ همین سشن (O-22) — `None` یعنی این کاربر معلمِ دارای پرونده نیست.
+
+    ترتیب: `UserSession.teacher_id` (استاندارد جدید) وگرنه تطبیق موبایل سایهٔ کاربر.
+    """
+    if not authorization:
+        return None
+    parts = authorization.split()
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        return None
+    session, _ = get_session_from_token(db, parts[1])
+    if not session:
+        return None
+    if getattr(session, "teacher_id", None):
+        teacher = db.query(Teacher).filter(Teacher.id == session.teacher_id,
+                                           Teacher.is_deleted == False).first()
+        if teacher is not None:
+            return teacher
+    user = db.query(User).filter(User.id == session.user_id).first()
+    if not user or user.role != "teacher":
+        return None
+    return db.query(Teacher).filter(Teacher.mobile == user.username,
+                                    Teacher.is_deleted == False).first()
+
+
 def check_user_login(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
     # FIX: use signed token verification
     if not authorization:

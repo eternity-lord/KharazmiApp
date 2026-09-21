@@ -7,7 +7,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from fastapi import Depends
 from main import app
-from dependencies import check_user_login, check_admin_access, check_admin_or_secretary_access
+from dependencies import (check_user_login, check_admin_access, check_admin_or_secretary_access,
+                            check_admin_secretary_or_teacher_access)
 
 from fastapi.params import Depends as DependsClass
 
@@ -59,7 +60,8 @@ def test_enforce_endpoint_security():
             dependencies = getattr(route, "dependencies", [])
             has_explicit_dependency = False
             for dep in dependencies:
-                if dep.dependency in [check_user_login, check_admin_access, check_admin_or_secretary_access] or (hasattr(dep.dependency, "__name__") and dep.dependency.__name__ == "dependency"):
+                if dep.dependency in [check_user_login, check_admin_access, check_admin_or_secretary_access,
+                                                 check_admin_secretary_or_teacher_access] or (hasattr(dep.dependency, "__name__") and dep.dependency.__name__ == "dependency"):
                     has_explicit_dependency = True
                     
             # Check parameters/signature for inline Depends
@@ -69,7 +71,8 @@ def test_enforce_endpoint_security():
                 for param in sig.parameters.values():
                     if param.default is not None and isinstance(param.default, DependsClass):
                         dep_func = param.default.dependency
-                        if dep_func in [check_user_login, check_admin_access, check_admin_or_secretary_access] or (hasattr(dep_func, "__name__") and dep_func.__name__ == "dependency"):
+                        if dep_func in [check_user_login, check_admin_access, check_admin_or_secretary_access,
+                                                 check_admin_secretary_or_teacher_access] or (hasattr(dep_func, "__name__") and dep_func.__name__ == "dependency"):
                             has_explicit_dependency = True
                             break
             

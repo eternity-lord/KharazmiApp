@@ -218,7 +218,7 @@ class TestStudentCreationPaths(BranchWorldBase):
         course = self._course(1, "B1001")
         result = register_and_enroll_student(
             self._register_and_enroll(course_id=course.id),
-            db=self.db, authorization="Bearer tok_sec1", _="secretary"
+            db=self.db, authorization="Bearer tok_sec1", sub_role="secretary"
         )
         student = self.db.query(Student).filter(Student.id == result["id"]).first()
         enrollment = self.db.query(Enrollment).filter(Enrollment.id == result["enrollment_id"]).first()
@@ -230,7 +230,7 @@ class TestStudentCreationPaths(BranchWorldBase):
         with self.assertRaises(HTTPException) as ctx:
             register_and_enroll_student(
                 self._register_and_enroll(course_id=course.id, branch_id=2),
-                db=self.db, authorization="Bearer tok_sec1", _="secretary"
+                db=self.db, authorization="Bearer tok_sec1", sub_role="secretary"
             )
         self.assertEqual(ctx.exception.status_code, 403)
         # داده‌ای ساخته نشده باشد
@@ -241,7 +241,7 @@ class TestStudentCreationPaths(BranchWorldBase):
         course = self._course(2, "B1003")
         result = register_and_enroll_student(
             self._register_and_enroll(course_id=course.id, paid_amount=100000),
-            db=self.db, authorization="Bearer tok_admin", _="admin"
+            db=self.db, authorization="Bearer tok_admin", sub_role="admin"
         )
         student = self.db.query(Student).filter(Student.id == result["id"]).first()
         self.assertEqual(student.branch_id, 2)
@@ -253,7 +253,7 @@ class TestStudentCreationPaths(BranchWorldBase):
         with self.assertRaises(HTTPException) as ctx:
             register_and_enroll_student(
                 self._register_and_enroll(),
-                db=self.db, authorization="Bearer tok_admin", _="admin"
+                db=self.db, authorization="Bearer tok_admin", sub_role="admin"
             )
         self.assertEqual(ctx.exception.status_code, 400)
 
@@ -335,7 +335,7 @@ class TestEnrollmentBranchConsistency(BranchWorldBase):
         data = EnrollmentCreate(student_id=st.id, course_id=course.id, register_date="1405/06/01",
                                 shift="عصر", total_tuition=1000000, paid_amount=0,
                                 payment_method="نقدی", receiver="-")
-        add_enrollment(data, db=self.db, _="admin")
+        add_enrollment(data, db=self.db, sub_role="admin")
         enrollment = self.db.query(Enrollment).filter(Enrollment.student_id == st.id).first()
         self.assertEqual(enrollment.branch_id, 1)
 
@@ -345,7 +345,7 @@ class TestEnrollmentBranchConsistency(BranchWorldBase):
         data = EnrollmentCreate(student_id=st.id, course_id=course.id, register_date="1405/06/01",
                                 shift="عصر", total_tuition=1000000, paid_amount=0,
                                 payment_method="نقدی", receiver="-")
-        add_enrollment(data, db=self.db, _="admin")
+        add_enrollment(data, db=self.db, sub_role="admin")
         enrollment = self.db.query(Enrollment).filter(Enrollment.student_id == st.id).first()
         self.assertEqual(enrollment.branch_id, 2)
 
@@ -355,7 +355,7 @@ class TestEnrollmentBranchConsistency(BranchWorldBase):
         data = EnrollmentCreate(student_id=st.id, course_id=course.id, register_date="1405/06/01",
                                 shift="عصر", total_tuition=1000000, paid_amount=0,
                                 payment_method="نقدی", receiver="-")
-        add_enrollment(data, db=self.db, _="admin")
+        add_enrollment(data, db=self.db, sub_role="admin")
         enrollment = self.db.query(Enrollment).filter(Enrollment.student_id == st.id).first()
         self.assertIsNone(enrollment.branch_id, "دو branch NULL ⇒ حدس کورکورانه ممنوع (guard پایان جلسه پاسخ می‌دهد)")
 
@@ -390,7 +390,7 @@ class TestBranchEndToEnd(BranchWorldBase):
         data = EnrollmentCreate(student_id=student.id, course_id=course.id, register_date="1405/06/01",
                                 shift="عصر", total_tuition=1000000, paid_amount=500000,
                                 payment_method="نقدی", receiver="منشی")
-        add_enrollment(data, db=self.db, _="admin")
+        add_enrollment(data, db=self.db, sub_role="admin")
         enrollment = self.db.query(Enrollment).filter(Enrollment.student_id == student.id).first()
         self.assertEqual(enrollment.branch_id, 1)
 

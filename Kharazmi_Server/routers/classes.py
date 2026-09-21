@@ -19,7 +19,10 @@ from models import (
 from schemas import (
     HistoryRequest, LoginRequest, TeacherInfo, FullTeacherProfile, StudentCreate, TeacherCreate, CourseCreate, EnrollmentCreate, GradeCreate, GradeItem, AttendanceLogRequest, AttendanceItem, AttendanceSubmitData, SmsSendRequest, ChangePasswordRequest, StudentProfileInfo, FullStudentProfile, TeacherProfileInfo, FullTeacherProfile, ClassReportInfo, ClassStudentData, ClassSessionHistory, FullClassReport, ShareConfigModel, StudentUpdate, TeacherUpdate, PersonListItem, TransactionUpdate, StudentAttendanceHistoryRequest, AdvancedSearchItem, FinanceSubmitData, PrintReceiptRequest, TransactionTestData
 )
-from dependencies import get_db, check_admin_access, check_admin_or_secretary_access, check_user_login, get_enrollment_tuition_and_discount, SESSION_EXPIRY_DAYS, display_name, safe_person_name
+from dependencies import (get_db, check_admin_access, check_admin_or_secretary_access,
+                            check_admin_secretary_or_teacher_access, resolve_session_teacher,
+                            check_user_login, get_enrollment_tuition_and_discount,
+                            SESSION_EXPIRY_DAYS, display_name, safe_person_name)
 
 # FIX: Bug 16 - share the tuition-minus-payment debt calculation across financial views.
 from financial_calculations import calculate_student_debt, calculate_enrollment_debt, MAX_TEACHER_SESSION_PRICE
@@ -371,7 +374,15 @@ def suspend_class_admin(course_id: int, db: Session = Depends(get_db), _: str = 
 
 
 @router.post("/enrollments/add")
-def add_enrollment(data: EnrollmentCreate, db: Session = Depends(get_db), _: str = Depends(check_admin_or_secretary_access)):
+def add_enrollment(
+    data: EnrollmentCreate,
+    db: Session = Depends(get_db),
+    sub_role: str = Depends(check_admin_secretary_or_teacher_access),
+    authorization: Optional[str] = Header(None),
+):
+    # FIX O-22: معلم هم می‌تواند برای **کلاس خودش** دانش‌آموز اضافه کند (قبلاً ۴۰۳ می‌گرفت و کلاس
+    # تازه‌ساخته‌اش خالی می‌ماند). دامنهٔ معلم دو خط پایین‌تر روی همان کلاس قفل می‌شود؛ منطق
+    # مالی هیچ تغییری ندارد.
     # اعتبارسنجی وجود دانش‌آموز و کلاس (جلوگیری از رکورد یتیم)
     student = db.query(Student).filter(Student.id == data.student_id, Student.is_deleted == False).first()
     if not student:
@@ -383,6 +394,14 @@ def add_enrollment(data: EnrollmentCreate, db: Session = Depends(get_db), _: str
     course = db.query(Course).filter(Course.id == data.course_id, Course.is_deleted == False).first()
     if not course:
         raise HTTPException(status_code=404, detail="کلاس مورد نظر یافت نشد")
+    # FIX O-22: معلم فقط در کلاس‌های خودش؛ هر کلاس دیگری (حتی موجود) ⇒ ۴۰۳ بدون هیچ نوشتنی.
+    # ترتیب عمدی: اول ۴۰۴ «ناموجود/آرشیوی» بعد ۴۰۳ «مالِ دیگری» — مثل سیاست H10.
+    if sub_role == "teacher":
+        _teacher = resolve_session_teacher(db, authorization)
+        if _teacher is None:
+            raise HTTPException(status_code=403, detail="پروندهٔ معلم شما یافت نشد؛ با آموزشگاه تماس بگیرید")
+        if course.teacher_id != _teacher.id:
+            raise HTTPException(status_code=403, detail="شما فقط می‌توانید در کلاس‌های خودتان دانش‌آموز ثبت‌نام کنید")
     # FIX H10: ثبت‌نام جدید در کلاس معلق ممنوع.
     if course.is_suspended:
         raise HTTPException(status_code=403, detail="این کلاس در حال حاضر معلق است و ثبت‌نام جدید امکان‌پذیر نیست")

@@ -16,7 +16,13 @@ from schemas import (
     HistoryRequest, LoginRequest, TeacherInfo, FullTeacherProfile, StudentCreate, TeacherCreate, CourseCreate, EnrollmentCreate, GradeCreate, GradeItem, AttendanceLogRequest, AttendanceItem, AttendanceSubmitData, SmsSendRequest, ChangePasswordRequest, StudentProfileInfo, FullStudentProfile, TeacherProfileInfo, FullTeacherProfile, ClassReportInfo, ClassStudentData, ClassSessionHistory, FullClassReport, ShareConfigModel, StudentUpdate, TeacherUpdate, PersonListItem, TransactionUpdate, StudentAttendanceHistoryRequest, AdvancedSearchItem, FinanceSubmitData, PrintReceiptRequest, TransactionTestData, StudentRegisterAndEnrollRequest
 )
 from storage import storage_dir, resolve_existing
-from dependencies import get_db, check_admin_access, check_admin_or_secretary_access, check_user_login, check_student_access, get_enrollment_tuition_and_discount, SESSION_EXPIRY_DAYS, limiter, ensure_student_shadow_users, get_session_student, get_session_parent, normalize_mobile, validate_image_upload, require_permission, resolve_notification_role
+from dependencies import (get_db, check_admin_access, check_admin_or_secretary_access,
+                            check_admin_secretary_or_teacher_access, resolve_session_teacher,
+                            check_user_login, check_student_access,
+                            get_enrollment_tuition_and_discount, SESSION_EXPIRY_DAYS, limiter,
+                            ensure_student_shadow_users, get_session_student, get_session_parent,
+                            normalize_mobile, validate_image_upload, require_permission,
+                            resolve_notification_role)
 # FIX(C6): خواندن واقعی تکالیف/آزمون‌ها/برنامهٔ هفتگی برای پورتال‌ها (بدون کد تکراری).
 from portal_data import build_portal_activity
 
@@ -79,7 +85,9 @@ def register_and_enroll_student(
     req: StudentRegisterAndEnrollRequest, 
     db: Session = Depends(get_db),
     authorization: Optional[str] = Header(None),
-    _: str = Depends(check_admin_or_secretary_access)
+    # FIX O-22: معلم هم می‌تواند دانش‌آموز جدید ثبت کند (و در **کلاس خودش** ثبت‌نام کند)؛
+    # قبلاً این مسیر فقط ادمین/منشی بود و معلم ۴۰۳ می‌گرفت. منطق مالی هیچ تغییری ندارد.
+    sub_role: str = Depends(check_admin_secretary_or_teacher_access)
 ):
     # 1. بررسی صحت کد ملی و عدم تکراری بودن کدملی دانش‌آموز
     if not is_valid_iranian_national_code(req.national_code):
@@ -109,8 +117,10 @@ def register_and_enroll_student(
             _fb_course = db.query(Course).filter(Course.id == req.course_id).first()
             if _fb_course is not None:
                 fallback_branch = _fb_course.branch_id
+        # FIX O-22: برای معلم، پروندهٔ معلم پاس داده می‌شود تا سیاست شعبه دقیقاً «شعبهٔ خودش» باشد.
         branch_id = resolve_creation_branch(
-            db, user=current_user, requested_branch_id=req.branch_id, fallback_branch_id=fallback_branch
+            db, user=current_user, requested_branch_id=req.branch_id, fallback_branch_id=fallback_branch,
+            teacher=(resolve_session_teacher(db, authorization) if sub_role == "teacher" else None),
         )
 
         # 2. ثبت فیزیکی مشخصات دانش‌آموز
@@ -153,6 +163,14 @@ def register_and_enroll_student(
             course = db.query(Course).filter(Course.id == req.course_id).first()
             if not course:
                 raise HTTPException(status_code=404, detail="کلاس مورد نظر یافت نشد")
+            # FIX O-22: معلم فقط برای کلاس‌های خودش؛ کلاس دیگری ⇒ ۴۰۳ پیش از هر نوشتنی
+            # (تراکنش همین‌جا rollback می‌شود ⇒ شاگرد نیمه‌ساخته باقی نمی‌ماند).
+            if sub_role == "teacher":
+                _teacher = resolve_session_teacher(db, authorization)
+                if _teacher is None:
+                    raise HTTPException(status_code=403, detail="پروندهٔ معلم شما یافت نشد؛ با آموزشگاه تماس بگیرید")
+                if course.teacher_id != _teacher.id:
+                    raise HTTPException(status_code=403, detail="شما فقط می‌توانید برای کلاس‌های خودتان دانش‌آموز ثبت کنید")
 
             # شهریه ثبت‌نام واقعی باید مثبت باشد (ثبت بدون کلاس اصلاً وارد این شاخه نمی‌شود)
             if req.total_tuition is None or req.total_tuition <= 0:

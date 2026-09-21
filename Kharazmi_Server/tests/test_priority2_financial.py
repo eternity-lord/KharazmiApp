@@ -375,7 +375,7 @@ def test_cancelled_enrollment_allows_new_registration(ledger):
     old_id = ledger.enrollment.id
     classes.delete_enrollment(old_id, db=ledger.db, _="admin")
     request = EnrollmentCreate(student_id=ledger.student.id, course_id=ledger.course.id, register_date="1405/06/16", shift="عصر", total_tuition=1000, paid_amount=0, payment_method="نقدی", receiver="admin")
-    result = classes.add_enrollment(request, db=ledger.db, _="admin")
+    result = classes.add_enrollment(request, db=ledger.db, sub_role="admin")
     assert result["enrollment_id"] != old_id
     assert ledger.db.get(models.Enrollment, old_id).is_deleted
     assert not ledger.db.get(models.Enrollment, result["enrollment_id"]).is_deleted

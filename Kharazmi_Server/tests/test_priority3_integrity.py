@@ -59,7 +59,7 @@ def test_initial_enrollment_credit_uses_component_and_remains_reversible(ledger)
         register_date="1405/06/15", shift="عصر", total_tuition=100,
         paid_amount=100, payment_method="نقدی", receiver="آموزشگاه",
     )
-    result = classes.add_enrollment(request, db=ledger.db, _="admin")
+    result = classes.add_enrollment(request, db=ledger.db, sub_role="admin")
     enrollment = ledger.db.query(models.Enrollment).filter(models.Enrollment.is_deleted == False).one()
     transaction = ledger.db.query(models.Transaction).one()
     assert (ledger.student.wallet_teacher, ledger.student.wallet_institute, ledger.student.wallet_balance) == (0, 100, 100)

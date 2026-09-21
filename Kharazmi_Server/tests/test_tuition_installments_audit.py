@@ -189,7 +189,7 @@ def add_enrollment(world, course_id=2, total_tuition=1000, paid_amount=0,
         receiver="صندوق", discount_type=discount_type, discount_value=discount_value,
         installments=installments,
     )
-    return classes.add_enrollment(data, db=world.db, _="admin")
+    return classes.add_enrollment(data, db=world.db, sub_role="admin")
 
 
 def pay(world, amount, enrollment_id=1, wallet="institute", method="نقدی"):
@@ -841,7 +841,7 @@ def test_fix_t1_invalid_installment_writes_nothing_at_all(world):
                            receiver="صندوق", discount_type="none", discount_value=0,
                            installments=[sneaky])
     with pytest.raises(HTTPException) as error:
-        classes.add_enrollment(data, db=db, _="admin")
+        classes.add_enrollment(data, db=db, sub_role="admin")
     assert error.value.status_code == 400, "لایه‌ی endpoint مثل اعتبارسنجی‌های همین تابع ⇒ ۴۰۰"
     db.rollback()   # همان کاری که بستن session در get_db انجام می‌دهد (معامله هرگز کامیت نشد)
 

@@ -188,11 +188,11 @@ class TestClassesRouter(unittest.TestCase):
             payment_method="نقد",
             receiver="مدیر",
         )
-        result = add_enrollment(data=enroll_data, db=self.db, _="admin")
+        result = add_enrollment(data=enroll_data, db=self.db, sub_role="admin")
         self.assertIn("enrollment_id", result)
 
         with self.assertRaises(HTTPException) as e:
-            add_enrollment(data=enroll_data, db=self.db, _="admin")
+            add_enrollment(data=enroll_data, db=self.db, sub_role="admin")
         self.assertEqual(e.exception.status_code, 400)
 
     def test_suspend_toggle(self):

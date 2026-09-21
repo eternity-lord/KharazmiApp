@@ -290,7 +290,9 @@
     <string name="attendance_queue_save_failed">❌ اتصال قطع شد و ذخیره محلی هم ناموفق بود؛ اطلاعات این صفحه را نگه دارید و دوباره «ثبت» را بزنید.</string>
     <string name="attendance_already_registered">این جلسه قبلاً ثبت شده است</string>
     <string name="attendance_validation_check">خطای اعتبارسنجی؛ ورودی‌ها را بررسی کنید</string>
-    <string name="attendance_server_error">❌ خطای سرور (%1$d)؛ لطفاً دوباره تلاش کنید.</string>
+    <!-- FIX(build): این پیام تک‌آرگومانی است و کلید جدا لازم دارد؛ قبلاً هم‌نام با پیام دوعملوندی بالا بود
+         و mergeDebugResources با «Found item String/attendance_server_error more than one time» می‌شکست. -->
+    <string name="attendance_server_error_retry">❌ خطای سرور (%1$d)؛ لطفاً دوباره تلاش کنید.</string>
     <string name="attendance_http_fallback">❌ خطای %1$d؛ %2$s</string>
     <string name="attendance_submit_failed">❌ ثبت جلسه ناموفق بود (%1$s)؛ دوباره تلاش کنید.</string>
     <string name="attendance_html_title">فرم حضور و غیاب در آموزشگاه خوارزمی و نیلوفر</string>

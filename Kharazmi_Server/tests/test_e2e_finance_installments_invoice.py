@@ -250,27 +250,28 @@ class TestDashboardsAndReceipts(FinanceWorld):
                                headers=hdr("tok-admin"))
         self.assertEqual(pdf.status_code, 200, pdf.text)
 
-    def test_12_receipt_print_endpoint_crashes_with_500_bug(self):
-        """🐞 باگ (سرور — خطای برنامه‌نویسی):
+    def test_12_receipt_print_endpoint_returns_print_job(self):
+        """O-05 (رفع‌شده): «چاپ حواله» باید ۲۰۰ بدهد و `print_job_id` بسازد.
 
-        `routers/finance.py:602` از `time.time()` استفاده می‌کند اما `time` در فایل **import نشده**
-        است (بالای فایل: io, uuid, os, datetime, html) ⇒ `POST /finance/receipt/print`
-        همیشه با `NameError: name 'time' is not defined` ⇒ **HTTP 500**.
-
-        اثر: دکمهٔ «چاپ حواله» در `InvoiceActivity` هیچ‌وقت کار نمی‌کند.
-        مسیر هم‌خانواده‌اش (`/finance/receipt/pdf`) سالم است ⇒ فقط مسیر print مرده.
+        ریشهٔ باگ: `routers/finance.py:602` از `time.time()` استفاده می‌کرد ولی `time` در فایل
+        import نشده بود ⇒ هر فراخوانی `NameError` و **HTTP 500** می‌شد و دکمهٔ چاپ در
+        `InvoiceActivity` هیچ‌وقت کار نمی‌کرد.
         """
         receipt = self.client.post("/finance/pay", json=pay_payload(90000, "institute"),
                                    headers=hdr("tok-admin")).json()
-        raw = TestClient(app, raise_server_exceptions=False)
-        printing = raw.post("/finance/receipt/print",
-                            json={"transaction_id": receipt["receipt_id"], "print_type": "print"},
-                            headers=hdr("tok-admin"))
-        self.assertEqual(printing.status_code, 500, "❗ رفتار فعلی: چاپ حواله ⇒ خطای ۵۰۰ سرور")
-        pdf = raw.post("/finance/receipt/pdf",
-                       json={"transaction_id": receipt["receipt_id"], "print_type": "pdf"},
-                       headers=hdr("tok-admin"))
-        self.assertEqual(pdf.status_code, 200, "مسیر pdf سالم است (ناسازگاری دو مسیر هم‌خانواده)")
+        printing = self.client.post("/finance/receipt/print",
+                                    json={"transaction_id": receipt["receipt_id"], "print_type": "print"},
+                                    headers=hdr("tok-admin"))
+        self.assertEqual(printing.status_code, 200, printing.text)
+        body = printing.json()
+        self.assertEqual(body["status"], "success")
+        self.assertTrue(body["print_job_id"].startswith("PRINT_"), body["print_job_id"])
+        self.assertIn("receipt_data", body)
+
+        pdf = self.client.post("/finance/receipt/pdf",
+                               json={"transaction_id": receipt["receipt_id"], "print_type": "pdf"},
+                               headers=hdr("tok-admin"))
+        self.assertEqual(pdf.status_code, 200, "مسیر pdf هم‌خانواده باید سالم بماند")
 
     def test_11_student_class_status_matches_enrollment(self):
         self.client.post("/finance/pay", json=pay_payload(100000, "institute"), headers=hdr("tok-admin"))

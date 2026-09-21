@@ -61,6 +61,8 @@
                 >
 
                     <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
                         android:text="وضعیت کلاس:  فعال ✅"
                         android:textAppearance="@style/TextAppearance.Kharazmi.SectionTitle"
                         android:textColor="@color/text_primary"
@@ -68,6 +70,8 @@
                     />
 
                     <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
                         android:id="@+id/tvSessionPrice"
                         android:text="تعرفه هر جلسه: ..."
                         android:textAppearance="@style/TextAppearance.Kharazmi.Body"

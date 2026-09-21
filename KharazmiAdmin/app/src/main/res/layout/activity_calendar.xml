@@ -70,6 +70,8 @@
             </LinearLayout>
 
             <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
                 android:text="رویدادها و برنامه‌های کلاسی من"
                 android:textAppearance="@style/TextAppearance.Kharazmi.SectionTitle"
                 android:textColor="@color/gold_primary"
@@ -122,6 +124,8 @@
                     android:padding="@dimen/spacing_normal">
 
                     <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
                         android:text="➕ تعریف اتاق / کلاس فیزیکی جدید"
                         android:textAppearance="@style/TextAppearance.Kharazmi.SectionTitle"
                         android:textColor="@color/gold_primary"
@@ -179,6 +183,8 @@
             </com.google.android.material.card.MaterialCardView>
 
             <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
                 android:text="اتاق‌ها و کلاس‌های فیزیکی آموزشگاه"
                 android:textAppearance="@style/TextAppearance.Kharazmi.SectionTitle"
                 android:textColor="@color/gold_primary"

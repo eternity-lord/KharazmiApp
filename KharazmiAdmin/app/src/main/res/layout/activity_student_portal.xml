@@ -209,6 +209,8 @@
                             android:layout_marginRight="12dp">
 
                             <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
                                 android:id="@+id/tvStudentName"
                                 android:text="دانش‌آموز: -"
                                 android:textAppearance="@style/TextAppearance.Kharazmi.SectionTitle"
@@ -216,6 +218,8 @@
                                 android:textStyle="bold" />
 
                             <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
                                 android:id="@+id/tvStudentCode"
                                 android:text="کد تحصیلی: -"
                                 android:textAppearance="@style/TextAppearance.Kharazmi.Caption"
@@ -242,6 +246,8 @@
                         android:padding="@dimen/spacing_normal">
 
                         <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
                             android:text="💳 بیلان و وضعیت شهریه من"
                             android:textAppearance="@style/TextAppearance.Kharazmi.SectionTitle"
                             android:textColor="@color/gold_primary"
@@ -270,6 +276,8 @@
 
                 <!-- Section: Accordion items for other student details -->
                 <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
                     android:text="اطلاعات تحصیلی و برنامه ریزی"
                     android:textAppearance="@style/TextAppearance.Kharazmi.SectionTitle"
                     android:textColor="@color/gold_primary"

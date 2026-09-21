@@ -11,6 +11,8 @@ import models
 from models import Student, Enrollment, Course, Grade, Installment, SessionLog, Attendance, SmsLog, ParentOTP, UserSession, User, Notification
 from schemas import ParentOtpRequest, ParentLoginRequest, ChildSelectRequest
 from dependencies import get_db, limiter, normalize_mobile, resolve_notification_role
+# FIX(C6): خواندن واقعی تکالیف/آزمون‌ها/برنامهٔ هفتگی برای پورتال‌ها (بدون کد تکراری).
+from portal_data import build_portal_activity
 from fastapi import Request
 
 # FIX: Bug 16 - share the tuition-minus-payment debt calculation across financial views.
@@ -398,33 +400,17 @@ def get_parent_child_profile(authorization: Optional[str] = Header(None), db: Se
     # FIX: Bug 16 - student/parent financial views must agree with tuition debtor reports.
     total_debt = calculate_student_debt(db, student)
 
-    # و) تکالیف، آزمون‌ها، جلسات پیش‌رو و اعلان‌ها برای ردیف‌های دانش‌آموز (داینامیک بر اساس کلاس‌ها)
-    homework_list = []
-    exams_list = []
-    upcoming_list = []
+    # و) تکالیف، آزمون‌ها، جلسات پیش‌رو و اعلان‌ها برای ردیف‌های دانش‌آموز
+    # FIX(C6): این سه لیست قبلاً **قالب ثابت جعلی** بودند (تکلیف «فصل ۲» با سررسید
+    # ۱۴۰۵/۰۶/۰۵، آزمون «هماهنگ مستمر» با تاریخ ۱۴۰۵/۰۶/۱۰ و جلسهٔ «شنبه و دوشنبه‌ها
+    # ۱۶:۰۰ الی ۱۷:۳۰») برای هر خانواده مستقل از واقعیت. حالا داده‌ی واقعیِ همان
+    # دانش‌آموز (تکالیف و آزمون‌های ثبت‌شده + برنامهٔ هفتگی خود کلاس) خوانده می‌شود.
+    portal_activity = build_portal_activity(db, student)
+    homework_list = portal_activity["homework"]
+    exams_list = portal_activity["exams"]
+    upcoming_list = portal_activity["upcoming_sessions"]
     notifications_list = []
-    
-    for en in enrollments:
-        if en.course:
-            c_title = en.course.title
-            homework_list.append({
-                "course_title": c_title,
-                "title": f"تمرین‌ها و حل مسائل فصل ۲ کتاب {c_title}",
-                "due_date": "۱۴۰۵/۰۶/۰۵",
-                "status": "در انتظار تحویل"
-            })
-            exams_list.append({
-                "course_title": c_title,
-                "title": f"آزمون هماهنگ مستمر کلاسی {c_title}",
-                "date": "۱۴۰۵/۰۶/۱۰",
-                "max_score": 20
-            })
-            upcoming_list.append({
-                "course_title": c_title,
-                "date": "شنبه و دوشنبه‌ها",
-                "time": "ساعت ۱۶:۰۰ الی ۱۷:۳۰"
-            })
-            
+
     # FIX(C1): اعلان‌های واقعیِ ولی از جدول `notifications` (به‌جای دو اعلان جعلیِ ثابت).
     # قبلاً هر ولی — مستقل از واقعیت — دو پیام نمایشی («شروع ترم»، «تعطیلی سرما») می‌دید و
     # اعلان‌های واقعی (پرداخت فرزند، یادآوری قسط، ...) هرگز به پورتال ولی نمی‌رسید.

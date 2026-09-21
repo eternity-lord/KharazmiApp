@@ -17,6 +17,8 @@ from schemas import (
 )
 from storage import storage_dir, resolve_existing
 from dependencies import get_db, check_admin_access, check_admin_or_secretary_access, check_user_login, check_student_access, get_enrollment_tuition_and_discount, SESSION_EXPIRY_DAYS, limiter, ensure_student_shadow_users, get_session_student, get_session_parent, normalize_mobile, validate_image_upload, require_permission, resolve_notification_role
+# FIX(C6): خواندن واقعی تکالیف/آزمون‌ها/برنامهٔ هفتگی برای پورتال‌ها (بدون کد تکراری).
+from portal_data import build_portal_activity
 
 # FIX: Bug 16 - share the tuition-minus-payment debt calculation across financial views.
 from financial_calculations import calculate_student_debt
@@ -636,33 +638,16 @@ def get_student_my_profile(authorization: Optional[str] = Header(None), db: Sess
     # FIX: Bug 16 - student/parent financial views must agree with tuition debtor reports.
     total_debt = calculate_student_debt(db, student)
 
-    # ۶. تکالیف، آزمون‌ها، جلسات پیش‌رو و اعلان‌ها (شبیه‌سازی پویا بر اساس کلاس‌ها)
-    homework_list = []
-    exams_list = []
-    upcoming_list = []
+    # ۶. تکالیف، آزمون‌ها، جلسات پیش‌رو و اعلان‌ها
+    # FIX(C6): قبلاً این سه لیست برای **هر** دانش‌آموز یک تکلیف و آزمون ساختگی با تاریخ‌های
+    # ثابت (۱۴۰۵/۰۶/۰۵ و ۱۴۰۵/۰۶/۱۰) و برنامهٔ هفتگیِ جعلی نشان می‌دادند. حالا همان داده‌ی
+    # واقعیِ ثبت‌شده در سیستم خوانده می‌شود (مثل پورتال ولی — یک منبع مشترک).
+    portal_activity = build_portal_activity(db, student)
+    homework_list = portal_activity["homework"]
+    exams_list = portal_activity["exams"]
+    upcoming_list = portal_activity["upcoming_sessions"]
     notifications_list = []
-    
-    for en in enrollments:
-        if en.course:
-            c_title = en.course.title
-            homework_list.append({
-                "course_title": c_title,
-                "title": f"تمرین‌ها و حل مسائل فصل ۲ کتاب {c_title}",
-                "due_date": "۱۴۰۵/۰۶/۰۵",
-                "status": "در انتظار تحویل"
-            })
-            exams_list.append({
-                "course_title": c_title,
-                "title": f"آزمون هماهنگ مستمر کلاسی {c_title}",
-                "date": "۱۴۰۵/۰۶/۱۰",
-                "max_score": 20
-            })
-            upcoming_list.append({
-                "course_title": c_title,
-                "date": "شنبه و دوشنبه‌ها",
-                "time": "ساعت ۱۶:۰۰ الی ۱۷:۳۰"
-            })
-            
+
     # FIX(C1): اعلان‌های واقعیِ دانش‌آموز از جدول `notifications` (به‌جای دو اعلان جعلیِ ثابت).
     notifications_list = _student_portal_notifications(db, student)
 

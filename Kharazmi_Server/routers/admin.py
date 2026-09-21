@@ -1914,6 +1914,16 @@ def restore_deleted_class(
     except Exception:
         actor_user_id, actor_name = None, ""
 
+    # FIX(D5): اگر معلمِ کلاس خودش آرشیو (حذف) شده باشد، بازیابی جواب می‌دهد ولی ادمین باید
+    # بداند کلاسِ برگشته **معلم فعال ندارد** (هشدار در پاسخ — بدون هیچ تغییر خودکارِ داده).
+    teacher = db.query(Teacher).filter(Teacher.id == course.teacher_id).first() if course.teacher_id else None
+    teacher_archived = bool(teacher is not None and teacher.is_deleted is True)
+    warnings = []
+    if teacher_archived:
+        warnings.append("معلم این کلاس آرشیو (حذف) شده است؛ کلاس بدون معلم فعال برمی‌گردد.")
+    elif teacher is None:
+        warnings.append("این کلاس معلم ثبت‌شده ندارد؛ پس از بازیابی بدون معلم فعال است.")
+
     course.is_deleted = False
     db.add(ClassRestoreLog(
         course_id=course.id,
@@ -1946,6 +1956,9 @@ def restore_deleted_class(
         "is_suspended": bool(course.is_suspended),
         "mode": "metadata_only",
         "finances_untouched": True,
+        # FIX(D5): هشدارهای عملیاتی برای ادمین (مثلاً معلم آرشیوشده) — بدون تغییر در داده.
+        "teacher_archived": teacher_archived,
+        "warnings": warnings,
         "note": "برای ادامهٔ کلاس، ثبت‌نام‌های جدید بسازید؛ سابقهٔ مالی قبلی عمداً بازیابی نشده است.",
         "deleted_at_was": _fmt_datetime(meta.get("deleted_at")),
         "reason": (data.reason or "").strip() or "",

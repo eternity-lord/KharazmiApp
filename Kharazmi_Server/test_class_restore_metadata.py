@@ -307,6 +307,22 @@ class TestClassRestoreMetadata(unittest.TestCase):
         self.assertEqual(self.db.query(ClassRestoreLog).filter(
             ClassRestoreLog.course_id == self.c_arch.id).count(), 2, "هر بازیابی یک رکورد حسابرسی")
 
+    def test_12b_warns_when_teacher_is_archived(self):
+        """D5: بازیابی کلاسِ معلم‌آرشیوشده انجام می‌شود ولی ادمین هشدار می‌گیرد."""
+        self.db.query(Teacher).filter(Teacher.id == self.teacher.id).update({"is_deleted": True})
+        self.db.commit()
+        body = self._restore(self.c_arch.id).json()
+        self.assertTrue(body["teacher_archived"], "هشدار معلم آرشیوشده باید در پاسخ باشد")
+        self.assertTrue(any("معلم" in w for w in body["warnings"]), body["warnings"])
+
+        # کلاس دوم (شعبه ۲) با معلم سالم ⇒ بدون هشدار و بدون متن اضافه
+        self.db.query(Teacher).filter(Teacher.id == self.teacher.id).update({"is_deleted": False})
+        self.db.commit()
+        resp2 = self._restore(self.c_arch_b2.id)
+        self.assertEqual(resp2.status_code, 200)
+        self.assertFalse(resp2.json()["teacher_archived"])
+        self.assertEqual(resp2.json()["warnings"], [])
+
     def test_12_active_class_is_untouched(self):
         before = (self.c_active.is_deleted, self.c_active.title)
         before_finance = self._financial_fingerprint()

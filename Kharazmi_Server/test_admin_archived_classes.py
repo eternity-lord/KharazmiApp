@@ -1,7 +1,9 @@
 # test_admin_archived_classes.py
 # Regression tests for «کلاس‌های حذف‌شده / آرشیو ادمین»:
-#   GET /admin/deleted_classes            (لیست آرشیو: اطلاعات کامل + branch isolation + جست‌وجو)
-#   GET /admin/deleted_classes/{id}       (جزئیات کنترول‌شده‌ی کلاس آرشیوشده)
+#   GET  /admin/deleted_classes           (لیست آرشیو: اطلاعات کامل + branch isolation + جست‌وجو)
+#   GET  /admin/deleted_classes/{id}      (جزئیات کنترول‌شده‌ی کلاس آرشیوشده)
+#   POST /admin/deleted_classes/{id}/restore = «فقط متادیتا» (FIX(D1))؛ تست‌های کامل آن در
+#        test_class_restore_metadata.py است و این فایل فقط قرارداد «هیچ restore دیگری نیست» را نگه می‌دارد.
 # و تعامل آن با DELETE /classes/{id} (جریان واقعی حذف) و GET /classes/list (لیست عادی).
 #
 # اجرا (روی DB کپی — نه DB واقعی، مطابق قاعده‌ی پروژه):
@@ -248,11 +250,20 @@ class TestAdminArchivedClasses(unittest.TestCase):
     # ------------------------------------------------------------------
     # ۸) restore وجود ندارد (policy فعلی) — و آرشیو فقط-خواندنی است
     # ------------------------------------------------------------------
-    def test_8_restore_not_offered_and_archive_is_read_only(self):
-        # سیاست: هیچ مسیر restore برای کلاس/ثبت‌نام در اپ وجود ندارد؛ اگر روزی اضافه شد
-        # این تست می‌شکند تا permission/branch isolation آن هم تست شود.
-        restore_paths = [p for p in app.openapi()["paths"] if "restore" in p.lower()]
-        self.assertEqual(restore_paths, [])
+    def test_8_restore_limited_to_metadata_and_archive_is_read_only(self):
+        # FIX(D1) — آپدیت **عمدی** این تست (همان‌طور که در ممیزی
+        # checkpoints/2026-09-20-archived-class-restore-audit.md پیش‌بینی شده بود): اکنون
+        # بازیابی «فقط متادیتا» اضافه شده است. سیاست جدید:
+        #   ۱) تنها مسیر restore مجاز = /admin/deleted_classes/{id}/restore با mode=metadata_only
+        #      (هیچ مسیر بازیابی ثبت‌نام/جلسه/تراکنش یا بازیابی کامل وجود ندارد)،
+        #   ۲) خواندن آرشیو هنوز هیچ چیزی را تغییر نمی‌دهد،
+        #   ۳) پوشش permission/branch isolation این مسیر در test_class_restore_metadata.py است.
+        restore_paths = sorted(p for p in app.openapi()["paths"] if "restore" in p.lower())
+        self.assertEqual(restore_paths, ["/admin/deleted_classes/{course_id}/restore"])
+        restore_op = app.openapi()["paths"]["/admin/deleted_classes/{course_id}/restore"]
+        self.assertIn("post", restore_op)
+        # هیچ مسیر دیگری (enrollment/session/full restore) وجود ندارد
+        self.assertEqual([p for p in restore_paths if "enrollment" in p or "session" in p.lower()], [])
         # خواندن آرشیو نباید وضعیت را تغییر دهد
         before = (self.db.query(Course).filter(Course.is_deleted == True).count(),  # noqa: E712
                   self.db.query(Enrollment).filter(Enrollment.course_id == self.c_arch_legacy.id).count())

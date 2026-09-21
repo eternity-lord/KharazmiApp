@@ -170,6 +170,22 @@ data class ArchivedClassDetail(
     @SerializedName("admin_note") val adminNote: String? = null
 )
 
+// FIX(D1): بازیابی «فقط متادیتا» کلاس آرشیوشده — درخواست/پاسخ پنل ادمین.
+// mode اجباری است (سرور فقط metadata_only را می‌پذیرد) و reason اختیاری برای حسابرسی.
+data class ClassRestoreRequest(
+    @SerializedName("mode") val mode: String = "metadata_only",
+    @SerializedName("reason") val reason: String? = null
+)
+
+data class ClassRestoreResponse(
+    @SerializedName("message") val message: String? = null,
+    @SerializedName("id") val id: Int? = null,
+    @SerializedName("title") val title: String? = null,
+    @SerializedName("mode") val mode: String? = null,
+    @SerializedName("finances_untouched") val financesUntouched: Boolean = false,
+    @SerializedName("note") val note: String? = null
+)
+
 // ==========================================
 // 6. مالی و ثبت نام (Financial & Enrollment)
 // ==========================================

@@ -14,7 +14,7 @@ import secrets  # FIX H12: پسورد تصادفی امن (الگوی C12)
 
 import models
 from models import (
-    Attendance, Course, Enrollment, Grade, InstituteShare, SessionLog, SmsLog, Student, Teacher, Transaction, User, UserSession, InstituteSettings, ActivityLog, Notification, DeviceToken, Room, Conversation, ConversationParticipant, Message, Exam, ExamQuestion, ExamAttempt, Lead
+    Attendance, Course, Enrollment, Grade, InstituteShare, SessionLog, SmsLog, Student, Teacher, Transaction, User, UserSession, InstituteSettings, ActivityLog, Notification, DeviceToken, Room, Conversation, ConversationParticipant, Message, Exam, ExamQuestion, ExamAttempt, Lead, ClassRestoreLog
 )
 from schemas import (
     HistoryRequest, LoginRequest, TeacherInfo, FullTeacherProfile, StudentCreate, TeacherCreate, CourseCreate, EnrollmentCreate, GradeCreate, GradeItem, AttendanceLogRequest, AttendanceItem, AttendanceSubmitData, SmsSendRequest, ChangePasswordRequest, StudentProfileInfo, FullStudentProfile, TeacherProfileInfo, FullTeacherProfile, ClassReportInfo, ClassStudentData, ClassSessionHistory, FullClassReport, ShareConfigModel, StudentUpdate, TeacherUpdate, PersonListItem, TransactionUpdate, StudentAttendanceHistoryRequest, AdvancedSearchItem, FinanceSubmitData, PrintReceiptRequest, TransactionTestData, BulkSmsRequest, BulkSuspendRequest, InstituteSettingsModel, PricingTableUpdateModel, TeacherListItem, SmsHistoryItem, PendingTeacherItem
@@ -1685,6 +1685,12 @@ def _archived_class_aggregates(db: Session, course_ids: List[int]) -> dict:
     return stats
 
 
+class ClassRestoreRequest(BaseModel):
+    """ورودی بازیابی کلاس آرشیوشده (فاز ۱ — فقط متادیتا)."""
+    mode: str
+    reason: Optional[str] = None
+
+
 @router.get("/admin/deleted_classes")
 def get_deleted_classes(
     query: Optional[str] = None,
@@ -1827,6 +1833,122 @@ def get_deleted_class_detail(
         "forgive_session_charges": bool(meta.get("forgive_session_charges", False)),
         "requested_by_role": meta.get("requested_by_role") or "",
         "admin_note": meta.get("admin_note") or "",
+    }
+
+
+@router.post("/admin/deleted_classes/{course_id}/restore")
+def restore_deleted_class(
+    course_id: int,
+    data: ClassRestoreRequest,
+    db: Session = Depends(get_db),
+    authorization: Optional[str] = Header(None),
+    _: str = Depends(check_admin_access),
+):
+    """FIX(D1) — بازیابی **فقط متادیتا** کلاس آرشیوشده (فاز ۱ طراحیِ ممیزی‌شده).
+
+    چرا فقط متادیتا؟ در ممیزی `checkpoints/2026-09-20-archived-class-restore-audit.md`
+    ثابت شد restore کامل امروز **امن نیست**: هنگام حذف، پول جابه‌جا می‌شود (وجه جلسات از
+    کیف پول شاگرد کسر و طلب معلم باز می‌شود) ولی هیچ دفتر کلّی از آن حرکت وجود ندارد؛
+    فلپ کردن `is_deleted` ردیف‌های قدیمی ⇒ بستانکاری کیف پول + زنده‌شدن مجدد هزینه‌ها
+    (Double-count)، احیای ردیف‌های برگشت‌خورده، و تضاد ایندکس یکتای جلسه (`IntegrityError`)
+    را به همراه دارد. بنابراین فاز ۱ فقط پوستهٔ کلاس را برمی‌گرداند:
+
+      • `Course.is_deleted = False` (کلاس در `/classes/list` و لیست‌های ادمین برمی‌گردد)
+      • ثبت رد پای حسابرسی در جدول جدید `ClassRestoreLog` (actor/reason/pre_state)
+      • **صفر اثر مالی**: `Enrollment`، `SessionLog` و `Transaction` آرشیوشده دست‌نخورده
+        می‌مانند ⇒ بدهی، کیف پول و طلب معلم دقیقاً بی‌تغییر.
+
+    پیامد عمدی و مستندشده: کلاس بازیابی‌شده در ابتدا **بدون شاگرد فعال** دیده می‌شود
+    (`students_active_count = 0`) و ادمین برای ادامه، ثبت‌نام جدید می‌سازد — این تنها
+    گزینه‌ای است که «منطق مالی» را دست‌نخورده نگه می‌دارد (شرط صریح کاربر).
+
+    کدهای خطا (مطابق طراحی ممیزی‌شده): 400 (mode نامعتبر) · 404 (شناسه وجود ندارد **یا**
+    کلاس شعبه‌ی دیگر است — مثل نمای آرشیو، بدون نشت وجود رکورد) · 409 (کلاس از قبل فعال است؛
+    مثلاً دو ادمین هم‌زمان روی یک ردیف کلیک کنند ⇒ پیام دوستانه به‌جای خطا یا بازیابی دوباره).
+    """
+    if (data.mode or "").strip() != "metadata_only":
+        raise HTTPException(
+            status_code=400,
+            detail="mode نامعتبر؛ در این نسخه فقط \"metadata_only\" پشتیبانی می‌شود (بازیابی کامل عمداً غیرفعال است)",
+        )
+
+    from routers.analytics import get_user_branch_filter  # lazy: جلوگیری از import چرخه‌ای
+    resolved_branch = get_user_branch_filter(db, authorization, None)
+
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="کلاس آرشیوشده یافت نشد")
+
+    # همان سیاست نمای آرشیو: ردیف شعبه‌ی دیگر «ناموجود» است (بدون نشت وجود رکورد).
+    if resolved_branch is not None and course.branch_id != resolved_branch:
+        raise HTTPException(status_code=404, detail="کلاس آرشیوشده یافت نشد")
+
+    if course.is_deleted is not True:  # noqa: E712 — فقط ردیف‌های صریحاً آرشیوشده
+        # 409 = «کاری برای انجام نیست»، نه خطای کاربر: کلاس زنده است (بدون تغییر داده).
+        raise HTTPException(status_code=409, detail="این کلاس از قبل فعال است و نیازی به بازیابی ندارد")
+
+    # وضعیت پیش از بازیابی (حسابرسی) — بدون حدس زدن تاریخی که ثبت نشده.
+    pre_state = {
+        "is_deleted": True,
+        "is_suspended": bool(course.is_suspended),
+        "archived_enrollments": db.query(Enrollment).filter(
+            Enrollment.course_id == course.id, Enrollment.is_deleted == True  # noqa: E712
+        ).count(),
+        "archived_sessions": db.query(SessionLog).filter(
+            SessionLog.course_id == course.id, SessionLog.is_deleted == True  # noqa: E712
+        ).count(),
+        "archived_transactions": db.query(Transaction).filter(
+            Transaction.course_id == course.id, Transaction.is_deleted == True  # noqa: E712
+        ).count(),
+        "wallet_debit": 0,  # فاز ۱ به کیف پول دست نمی‌زند
+    }
+    meta = _archived_deletion_meta(db, [course.id]).get(course.id, {})
+
+    actor_user_id, actor_name = None, ""
+    try:
+        from dependencies import resolve_actor_user_id
+        actor_user_id = resolve_actor_user_id(db, authorization)
+        if actor_user_id:
+            actor = db.query(User).filter(User.id == actor_user_id).first()
+            actor_name = (actor.full_name or actor.username) if actor else ""
+    except Exception:
+        actor_user_id, actor_name = None, ""
+
+    course.is_deleted = False
+    db.add(ClassRestoreLog(
+        course_id=course.id,
+        mode="metadata_only",
+        reason=(data.reason or "").strip() or None,
+        actor_user_id=actor_user_id,
+        actor_name=actor_name or None,
+        pre_state_json=json.dumps(pre_state, ensure_ascii=False),
+        finance_touched=False,
+    ))
+    try:
+        db.add(ActivityLog(
+            admin_username=actor_name or "admin",
+            action="restore_class_metadata",
+            target_id=course.id,
+            target_name=course.title or "",
+            details=f"restore metadata_only — دلیل: {(data.reason or '').strip() or 'ثبت نشده'}",
+        ))
+    except Exception:
+        pass  # رد پای اصلی در ClassRestoreLog است؛ نبود ActivityLog نباید بازیابی را بشکند
+
+    db.commit()
+    db.refresh(course)
+    return {
+        "message": "کلاس بازیابی شد (فقط متادیتا) — ثبت‌نام‌ها و سابقهٔ مالی دست‌نخورده است",
+        "id": course.id,
+        "title": course.title or "",
+        "code": course.code or "",
+        "is_deleted": bool(course.is_deleted),
+        "is_suspended": bool(course.is_suspended),
+        "mode": "metadata_only",
+        "finances_untouched": True,
+        "note": "برای ادامهٔ کلاس، ثبت‌نام‌های جدید بسازید؛ سابقهٔ مالی قبلی عمداً بازیابی نشده است.",
+        "deleted_at_was": _fmt_datetime(meta.get("deleted_at")),
+        "reason": (data.reason or "").strip() or "",
     }
 
 

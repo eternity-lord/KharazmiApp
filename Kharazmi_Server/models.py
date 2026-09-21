@@ -919,6 +919,26 @@ if __name__ == "__main__":
     print("✅ دیتابیس آپدیت شد (اطلاعات قبلی حفظ شد).")
 
 
+class ClassRestoreLog(Base):
+    """FIX(D1): دفتر بازیابی کلاس آرشیوشده — «چه کسی، چه زمانی، با چه دلیلی و در چه حالتی».
+
+    چرا جدول جدا (نه تغییر وضعیت ClassDeletionRequest): وضعیت آن رکورد معنای «تصمیم حذف»
+    دارد (pending/approved/rejected) و بازنویسی‌اش تاریخچهٔ تصمیم را از بین می‌برد.
+    دامنهٔ فاز ۱ فقط متادیتا است؛ `pre_state_json` برای حسابرسی نگه داشته می‌شود که
+    وضعیت پیش از بازیابی (کلاس/شمارش ردیف‌های آرشیوی) قابل بازبینی باشد.
+    """
+    __tablename__ = "class_restore_logs"
+    id = Column(Integer, primary_key=True, index=True)
+    course_id = Column(Integer, ForeignKey("courses.id"), nullable=False, index=True)
+    mode = Column(String, default="metadata_only")  # فاز ۱ فقط metadata_only
+    reason = Column(String, nullable=True)
+    actor_user_id = Column(Integer, nullable=True)
+    actor_name = Column(String, nullable=True)
+    pre_state_json = Column(Text, nullable=True)
+    finance_touched = Column(Boolean, default=False, nullable=False)
+    restored_at = Column(DateTime, default=datetime.datetime.now)
+
+
 class ClassDeletionRequest(Base):
     """درخواست حذف کلاس توسط معلم/منشی + تایید ادمین (اسنپ‌شات مالی برای بازبینی)."""
     __tablename__ = "class_deletion_requests"

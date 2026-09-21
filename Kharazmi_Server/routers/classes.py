@@ -19,7 +19,7 @@ from models import (
 from schemas import (
     HistoryRequest, LoginRequest, TeacherInfo, FullTeacherProfile, StudentCreate, TeacherCreate, CourseCreate, EnrollmentCreate, GradeCreate, GradeItem, AttendanceLogRequest, AttendanceItem, AttendanceSubmitData, SmsSendRequest, ChangePasswordRequest, StudentProfileInfo, FullStudentProfile, TeacherProfileInfo, FullTeacherProfile, ClassReportInfo, ClassStudentData, ClassSessionHistory, FullClassReport, ShareConfigModel, StudentUpdate, TeacherUpdate, PersonListItem, TransactionUpdate, StudentAttendanceHistoryRequest, AdvancedSearchItem, FinanceSubmitData, PrintReceiptRequest, TransactionTestData
 )
-from dependencies import get_db, check_admin_access, check_admin_or_secretary_access, check_user_login, get_enrollment_tuition_and_discount, SESSION_EXPIRY_DAYS
+from dependencies import get_db, check_admin_access, check_admin_or_secretary_access, check_user_login, get_enrollment_tuition_and_discount, SESSION_EXPIRY_DAYS, display_name, safe_person_name
 
 # FIX: Bug 16 - share the tuition-minus-payment debt calculation across financial views.
 from financial_calculations import calculate_student_debt, calculate_enrollment_debt, MAX_TEACHER_SESSION_PRICE
@@ -185,7 +185,7 @@ def get_all_classes(
     for c in courses:
         # 1. Get Teacher Name
         teacher = db.query(Teacher).filter(Teacher.id == c.teacher_id).first()
-        t_name = f"{teacher.first_name} {teacher.last_name}" if teacher else "نامشخص"
+        t_name = display_name(teacher, "نامشخص")
 
         # 2. Get Top 10 Students for Preview (Updated from 3 to 10)
         enrollments = (
@@ -196,7 +196,7 @@ def get_all_classes(
         for en in enrollments:
             st = db.query(Student).filter(Student.id == en.student_id, Student.is_deleted == False).first()
             if st:
-                student_names.append(f"{st.first_name} {st.last_name}")
+                student_names.append(display_name(st, "نامشخص"))
 
         # 3. Calculate debt for the class
         total_debt = 0
@@ -518,7 +518,7 @@ def get_class_full_report(id: int, db: Session = Depends(get_db), authorization:
             raise HTTPException(status_code=403, detail="شما مجاز به مشاهده اطلاعات این کلاس نیستید")
 
     teacher = db.query(Teacher).filter(Teacher.id == course.teacher_id).first()
-    t_name = f"{teacher.first_name} {teacher.last_name}" if teacher else "نامشخص"
+    t_name = display_name(teacher, "نامشخص")
 
     # 2. اطلاعات دانش‌آموزان و مالی
     # FIX: Bug 13 - exclude archived Enrollment rows from this active view.
@@ -540,7 +540,7 @@ def get_class_full_report(id: int, db: Session = Depends(get_db), authorization:
 
         student_list.append(
             ClassStudentData(
-                name=f"{st.first_name} {st.last_name}",
+                name=display_name(st, "نامشخص"),
                 mobile=st.student_mobile,
                 paid=en.total_paid,
                 debt=debt,
@@ -679,7 +679,7 @@ def get_class_students_excel(class_id: int, db: Session = Depends(get_db), _: st
             
             row_data = [
                 st.id,
-                f"{st.first_name} {st.last_name}",
+                display_name(st, "نامشخص"),
                 enroll.total_tuition,
                 d_type_farsi,
                 d_val_disp,
@@ -786,7 +786,7 @@ def get_class_students_full(id: int, db: Session = Depends(get_db), authorizatio
                 {
                     "student_id": st.id,
                     "student_code": st.student_code,
-                    "student_name": f"{st.first_name} {st.last_name}",
+                    "student_name": display_name(st, "نامشخص"),
                     "national_code": st.national_code,
                     "mobile": st.student_mobile,
                     "total_tuition": final_tuition,
@@ -928,7 +928,7 @@ def _build_class_deletion_snapshot(db: Session, course) -> dict:
         total_paid += paid
         students_rows.append({
             "student_id": en.student_id,
-            "name": f"{st.first_name} {st.last_name}" if st else "نامشخص",
+            "name": display_name(st, "نامشخص"),
             "sessions_attended": attended,
             "tuition_final": final_tuition,
             "total_paid": paid,
@@ -1036,7 +1036,7 @@ def list_class_deletion_requests(
         if r.requested_by_teacher_id:
             t = db.query(Teacher).filter(Teacher.id == r.requested_by_teacher_id).first()
             if t:
-                requester_name = f"{t.first_name} {t.last_name}"
+                requester_name = display_name(t, "نامشخص")
         elif r.requested_by_user_id:
             u = db.query(User).filter(User.id == r.requested_by_user_id).first()
             if u:

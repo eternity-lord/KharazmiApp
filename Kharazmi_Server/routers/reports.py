@@ -17,7 +17,7 @@ from models import (
 from schemas import (
     HistoryRequest, LoginRequest, TeacherInfo, FullTeacherProfile, StudentCreate, TeacherCreate, CourseCreate, EnrollmentCreate, GradeCreate, GradeItem, AttendanceLogRequest, AttendanceItem, AttendanceSubmitData, SmsSendRequest, ChangePasswordRequest, StudentProfileInfo, FullStudentProfile, TeacherProfileInfo, FullTeacherProfile, ClassReportInfo, ClassStudentData, ClassSessionHistory, FullClassReport, ShareConfigModel, StudentUpdate, TeacherUpdate, PersonListItem, TransactionUpdate, StudentAttendanceHistoryRequest, AdvancedSearchItem, FinanceSubmitData, PrintReceiptRequest, TransactionTestData
 )
-from dependencies import get_db, check_admin_access, check_admin_or_secretary_access, check_user_login, check_student_access, get_enrollment_tuition_and_discount, SESSION_EXPIRY_DAYS, resolve_effective_sub_role
+from dependencies import get_db, check_admin_access, check_admin_or_secretary_access, check_user_login, check_student_access, get_enrollment_tuition_and_discount, SESSION_EXPIRY_DAYS, resolve_effective_sub_role, display_name, safe_person_name
 
 # FIX: Bug 16 - share the tuition-minus-payment debt calculation across financial views.
 from financial_calculations import calculate_student_debt
@@ -265,12 +265,12 @@ def get_financial_report(
             if en:
                 st = db.query(Student).filter(Student.id == en.student_id).first()
                 if st:
-                    st_name = f"{st.first_name} {st.last_name}"
+                    st_name = display_name(st, "نامشخص")
                     student_id = st.id
         elif t.student_id:
             st = db.query(Student).filter(Student.id == t.student_id).first()
             if st:
-                st_name = f"{st.first_name} {st.last_name}"
+                st_name = display_name(st, "نامشخص")
                 student_id = st.id
         report.append(
             {
@@ -314,7 +314,7 @@ def get_debtors_report(
             res.append(
                 {
                     "student_id": student.id,
-                    "student_name": f"{student.first_name} {student.last_name}",
+                    "student_name": display_name(student, "نامشخص"),
                     "amount": total_debt,
                     "date": "-",
                     "description": "بدهی",
@@ -369,7 +369,7 @@ def get_debtors_excel(
         if total_debt > 0:
             row_data = [
                 student.id,
-                f"{student.first_name} {student.last_name}",
+                display_name(student, "نامشخص"),
                 debt_teacher,
                 debt_institute,
                 total_debt,
@@ -529,7 +529,7 @@ def get_financial_summary(
         return {
             "user_type": "teacher",
             "teacher_id": teacher_id,
-            "teacher_name": f"{teacher.first_name} {teacher.last_name}",
+            "teacher_name": display_name(teacher, "نامشخص"),
             "year": year,
             "month": month,
             "monthly": {
@@ -577,7 +577,7 @@ def get_student_statement(
 
     return {
         "student_id": student.id,
-        "student_name": f"{student.first_name} {student.last_name}",
+        "student_name": display_name(student, "نامشخص"),
         "student_code": student.student_code or str(100000 + student.id),
         "total_paid_institute": int(total_paid_institute),
         "total_debt_institute": int(total_debt_institute),
@@ -737,7 +737,7 @@ def print_student_statement(
             
             <div class="row-info">
                 <span class="label">نام دانش‌آموز:</span>
-                <span class="value">{student.first_name} {student.last_name}</span>
+                <span class="value">{display_name(student, 'نامشخص')}</span>
             </div>
             <div class="row-info">
                 <span class="label">کد دانش‌آموزی:</span>
@@ -805,7 +805,7 @@ def print_student_profile(
             continue
         course = en.course
         teacher = db.query(Teacher).filter(Teacher.id == course.teacher_id).first()
-        teacher_name = f"{teacher.first_name} {teacher.last_name}" if teacher else "بدون معلم"
+        teacher_name = display_name(teacher, "نامشخص") if teacher else "بدون معلم"
         
         # FIX: Bug 12 - exclude archived Transaction rows from this active view.
         paid_teacher = db.query(func.sum(Transaction.amount)).filter(Transaction.is_deleted == False, Transaction.is_reversed == False).filter(
@@ -963,7 +963,7 @@ def print_student_profile(
             <div class="section-title">مشخصات هویتی</div>
             <div class="row-info">
                 <span class="label">نام و نام خانوادگی:</span>
-                <span class="value" style="font-weight: bold;">{student.first_name} {student.last_name}</span>
+                <span class="value" style="font-weight: bold;">{display_name(student, 'نامشخص')}</span>
             </div>
             <div class="row-info">
                 <span class="label">کد دانش‌آموزی:</span>

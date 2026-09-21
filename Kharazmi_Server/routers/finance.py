@@ -17,7 +17,7 @@ from models import (
 from schemas import (
     HistoryRequest, LoginRequest, TeacherInfo, FullTeacherProfile, StudentCreate, TeacherCreate, CourseCreate, EnrollmentCreate, GradeCreate, GradeItem, AttendanceLogRequest, AttendanceItem, AttendanceSubmitData, SmsSendRequest, ChangePasswordRequest, StudentProfileInfo, FullStudentProfile, TeacherProfileInfo, FullTeacherProfile, ClassReportInfo, ClassStudentData, ClassSessionHistory, FullClassReport, ShareConfigModel, StudentUpdate, TeacherUpdate, PersonListItem, TransactionUpdate, StudentAttendanceHistoryRequest, AdvancedSearchItem, FinanceSubmitData, PrintReceiptRequest, TransactionTestData
 )
-from dependencies import get_db, check_admin_access, check_admin_or_secretary_access, check_user_login, check_student_access, get_enrollment_tuition_and_discount, SESSION_EXPIRY_DAYS, get_session_student, get_session_parent  # FIX (L14/Y4): check_student_access برای 637
+from dependencies import get_db, check_admin_access, check_admin_or_secretary_access, check_user_login, check_student_access, get_enrollment_tuition_and_discount, SESSION_EXPIRY_DAYS, get_session_student, get_session_parent, display_name, safe_person_name  # FIX (L14/Y4): check_student_access برای 637
 
 # FIX: Bug 16 - share the tuition-minus-payment debt calculation across financial views.
 from dependencies import limiter  # FIX F-B1: ریت‌لیمیت کال‌بک پرداخت (endpoint پول بدون احراز).
@@ -77,7 +77,7 @@ def search_finance_advanced(
     courses = courses_q.all()
     for c in courses:
         teacher = db.query(Teacher).filter(Teacher.id == c.teacher_id).first()
-        t_name = f"{teacher.first_name} {teacher.last_name}" if teacher else "بدون معلم"
+        t_name = display_name(teacher, "نامشخص") if teacher else "بدون معلم"
 
         # FIX: Bug 13 - exclude archived Enrollment rows from this active view.
         enrollments = db.query(Enrollment).filter(Enrollment.is_deleted == False).filter(Enrollment.course_id == c.id).all()
@@ -96,7 +96,7 @@ def search_finance_advanced(
                 class_students.append(
                     {
                         "id": st.id,
-                        "name": f"{st.first_name} {st.last_name}",
+                        "name": display_name(st, "نامشخص"),
                         "debt": total_debt,
                         "total_debt": total_debt,
                         "debt_teacher": debt_teacher,
@@ -160,7 +160,7 @@ def search_finance_advanced(
             AdvancedSearchItem(
                 type="student",
                 id=s.id,
-                title=f"{s.first_name} {s.last_name}",
+                title=display_name(s, "نامشخص"),
                 subtitle=f"کلاس: {last_course_name}",
                 info=f"بدهی کل: {total_debt_val:,} تومان",  # نمایش متنی
                 student_id=s.id,
@@ -583,7 +583,7 @@ def print_receipt(req: PrintReceiptRequest, db: Session = Depends(get_db), autho
     # اطلاعات حواله برای چاپ
     receipt_data = {
         "receipt_id": transaction.id,
-        "student_name": f"{student.first_name} {student.last_name}",
+        "student_name": display_name(student, "نامشخص"),
         "student_national_code": student.national_code,
         "amount": transaction.amount,
         "payment_method": transaction.payment_method,
@@ -626,7 +626,7 @@ def generate_pdf_receipt(req: PrintReceiptRequest, db: Session = Depends(get_db)
     # اطلاعات حواله برای PDF
     receipt_data = {
         "receipt_id": transaction.id,
-        "student_name": f"{student.first_name} {student.last_name}",
+        "student_name": display_name(student, "نامشخص"),
         "student_national_code": student.national_code,
         "amount": transaction.amount,
         "payment_method": transaction.payment_method,
@@ -1254,14 +1254,14 @@ def payment_callback(
                     admin_username="online_payment_system",
                     action="online_payment_success",
                     target_id=student.id,
-                    target_name=f"{student.first_name} {student.last_name}",
+                    target_name=display_name(student, "نامشخص"),
                     details=f"پرداخت آنلاین موفق به مبلغ {payment.amount:,} تومان به کیف پول {payment.target_wallet}. شماره تراکنش: {new_trans.id}"
                 ))
 
                 # ۶. ارسال نوتیفیکیشن‌های درون‌برنامه‌ای و پیامکی
                 try:
                     today_str = _jalali_now_str()  # FIX (audit-v2/#12-H3): شمسی.
-                    msg_sms = f"ولی محترم، پرداخت آنلاین بابت فرزند شما {student.first_name} {student.last_name} به مبلغ {payment.amount:,} تومان با موفقیت انجام شد. کد پیگیری: {trk_code}"
+                    msg_sms = f"ولی محترم، پرداخت آنلاین بابت فرزند شما {display_name(student, 'دانش‌آموز')} به مبلغ {payment.amount:,} تومان با موفقیت انجام شد. کد پیگیری: {trk_code}"
                     db.add(SmsLog(
                         target_group=f"online_pay_{payment.id}",
                         message_text=msg_sms,
@@ -1585,7 +1585,7 @@ def refund_transaction(
             admin_username=_audit_username,
             action="transaction_refund",
             target_id=student.id,
-            target_name=f"{student.first_name} {student.last_name}",
+            target_name=display_name(student, "نامشخص"),
             details=f"استرداد تراکنش #{trans.id} به مبلغ {trans.amount:,} تومان و کسر از کیف پول {trans.target_wallet}."
         ))
         
@@ -1996,7 +1996,7 @@ def send_installment_payment_reminder(
     if not student.parent_mobile:
         raise HTTPException(status_code=400, detail="شماره موبایل ولی برای این دانش‌آموز ثبت نشده است")
 
-    msg = f"ولی محترم دانش‌آموز {student.first_name} {student.last_name}، بدینوسیله به اطلاع می‌رساند قسط شهریه فرزند شما به مبلغ {inst.amount:,} تومان سررسید {inst.due_date} معوقه/سررسید شده است. لطفاً جهت واریز اقدام فرمایید."
+    msg = f"ولی محترم دانش‌آموز {display_name(student, 'گرامی')}، بدینوسیله به اطلاع می‌رساند قسط شهریه فرزند شما به مبلغ {inst.amount:,} تومان سررسید {inst.due_date} معوقه/سررسید شده است. لطفاً جهت واریز اقدام فرمایید."
     
     # ۱. ثبت در بخش پیامک‌ها
     db.add(SmsLog(
@@ -2235,7 +2235,7 @@ def get_receipt_details(
     verify_financial_idor(trans.student_id, authorization, db)
     
     student = db.query(Student).filter(Student.id == trans.student_id).first()
-    student_name = f"{student.first_name} {student.last_name}" if student else "نامشخص"
+    student_name = display_name(student, "نامشخص")
     student_national = student.national_code if student else "---"
     # FIX H16: نام کلاس برای چاپ مجددِ سرور-محور؛ بدون فیلتر is_deleted (رسید سند تاریخی است).
     course_name = "---"
@@ -2299,7 +2299,7 @@ def get_invoice_details(
     
     return {
         "enrollment_id": enroll.id,
-        "student_name": f"{student.first_name} {student.last_name}" if student else "نامشخص",
+        "student_name": display_name(student, "نامشخص"),
         "course_title": course.title if course else "کلاس حذف شده",
         "base_tuition": enroll.total_tuition,
         "discount_type": enroll.discount_type,
@@ -2351,7 +2351,7 @@ def get_debtors_list(
         
         result.append({
             "student_id": s.id,
-            "student_name": f"{s.first_name} {s.last_name}",
+            "student_name": display_name(s, "نامشخص"),
             "national_code": s.national_code,
             "parent_mobile": s.parent_mobile,
             "debt_teacher": abs(w_t) if w_t < 0 else 0,
@@ -2450,7 +2450,8 @@ def get_teacher_settlements_summary(
 
         result.append({
             "teacher_id": t.id,
-            "teacher_name": f"{t.first_name} {t.last_name}",
+            # FIX(A4): نام معلم با تحمل NULL (رکورد legacy نباید «None None» بدهد)
+            "teacher_name": display_name(t, "نامشخص"),
             "mobile": t.mobile,
             "card_number": t.card_number or "---",
             "session_count": session_count,

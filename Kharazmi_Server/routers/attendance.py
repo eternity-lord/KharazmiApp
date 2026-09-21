@@ -16,7 +16,7 @@ from models import (
 from schemas import (
     HistoryRequest, LoginRequest, TeacherInfo, FullTeacherProfile, StudentCreate, TeacherCreate, CourseCreate, EnrollmentCreate, GradeCreate, GradeItem, AttendanceLogRequest, AttendanceItem, AttendanceSubmitData, SmsSendRequest, ChangePasswordRequest, StudentProfileInfo, FullStudentProfile, TeacherProfileInfo, FullTeacherProfile, ClassReportInfo, ClassStudentData, ClassSessionHistory, FullClassReport, ShareConfigModel, StudentUpdate, TeacherUpdate, PersonListItem, TransactionUpdate, StudentAttendanceHistoryRequest, AdvancedSearchItem, FinanceSubmitData, PrintReceiptRequest, TransactionTestData
 )
-from dependencies import get_db, check_admin_access, check_user_login, get_enrollment_tuition_and_discount, SESSION_EXPIRY_DAYS, get_session_student, get_session_parent, validate_session_items_membership, validate_session_item_statuses
+from dependencies import get_db, check_admin_access, check_user_login, get_enrollment_tuition_and_discount, SESSION_EXPIRY_DAYS, get_session_student, get_session_parent, validate_session_items_membership, validate_session_item_statuses, display_name, safe_person_name
 from financial_calculations import compute_session_shares
 # FIX (F-S4): قرارداد واحد وضعیت حضور — هم در schema و هم در مسیرهای داخلی (کلاس زنده).
 from validation import validate_attendance_status
@@ -427,7 +427,7 @@ def get_class_attendance(req: AttendanceLogRequest, db: Session = Depends(get_db
     result = []
     for a in atts:
         st = db.query(Student).filter(Student.id == a.student_id, Student.is_deleted == False).first()
-        st_name = f"{st.first_name} {st.last_name}" if st else "حذف شده"
+        st_name = display_name(st, "نامشخص") if st else "حذف شده"
         result.append(
             {
                 "student_id": a.student_id,
@@ -652,7 +652,7 @@ def submit_session_and_calculate(
                 recipient_user_id=st.parent_user_id,
                 recipient_role="parent",
                 type="attendance",
-                title=f"⚠️ گزارش غیبت دانش‌آموز: {st.first_name} {st.last_name}",
+                title=f"⚠️ گزارش غیبت دانش‌آموز: {display_name(st, 'دانش‌آموز')}",
                 body=f"به اطلاع می‌رساند فرزند شما در تاریخ {data.date} در کلاس {course.title} به صورت {excused_str} غایب بوده است.",
                 commit=False,  # FIX atomicity: کامیت با کامیت نهایی حلقه ثبت جلسه (خط پایانی تابع)
             )
@@ -798,7 +798,7 @@ def get_student_attendance_history(req: StudentAttendanceHistoryRequest, db: Ses
     rate = (present_count / total_sessions * 100) if total_sessions > 0 else 100.0
 
     return {
-        "student_name": f"{student.first_name} {student.last_name}",
+        "student_name": display_name(student, "نامشخص"),
         "course_title": course.title,
         "course_code": course.code,
         "total_sessions": total_sessions,
@@ -827,7 +827,7 @@ def get_session_details(session_code: int, db: Session = Depends(get_db), author
             raise HTTPException(status_code=403, detail="شما مجاز به مشاهده جزئیات این جلسه نیستید")
     t_name = ""
     if course and course.teacher:
-        t_name = f"{course.teacher.first_name} {course.teacher.last_name}"
+        t_name = display_name(course.teacher, "نامشخص")
         
     atts = db.query(Attendance).filter(
         Attendance.session_id == session.id, Attendance.is_deleted == False,  # FIX (F-S2)
@@ -835,7 +835,7 @@ def get_session_details(session_code: int, db: Session = Depends(get_db), author
     items = []
     for a in atts:
         student = db.query(Student).filter(Student.id == a.student_id, Student.is_deleted == False).first()
-        st_name = f"{student.first_name} {student.last_name}" if student else "حذف شده"
+        st_name = display_name(student, "نامشخص") if student else "حذف شده"
         items.append({
             "student_id": a.student_id,
             "name": st_name,
@@ -1285,7 +1285,7 @@ def get_admin_live_sessions(
             "course_id": live.course_id,
             "class_title": course.title if course else "کلاس حذف شده",
             "course_code": course.code if course else "",
-            "teacher_name": f"{teacher.first_name} {teacher.last_name}" if teacher else "نامشخص",
+            "teacher_name": display_name(teacher, "نامشخص"),
             "start_time": live.start_time,
             "started_at_ts": live.started_at_ts,
             "elapsed_minutes": elapsed_min,
@@ -1342,7 +1342,7 @@ def get_admin_live_session_roster(
             excused = False
         students_list.append({
             "student_id": st.id,
-            "student_name": f"{st.first_name} {st.last_name}",
+            "student_name": display_name(st, "نامشخص"),
             "status": status if status else "UNSET",  # Present/Late/Absent/UNSET
             "excused": excused,
             "student_mobile": st.student_mobile or "",
@@ -1357,7 +1357,7 @@ def get_admin_live_session_roster(
         "course_id": live.course_id,
         "class_title": course.title if course else "کلاس حذف شده",
         "course_code": course.code if course else "",
-        "teacher_name": f"{teacher.first_name} {teacher.last_name}" if teacher else "نامشخص",
+        "teacher_name": display_name(teacher, "نامشخص"),
         "start_time": live.start_time,
         "started_at_ts": live.started_at_ts,
         "elapsed_minutes": max(0, elapsed_min),

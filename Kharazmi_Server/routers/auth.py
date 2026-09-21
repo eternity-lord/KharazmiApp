@@ -16,7 +16,7 @@ from models import (
 from schemas import (
     HistoryRequest, LoginRequest, TeacherInfo, FullTeacherProfile, StudentCreate, TeacherCreate, CourseCreate, EnrollmentCreate, GradeCreate, GradeItem, AttendanceLogRequest, AttendanceItem, AttendanceSubmitData, SmsSendRequest, ChangePasswordRequest, StudentProfileInfo, FullStudentProfile, TeacherProfileInfo, FullTeacherProfile, ClassReportInfo, ClassStudentData, ClassSessionHistory, FullClassReport, ShareConfigModel, StudentUpdate, TeacherUpdate, PersonListItem, TransactionUpdate, StudentAttendanceHistoryRequest, AdvancedSearchItem, FinanceSubmitData, PrintReceiptRequest, TransactionTestData
 )
-from dependencies import get_db, check_admin_access, check_user_login, get_enrollment_tuition_and_discount, SESSION_EXPIRY_DAYS, limiter, get_current_user, hash_password, verify_password, ROLE_PERMISSIONS, create_jwt_token, ensure_student_shadow_users, get_session_student, get_session_parent, normalize_mobile, resolve_notification_role
+from dependencies import get_db, check_admin_access, check_user_login, get_enrollment_tuition_and_discount, SESSION_EXPIRY_DAYS, limiter, get_current_user, hash_password, verify_password, ROLE_PERMISSIONS, create_jwt_token, ensure_student_shadow_users, get_session_student, get_session_parent, normalize_mobile, resolve_notification_role, display_name, safe_person_name
 
 router = APIRouter()
 
@@ -109,6 +109,9 @@ def login_user(request: Request, req: LoginRequest, db: Session = Depends(get_db
         # این نسخه جفت را همیشه سازگار نگه می‌دارد (canonical یا legacy): دقیقِ legacy اول، heal جفت فقط
         # اگر canonical آزاد باشد، adopt سایه‌ی canonical فقط اگر مال دیگری نباشد، ساخت با جفت سازگار.
         mob_norm = normalize_mobile(teacher.mobile) or teacher.mobile
+        # FIX(A4): نام معلم یک‌بار و امن ساخته می‌شود تا ساخت/مقایسه/به‌روزرسانی full_name
+        # و پاسخ ورود همه یک مقدار بگیرند (الگوی قدیمی با نام NULL «None None» می‌ساخت).
+        _teacher_name = safe_person_name(teacher.first_name, teacher.last_name, "معلم")
         u = db.query(User).filter(User.username == teacher.mobile).with_for_update().first()
         if u is not None and (u.role or "") == "teacher" and mob_norm != teacher.mobile:
             _owner = db.query(Teacher).filter(Teacher.mobile == mob_norm, Teacher.id != teacher.id).first()
@@ -136,7 +139,7 @@ def login_user(request: Request, req: LoginRequest, db: Session = Depends(get_db
             _candidate = User(
                 username=_new_name,
                 password=teacher.password,  # از Teacher هش کپی می‌شود فقط بار اول
-                full_name=f"{teacher.first_name} {teacher.last_name}",
+                full_name=_teacher_name,
                 role="teacher",
                 sub_role="teacher",
                 branch_id=teacher.branch_id
@@ -156,16 +159,16 @@ def login_user(request: Request, req: LoginRequest, db: Session = Depends(get_db
                 if u is None:
                     raise
                 # همگام‌سازی سبک اگر برنده قدیمی باشد
-                if u.full_name != f"{teacher.first_name} {teacher.last_name}":
-                    u.full_name = f"{teacher.first_name} {teacher.last_name}"
+                if u.full_name != _teacher_name:
+                    u.full_name = _teacher_name
                 if u.branch_id != teacher.branch_id:
                     u.branch_id = teacher.branch_id
                 db.flush()
         else:
             # FIX: فقط full_name و branch_id را همگام کن، نه پسورد
             # اگر موبایل معلم عوض شده باشد، User.username قدیمی می‌ماند – برای همین teacher_id را جدا ذخیره می‌کنیم
-            if u.full_name != f"{teacher.first_name} {teacher.last_name}":
-                u.full_name = f"{teacher.first_name} {teacher.last_name}"
+            if u.full_name != _teacher_name:
+                u.full_name = _teacher_name
             if u.branch_id != teacher.branch_id:
                 u.branch_id = teacher.branch_id
             db.flush()
@@ -187,7 +190,7 @@ def login_user(request: Request, req: LoginRequest, db: Session = Depends(get_db
             "role": "teacher",
             "token": token,
             "user_id": teacher.id,  # برای سازگاری با اندروید که Teacher.id انتظار دارد
-            "name": f"{teacher.first_name} {teacher.last_name}",
+            "name": _teacher_name,
             "branch_id": teacher.branch_id,
             "message": "ورود معلم موفقیت آمیز بود",
         }
@@ -415,7 +418,7 @@ def get_me(authorization: Optional[str] = Header(None), db: Session = Depends(ge
             if user_obj:
                 teacher = db.query(Teacher).filter(Teacher.mobile == user_obj.username).first()
         if teacher:
-            user_name = f"{teacher.first_name} {teacher.last_name}"
+            user_name = display_name(teacher, "نامشخص")
             user_id = teacher.id
     elif role in ["admin", "secretary"]:
         user = db.query(User).filter(User.id == session.user_id).first()
@@ -426,13 +429,13 @@ def get_me(authorization: Optional[str] = Header(None), db: Session = Depends(ge
         student = get_session_parent(db, session)
         if not student:
             raise HTTPException(status_code=401, detail="نشست معتبر نیست؛ لطفاً دوباره وارد شوید")
-        user_name = f"ولی {student.first_name} {student.last_name}"
+        user_name = f"ولی {safe_person_name(student.first_name, student.last_name, 'دانش‌آموز')}"
         user_id = student.id
     elif role == "student":
         student = get_session_student(db, session)
         if not student:
             raise HTTPException(status_code=401, detail="نشست معتبر نیست؛ لطفاً دوباره وارد شوید")
-        user_name = f"{student.first_name} {student.last_name}"
+        user_name = display_name(student, "نامشخص")
         user_id = student.id
             
     return {
@@ -581,7 +584,7 @@ def student_login(request: Request, req: StudentLoginRequest, db: Session = Depe
     return {
         "status": "success",
         "token": token,
-        "student_name": f"{student.first_name} {student.last_name}"
+        "student_name": display_name(student, "نامشخص")
     }
 
 class DeviceTokenRequest(BaseModel):

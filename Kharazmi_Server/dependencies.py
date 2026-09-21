@@ -185,6 +185,28 @@ def resolve_effective_sub_role(user) -> str:
     return role
 
 
+def safe_person_name(first, last, fallback: str = "") -> str:
+    """نام کامل «نام + نام‌خانوادگی» با تحمل NULL — هرگز «None None»/«None» تولید نمی‌کند (FIX A4).
+
+    فیلدهای `first_name`/`last_name` در رکوردهای legacy می‌توانند NULL باشند؛ الگوی قدیمی
+    `f"{first_name} {last_name}"` در گزارش‌ها، رسیدها، پیامک‌ها و لیست‌ها «None None» چاپ می‌کرد.
+    فقط بخش‌های موجود با فاصله به هم می‌چسبند و اگر هیچ بخشی نبود، `fallback` برمی‌گردد.
+    """
+    parts = []
+    for value in (first, last):
+        text = "" if value is None else str(value).strip()
+        if text:
+            parts.append(text)
+    return " ".join(parts) if parts else fallback
+
+
+def display_name(obj, fallback: str = "") -> str:
+    """نام نمایشیِ امن یک موجودیت (Student/Teacher/User/…) — `None` ⇒ `fallback` (FIX A4)."""
+    if obj is None:
+        return fallback
+    return safe_person_name(getattr(obj, "first_name", None), getattr(obj, "last_name", None), fallback)
+
+
 def check_admin_access(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
     # FIX: use signed token verification
     if not authorization:

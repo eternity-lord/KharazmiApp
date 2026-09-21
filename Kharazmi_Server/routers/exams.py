@@ -10,13 +10,14 @@ from sqlalchemy import desc
 
 import models
 from models import Exam, ExamQuestion, ExamAttempt, Course, Student, Teacher, Enrollment, Grade, Attendance, SessionLog
+from storage import storage_dir
 from dependencies import get_db, check_user_login, require_permission, NotificationService, check_student_access, get_session_student, get_session_parent, ensure_student_shadow_users
 
 router = APIRouter()
 
 # Secure Storage for PDF Report Cards
-PDF_DIR = "/home/user/uploads/report_cards"
-os.makedirs(PDF_DIR, exist_ok=True)
+# FIX(storage): ریشهٔ واحد فایل‌ها (پیش‌فرض داخل پروژه) — به‌جای مسیر مطلق ماشین توسعه‌دهنده.
+PDF_DIR = storage_dir("report_cards")
 
 # Pydantic Schemas
 class ExamCreateRequest(BaseModel):
@@ -389,7 +390,7 @@ def export_report_card_pdf(
     
     # Draw simple text file representing PDF and save in uploads folder
     safe_name = f"ReportCard_{student_id}.pdf"
-    file_path = os.path.join(PDF_DIR, safe_name)
+    file_path = os.path.join(storage_dir("report_cards"), safe_name)
     
     # Generate simple, beautiful text representation inside the PDF file
     from reportlab.pdfgen import canvas

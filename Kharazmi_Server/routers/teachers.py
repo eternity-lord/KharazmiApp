@@ -16,6 +16,7 @@ from models import (
 from schemas import (
     HistoryRequest, LoginRequest, TeacherInfo, FullTeacherProfile, StudentCreate, TeacherCreate, CourseCreate, EnrollmentCreate, GradeCreate, GradeItem, AttendanceLogRequest, AttendanceItem, AttendanceSubmitData, SmsSendRequest, ChangePasswordRequest, StudentProfileInfo, FullStudentProfile, TeacherProfileInfo, FullTeacherProfile, ClassReportInfo, ClassStudentData, ClassSessionHistory, FullClassReport, ShareConfigModel, StudentUpdate, TeacherUpdate, PersonListItem, TransactionUpdate, StudentAttendanceHistoryRequest, AdvancedSearchItem, FinanceSubmitData, PrintReceiptRequest, TransactionTestData, SettleRequest, TeacherListItem
 )
+from storage import storage_dir, resolve_existing
 from dependencies import get_db, check_admin_access, check_admin_or_secretary_access, check_user_login, get_enrollment_tuition_and_discount, SESSION_EXPIRY_DAYS, hash_password, verify_password, limiter, normalize_mobile, validate_image_upload
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill
@@ -578,7 +579,7 @@ async def upload_teacher_photo(id: int, file: UploadFile = File(...), db: Sessio
         
     # Generate unique filename
     unique_filename = f"{uuid.uuid4().hex}{file_ext}"
-    filepath = os.path.join("uploads/profiles", unique_filename)
+    filepath = os.path.join(storage_dir("profiles"), unique_filename)
     
     # Write to disk
     with open(filepath, "wb") as f_out:
@@ -586,8 +587,9 @@ async def upload_teacher_photo(id: int, file: UploadFile = File(...), db: Sessio
         
     # Delete old file
     if teacher.profile_image:
-        old_path = os.path.join("uploads/profiles", teacher.profile_image)
-        if os.path.exists(old_path):
+        # پاک‌کردن فایل قبلی — حتی اگر در مسیر قدیمی (نسبت به cwd) مانده باشد
+        old_path = resolve_existing("profiles", teacher.profile_image)
+        if old_path:
             try:
                 os.remove(old_path)
             except Exception:

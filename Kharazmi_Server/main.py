@@ -25,6 +25,7 @@ app = FastAPI(
 from slowapi.errors import RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
 from dependencies import limiter, check_user_login
+from storage import storage_dir, resolve_existing
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
@@ -83,7 +84,9 @@ app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(audit_trail.AuditContextMiddleware)
 
 # FIX M3: پوشه‌ی آپلود نگه داشته می‌شود ولی سرو عمومی StaticFiles حذف شد.
-os.makedirs("uploads/profiles", exist_ok=True)
+# FIX(storage): پوشهٔ آپلود با مسیر مطلقِ مستقل از cwd ساخته می‌شود (قبلاً "uploads/profiles"
+# یعنی بسته به پوشهٔ اجرای سرور، فایل‌ها جای دیگری می‌رفتند و سرو شدنشان ۴۰۴ می‌شد).
+storage_dir("profiles")
 
 
 # FIX M3: سرو فایل آپلودی فقط برای لاگین‌کرده‌ها (به‌جای StaticFiles عمومی).
@@ -95,8 +98,9 @@ def serve_upload(filename: str, _: str = Depends(check_user_login)):
     safe = os.path.basename(filename)
     if not safe or safe.startswith("."):
         raise HTTPException(status_code=400, detail="نام فایل معتبر نیست")
-    path = os.path.join("uploads/profiles", safe)
-    if not os.path.isfile(path):
+    # FIX(storage): اول ریشهٔ فعلی، بعد مسیرهای قدیمی (سازگاری عقب‌رو ⇒ عکس‌های قدیمی ۴۰۴ نمی‌شوند)
+    path = resolve_existing("profiles", safe)
+    if not path or not os.path.isfile(path):
         raise HTTPException(status_code=404, detail="فایل یافت نشد")
     return FileResponse(path)
 

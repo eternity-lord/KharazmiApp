@@ -10,13 +10,14 @@ from sqlalchemy import desc, or_
 
 import models
 from models import Conversation, ConversationParticipant, Message, Course, Student, Teacher, Enrollment, User
+from storage import storage_dir
 from dependencies import get_db, check_user_login, require_permission, NotificationService, resolve_participant_keys, resolve_notification_recipient
 
 router = APIRouter()
 
 # Secure Storage Configuration for Messenger Attachments
-UPLOAD_DIR = "/home/user/uploads/messages"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+# FIX(storage): ریشهٔ واحد فایل‌ها (پیش‌فرض داخل پروژه) — به‌جای مسیر مطلق ماشین توسعه‌دهنده.
+UPLOAD_DIR = storage_dir("messages")
 
 # Size limit: 10 MB
 MAX_FILE_SIZE = 10 * 1024 * 1024

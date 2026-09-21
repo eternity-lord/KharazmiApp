@@ -10,13 +10,15 @@ from sqlalchemy import desc
 
 import models
 from models import Homework, HomeworkSubmission, Course, Enrollment, Student, Teacher
+from storage import storage_dir
 from dependencies import get_db, check_user_login, require_permission, NotificationService, get_session_student, get_session_parent, ensure_student_shadow_users
 
 router = APIRouter()
 
 # Secure Storage Configuration
-UPLOAD_DIR = "/home/user/uploads/homework"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+# FIX(storage): مسیر پیش‌فرض داخلی پروژه (قابل تغییر با KHARAZMI_UPLOAD_ROOT) —
+# الگوی قبلی مسیر مطلق ماشین توسعه‌دهنده بود و در CI/سرور دیگر import را می‌شکست.
+UPLOAD_DIR = storage_dir("homework")
 
 # Size limit: 10 MB
 MAX_FILE_SIZE = 10 * 1024 * 1024
@@ -205,7 +207,8 @@ async def submit_homework_file(
     # File upload validation
     ext = validate_file(file)
     safe_name = sanitize_filename(file.filename)
-    file_path = os.path.join(UPLOAD_DIR, safe_name)
+    # در زمان نوشتن دوباره resolve می‌شود تا override محیطی/تست معتبر باشد
+    file_path = os.path.join(storage_dir("homework"), safe_name)
     
     # Save the file securely
     contents = await file.read()

@@ -5,6 +5,7 @@ from typing import List, Optional, Union
 from sqlalchemy import desc, or_, text, func, case
 import io
 import json  # FIX(A2): snapshot_json برای رکورد حذف کلاس
+from storage import storage_dir, resolve_existing
 import uuid
 import os
 import datetime
@@ -1555,7 +1556,7 @@ async def upload_institute_logo(file: UploadFile = File(...), db: Session = Depe
         
     # Generate unique filename
     unique_filename = f"logo_{uuid.uuid4().hex}{file_ext}"
-    filepath = os.path.join("uploads/profiles", unique_filename)
+    filepath = os.path.join(storage_dir("profiles"), unique_filename)
     
     # Write to disk
     with open(filepath, "wb") as f_out:
@@ -1563,8 +1564,9 @@ async def upload_institute_logo(file: UploadFile = File(...), db: Session = Depe
         
     # Delete old file
     if settings.logo_path:
-        old_path = os.path.join("uploads/profiles", settings.logo_path)
-        if os.path.exists(old_path):
+        # پاک‌کردن لوگوی قبلی — حتی اگر در مسیر قدیمی (نسبت به cwd) مانده باشد
+        old_path = resolve_existing("profiles", settings.logo_path)
+        if old_path:
             try:
                 os.remove(old_path)
             except Exception:

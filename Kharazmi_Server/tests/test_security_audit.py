@@ -2,7 +2,8 @@ import sys
 import os
 
 # Add parent directory to path so main can be imported
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+# FIX(tests-dir): مسیر کد سرور یک سطح بالاتر از پوشهٔ tests/ است.
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from fastapi import Depends
 from main import app

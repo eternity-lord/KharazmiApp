@@ -20,7 +20,8 @@ from today_summary import jalali_date_string
 # FIX(B1): مسیر فایل‌های سرور مستقل از پوشهٔ اجرا — نسبت به محل همین فایل تست، نه cwd.
 # الگوی قدیمی `open("Kharazmi_Server/routers/x.py")` فقط وقتی کار می‌کرد که سوئیت از ریشهٔ ریپو
 # اجرا شود و از داخل `Kharazmi_Server/` (یا هر پوشهٔ دیگر) با FileNotFoundError می‌شکست.
-_SERVER_DIR = os.path.dirname(os.path.abspath(__file__))
+# FIX(tests-dir): تست‌ها به پوشهٔ `tests/` منتقل شدند ⇒ پوشهٔ سرور یک سطح بالاتر است.
+_SERVER_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def _server_file(*parts):

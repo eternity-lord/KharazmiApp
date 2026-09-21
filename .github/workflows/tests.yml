@@ -58,11 +58,11 @@ jobs:
           echo "DB_BEFORE=$(md5sum Kharazmi_Server/gaj_db.db | cut -d' ' -f1)" >> "$GITHUB_ENV"
 
       - name: Run full suite from repository root
-        run: python -m pytest Kharazmi_Server -q
+        run: python -m pytest Kharazmi_Server/tests -q
 
       - name: Run suite from inside Kharazmi_Server (cwd-independence guard, B1)
         working-directory: Kharazmi_Server
-        run: python -m pytest test_audit.py test_dashboard.py test_dashboard_performance.py test_suite_cwd_independence.py -q
+        run: python -m pytest tests/test_audit.py tests/test_dashboard.py tests/test_dashboard_performance.py tests/test_suite_cwd_independence.py -q
 
       - name: Guard - real institute database untouched
         run: |

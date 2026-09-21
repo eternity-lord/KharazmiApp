@@ -504,7 +504,8 @@ class TestAuditTrailEndToEnd(AuditTrailBase):
 class TestIsolationFromProtectedRouters(unittest.TestCase):
 
     def test_protected_routers_are_untouched(self):
-        routers_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "routers")
+        # FIX(tests-dir): پوشهٔ سرور یک سطح بالاتر از پوشهٔ tests/ است.
+        routers_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "routers")
         for name in PROTECTED_ROUTERS:
             path = os.path.join(routers_dir, f"{name}.py")
             with open(path, encoding="utf-8") as handle:

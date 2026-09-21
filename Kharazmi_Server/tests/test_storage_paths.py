@@ -36,7 +36,8 @@ import storage
 from dependencies import get_db, hash_password
 from main import app
 
-SERVER_DIR = os.path.dirname(os.path.abspath(__file__))
+# FIX(tests-dir): این فایل در tests/ است؛ کد سرور یک سطح بالاتر قرار دارد.
+SERVER_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SEARCH_DIRS = (SERVER_DIR, os.path.join(SERVER_DIR, "routers"))
 # مسیرهای مطلقِ ماشینی که نباید در کد باشند (فقط storage.py به‌عنوان سازگاری عقب‌رو مجاز است)
 FORBIDDEN_ABSOLUTE_PREFIXES = ("/home/user", "/root/", "/Users/", "/var/www", "C:\\")

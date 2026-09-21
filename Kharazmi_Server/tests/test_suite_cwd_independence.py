@@ -15,7 +15,7 @@
 #
 # اجرا (از ریشهٔ ریپو):
 #   DATABASE_URL=sqlite:////tmp/b1.db JWT_SECRET_KEY=<hex> \
-#     python3 -m pytest Kharazmi_Server/test_suite_cwd_independence.py -q
+#     python3 -m pytest Kharazmi_Server/tests/test_suite_cwd_independence.py -q
 import io
 import os
 import subprocess
@@ -23,8 +23,11 @@ import sys
 import tokenize
 import unittest
 
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # ریشهٔ ریپو
-SERVER_DIR = os.path.join(REPO_ROOT, "Kharazmi_Server")
+# FIX(tests-dir): این فایل اکنون در `Kharazmi_Server/tests/` است ⇒
+#   TESTS_DIR = پوشهٔ همین فایل | SERVER_DIR = یک سطح بالاتر | REPO_ROOT = دو سطح بالاتر
+TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
+SERVER_DIR = os.path.dirname(TESTS_DIR)
+REPO_ROOT = os.path.dirname(SERVER_DIR)
 
 # همان ۵ تستی که پیش از B1 از داخل Kharazmi_Server/ با FileNotFoundError می‌شکستند
 PREVIOUSLY_CWD_DEPENDENT = [
@@ -63,10 +66,10 @@ def relative_server_path_lines(path):
 class TestNoRelativeServerPaths(unittest.TestCase):
     def test_no_relative_kharazmi_server_paths_in_tests(self):
         offenders = []
-        for name in sorted(os.listdir(SERVER_DIR)):
+        for name in sorted(os.listdir(TESTS_DIR)):
             if not (name.startswith("test_") and name.endswith(".py")):
                 continue
-            path = os.path.join(SERVER_DIR, name)
+            path = os.path.join(TESTS_DIR, name)
             offenders.extend(f"{name}:{lineno}" for lineno in relative_server_path_lines(path))
         self.assertEqual(offenders, [], f"مسیر وابسته به cwd در تست‌ها پیدا شد: {offenders}")
 
@@ -90,7 +93,7 @@ class TestPytestIniPinsDiscovery(unittest.TestCase):
         self.assertIn("[pytest]", content)
         self.assertIn("testpaths", content)
         self.assertIn("Kharazmi_Server", content,
-                      "testpaths باید مجموعهٔ Kharazmi_Server را تثبیت کند")
+                      "testpaths باید مجموعهٔ تست‌های Kharazmi_Server را تثبیت کند")
         self.assertIn("KharazmiAdmin", content,
                       "درخت اندروید باید از کشف تست‌ها بیرون بماند")
 
@@ -98,13 +101,14 @@ class TestPytestIniPinsDiscovery(unittest.TestCase):
 class TestSuiteRunsFromServerDirectory(unittest.TestCase):
     """سنجش رفتاری: همان ۵ تست باید از داخل Kharazmi_Server/ هم سبز باشند."""
 
-    def test_previously_failing_tests_pass_with_server_cwd(self):
+    def test_previously_failing_tests_pass_with_server_cwd(self):  # noqa: D401
         env = dict(os.environ)
         env.setdefault("JWT_SECRET_KEY", "b1-cwd-independence-secret")
         env.setdefault("DATABASE_URL", "sqlite:////tmp/b1_cwd_independence.db")
         env.pop("PYTHONPATH", None)  # مثل اجرای مستند پروژه: اتکا به مسیر خودِ تست
         result = subprocess.run(
-            [sys.executable, "-m", "pytest", *PREVIOUSLY_CWD_DEPENDENT, "-q", "-p", "no:randomly"],
+            [sys.executable, "-m", "pytest", *[os.path.join("tests", node) for node in PREVIOUSLY_CWD_DEPENDENT],
+             "-q", "-p", "no:randomly"],
             cwd=SERVER_DIR, env=env, capture_output=True, text=True, timeout=600,
         )
         tail = (result.stdout or "")[-1500:] + (result.stderr or "")[-500:]
@@ -121,7 +125,7 @@ class TestSuiteRunsFromServerDirectory(unittest.TestCase):
         env.pop("PYTHONPATH", None)
         result = subprocess.run(
             [sys.executable, "-m", "pytest",
-             os.path.join(SERVER_DIR, "test_audit.py::TestAuditRadar::test_no_silent_except_pass"),
+             os.path.join(TESTS_DIR, "test_audit.py::TestAuditRadar::test_no_silent_except_pass"),
              "-q", "-p", "no:randomly"],
             cwd=REPO_ROOT, env=env, capture_output=True, text=True, timeout=600,
         )

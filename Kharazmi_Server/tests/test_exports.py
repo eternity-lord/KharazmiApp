@@ -247,7 +247,9 @@ class TestExportsCSV(unittest.TestCase):
     def test_exports_module_has_no_write_calls(self):
         # مسیر مستقل از cwd — سوئیت از دو نقطه‌ی مختلف اجرا می‌شود (Kharazmi_Server/ و ریشه‌ی ریپو)
         # و بعضی تست‌های قدیمی (test_dashboard) عمداً از مسیر نسبی ریشه استفاده می‌کنند.
-        module_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "routers", "exports.py")
+        # FIX(tests-dir): پوشهٔ سرور یک سطح بالاتر از پوشهٔ tests/ است.
+        module_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                   "routers", "exports.py")
         with open(module_path, encoding="utf-8") as f:
             src = f.read()
         for forbidden in ("db.commit(", "db.add(", "db.add_all(", "db.delete(", "db.flush("):

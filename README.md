@@ -11,6 +11,10 @@
 
 ## Running tests
 
+> **ساختار تست‌ها:** همهٔ تست‌های پایتونی در پوشهٔ `Kharazmi_Server/tests/` قرار دارند
+> (فایل‌های `test_*.py`). `Kharazmi_Server/tests/conftest.py` مسیر ماژول‌های سرور را در
+> `sys.path` تثبیت می‌کند تا اجرای تست‌ها از **هر پوشه‌ای** کار کند.
+
 ### پیش‌نیاز
 
 - Python 3.11
@@ -29,24 +33,24 @@ python3 -m venv .venv
 # از ریشهٔ ریپو (روش مستند پروژه)
 DATABASE_URL=sqlite:////tmp/kharazmi_test.db \
 JWT_SECRET_KEY=test-secret-not-production \
-python3 -m pytest Kharazmi_Server -q
+python3 -m pytest Kharazmi_Server/tests -q
 ```
 
 سوئیت **مستقل از پوشهٔ اجرا** است؛ هر یک از این دو هم کار می‌کند:
 
 ```bash
-# از ریشه — کشف تست‌ها از pytest.ini (testpaths = Kharazmi_Server)
+# از ریشه — کشف تست‌ها از pytest.ini (testpaths = Kharazmi_Server/tests)
 pytest -q
 
 # از داخل خود پوشهٔ سرور
-cd Kharazmi_Server && pytest -q
+cd Kharazmi_Server && pytest tests -q
 ```
 
 ### اجرای یک فایل یا یک تست
 
 ```bash
-python3 -m pytest Kharazmi_Server/test_finance_flow.py -q
-python3 -m pytest "Kharazmi_Server/test_reports.py::TestReports::test_student_statement" -q
+python3 -m pytest Kharazmi_Server/tests/test_reports.py -q
+python3 -m pytest "Kharazmi_Server/tests/test_reports.py::TestReports::test_student_statement" -q
 ```
 
 ### نکته‌ها
@@ -54,7 +58,7 @@ python3 -m pytest "Kharazmi_Server/test_reports.py::TestReports::test_student_st
 - **`DATABASE_URL` را حتماً موقت بگیرید** (`/tmp/...`). بدون آن، `from main import app` روی دیتابیس پیش‌فرض پروژه کار می‌کند.
 - `JWT_SECRET_KEY` در تست‌ها می‌تواند هر مقدار تستی باشد؛ **هرگز** مقدار واقعی محیط تولید را در ترمینال/فایل تست نگذارید.
 - تست‌های مربوط به ریت‌لیمیت در چند فایل به‌صورت داخلی `limiter.enabled = False` می‌کنند (الگوی موجود پروژه).
-- `pytest.ini` در ریشه، مسیر کشف تست‌ها را تثبیت می‌کند و درخت اندروید (`KharazmiAdmin/`) و مستندات (`checkpoints/`) را از کشف تست بیرون می‌گذارد.
+- `pytest.ini` در ریشه، مسیر کشف تست‌ها (`Kharazmi_Server/tests`) را تثبیت می‌کند و درخت اندروید (`KharazmiAdmin/`) و مستندات (`checkpoints/`) را از کشف تست بیرون می‌گذارد.
 
 ### CI (گیت‌هاب اکشنز)
 

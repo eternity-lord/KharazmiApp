@@ -670,6 +670,8 @@
     <string name="tprof_row">%1$s%2$s (حاضرین: %3$s نفر)</string>
     <string name="tprof_date">📅 تاریخ برگزاری: %1$s</string>
     <!-- FIX(undated-sessions): جلسه‌ی بدون تاریخ (سرور "" برمی‌گرداند) به‌جای خط خالی -->
+    <!-- FIX(A3): برچسب محور نمودار برای جلسه‌ی بدون تاریخ (سرور "" برمی‌گرداند) -->
+    <string name="chart_date_unknown">تاریخ نامشخص</string>
     <string name="tprof_date_unknown">📅 تاریخ برگزاری: نامشخص</string>
     <string name="tprof_sessions">%1$s جلسه</string>
     <string name="tprof_settled_date">📅 تاریخ تسویه: %1$s</string>

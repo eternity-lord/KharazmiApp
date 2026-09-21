@@ -55,6 +55,47 @@ def get_user_branch_filter(db: Session, authorization: Optional[str], branch_id:
         pass
     return branch_id
 
+def _parsed_project_date(value):
+    """تاریخ (شمسی/میلادی) را parse می‌کند؛ مقدار نامعلوم/نامعتبر ⇒ None (بدون استثنا)."""
+    from today_summary import parse_project_date  # lazy، الگوی موجود پروژه
+    try:
+        return parse_project_date(value)
+    except Exception:
+        return None
+
+
+def _date_in_range(value, start_day, end_day) -> bool:
+    """فیلتر بازهٔ تاریخ با سیاست «هیچ ردیف مالی بی‌صدا حذف نشود» (FIX A3).
+
+    پیش‌تر این تابع در `reports.py` برای هر مقدار غیرقابل‌parse — از جمله `date = NULL` —
+    `return False` می‌داد و ردیف از گزارش‌ها (نمودار درآمد، روند حضور، چارت سهم‌ها و گزارش
+    مالی) حذف می‌شد؛ حتی وقتی کاربر هیچ بازه‌ای درخواست نکرده بود. نتیجه: جمع مالی آموزشگاه
+    کمتر از واقع نمایش داده می‌شد. (همان باگی که در «طلب تسویه‌نشدهٔ معلم» رفع شد.)
+
+    سیاست فعلی:
+      • بدون بازه ⇒ همهٔ ردیف‌ها می‌آیند (تاریخ‌دار و بی‌تاریخ).
+      • با بازه ⇒ فقط ردیف‌های دارای تاریخِ معتبر محدود می‌شوند؛ ردیف بی‌تاریخ/نامعتبر
+        می‌ماند (نمی‌توان اثبات کرد بیرون بازه است) و هیچ تاریخ جعلی ساخته نمی‌شود.
+    """
+    parsed = _parsed_project_date(value)
+    if parsed is None:
+        return True
+    if start_day is not None and parsed < start_day:
+        return False
+    if end_day is not None and parsed > end_day:
+        return False
+    return True
+
+
+def _api_date_or_blank(value) -> str:
+    """تاریخِ قابل‌نمایش در API: تاریخ معتبر ⇒ همان مقدار ذخیره‌شده؛ نامعلوم ⇒ "".
+
+    کلاینت‌ها (اپ اندروید) مدل `String` غیر-null دارند؛ فرستادن `null` یا تاریخ جعلی
+    ممنوع است. مقدار خام دیتابیس هم دست‌کاری نمی‌شود.
+    """
+    return value if _parsed_project_date(value) is not None else ""
+
+
 @router.get("/reports/chart-data")
 def get_chart_data(
     class_id: Optional[int] = None,
@@ -66,18 +107,12 @@ def get_chart_data(
 ):
     # FIX H3-B3: boundaries may be Jalali (app ranges) or Gregorian; Transaction.date mixes both
     # by row type, so SQL string ranges can't bound it — parse and filter in Python.
-    from today_summary import parse_project_date  # lazy, same pattern as routers/analytics.py
-    start_day = parse_project_date(start_date) if start_date else None
-    end_day = parse_project_date(end_date) if end_date else None
-    def _in_range(value):
-        parsed = parse_project_date(value)
-        if parsed is None:
-            return False
-        if start_day is not None and parsed < start_day:
-            return False
-        if end_day is not None and parsed > end_day:
-            return False
-        return True
+    # FIX(A3): فیلتر/نمایش تاریخ از helper مشترک ماژول می‌آید (ردیف بی‌تاریخ حذف نمی‌شود).
+    start_day = _parsed_project_date(start_date) if start_date else None
+    end_day = _parsed_project_date(end_date) if end_date else None
+
+    def _in_range(value):  # سازگاری با فراخوانی‌های همین تابع
+        return _date_in_range(value, start_day, end_day)
 
     # 1. Income Chart (existing + filters)
     # FIX: Bug 12 - exclude archived Transaction rows from this active view.
@@ -107,7 +142,13 @@ def get_chart_data(
     if class_id:
         q_sessions = q_sessions.filter(SessionLog.course_id == class_id)
 
-    sessions = [s for s in q_sessions.order_by(SessionLog.date.asc()).all() if _in_range(s.date)]
+    sessions = [s for s in q_sessions.all() if _in_range(s.date)]
+    # FIX(A3): ترتیب قطعی (deterministic) — تاریخ معتبر صعودی، ردیف‌های بی‌تاریخ در انتها و
+    # در تاریخ یکسان، id صعودی. پیش‌تر ترتیب به رفتار دیتابیس در NULL وابسته بود (در SQLite
+    # اول، در PostgreSQL آخر) ⇒ خروجی بین محیط‌ها تفاوت داشت.
+    sessions.sort(key=lambda s: (_parsed_project_date(s.date) is None,
+                                 _parsed_project_date(s.date) or datetime.date.min,
+                                 s.id))
     session_ids = [s.id for s in sessions]
     attendance_trend = []
     
@@ -139,7 +180,8 @@ def get_chart_data(
             total = present + absent
             pct = (present / total * 100) if total > 0 else 100.0
             attendance_trend.append({
-                "date": s.date,
+                # FIX(A3): مقدار نامعلوم ⇒ "" (بدون تاریخ جعلی و بدون null برای کلاینت)
+                "date": _api_date_or_blank(s.date),
                 "present": present,
                 "absent": absent,
                 "percentage": round(pct, 1)
@@ -202,18 +244,12 @@ def get_financial_report(
     resolved_branch = get_user_branch_filter(db, authorization, branch_id)
     # FIX H3-B3: boundaries may be Jalali or Gregorian; Transaction.date mixes both by row type —
     # parse and filter in Python (same pattern as get_chart_data above).
-    from today_summary import parse_project_date  # lazy, same pattern as routers/analytics.py
-    start_day = parse_project_date(start_date) if start_date else None
-    end_day = parse_project_date(end_date) if end_date else None
+    # FIX(A3): همان helper مشترک — ردیف بی‌تاریخ از گزارش مالی حذف نمی‌شود.
+    start_day = _parsed_project_date(start_date) if start_date else None
+    end_day = _parsed_project_date(end_date) if end_date else None
+
     def _in_range(value):
-        parsed = parse_project_date(value)
-        if parsed is None:
-            return False
-        if start_day is not None and parsed < start_day:
-            return False
-        if end_day is not None and parsed > end_day:
-            return False
-        return True
+        return _date_in_range(value, start_day, end_day)
     # FIX: Bug 12 - exclude archived Transaction rows from this active view.
     query = db.query(Transaction).filter(Transaction.is_deleted == False, Transaction.is_reversed == False)
     if resolved_branch is not None:
@@ -241,7 +277,8 @@ def get_financial_report(
                 "student_id": student_id,
                 "student_name": st_name,
                 "amount": t.amount,
-                "date": t.date,
+                # FIX(A3): تاریخ نامعلوم ⇒ "" (نه null؛ نه تاریخ جعلی)
+                "date": _api_date_or_blank(t.date),
                 "description": t.description,
                 "payment_method": t.payment_method,
             }

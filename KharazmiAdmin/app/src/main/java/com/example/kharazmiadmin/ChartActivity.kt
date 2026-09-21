@@ -320,9 +320,12 @@ class ChartActivity : BaseActivity() {
         val entries = ArrayList<Entry>()
         val labels = ArrayList<String>()
 
+        val unknownDate = getString(R.string.chart_date_unknown)
         for (i in data.indices) {
             entries.add(Entry(i.toFloat(), data[i].percentage.toFloat()))
-            labels.add(data[i].date)
+            // FIX(A3): سرور برای جلسه‌ی بدون تاریخ "" برمی‌گرداند (هیچ تاریخ جعلی ساخته نمی‌شود)
+            // ⇒ به‌جای برچسب خالی، «تاریخ نامشخص» روی محور نمایش داده می‌شود.
+            labels.add(data[i].date.takeIf { it.isNotBlank() } ?: unknownDate)
         }
 
         val dataSet = LineDataSet(entries, getString(R.string.chart_line_att))

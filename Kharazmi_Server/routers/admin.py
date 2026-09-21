@@ -313,7 +313,10 @@ def delete_teacher(teacher_id: int, db: Session = Depends(get_db), _: str = Depe
         raise HTTPException(status_code=404, detail="معلم یافت نشد")
 
     # Check if teacher has any active classes
-    active_classes = db.query(Course).filter(Course.teacher_id == teacher_id).count()
+    # FIX O-11: «فعال» یعنی آرشیو نشده. قبلاً هر کلاس (حتی حذف‌شده) شمرده می‌شد و معلمی که
+    # فقط کلاس آرشیوشده داشت قابل حذف نبود؛ پیام «N کلاس فعال دارد» هم درست نبود.
+    active_classes = db.query(Course).filter(Course.teacher_id == teacher_id,
+                                             Course.is_deleted == False).count()
     if active_classes > 0:
         raise HTTPException(
             status_code=400,

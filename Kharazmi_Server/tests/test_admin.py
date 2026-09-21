@@ -247,6 +247,36 @@ class TestAdminRouter(unittest.TestCase):
         result_del = delete_teacher(teacher_id=self.other_teacher.id, db=self.db, _="admin")
         self.assertIn("حذف", result_del["message"])
 
+    def test_delete_teacher_allowed_when_all_classes_are_archived(self):
+        """O-11: کلاس آرشیوشده نباید مانع حذف معلم شود.
+
+        قبلاً `active_classes = query(Course).filter(teacher_id).count()` بود ⇒ هر کلاس
+        آرشیوشده هم «فعال» شمرده می‌شد و پیام «این معلم N کلاس فعال دارد» درست نبود.
+        """
+        self.db.query(Course).filter(Course.teacher_id == self.teacher.id).update({"is_deleted": True})
+        self.db.commit()
+
+        result = delete_teacher(teacher_id=self.teacher.id, db=self.db, _="admin")
+        self.assertIn("حذف", result["message"], result)
+        self.db.refresh(self.teacher)
+        self.assertTrue(self.teacher.is_deleted, "معلم باید سافت‌دیلیت شود")
+        self.assertEqual(self.db.query(Course).filter(Course.teacher_id == self.teacher.id,
+                                                      Course.is_deleted == True).count(), 1,
+                         "کلاس آرشیوشده باید دست‌نخورده بماند")
+
+    def test_delete_teacher_message_counts_only_active_classes(self):
+        """O-11: عدد داخل پیام باید فقط کلاس‌های **فعال** را بشمارد."""
+        self.db.add(Course(title="کلاس آرشیو", code="C-2", teacher_id=self.teacher.id,
+                           is_admin_approved=True, is_deleted=True))
+        self.db.commit()
+
+        with self.assertRaises(HTTPException) as e:
+            delete_teacher(teacher_id=self.teacher.id, db=self.db, _="admin")
+        self.assertEqual(e.exception.status_code, 400)
+        self.assertIn("1 کلاس فعال", e.exception.detail,
+                      f"پیام باید فقط کلاس فعال را بشمارد: {e.exception.detail}")
+        self.assertNotIn("2 کلاس فعال", e.exception.detail)
+
     def test_admin_dependency_blocks_non_admin(self):
         with self.assertRaises(HTTPException) as e:
             check_admin_access("Bearer teacher-token", self.db)

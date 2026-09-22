@@ -103,10 +103,23 @@ class TeacherDashboardActivity : BaseActivity() {
 
         // ============================================================
         // 4. دکمه ثبت حواله / شهریه (لینک به InvoiceActivity)
+        // FIX (گروه۳/آیتم۱۱): این صفحه پنل **معلم** است (LoginActivity فقط با
+        // `response.role == "teacher"` اینجا می‌آید و EditStudentActivity.returnToDashboard
+        // هم فقط برای `userRole == "teacher"`) و ثبت حواله/وصول پول کار ادمین/منشی است ⇒
+        // کارت برای غیر ادمین پنهان می‌شود و listener هم فقط در شاخهٔ ادمین ثبت می‌گردد
+        // (دکمهٔ پنهانِ کلیک‌پذیر = راه فرار). همان چک نقش موجود پروژه:
+        // `UserCreds` → `USER_SUB_ROLE` (مثل ClassDetailActivity:334) — الگوی جدید نساختیم.
         // ============================================================
-        findViewById<MaterialCardView>(R.id.cardFastInvoice).setOnClickListener {
-            val intent = Intent(this, InvoiceActivity::class.java)
-            startActivity(intent)
+        val credsPrefs = getSharedPreferences("UserCreds", Context.MODE_PRIVATE)
+        val subRole = credsPrefs.getString("USER_SUB_ROLE", "admin") ?: "admin"
+        val cardFastInvoice = findViewById<MaterialCardView>(R.id.cardFastInvoice)
+        if (subRole != "admin") {
+            cardFastInvoice.visibility = android.view.View.GONE
+        } else {
+            cardFastInvoice.setOnClickListener {
+                val intent = Intent(this, InvoiceActivity::class.java)
+                startActivity(intent)
+            }
         }
         // ============================================================
 

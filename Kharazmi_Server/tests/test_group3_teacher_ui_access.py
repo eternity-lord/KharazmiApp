@@ -56,7 +56,8 @@ def strip_comments(source: str) -> str:
 def function_body(source: str, name: str) -> str:
     """بدنهٔ یک تابع کاتلین تا شروع تابع هم‌سطح بعدی (برای گاردِ «فقط در این مسیر»)."""
     code = strip_comments(source)
-    match = re.search(r"\n\s*(?:private |internal |public )?fun\s+" + re.escape(name) + r"\s*\(", code)
+    match = re.search(r"\n\s*(?:(?:private|internal|public|override|open|suspend)\s+)*fun\s+"
+                      + re.escape(name) + r"\s*\(", code)
     assert match, f"تابع {name} در سورس پیدا نشد"
     rest = code[match.end():]
     nxt = re.search(r"\n\s{0,4}(?:private |internal |public |override )*fun\s+\w+", rest)
@@ -102,6 +103,48 @@ class TestItem10SettlementPopupButton(unittest.TestCase):
         """الگوی موجود (جلسه/حضوروغیاب) نباید رگرسیون کند."""
         src = strip_comments(kt("AttendanceActivity.kt"))
         self.assertRegex(src, GONE.format(btn="btnRegisterAgain"))
+
+
+class TestItem11TeacherDashboardInvoiceButton(unittest.TestCase):
+    """آیتم ۱۱ — حذف «ثبت حواله» از داشبورد معلم.
+
+    ریشه: `TeacherDashboardActivity` کارت `cardFastInvoice` را **بدون هیچ چک نقشی**
+    به `InvoiceActivity` وصل می‌کرد، در حالی که این صفحه فقط پنل معلم است
+    (`LoginActivity` تنها وقتی `response.role == "teacher"` باشد اینجا می‌آید و
+    `EditStudentActivity.returnToDashboard` هم فقط برای `userRole == "teacher"`).
+    ثبت حواله/وصول پول کار ادمین/منشی است ⇒ نباید در پنل معلم دیده شود.
+    چک نقش، همان الگوی غالب پروژه است: `UserCreds` → `USER_SUB_ROLE`
+    (مثل `ClassDetailActivity:334` و `StudentProfileActivity:275`) — الگوی جدید نساختیم.
+    """
+
+    def test_11a_fast_invoice_card_is_role_gated_and_hidden(self):
+        body = function_body(kt("TeacherDashboardActivity.kt"), "onCreate")
+        self.assertIn("R.id.cardFastInvoice", body, "کارت ثبت حواله در همین صفحه است")
+        # چک نقش موجود پروژه خوانده می‌شود (نه یک سازوکار جدید)
+        self.assertRegex(body, r'getSharedPreferences\("UserCreds"')
+        self.assertRegex(body, r'getString\("USER_SUB_ROLE",\s*"admin"\)')
+        gate = body[body.index("USER_SUB_ROLE"):]
+        self.assertRegex(gate, r'subRole\s*!=\s*"admin"',
+                         "باید شاخهٔ «غیر ادمین» داشته باشد")
+        self.assertRegex(gate, r"cardFastInvoice\.visibility\s*=\s*(android\.view\.)?View\.GONE",
+                         "کارت ثبت حواله باید برای معلم پنهان شود")
+
+    def test_11b_the_invoice_shortcut_only_stays_for_admin(self):
+        """listener باید **بعد از** گارد نقش بیاید ⇒ برای معلم هرگز ثبت نمی‌شود."""
+        body = function_body(kt("TeacherDashboardActivity.kt"), "onCreate")
+        gate = body[body.index("USER_SUB_ROLE"):]
+        self.assertGreater(gate.index("cardFastInvoice.setOnClickListener"),
+                           gate.index('subRole != "admin"'),
+                           "ثبت listener باید داخل شاخهٔ ادمین باشد، نه قبل از گارد نقش")
+
+    def test_11c_other_teacher_dashboard_shortcuts_are_untouched(self):
+        """فقط «ثبت حواله» حذف می‌شود؛ بقیهٔ میان‌برهای پنل معلم سر جایشان می‌مانند."""
+        body = function_body(kt("TeacherDashboardActivity.kt"), "onCreate")
+        for card in ("cardRegisterStudent", "cardRegisterClass", "cardAttendance",
+                     "cardIncompleteClasses", "cardReports"):
+            self.assertIn(f"R.id.{card}", body, f"میان‌بر {card} نباید حذف شود")
+            self.assertRegex(body, r"R\.id\." + card + r"\)\.setOnClickListener",
+                             f"listener {card} باید سر جایش بماند")
 
 
 if __name__ == "__main__":

@@ -470,6 +470,12 @@ class TeacherProfileActivity : BaseActivity() {
 
                     dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnPrintRemittance).visibility = View.GONE
                     dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnSaveAsPdf).visibility = View.GONE
+                    // FIX (گروه۳/آیتم۱۰): این پاپ‌آپ لی‌اوت مشترک «ثبت حواله» را inflate می‌کند،
+                    // ولی اینجا **تسویهٔ حساب معلم** است نه پرداخت دانش‌آموز ⇒ دکمهٔ
+                    // «ثبت مجدد برای دانش‌آموز دیگر» بی‌معنا بود (و در این مسیر listener هم نداشت ⇒
+                    // کلیکش هیچ کاری نمی‌کرد). همان الگوی موجود در AttendanceActivity:813.
+                    // دکمه فقط در مسیر ثبت حوالهٔ دانش‌آموز (InvoiceActivity) فعال می‌ماند.
+                    dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnRegisterAgain).visibility = View.GONE
                     
                     val btnClose = dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnClose)
                     btnClose.text = getString(R.string.common_ok)

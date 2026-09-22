@@ -505,13 +505,33 @@ def get_logged_in_teacher(db: Session, authorization: Optional[str]) -> Optional
     return db.query(Teacher).filter(Teacher.id == session.user_id).first()
 
 
+def _optional_int_param(value: Optional[str], field_label: str) -> Optional[int]:
+    """FIX (گروه۲/آیتم۵): پارامتر عددیِ «خالی» در query string ⇒ None، نه ۴۲۲ خام pydantic.
+
+    چرا لازم است: کلاینت Retrofit یک `@Query` با مقدار `null` را به‌صورت `teacher_id=`
+    (رشتهٔ خالی) روی URL می‌گذارد؛ امضای `Optional[int]` در FastAPI همان را با بدنهٔ خام
+    «Input should be a valid integer» رد می‌کرد ⇒ گزارش مالی پنل معلم هیچ‌وقت باز نمی‌شد.
+    مقدارِ واقعاً نامعتبر (مثل «abc») بی‌صدا نادیده گرفته نمی‌شود: ۴۰۰ با پیام فارسی.
+    """
+    if value is None:
+        return None
+    text_value = str(value).strip()
+    if not text_value:
+        return None
+    try:
+        return int(text_value)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400,
+                            detail=f"{field_label} باید یک عدد صحیح باشد (مثال: 1405)")
+
+
 @router.get("/reports/financial_summary")
 def get_financial_summary(
     user_type: str,  # "institute" or "teacher"
-    teacher_id: Optional[int] = None,
-    year: Optional[int] = None,
-    month: Optional[int] = None,
-    branch_id: Optional[int] = None,  # Added branch_id 🆕
+    teacher_id: Optional[str] = None,
+    year: Optional[str] = None,
+    month: Optional[str] = None,
+    branch_id: Optional[str] = None,
     authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
     sub_role: str = Depends(check_user_login)
@@ -519,6 +539,16 @@ def get_financial_summary(
     # FIX (L14/Y4): تکمیل تله — شاگرد/ولی 403؛ معلم در ادامه به خلاصه‌ی خودش قفل می‌شود (کد موجود).
     if sub_role not in ("admin", "secretary", "teacher"):
         raise HTTPException(status_code=403, detail="شما دسترسی لازم برای مشاهده خلاصه مالی را ندارید")
+    # FIX (گروه۲/آیتم۵): `user_type` نامعتبر پیش‌تر **۲۰۰ با بدنهٔ `null`** می‌داد (تابع بدون
+    # return پایان می‌یافت) ⇒ Gson در کلاینت روی `FinancialSummaryResponse` غیرnullable خطا
+    # می‌کرد. حالا صریح ۴۰۰ با پیام فارسی؛ پارامترهای عددی هم از هلپر `_optional_int_param`
+    # عبور می‌کنند تا query خالی (`teacher_id=`/`year=`) به‌جای ۴۲۲ خام، None شود.
+    if user_type not in ("institute", "teacher"):
+        raise HTTPException(status_code=400, detail="user_type باید institute یا teacher باشد")
+    teacher_id = _optional_int_param(teacher_id, "شناسهٔ معلم")
+    year = _optional_int_param(year, "سال")
+    month = _optional_int_param(month, "ماه")
+    branch_id = _optional_int_param(branch_id, "شناسهٔ شعبه")
     resolved_branch = get_user_branch_filter(db, authorization, branch_id)
     # بررسی و محدودسازی در صورتی که کاربر جاری معلم باشد
     logged_teacher = get_logged_in_teacher(db, authorization)

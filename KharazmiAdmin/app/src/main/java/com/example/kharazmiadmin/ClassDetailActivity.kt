@@ -190,8 +190,21 @@ class ClassDetailActivity : BaseActivity() {
         }
 
         // ۴) دکمه تعلیق کلاس
-        findViewById<Button>(R.id.btnSuspendAction).setOnClickListener {
-            suspendClass()
+        // FIX (گروه۳/آیتم۱۳): در پنل معلم، «امور مدیریتی» (= تعلیق کلاس) پنهان می‌شود و
+        // فقط «اصلاح اطلاعات کلاس» و «حذف کلاس» می‌ماند؛ حذف برای غیر ادمین از قبل مسیر
+        // درستش را می‌رود (showDeleteClassDialog → requestDeleteClass) ⇒ دست نمی‌خورد.
+        // تعلیق مستقیماً POST classes/{id}/suspend می‌زند و کار ادمین/منشی است، پس listener
+        // هم فقط در شاخهٔ ادمین ثبت می‌شود (دکمهٔ پنهانِ کلیک‌پذیر = راه فرار).
+        // همان چک نقش موجود پروژه: `UserCreds` → `USER_SUB_ROLE` (showDeleteClassDialog:334).
+        val credsPrefs = getSharedPreferences("UserCreds", Context.MODE_PRIVATE)
+        val subRole = credsPrefs.getString("USER_SUB_ROLE", "admin") ?: "admin"
+        val btnSuspendAction = findViewById<Button>(R.id.btnSuspendAction)
+        if (subRole == "admin") {
+            btnSuspendAction.setOnClickListener {
+                suspendClass()
+            }
+        } else {
+            btnSuspendAction.visibility = View.GONE
         }
 
         // ۵) دکمه حذف کلاس (با اعمال قفل مالی انحصاری)

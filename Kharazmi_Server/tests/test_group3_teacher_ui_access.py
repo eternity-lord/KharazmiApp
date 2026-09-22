@@ -196,5 +196,59 @@ class TestItem12TeacherClassBannerButtons(unittest.TestCase):
         self.assertRegex(cm, r"btnRegisterInvoice\.setOnClickListener")
 
 
+class TestItem13TeacherClassPageAdminAffairs(unittest.TestCase):
+    """آیتم ۱۳ — صفحهٔ کلاس در پنل معلم: «امور مدیریتی» مخفی، فقط اصلاح اطلاعات + حذف کلاس.
+
+    صفحهٔ کلاس = `ClassDetailActivity` (از بنر کلاس‌های تأییدشدهٔ داشبورد معلم باز
+    می‌شود). بخش «امور مدیریتی و تنظیمات دوره» در `activity_class_detail.xml` سه دکمه
+    دارد: `btnEditClassInfoAction` (اصلاح اطلاعات)، `btnSuspendAction` (تعلیق کلاس) و
+    `btnDeleteClassAction` (حذف کلاس). تنها کار **مدیریتی/ادمینی** این بخش «تعلیق» است
+    (`suspendClass()` مستقیم به `POST classes/{id}/suspend` می‌زند) و هیچ چک نقشی هم
+    روی دکمه‌ها نبود ⇒ معلم دکمهٔ تعلیق را فعال می‌دید.
+    حذف کلاس برای غیر ادمین از قبل مسیر درست را می‌رود (`showDeleteClassDialog` همان
+    `USER_SUB_ROLE` را می‌خواند و به‌جای حذف، `requestDeleteClass` صدا می‌زند) ⇒ باید
+    سر جایش بماند؛ اصلاح اطلاعات هم همین‌طور.
+    """
+
+    def test_13a_suspend_action_is_hidden_and_ungated_for_teachers(self):
+        src = kt("ClassDetailActivity.kt")
+        body = function_body(src, "onCreate")
+        # همان چک نقش موجود پروژه خوانده می‌شود
+        self.assertRegex(body, r'getSharedPreferences\("UserCreds"')
+        self.assertRegex(body, r'getString\("USER_SUB_ROLE",\s*"admin"\)')
+        gate = body[body.index("USER_SUB_ROLE"):]
+        self.assertRegex(gate, r"R\.id\.btnSuspendAction\)")
+        self.assertRegex(gate, r"btnSuspendAction\.visibility\s*=\s*View\.GONE",
+                         "دکمهٔ تعلیق باید برای معلم پنهان شود")
+        # listener فقط در شاخهٔ ادمین (دکمهٔ پنهانِ کلیک‌پذیر = راه فرار)
+        self.assertRegex(gate, r"btnSuspendAction\.setOnClickListener")
+        self.assertLess(gate.index("btnSuspendAction.setOnClickListener"),
+                        gate.index("btnSuspendAction.visibility"))
+
+    def test_13b_edit_info_and_delete_stay_for_teachers(self):
+        body = function_body(kt("ClassDetailActivity.kt"), "onCreate")
+        for btn in ("btnEditClassInfoAction", "btnDeleteClassAction"):
+            self.assertRegex(body, r"R\.id\." + btn + r"\)\.setOnClickListener",
+                             f"{btn} باید برای معلم هم فعال بماند")
+            self.assertNotRegex(body, re.compile(btn + r"[^\n]{0,120}?View\.GONE"),
+                                f"{btn} نباید در پنل معلم پنهان شود")
+
+    def test_13c_delete_for_non_admin_is_still_a_request_not_a_delete(self):
+        """مسیر موجودِ «درخواست حذف» برای غیر ادمین دست‌نخورده می‌ماند."""
+        src = strip_comments(kt("ClassDetailActivity.kt"))
+        self.assertRegex(src, r'val subRole = prefs\.getString\("USER_SUB_ROLE", "admin"\)')
+        self.assertRegex(src, r"api\.requestDeleteClass\(classId, DeleteClassRequest\(forgive\)\)")
+        self.assertRegex(src, r"api\.deleteClass\(classId, forgive\)")
+
+    def test_13d_layout_and_endpoints_untouched(self):
+        """layout مشترک و endpointها دست نمی‌خورند (فقط UI سمت معلم)."""
+        detail = layout("activity_class_detail.xml")
+        for btn in ("btnEditClassInfoAction", "btnSuspendAction", "btnDeleteClassAction"):
+            self.assertIn("@+id/" + btn, detail)
+        self.assertIn("امور مدیریتی و تنظیمات دوره", detail)
+        self.assertEqual(strip_comments(kt("ClassDetailActivity.kt")).count("suspendClass()"), 2,
+                         "فقط یک فراخوانی suspendClass() از دکمه می‌آید (تعریف + کلیک ادمین)")
+
+
 if __name__ == "__main__":
     unittest.main()

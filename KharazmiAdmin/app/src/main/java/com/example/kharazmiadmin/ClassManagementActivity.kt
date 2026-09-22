@@ -221,7 +221,10 @@ class ClassManagementActivity : BaseActivity() {
             holder.tvTitle.text = item.title
             holder.tvCode.text = getString(R.string.cmgmt_code_row, item.code)
             holder.tvGradeLevel.text = item.grade_level
-            holder.tvGender.text = item.gender
+            // سیستم برای کلاس جنسیت ثبت نمی‌کند؛ فقط چیپ همین بنر ادمین مخفی می‌شود.
+            // مدل/endpoint مشترک دست‌نخورده می‌ماند تا پنل معلم رفتار ناخواسته نگیرد.
+            holder.tvGender.text = ""
+            holder.tvGender.visibility = View.GONE
             holder.tvSessionCount.text = getString(R.string.cmgmt_sessions_row, item.session_count)
 
             // اعمال رنگ پس‌زمینه کارت کلاس بر اساس bg_color ثبت شده

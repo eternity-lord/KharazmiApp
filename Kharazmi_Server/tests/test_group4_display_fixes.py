@@ -75,5 +75,68 @@ class TestItem17AdminClassStudentList(unittest.TestCase):
         self.assertIn("api.getClassStudentsFull(classId)", src)
 
 
+def py(name: str) -> str:
+    path = os.path.join(SERVER_DIR, name)
+    assert os.path.exists(path), f"فایل Python پیدا نشد: {path}"
+    with open(path, encoding="utf-8") as handle:
+        return handle.read()
+
+
+class TestItems18To21TeacherAndAdminBanners(unittest.TestCase):
+    """قرارداد آیتم‌های باقی‌ماندهٔ گروه ۴؛ پنل هر مورد جداگانه قفل می‌شود."""
+
+    def test_18_teacher_class_student_list_reaches_the_shared_fixed_screen(self):
+        """مسیر پنل معلم باید برای کلاس تأییدشده به همان صفحهٔ جزئیات برود.
+
+        visibilityِ RecyclerView در آیتم ۱۷ روی همین Activity فیکس شده و این تست
+        مسیر معلم را جداگانه تأیید می‌کند؛ مسیر endpoint معلم به endpoint جزئیات
+        دانش‌آموزان نیز در همان صفحهٔ مشترک اجرا می‌شود.
+        """
+        fetch_body = function_body(kt("TeacherDashboardActivity.kt"), "fetchClasses")
+        self.assertIn("ClassDetailActivity::class.java", fetch_body)
+        self.assertIn('putExtra("CLASS_ID", selectedClass.id)', fetch_body)
+
+        detail_src = kt("ClassDetailActivity.kt")
+        student_tab = function_body(detail_src, "updateUI")
+        student_tab = student_tab[student_tab.index("1 ->"):]
+        self.assertRegex(student_tab, r"rvStudents\.visibility\s*=\s*View\.VISIBLE")
+        self.assertIn("api.getClassStudentsFull(classId)", detail_src)
+
+    def test_19_teacher_banner_binds_name_and_theme_explicitly(self):
+        """بنر پنل معلم باید title و bg_color پاسخ واقعی را قطعی روی ویجت بنشاند."""
+        body = function_body(kt("TeacherDashboardActivity.kt"), "onBindViewHolder")
+        self.assertRegex(body, r"val classTitle\s*=\s*item\.title\?\.trim\(\)\.orEmpty\(\)")
+        self.assertRegex(body, r"holder\.title\.text\s*=\s*classTitle\.ifEmpty")
+        self.assertRegex(body, r"holder\.title\.visibility\s*=\s*(android\.view\.)?View\.VISIBLE")
+        self.assertRegex(body, r"val cardColor\s*=\s*item\.bg_color")
+        self.assertIn("Color.parseColor(cardColor)", body)
+
+    def test_20_teacher_endpoint_exposes_the_same_debt_breakdown_as_admin_classes(self):
+        """منبع بدهی پنل معلم باید همان محاسبهٔ endpoint لیست کلاس‌های ادمین باشد."""
+        src = py("routers/teachers.py")
+        start = src.index('@router.get("/teachers/{teacher_id}/classes")')
+        end = src.index('@router.get("/teachers/{teacher_id}/incomplete_classes")', start)
+        route = src[start:end]
+        for key in ("total_debt", "debt_to_teacher", "debt_to_institute"):
+            self.assertIn(f'"{key}"', route, f"endpoint معلم باید {key} را برگرداند")
+        self.assertIn("calculate_enrollment_debt", route)
+
+        body = function_body(kt("TeacherDashboardActivity.kt"), "onBindViewHolder")
+        for view_id, field in (("tvTotalDebt", "total_debt"),
+                               ("tvTeacherDebt", "debt_to_teacher"),
+                               ("tvInstituteDebt", "debt_to_institute")):
+            self.assertIn(f"R.id.{view_id}", kt("TeacherDashboardActivity.kt"))
+            self.assertRegex(body, rf"holder\.{view_id}\.text.*item\.{field}")
+
+    def test_21_admin_class_banner_hides_unregistered_gender_text_only_in_admin_adapter(self):
+        """gender_type در مدل می‌ماند؛ فقط چیپِ بنر مدیریت کلاس‌های ادمین مخفی می‌شود."""
+        body = function_body(kt("ClassManagementActivity.kt"), "onBindViewHolder")
+        self.assertRegex(body, r"holder\.tvGender\.visibility\s*=\s*View\.GONE")
+        self.assertIn("holder.tvGender", body)
+        teacher_body = function_body(kt("TeacherDashboardActivity.kt"), "onBindViewHolder")
+        self.assertNotIn("holder.tvGender.visibility", teacher_body,
+                         "فیکس آیتم ۲۱ نباید گارد ادمین را به adapter پنل معلم منتقل کند")
+
+
 if __name__ == "__main__":
     unittest.main()

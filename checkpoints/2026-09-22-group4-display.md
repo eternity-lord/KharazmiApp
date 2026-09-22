@@ -1,11 +1,11 @@
 # گروه ۴ — نمایش خراب
 
-## وضعیت این تحویل: آیتم ۱۷ تمام شد
+## وضعیت این تحویل: آیتم‌های ۱۷ تا ۲۱ تمام شد
 
-- **آیتم:** ۱۷ — `[پنل ادمین]` لیست دانش‌آموزان کلاس خالی نمایش داده می‌شد
+- **آیتم‌ها:** ۱۷ `[پنل ادمین]` · ۱۸ `[پنل معلم]` · ۱۹ `[پنل معلم]` · ۲۰ `[پنل معلم]` · ۲۱ `[پنل ادمین]`
 - **تاریخ:** ۲۰۲۶-۰۹-۲۲
 - **برنچ کاری جلسه:** `arena/01a0c9b8-kharazmiapp`
-- **محدوده:** فقط مسیر مشترک جزئیات کلاس که از پنل ادمین باز می‌شود؛ endpoint/سرور تغییر نکرد.
+- **محدوده:** فقط UI پنل مشخص‌شده و endpoint لازم برای تأمین عددهای پنل معلم؛ مسیرهای پنل مقابل دست‌نخورده ماندند.
 
 > نکتهٔ محیطی: سندهای قبلی گروه ۳ نام برنچ `arena/01a0c867-kharazmiapp` را ثبت کرده‌اند، اما checkout این جلسه طبق قفل Arena روی `arena/01a0c9b8-kharazmiapp` است و تغییر برنچ انجام نشد.
 
@@ -86,50 +86,111 @@ adapter هم داده می‌گرفت، اما ویجت binding‌شده تما�
 
 ---
 
-## ۳) فیکس حداقلی
+## ۳) فیکس حداقلی آیتم ۱۷ و ۱۸
 
 در `KharazmiAdmin/app/src/main/java/com/example/kharazmiadmin/ClassDetailActivity.kt`
-داخل شاخهٔ تب دانش‌آموزان فقط این خط اضافه شد:
+داخل شاخهٔ تب دانش‌آموزان این خط اضافه شد:
 
 ```kotlin
 rvStudents.visibility = View.VISIBLE
 ```
 
-endpointها، مدل سرور، adapter و layout تغییر نکردند.
+`TeacherDashboardActivity` برای کلاس تأییدشده به همین `ClassDetailActivity` می‌رود؛
+مسیر پنل معلم جداگانه تأیید شد و endpoint مشترک `/classes/{id}/students_full`
+برای session واقعی معلم پاسخ `200` و لیست غیرخالی داد.
 
 ---
 
-## ۴) راستی‌آزمایی بعد از فیکس
+## ۴) آیتم ۱۹ — نام و تم بنر کلاس در پنل معلم
 
-- تست آیتم ۱۷: **۳ passed**
+لاگ واقعی endpoint معلم روی کپی DB:
+
+```text
+GET /teachers/1/classes (real teacher session) -> 200
+[{"id":1,"title":"ریاضی کنکور","code":"3406",
+  "grade_level":"کنکور","bg_color":"#FFFFFF", ...}]
+```
+
+endpoint نام کلاس و `bg_color` را داشت، اما binding آداپتر به مقدار خام nullable متکی بود
+و fallback/visibility صریح نداشت. در `TeacherClassAdapter`:
+
+- نام کلاس با trim و fallback به کد کلاس bind می‌شود؛
+- `tvClassTitle` و `tvClassCode` صریحاً visible می‌شوند؛
+- `bg_color` روی `MaterialCardView` اعمال می‌شود و رنگ نامعتبر به سفید fallback می‌کند؛
+- وضعیت در badge واقعی `tvStatus` و پایه در `tvTeacherName` نمایش داده می‌شود.
+
+این تغییر فقط آداپتر پنل معلم است و مسیر ادمین را تغییر نمی‌دهد.
+
+---
+
+## ۵) آیتم ۲۰ — بدهی بنر کلاس در پنل معلم
+
+قبل از فیکس، endpoint `/teachers/{teacher_id}/classes` فقط title/code/grade/status/
+students_preview/bg_color را برمی‌گرداند و هیچ مقدار `total_debt` یا بدهی تفکیکی نداشت؛
+درحالی‌که layout همان سه TextView مالی را داشت و آداپتر معلم آن‌ها را bind نمی‌کرد.
+
+فیکس:
+
+- endpoint معلم اکنون `total_debt`، `debt_to_teacher` و `debt_to_institute` را برمی‌گرداند؛
+- بدهی کل با `calculate_enrollment_debt` و همان fallback endpoint ادمین محاسبه می‌شود؛
+- سه مقدار در `TeacherClassAdapter` به TextViewهای مالی bind می‌شوند.
+
+مقایسهٔ واقعی روی کپی DB با بدهی آزمایشی فقط در کپی:
+
+```text
+teacher endpoint: total_debt=900, debt_to_teacher=300, debt_to_institute=200
+admin endpoint:   total_debt=900, debt_to_teacher=300, debt_to_institute=200
+```
+
+فایل واقعی DB در این probe تغییر نکرد.
+
+---
+
+## ۶) آیتم ۲۱ — حذف جنسیت مختلط از بنر مدیریت کلاس‌ها در پنل ادمین
+
+`gender_type` در مدل/endpoint باقی ماند، اما چون سیستم جنسیت کلاس را ثبت نمی‌کند،
+در `ClassManagementActivity.ClassAdapter.onBindViewHolder` فقط `chipGender` برای بنر
+ادمین با `View.GONE` مخفی شد و متنش خالی شد.
+
+`item_class_row.xml` و `TeacherClassAdapter` دست‌کاری نشدند؛ بنابراین این فیکس به پنل
+معلم یا کامپوننت دیگر نشت نمی‌کند.
+
+---
+
+## ۷) راستی‌آزمایی بعد از فیکس‌های ۱۷ تا ۲۱
+
+- تست قرمز باقی‌مانده‌ها قبل از فیکس: **۳ failed, 4 passed**
+- تست گروه ۴: **۷ passed**
+- تست گروه ۳ + گروه ۴: **۲۹ passed**
 - `ast.parse` روی **۱۳۹ فایل Python**: موفق
+- parse همهٔ XML منابع: موفق
 - `import main` روی کپی `/tmp`: موفق
-- سوئیت کامل روی کپی `/tmp`: **۱۱۵۱ passed**
+- شمارش دستی `{}`/`()`/`[]` برای فایل‌های Kotlin تغییر‌یافته: متعادل؛ اختلاف `ClassDetailActivity` همان `parens=-5` قبلی است
+- سوئیت کامل روی کپی `/tmp`: **۱۱۵۵ passed, 74 warnings**
 - md5 فایل واقعی قبل/بعد: یکسان و برابر با
   `f048f8d118b33c4eaa944490594121d7`
 - کامپایل اندروید: طبق قانون پروژه انجام نشد
 - `git diff --check`: موفق
 
-تست‌های آیتم ۱۷ علاوه بر visibility، اتصال adapter و استفادهٔ Activity از endpoint واقعی
-`classes/{id}/students_full` را نیز قفل می‌کنند.
-
 ---
 
-## ۵) تغییرات این تحویل
+## ۸) تغییرات این تحویل
 
 ```text
 KharazmiAdmin/app/src/main/java/com/example/kharazmiadmin/ClassDetailActivity.kt
+KharazmiAdmin/app/src/main/java/com/example/kharazmiadmin/TeacherDashboardActivity.kt
+KharazmiAdmin/app/src/main/java/com/example/kharazmiadmin/ClassManagementActivity.kt
+Kharazmi_Server/routers/teachers.py
 Kharazmi_Server/tests/test_group4_display_fixes.py
 checkpoints/2026-09-22-group4-display.md
 ```
 
-## ۶) وضعیت ادامهٔ گروه ۴
+## ۹) وضعیت گروه ۴
 
 - [x] ۱۷ — پنل ادمین: لیست دانش‌آموزان کلاس
-- [ ] ۱۸ — پنل معلم: همان لیست، با تأیید جداگانهٔ مسیر پنل معلم
-- [ ] ۱۹ — پنل معلم: تم/اسم کلاس روی بنر
-- [ ] ۲۰ — پنل معلم: بدهی به معلم/بدهی کل روی بنر
-- [ ] ۲۱ — پنل ادمین: حذف متن جنسیت مختلط از بنر مدیریت کلاس‌ها
+- [x] ۱۸ — پنل معلم: همان لیست، با تأیید جداگانهٔ مسیر پنل معلم
+- [x] ۱۹ — پنل معلم: تم/اسم کلاس روی بنر
+- [x] ۲۰ — پنل معلم: بدهی به معلم/بدهی کل روی بنر
+- [x] ۲۱ — پنل ادمین: حذف متن جنسیت مختلط از بنر مدیریت کلاس‌ها
 
-آیتم ۱۸ هنوز جداگانه اجرا و گزارش نشده است؛ اگرچه ریشهٔ آیتم ۱۷ در `ClassDetailActivity`
-مشترک به نظر می‌رسد، مسیر پنل معلم باید در آیتم ۱۸ به‌طور مستقل تأیید شود.
+هر پنج آیتم گروه ۴ تمام شد و قبل از commit، سوئیت کامل روی کپی `/tmp` سبز شد.

@@ -18,6 +18,7 @@ from schemas import (
 )
 from storage import storage_dir, resolve_existing
 from dependencies import get_db, check_admin_access, check_admin_or_secretary_access, check_user_login, get_enrollment_tuition_and_discount, SESSION_EXPIRY_DAYS, hash_password, verify_password, limiter, normalize_mobile, validate_image_upload
+from financial_calculations import calculate_enrollment_debt
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill
 from fastapi.responses import StreamingResponse
@@ -284,7 +285,35 @@ def get_my_classes(
             if st:
                 student_names.append(f"{st.first_name} {st.last_name}")
 
-        # 3. Build Result Dictionary
+        # 3. همان منبع بدهیِ endpoint لیست کلاس‌های ادمین، برای بنر پنل معلم.
+        # بدهی تفکیکی از کیف‌ها می‌آید؛ بدهی کل از ماندهٔ همین enrollment می‌آید
+        # (برای enrollment بدون شهریه، fallback کیف‌ها مثل ClassManagementActivity است).
+        total_debt = 0
+        debt_to_teacher = 0
+        debt_to_institute = 0
+        all_enrollments = (
+            db.query(Enrollment)
+            .filter(Enrollment.is_deleted == False)
+            .filter(Enrollment.course_id == c.id)
+            .all()
+        )
+        for en in all_enrollments:
+            st = db.query(Student).filter(Student.id == en.student_id, Student.is_deleted == False).first()
+            if not st:
+                continue
+            wallet_teacher = st.wallet_teacher if st.wallet_teacher is not None else 0
+            wallet_institute = st.wallet_institute if st.wallet_institute is not None else 0
+            student_debt_teacher = abs(wallet_teacher) if wallet_teacher < 0 else 0
+            student_debt_institute = abs(wallet_institute) if wallet_institute < 0 else 0
+            debt_to_teacher += student_debt_teacher
+            debt_to_institute += student_debt_institute
+            total_debt += (
+                calculate_enrollment_debt(en)
+                if en.total_tuition
+                else student_debt_teacher + student_debt_institute
+            )
+
+        # 4. Build Result Dictionary
         result.append(
             {
                 "id": c.id,
@@ -295,6 +324,9 @@ def get_my_classes(
                 "is_suspended": c.is_suspended if c.is_suspended is not None else False,
                 "students_preview": student_names,  # <--- CRITICAL NEW FIELD
                 "bg_color": c.bg_color or "#FFFFFF",
+                "total_debt": total_debt,
+                "debt_to_teacher": debt_to_teacher,
+                "debt_to_institute": debt_to_institute,
             }
         )
 

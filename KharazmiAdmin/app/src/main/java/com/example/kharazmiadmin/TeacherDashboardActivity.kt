@@ -28,7 +28,10 @@ data class TeacherClassItem(
     val is_admin_approved: Boolean = false,
     val is_suspended: Boolean = false,
     val students_preview: List<String>? = null, // New field added
-    val bg_color: String? = "#FFFFFF"
+    val bg_color: String? = "#FFFFFF",
+    val total_debt: Long = 0,
+    val debt_to_teacher: Long = 0,
+    val debt_to_institute: Long = 0
 )
 
 interface TeacherPanelApi {
@@ -514,6 +517,10 @@ class TeacherClassAdapter(
         val title: TextView = v.findViewById(R.id.tvClassTitle)
         val code: TextView = v.findViewById(R.id.tvClassCode)
         val sub: TextView = v.findViewById(R.id.tvTeacherName)
+        val status: TextView = v.findViewById(R.id.tvStatus)
+        val tvTotalDebt: TextView = v.findViewById(R.id.tvTotalDebt)
+        val tvTeacherDebt: TextView = v.findViewById(R.id.tvTeacherDebt)
+        val tvInstituteDebt: TextView = v.findViewById(R.id.tvInstituteDebt)
         val llStudentPreview: LinearLayout = v.findViewById(R.id.ll_student_preview) // Added View Binding
         // FIX (گروه۳/آیتم۱۲): این دو در layout پیش‌فرض نمایان‌اند و آداپتر معلم قبلاً
         // هرگز به آن‌ها دست نمی‌زد ⇒ دو دکمهٔ نمایانِ بی‌عملکرد در پنل معلم.
@@ -528,35 +535,50 @@ class TeacherClassAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = list[position]
-        holder.title.text = item.title
-        holder.code.text = holder.itemView.context.getString(R.string.tdash_code_row, item.code)
+        val classTitle = item.title?.trim().orEmpty()
+        val classCode = item.code?.trim().orEmpty()
+        holder.title.text = classTitle.ifEmpty { classCode }
+        holder.title.visibility = android.view.View.VISIBLE
+        holder.code.text = holder.itemView.context.getString(R.string.tdash_code_row, classCode)
+        holder.code.visibility = android.view.View.VISIBLE
 
-        // اعمال رنگ پس‌زمینه کارت کلاس بر اساس bg_color ثبت شده
-        if (!item.bg_color.isNullOrEmpty()) {
-            try {
-                (holder.itemView as? com.google.android.material.card.MaterialCardView)?.setCardBackgroundColor(
-                    android.graphics.Color.parseColor(item.bg_color)
-                )
-            } catch (e: Exception) {
-                // FIX: Bug 19 - cancellation is not a network/UI error.
-                if (e is kotlinx.coroutines.CancellationException) throw e;
-                // رنگ نامعتبر رد می‌شود
-            }
+        // بنر پنل معلم باید تم ثبت‌شدهٔ کلاس را قطعی روی همان کارت بنشاند؛
+        // مقدار خالی/نامعتبر فقط به تم پیش‌فرض برمی‌گردد و اسم کلاس حذف نمی‌شود.
+        val cardColor = item.bg_color?.trim().takeUnless { it.isNullOrEmpty() } ?: "#FFFFFF"
+        try {
+            (holder.itemView as? com.google.android.material.card.MaterialCardView)?.setCardBackgroundColor(
+                android.graphics.Color.parseColor(cardColor)
+            )
+        } catch (e: Exception) {
+            // FIX: Bug 19 - cancellation is not a network/UI error.
+            if (e is kotlinx.coroutines.CancellationException) throw e;
+            (holder.itemView as? com.google.android.material.card.MaterialCardView)?.setCardBackgroundColor(
+                android.graphics.Color.WHITE
+            )
         }
 
         if (item.is_suspended) {
-            holder.sub.text = holder.itemView.context.getString(R.string.tdash_suspended)
-            holder.sub.setTextColor(android.graphics.Color.parseColor("#D32F2F"))
+            holder.status.text = holder.itemView.context.getString(R.string.tdash_suspended)
+            holder.status.setTextColor(android.graphics.Color.parseColor("#D32F2F"))
+            holder.sub.text = item.grade_level?.trim().orEmpty()
             holder.itemView.alpha = 0.5f
         } else if (item.is_admin_approved) {
-            holder.sub.text = holder.itemView.context.getString(R.string.tdash_active)
-            holder.sub.setTextColor(android.graphics.Color.parseColor("#388E3C"))
+            holder.status.text = holder.itemView.context.getString(R.string.tdash_active)
+            holder.status.setTextColor(android.graphics.Color.parseColor("#388E3C"))
+            holder.sub.text = item.grade_level?.trim().orEmpty()
             holder.itemView.alpha = 1.0f
         } else {
-            holder.sub.text = holder.itemView.context.getString(R.string.tdash_pending)
-            holder.sub.setTextColor(android.graphics.Color.parseColor("#F57C00"))
+            holder.status.text = holder.itemView.context.getString(R.string.tdash_pending)
+            holder.status.setTextColor(android.graphics.Color.parseColor("#F57C00"))
+            holder.sub.text = item.grade_level?.trim().orEmpty()
             holder.itemView.alpha = 1.0f
         }
+        holder.sub.visibility = if (holder.sub.text.isNullOrEmpty()) android.view.View.GONE else android.view.View.VISIBLE
+
+        // اعداد مالی از همان endpoint کلاس‌ها می‌آیند و در بنر معلم هم صریح bind می‌شوند.
+        holder.tvTotalDebt.text = String.format("%,d", item.total_debt)
+        holder.tvTeacherDebt.text = String.format("%,d", item.debt_to_teacher)
+        holder.tvInstituteDebt.text = String.format("%,d", item.debt_to_institute)
 
         // FIX (گروه۳/آیتم۱۲): تعلیق و ثبت حواله از اختیارات ادمین/منشی‌اند؛ در پنل معلم
         // پنهان می‌شوند (listener هم سمت ادمینِ ClassManagementActivity می‌ماند).

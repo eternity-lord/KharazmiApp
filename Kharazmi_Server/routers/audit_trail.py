@@ -30,13 +30,15 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import event, inspect, select
+from sqlalchemy import event, func, inspect, or_, select, tuple_
 from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
 
 import models
-from dependencies import check_admin_access, get_db, get_session_from_token
-from models import FinancialAuditLog, Installment, Transaction, User
+from dependencies import check_admin_access, display_name, get_db, get_session_from_token
+# FIX (گروه۲/آیتم۸): برای join نام‌ها به‌جای شناسهٔ خام و جست‌وجوی نام
+from models import (ActivityLog, Branch, Course, Enrollment, FinancialAuditLog, Installment,
+                    Student, Teacher, Transaction, User)
 
 router = APIRouter()
 
@@ -312,6 +314,319 @@ def setup_audit_listeners(engine=None) -> bool:
 # ==========================================
 # 3) اندپوینت کوئری — GET /audit-trail/logs (admin only)
 # ==========================================
+# ---------------------------------------------------------------------------
+# FIX (گروه۲/آیتم ۸): غنی‌سازی نمایش تاریخچه — «چه چیزی عوض شد» به زبان آدم،
+# نام‌ها به‌جای شناسهٔ خام، کاربر تغییردهنده، لینک صورت‌حساب، جست‌وجوی نام و رنگ.
+# همه‌ی اینها فقط در **لایهٔ خواندن** اضافه شده‌اند: جدول `financial_audit_logs`،
+# listener ها و کلیدهای قبلی پاسخ دست‌نخورده‌اند (کلاینت منتشرشده نمی‌شکند و
+# سند خام old/new_values برای ممیزی دقیق سر جایش می‌ماند).
+# ---------------------------------------------------------------------------
+ACTION_LABELS = {"create": "ایجاد", "update": "ویرایش", "delete": "حذف"}
+ACTION_COLORS = {"create": "#4CAF50", "update": "#FB8C00", "delete": "#E53935"}
+CHANGE_TYPE_COLORS = {
+    "new_payment": "#4CAF50",   # سبز — ثبت جدید
+    "edited": "#FB8C00",        # نارنجی — ویرایش
+    "reversed": "#E53935",      # قرمز — برگشت‌خورده
+    "voided": "#9E9E9E",        # خاکستری — باطل/حذف نرم
+    "deleted": "#E53935",       # قرمز — حذف
+}
+
+# action های ActivityLog → برچسب فارسی (برای `actor_action`؛ مقدار خام در `actor_action_key`)
+ACTIVITY_ACTION_LABELS = {
+    "transaction_refund": "استرداد تراکنش",
+    "transaction_edit": "ویرایش تراکنش",
+    "transaction_delete": "حذف تراکنش",
+    "transaction_reversed": "برگشت تراکنش",
+    "submit_payment": "ثبت پرداخت",
+    "online_payment_success": "پرداخت آنلاین موفق",
+    "create_installment": "ایجاد قسط",
+    "update_installment_amount": "ویرایش مبلغ قسط",
+    "delete_installment": "حذف قسط",
+    "pay_installment_manual": "وصول دستی قسط",
+    "debtors_reminder": "یادآوری بدهی",
+}
+FIELD_LABELS = {
+    # مشترک
+    "amount": "مبلغ", "date": "تاریخ", "is_deleted": "حذف‌شده", "description": "شرح",
+    "id": "شناسه",
+    # Transaction
+    "remittance_number": "شمارهٔ حواله", "branch_id": "شعبه", "session_id": "جلسه",
+    "student_id": "دانش‌آموز", "enrollment_id": "ثبت‌نام", "course_id": "کلاس",
+    "payment_method": "روش پرداخت", "tracking_code": "کد رهگیری", "receiver": "گیرنده",
+    "type": "نوع تراکنش", "share_teacher": "سهم معلم", "share_institute": "سهم آموزشگاه",
+    "target_wallet": "کیف پول مقصد", "idempotency_key": "کلید یکتایی",
+    "is_reversed": "برگشت‌خورده",
+    # Installment
+    "due_date": "سررسید", "is_paid": "پرداخت‌شده", "paid_at": "زمان پرداخت",
+    "paid_amount": "مبلغ پرداخت‌شده",
+}
+ID_LABEL_KEYS = {"branch_id", "session_id", "student_id", "enrollment_id", "course_id"}
+MONEY_FIELDS = {"amount", "share_teacher", "share_institute", "paid_amount"}
+BOOL_FIELDS = {"is_deleted", "is_reversed", "is_paid"}
+_MAX_SUMMARY_ITEMS = 4          # سقف بندهای جملهٔ خلاصه (بقیه: «و N تغییر دیگر»)
+_SEARCH_ID_LIMIT = 2000         # سقف شناسه‌های تزریق‌شده به IN (محافظ SQLite variable limit)
+_ACTOR_WINDOW_MINUTES = 30      # پنجرهٔ زمانی fallback روی ActivityLog
+
+
+def _field_label(key: str) -> str:
+    return FIELD_LABELS.get(key, key)
+
+
+def _display_value(key: str, value: Any) -> str:
+    """مقدار خام → متن خوانا (هزارگان برای پول، بله/خیر برای بول، «خالی» برای None)."""
+    if value is None or value == "":
+        return "خالی"
+    if key in BOOL_FIELDS:
+        return "بله" if value in (True, 1, "1", "true", "True") else "خیر"
+    if key in MONEY_FIELDS:
+        try:
+            return f"{int(value):,}"
+        except Exception:
+            return str(value)
+    return str(value)
+
+
+def _change_summary(action: str, changed: List[str], old: Optional[Dict[str, Any]],
+                    new: Optional[Dict[str, Any]]) -> str:
+    """جملهٔ فارسی «چه چیزی عوض شد» — به‌جای لیست خام نام ستون‌ها."""
+    verb = {"create": "ثبت شد", "update": "تغییر کرد", "delete": "حذف شد"}.get(action, action)
+    if action == "create":
+        items = [f"{_field_label(key)} {_display_value(key, (new or {}).get(key))}"
+                 for key in changed[:_MAX_SUMMARY_ITEMS]]
+    elif action == "delete":
+        items = [f"{_field_label(key)} {_display_value(key, (old or {}).get(key))}"
+                 for key in changed[:_MAX_SUMMARY_ITEMS]]
+    else:
+        items = [f"{_field_label(key)}: {_display_value(key, (old or {}).get(key))} ← "
+                 f"{_display_value(key, (new or {}).get(key))}"
+                 for key in changed[:_MAX_SUMMARY_ITEMS]]
+    summary = "؛ ".join(item for item in items if item)
+    rest = len(changed) - len(items)
+    if rest > 0:
+        summary = f"{summary}؛ و {rest} تغییر دیگر" if summary else f"{rest} تغییر"
+    return f"{verb}: {summary}" if summary else verb
+
+
+def _change_type_meta(action: str, old: Optional[Dict[str, Any]],
+                      new: Optional[Dict[str, Any]]) -> Tuple[str, str, str]:
+    """(نوع تغییر به زبان ساده, کلید نوع, رنگ) — کلاینت Android رنگ را مستقیم مصرف می‌کند
+    (بدون نیاز به drawable جدید)؛ `icon_color` هم برای آیکون رنگی هر نوع تغییر است."""
+    # `action_label` همیشه ترجمهٔ سادهٔ خود action است (ایجاد/ویرایش/حذف)؛
+    # ظرافت‌ها (برگشت‌خورده/باطل‌شده) در `change_type` + `icon_color` منعکس می‌شود.
+    if action == "create":
+        key = "new_payment"
+    elif action == "delete":
+        key = "deleted"
+    elif (new or {}).get("is_reversed") and not (old or {}).get("is_reversed"):
+        key = "reversed"
+    elif (new or {}).get("is_deleted") and not (old or {}).get("is_deleted"):
+        key = "voided"
+    else:
+        key = "edited"
+    return ACTION_LABELS.get(action, action), key, CHANGE_TYPE_COLORS.get(key, "#607D8B")
+
+
+def _collect_ref_ids(entity_type: str, old: Optional[Dict[str, Any]], new: Optional[Dict[str, Any]],
+                     wanted: Dict[str, set]) -> None:
+    """شناسه‌های موردنیاز join یک ردیف لاگ را در `wanted` جمع می‌کند.
+
+    کلیدها: student_id / course_id / branch_id / enrollment_id (هرکدام یک set با حداکثر یک عضو؛
+    مقدار جدید اولویت دارد و در نبودش مقدار قبلی — مثلاً در delete فقط old_values هست).
+    `enrollments`/`installment_enrollments` در سطح صفحه برای کوئری دسته‌ای جمع می‌شوند.
+    """
+    def as_int(value: Any) -> Optional[int]:
+        try:
+            return int(value) if value is not None else None
+        except Exception:
+            return None
+
+    for source in (new, old):
+        if not source:
+            continue
+        for key in ("student_id", "course_id", "branch_id", "enrollment_id"):
+            value = as_int(source.get(key))
+            if value is None:
+                continue
+            bucket = wanted.setdefault(key, set())
+            if not bucket:
+                bucket.add(value)
+
+
+def _entity_refs_batch(db: Session, collected: List[Tuple[int, str, Dict[str, set]]],
+                       page_ids: Dict[str, set]) -> Tuple[Dict[int, Dict[str, Any]], Dict[int, Optional[int]]]:
+    """join دسته‌ای نام‌ها (یک کوئری به‌ازای هر نوع موجودیت برای کل صفحه ⇒ بدون N+1).
+
+    برمی‌گرداند: (`refs_by_log`, `student_id_by_log`) — دومی برای «لینک صورت‌حساب» لازم است
+    و از همان joinهای دسته‌ای می‌آید (کوئری اضافی به‌ازای هر ردیف زده نمی‌شود).
+    سیاست نام تهی: شناسه‌ای که موجودیتش پیدا نشود (رکورد یتیم/حذف فیزیکی) در خروجی
+    **نمی‌آید** تا کلاینت «None» نشان ندهد.
+    """
+    students: Dict[int, Any] = {}
+    courses: Dict[int, Any] = {}
+    branches: Dict[int, str] = {}
+    enrollments: Dict[int, Any] = {}
+    enrollment_ids = set(page_ids.get("enrollment_ids") or ()) | set(
+        page_ids.get("installment_enrollment_ids") or ())
+    if enrollment_ids:
+        enrollments = {row.id: row for row in db.query(Enrollment).filter(
+            Enrollment.id.in_(enrollment_ids)).all()}
+    # دانش‌آموزِ خودِ ردیف + دانش‌آموزِ ثبت‌نامِ linked (قسط student_id ندارد)
+    student_ids = set(page_ids.get("student_ids") or ())
+    student_ids |= {enrollment.student_id for enrollment in enrollments.values()
+                    if enrollment.student_id}
+    if student_ids:
+        students = {row.id: row for row in db.query(Student).filter(
+            Student.id.in_(student_ids)).all()}
+    if page_ids.get("course_ids"):
+        courses = {row.id: row for row in db.query(Course).filter(
+            Course.id.in_(page_ids["course_ids"])).all()}
+    if page_ids.get("branch_ids"):
+        branches = {row.id: (row.name or "") for row in db.query(Branch).filter(
+            Branch.id.in_(page_ids["branch_ids"])).all()}
+
+    teacher_ids = {course.teacher_id for course in courses.values() if course.teacher_id}
+    # معلمِ کلاسِ ثبت‌نام هم لازم است (قسط خودش course_id ندارد)
+    extra_course_ids = {enrollment.course_id for enrollment in enrollments.values()
+                        if enrollment.course_id and enrollment.course_id not in courses}
+    if extra_course_ids:
+        for row in db.query(Course).filter(Course.id.in_(extra_course_ids)).all():
+            courses[row.id] = row
+            if row.teacher_id:
+                teacher_ids.add(row.teacher_id)
+    teacher_ids.discard(None)
+    teachers: Dict[int, Any] = {}
+    if teacher_ids:
+        teachers = {row.id: row for row in db.query(Teacher).filter(
+            Teacher.id.in_(teacher_ids)).all()}
+
+    refs_by_log: Dict[int, Dict[str, Any]] = {}
+    student_by_log: Dict[int, Optional[int]] = {}
+    for log_id, entity_type, wanted in collected:
+        refs: Dict[str, Any] = {}
+        student_id = next(iter(wanted.get("student_id") or ()), None)
+        course_id = next(iter(wanted.get("course_id") or ()), None)
+        branch_id = next(iter(wanted.get("branch_id") or ()), None)
+        enrollment_id = next(iter(wanted.get("enrollment_id") or ()), None)
+        enrollment = enrollments.get(enrollment_id) if enrollment_id is not None else None
+        if enrollment is not None:
+            student_id = student_id if student_id is not None else enrollment.student_id
+            course_id = course_id if course_id is not None else enrollment.course_id
+        student_by_log[log_id] = student_id
+        student = students.get(student_id) if student_id is not None else None
+        course = courses.get(course_id) if course_id is not None else None
+        teacher = None
+        if course is not None and course.teacher_id:
+            teacher = teachers.get(course.teacher_id)
+        refs["student"] = display_name(student, "نامشخص") if student is not None else ""
+        refs["teacher"] = display_name(teacher, "نامشخص") if teacher is not None else ""
+        if course is not None:
+            refs["course"] = course.title or "کلاس بدون نام"
+        if branch_id is not None and branches.get(branch_id):
+            refs["branch"] = branches[branch_id]
+        if entity_type == "installment" and enrollment is not None:
+            parts = [part for part in (refs["student"], refs.get("course", "")) if part]
+            if parts:
+                refs["enrollment"] = " — ".join(parts)
+        # کلیدهای تهی حذف می‌شوند (تا کلاینت «None» نبیند) اما student/teacher همیشه
+        # می‌مانند — چون UI برای آن‌ها placeholder ثابت دارد («بدون معلم»/«—»).
+        kept = {key: value for key, value in refs.items() if value}
+        kept.setdefault("student", "")
+        kept.setdefault("teacher", "")
+        refs_by_log[log_id] = kept
+    return refs_by_log, student_by_log
+
+
+def _activity_actor(db: Session, entity_type: str, entity_id: Optional[int],
+                    candidates: Tuple[Optional[datetime.datetime], ...]) -> Tuple[str, Optional[str]]:
+    """کاربر تغییردهنده از `ActivityLog` موجود — فقط وقتی لاگ ممیزی کاربر ندارد.
+
+    نوشتن‌های سیستمی/ورکری (پایان خودکار جلسه، تسویهٔ خودکار، …) در `FinancialAuditLog`
+    بی‌`username` می‌مانند؛ همان عملیات در `ActivityLog` (که در مسیرهای مالی نوشته می‌شود)
+    کاربر را دارد ⇒ به‌جای موتور لاگ جدید، از همان منبع موجود fallback می‌گیریم.
+
+    تطبیق: `target_id` = شناسهٔ همان موجودیت + action هم‌خانواده + پنجرهٔ زمانی.
+    `candidates` عمداً چندتایی است: `FinancialAuditLog.timestamp` را listener با
+    `utcnow()` می‌نویسد ولی بخشی از مسیرهای قدیمی/تست‌ها زمان محلی می‌گذارند و
+    `ActivityLog.timestamp` هم `utcnow()` است ⇒ پنجره از min تا max هر دو تفسیر
+    (به‌علاوهٔ ±۳۰ دقیقه) گرفته می‌شود تا تفاوت ساعت‌منطقه باعث از دست رفتن کاربر نشود.
+    """
+    if entity_id is None:
+        return "", None
+    family = {
+        "installment": ("create_installment", "update_installment_amount", "delete_installment",
+                        "pay_installment_manual"),
+        "transaction": ("transaction_refund", "transaction_edit", "transaction_delete",
+                        "transaction_reversed", "submit_payment", "online_payment_success"),
+    }.get(entity_type)
+    if not family:
+        return "", None
+    stamps = [stamp for stamp in candidates if stamp is not None] or [datetime.datetime.utcnow()]
+    window = datetime.timedelta(minutes=_ACTOR_WINDOW_MINUTES)
+    # نکتهٔ داده‌ای (بدون حدس، از روی کد): مسیرهای مختلف `ActivityLog.target_id` را جور
+    # دیگری پر می‌کنند — استرداد تراکنش در finance.py شناسهٔ **دانش‌آموز** را می‌گذارد و
+    # «#<شناسهٔ تراکنش>» را در details می‌نویسد، ولی مسیرهای قسط شناسهٔ خود قسط را
+    # می‌گذارند. پس هر دو شکل تطبیق داده می‌شود تا نام کاربر گم نشود.
+    try:
+        row = (db.query(ActivityLog)
+               .filter(ActivityLog.action.in_(family),
+                       or_(ActivityLog.target_id == entity_id,
+                           ActivityLog.details.like(f"%#{entity_id}%")),
+                       ActivityLog.timestamp >= min(stamps) - window,
+                       ActivityLog.timestamp <= max(stamps) + window)
+               .order_by(ActivityLog.id.desc())
+               .first())
+    except Exception:
+        row = None
+    if row is None or not row.admin_username:
+        return "", None
+    return row.admin_username, row.action
+
+
+def _resolve_search(db: Session, term: str) -> Tuple[set, set]:
+    """جست‌وجوی نام ⇒ (شناسهٔ تراکنش‌ها, شناسهٔ قسط‌ها) — «پیشنهاد من» آیتم ۸.
+
+    منابع تطبیق: نام دانش‌آموز · نام معلم (از کلاسِ تراکنش/قسط) · عنوان کلاس · نام شعبه ·
+    گیرندهٔ رسید · کد ملی/موبایل. همه با یک ILIKE/LIKE روی هر جدول (بدون حلقه روی ردیف‌ها).
+    """
+    like = f"%{term}%"
+    # نام کامل هم تطبیق داده می‌شود («مریم احمدی» نه در first_name است نه در last_name)
+    student_full = func.coalesce(Student.first_name, "") + " " + func.coalesce(Student.last_name, "")
+    teacher_full = func.coalesce(Teacher.first_name, "") + " " + func.coalesce(Teacher.last_name, "")
+    student_ids = {row[0] for row in db.query(Student.id).filter(
+        or_(Student.first_name.like(like), Student.last_name.like(like), student_full.like(like),
+            Student.national_code.like(like), Student.student_mobile.like(like),
+            Student.parent_mobile.like(like))).limit(_SEARCH_ID_LIMIT).all()}
+    teacher_ids = {row[0] for row in db.query(Teacher.id).filter(
+        or_(Teacher.first_name.like(like), Teacher.last_name.like(like), teacher_full.like(like),
+            Teacher.mobile.like(like))).limit(_SEARCH_ID_LIMIT).all()}
+    teacher_courses = {row[0] for row in db.query(Course.id).filter(
+        Course.teacher_id.in_(teacher_ids)).limit(_SEARCH_ID_LIMIT).all()} if teacher_ids else set()
+    title_courses = {row[0] for row in db.query(Course.id).filter(
+        Course.title.like(like)).limit(_SEARCH_ID_LIMIT).all()}
+    course_ids = teacher_courses | title_courses
+    branch_ids = {row[0] for row in db.query(Branch.id).filter(
+        Branch.name.like(like)).limit(_SEARCH_ID_LIMIT).all()}
+
+    tx_query = db.query(Transaction.id).filter(or_(
+        Transaction.student_id.in_(student_ids),
+        Transaction.course_id.in_(course_ids),
+        Transaction.branch_id.in_(branch_ids),
+        Transaction.receiver.like(like),
+        Transaction.description.like(like),
+    ))
+    tx_ids = {row[0] for row in tx_query.limit(_SEARCH_ID_LIMIT).all()}
+
+    enrollment_ids = {row[0] for row in db.query(Enrollment.id).filter(or_(
+        Enrollment.student_id.in_(student_ids),
+        Enrollment.course_id.in_(course_ids),
+        Enrollment.branch_id.in_(branch_ids),
+    )).limit(_SEARCH_ID_LIMIT).all()}
+    inst_ids = {row[0] for row in db.query(Installment.id).filter(
+        Installment.enrollment_id.in_(enrollment_ids)).limit(_SEARCH_ID_LIMIT).all()
+    } if enrollment_ids else set()
+    return tx_ids, inst_ids
+
+
 class AuditLogEntry(BaseModel):
     id: int
     timestamp: str
@@ -323,6 +638,22 @@ class AuditLogEntry(BaseModel):
     new_values: Optional[Dict[str, Any]] = None
     ip_address: Optional[str] = None
     changed_fields: List[str] = []
+    # FIX (گروه۲/آیتم ۸): فیلدهای نمایشی جدید — همه افزودنی‌اند (کلیدهای بالا دست‌نخورده)
+    labels: Dict[str, str] = {}                 # نام ستون → برچسب فارسی
+    changed_labels: List[str] = []              # برچسب فارسی ستون‌های تغییریافته
+    change_summary: str = ""                    # جملهٔ خوانا: «مبلغ: 100,000 ← 250,000»
+    action_label: str = ""                      # ایجاد/ویرایش/حذف/باطل‌شده/برگشت‌خورده
+    change_type: str = ""                       # کلید ماشین‌خوان نوع تغییر
+    action_color: str = ""                      # رنگ پیشنهادی ردیف (Material)
+    icon_color: str = ""                        # رنگ آیکون همان نوع تغییر
+    entity_refs: Dict[str, Any] = {}            # نام‌ها به‌جای شناسهٔ خام (کلاس/شعبه/دانش‌آموز/معلم)
+    student_id: Optional[int] = None
+    student_name: str = ""
+    student_statement_path: str = ""            # لینک مستقیم به صورت‌حساب دانش‌آموز
+    actor_username: str = ""                    # کاربر تغییردهنده (با fallback روی ActivityLog)
+    actor_source: str = ""                      # audit_context | activity_log | none
+    actor_action: Optional[str] = None          # برچسب فارسیِ عملیاتِ ActivityLog (در حالت fallback)
+    actor_action_key: Optional[str] = None      # همان action خام (برای فیلتر/دیباگ)
 
 
 class AuditTrailResponse(BaseModel):
@@ -421,6 +752,7 @@ def list_audit_logs(
     user_id: Optional[int] = Query(None, ge=1, description="فیلتر بر اساس کاربر"),
     start_date: Optional[str] = Query(None, description="از تاریخ (ISO یا جلالی)"),
     end_date: Optional[str] = Query(None, description="تا تاریخ (ISO یا جلالی، شامل کل روز)"),
+    search: Optional[str] = Query(None, description="جست‌وجوی نام دانش‌آموز/معلم/کلاس/شعبه/گیرنده"),
     page: int = Query(1, ge=1),
     limit: int = Query(DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
     _: str = Depends(check_admin_access),
@@ -438,6 +770,23 @@ def list_audit_logs(
         raise HTTPException(status_code=400, detail="start_date بعد از end_date است")
 
     query = db.query(FinancialAuditLog)
+    # FIX (گروه۲/آیتم ۸ — «پیشنهاد من»): جست‌وجو بر اساس نام (نه فقط شناسه).
+    # اسم‌ها در جدول لاگ ذخیره نمی‌شوند (سند خام باید دست‌نخورده بماند) ⇒ نام به شناسه
+    # ترجمه و روی `entity_id` فیلتر می‌شود؛ `total`/`pages` هم درست می‌مانند.
+    search_term = (search or "").strip()
+    if search_term:
+        tx_ids, inst_ids = _resolve_search(db, search_term)
+        if entity_type == "transaction":
+            inst_ids = set()
+        elif entity_type == "installment":
+            tx_ids = set()
+        pairs = ([("transaction", tx_id) for tx_id in tx_ids]
+                 + [("installment", inst_id) for inst_id in inst_ids])
+        if not pairs:
+            return AuditTrailResponse(logs=[], total=0, page=page, limit=limit, pages=0)
+        pairs = pairs[:_SEARCH_ID_LIMIT]
+        query = query.filter(tuple_(FinancialAuditLog.entity_type, FinancialAuditLog.entity_id)
+                             .in_(pairs))
     if entity_type is not None:
         query = query.filter(FinancialAuditLog.entity_type == entity_type)
     if entity_id is not None:
@@ -461,10 +810,53 @@ def list_audit_logs(
         .all()
     )
 
-    logs: List[AuditLogEntry] = []
+    # FIX (گروه۲/آیتم ۸): دو پاس روی همان ردیف‌های صفحه — پاس اول فقط شناسه‌ها را جمع
+    # می‌کند تا join نام‌ها **دسته‌ای** انجام شود (بدون N+1؛ limit صفحه حداکثر 200 است).
+    parsed: List[Tuple[Any, Optional[Dict[str, Any]], Optional[Dict[str, Any]], List[str], Dict[str, set]]] = []
+    page_ids: Dict[str, set] = {"student_ids": set(), "course_ids": set(), "branch_ids": set(),
+                                "enrollment_ids": set(), "installment_enrollment_ids": set()}
     for row in rows:
         old_values = _load_json(row.old_values)
         new_values = _load_json(row.new_values)
+        wanted: Dict[str, set] = {}
+        _collect_ref_ids(row.entity_type, old_values, new_values, wanted)
+        for key in ("student_id", "course_id", "branch_id", "enrollment_id"):
+            page_ids[f"{key}s"] |= wanted.get(key, set())
+        if row.entity_type == "installment":
+            # قسط فقط `enrollment_id` دارد ⇒ زنجیرهٔ قسط→ثبت‌نام→(دانش‌آموز/کلاس/معلم)
+            page_ids["installment_enrollment_ids"] |= wanted.get("enrollment_id", set())
+        parsed.append((row, old_values, new_values,
+                       _changed_fields(row.action, old_values, new_values), wanted))
+
+    refs_by_log, student_id_by_log = _entity_refs_batch(
+        db, [(row.id, row.entity_type, wanted) for row, _o, _n, _c, wanted in parsed], page_ids)
+
+    logs: List[AuditLogEntry] = []
+    for row, old_values, new_values, changed, wanted in parsed:
+        action_label, change_type, icon_color = _change_type_meta(row.action, old_values, new_values)
+        refs = refs_by_log.get(row.id, {})
+        student_id = student_id_by_log.get(row.id)
+        student_name = refs.get("student", "")
+        # «لینک مستقیم به صورت‌حساب دانش‌آموز»: مسیرِ همان اندپوینت موجود
+        # (GET /reports/student_statement) تا کلاینت فقط باز کند — اندپوینت جدید لازم نیست.
+        statement_path = f"/reports/student_statement?student_id={student_id}" if student_id else ""
+
+        # timestamp خام (UTC طبق listener) + تفسیر محلی — هر دو به fallback کاربر داده می‌شود
+        when_utc = _to_utc_naive(row.timestamp) if row.timestamp else None
+        actor_action_key = None
+        if row.username:
+            actor_username, actor_source, actor_action = row.username, "audit_context", None
+        else:
+            # نوشتن سیستمی/ورکری ⇒ نام کاربر از ActivityLog موجود (موتور لاگ جدید نساختیم)
+            activity_username, activity_action = _activity_actor(
+                db, row.entity_type, row.entity_id, (row.timestamp, when_utc))
+            if activity_username:
+                actor_username, actor_source = activity_username, "activity_log"
+                actor_action = ACTIVITY_ACTION_LABELS.get(activity_action, activity_action)
+                actor_action_key = activity_action
+            else:
+                actor_username, actor_source, actor_action = "", "none", None
+
         logs.append(AuditLogEntry(
             id=row.id,
             timestamp=_to_local_naive(row.timestamp).isoformat(sep=" ") if row.timestamp else "",
@@ -475,7 +867,24 @@ def list_audit_logs(
             old_values=old_values,
             new_values=new_values,
             ip_address=row.ip_address,
-            changed_fields=_changed_fields(row.action, old_values, new_values),
+            changed_fields=changed,
+            labels={key: _field_label(key) for key in changed},
+            changed_labels=[_field_label(key) for key in changed],
+            change_summary=_change_summary(row.action, changed, old_values, new_values),
+            action_label=action_label,
+            change_type=change_type,
+            # رنگ ردیف = رنگ «نوع تغییر» (برگشت‌خورده قرمز، باطل‌شده خاکستری، …) نه رنگ action خام؛
+            # در غیر این صورت یک استرداد همیشه نارنجیِ «ویرایش» دیده می‌شد.
+            action_color=CHANGE_TYPE_COLORS.get(change_type, ACTION_COLORS.get(row.action, "#607D8B")),
+            icon_color=icon_color,
+            entity_refs=refs,
+            student_id=student_id,
+            student_name=student_name,
+            student_statement_path=statement_path,
+            actor_username=actor_username,
+            actor_source=actor_source,
+            actor_action=actor_action,
+            actor_action_key=actor_action_key,
         ))
 
     pages = (total + limit - 1) // limit if limit else 0

@@ -1329,7 +1329,8 @@
     <string name="audit_trail_export_error">خطا در خروجی: %1$s</string>
     <string name="audit_trail_export_share">اشتراک‌گذاری خروجی تاریخچه</string>
     <string name="audit_trail_export_open_failed">برنامه‌ای برای باز کردن فایل پیدا نشد؛ مسیر: %1$s</string>
-    <string name="audit_trail_csv_header">زمان,کاربر,عملیات,نوع,شناسه,فیلدهای تغییریافته,خلاصه تغییر,IP</string>
+    <!-- FIX (گروه۲/آیتم۸): دو ستون جدید «کاربر تغییردهنده» و «مربوط به» (نام‌ها به‌جای شناسه خام) -->
+    <string name="audit_trail_csv_header">زمان,کاربر,عملیات,نوع,شناسه,فیلدهای تغییریافته,خلاصه تغییر,IP,کاربر تغییردهنده,مربوط به</string>
     <string name="audit_trail_pick_ok">تأیید</string>
     <string name="audit_trail_pick_cancel">انصراف</string>
     <string name="audit_trail_pick_today">امروز</string>
@@ -1346,6 +1347,16 @@
     <string name="audit_trail_field_target_wallet">کیف پول مقصد</string>
     <string name="audit_trail_field_student">شناسه دانش‌آموز</string>
     <string name="audit_trail_field_enrollment">شناسه ثبت‌نام</string>
+
+    <!-- FIX (گروه۲/آیتم۸): جست‌وجوی نام + نمایش نام‌ها به‌جای شناسه‌ی خام + لینک صورت‌حساب -->
+    <string name="audit_trail_search_hint">جست‌وجوی نام دانش‌آموز / معلم / کلاس / شعبه</string>
+    <string name="audit_trail_refs_line">🔗 %1$s</string>
+    <string name="audit_trail_dialog_actor">کاربر تغییردهنده: %1$s</string>
+    <string name="audit_trail_dialog_actor_activity">کاربر تغییردهنده: %1$s (از گزارش فعالیت: %2$s)</string>
+    <string name="audit_trail_dialog_actor_unknown">کاربر تغییردهنده: سیستم / نامشخص</string>
+    <string name="audit_trail_dialog_refs">مربوط به: %1$s</string>
+    <string name="audit_trail_dialog_open_statement">صورت‌حساب دانش‌آموز</string>
+    <string name="audit_trail_no_student_link">این تغییر به دانش‌آموزی لینک نیست</string>
 
     <!-- دکمه ورود به تاریخچه مالی در داشبورد ادمین -->
     <string name="dashboard_action_audit_trail">تاریخچه تغییرات مالی</string>

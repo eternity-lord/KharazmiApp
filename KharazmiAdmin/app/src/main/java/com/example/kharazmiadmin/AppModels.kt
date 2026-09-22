@@ -832,7 +832,28 @@ data class AuditTrailLog(
     @SerializedName("old_values") val oldValues: Map<String, Any>? = null,
     @SerializedName("new_values") val newValues: Map<String, Any>? = null,
     @SerializedName("ip_address") val ipAddress: String? = null,
-    @SerializedName("changed_fields") val changedFields: List<String> = emptyList()
+    @SerializedName("changed_fields") val changedFields: List<String> = emptyList(),
+    // ---- FIX (گروه۲/آیتم۸): فیلدهای غنی‌شده‌ی سرور (همه اختیاری ⇒ کلاینت قدیمی نمی‌شکند) ----
+    /** نام ستون → برچسب فارسی (فقط ستون‌های تغییریافته) */
+    val labels: Map<String, String>? = null,
+    @SerializedName("changed_labels") val changedLabels: List<String>? = null,
+    /** جمله‌ی خوانا: «مبلغ: 100,000 ← 250,000» */
+    @SerializedName("change_summary") val changeSummary: String? = null,
+    @SerializedName("action_label") val actionLabel: String? = null,
+    /** new_payment | edited | reversed | voided | deleted */
+    @SerializedName("change_type") val changeType: String? = null,
+    @SerializedName("action_color") val actionColor: String? = null,
+    @SerializedName("icon_color") val iconColor: String? = null,
+    /** نام‌ها به‌جای شناسه‌ی خام: student/teacher/course/branch/enrollment */
+    @SerializedName("entity_refs") val entityRefs: Map<String, String>? = null,
+    @SerializedName("student_id") val studentId: Int? = null,
+    @SerializedName("student_name") val studentName: String? = null,
+    @SerializedName("student_statement_path") val studentStatementPath: String? = null,
+    @SerializedName("actor_username") val actorUsername: String? = null,
+    /** audit_context | activity_log | none */
+    @SerializedName("actor_source") val actorSource: String? = null,
+    @SerializedName("actor_action") val actorAction: String? = null,
+    @SerializedName("actor_action_key") val actorActionKey: String? = null
 )
 
 data class AuditTrailResponse(

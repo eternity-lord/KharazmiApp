@@ -109,6 +109,23 @@
                         android:inputType="number" />
                 </com.google.android.material.textfield.TextInputLayout>
 
+                <!-- FIX (گروه۲/آیتم۸): جست‌وجو بر اساس نام دانش‌آموز/معلم/کلاس/شعبه/گیرنده
+                     (پارامتر search در GET audit-trail/logs) — همان الگوی فیلد بالایی -->
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:hint="@string/audit_trail_search_hint">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etAuditSearch"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:imeOptions="actionSearch"
+                        android:inputType="text" />
+                </com.google.android.material.textfield.TextInputLayout>
+
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

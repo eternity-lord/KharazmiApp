@@ -54,6 +54,7 @@ class AuditTrailActivity : BaseActivity() {
     private lateinit var spEntityType: Spinner
     private lateinit var spAction: Spinner
     private lateinit var etEntityId: TextInputEditText
+    private lateinit var etSearch: TextInputEditText   // FIX (گروه۲/آیتم۸): جست‌وجوی نام
     private lateinit var btnFromDate: MaterialButton
     private lateinit var btnToDate: MaterialButton
 
@@ -96,6 +97,7 @@ class AuditTrailActivity : BaseActivity() {
         spEntityType = findViewById(R.id.spAuditEntityType)
         spAction = findViewById(R.id.spAuditAction)
         etEntityId = findViewById(R.id.etAuditEntityId)
+        etSearch = findViewById(R.id.etAuditSearch)
         btnFromDate = findViewById(R.id.btnAuditFromDate)
         btnToDate = findViewById(R.id.btnAuditToDate)
 
@@ -141,6 +143,7 @@ class AuditTrailActivity : BaseActivity() {
             fromDate = null
             toDate = null
             etEntityId.setText("")
+            etSearch.setText("")   // FIX (گروه۲/آیتم۸): جست‌وجوی نام هم پاک می‌شود
             updateDateLabels()
             spEntityType.setSelection(0)   // خودِ listener باعث بارگذاری مجدد می‌شود
             spAction.setSelection(0)
@@ -148,6 +151,11 @@ class AuditTrailActivity : BaseActivity() {
         }
 
         etEntityId.setOnEditorActionListener { _, _, _ ->
+            loadLogs(reset = true)
+            true
+        }
+
+        etSearch.setOnEditorActionListener { _, _, _ ->
             loadLogs(reset = true)
             true
         }
@@ -211,9 +219,12 @@ class AuditTrailActivity : BaseActivity() {
 
     private fun selectedEntityId(): Int? = etEntityId.text?.toString()?.trim()?.takeIf { it.isNotEmpty() }?.toIntOrNull()
 
+    /** FIX (گروه۲/آیتم۸): عبارت جست‌وجوی نام (خالی ⇒ null تا فیلتر اعمال نشود). */
+    private fun selectedSearch(): String? = etSearch.text?.toString()?.trim()?.takeIf { it.isNotEmpty() }
+
     private fun hasActiveFilters(): Boolean =
         selectedEntityType() != null || selectedAction() != null || selectedEntityId() != null ||
-            fromDate != null || toDate != null
+            selectedSearch() != null || fromDate != null || toDate != null
 
     // ------------------------------------------------------------------
     // بارگذاری (صفحه‌بندی)
@@ -239,6 +250,7 @@ class AuditTrailActivity : BaseActivity() {
                     action = selectedAction(),
                     startDate = fromDate,
                     endDate = toDate,
+                    search = selectedSearch(),
                     page = pageToLoad,
                     limit = PAGE_SIZE
                 )
@@ -318,6 +330,7 @@ class AuditTrailActivity : BaseActivity() {
                         action = selectedAction(),
                         startDate = fromDate,
                         endDate = toDate,
+                        search = selectedSearch(),
                         page = page,
                         limit = 200
                     )
@@ -370,12 +383,16 @@ class AuditTrailActivity : BaseActivity() {
             val row = listOf(
                 item.timestamp,
                 item.username ?: "",
-                actionLabel(item.action),
+                displayActionLabel(item),
                 entityLabel(item.entityType),
                 item.entityId?.toString() ?: "",
-                item.changedFields.joinToString("; "),
-                diffSummaryFor(item),
-                item.ipAddress ?: ""
+                item.changedLabels?.joinToString("; ")?.takeIf { it.isNotBlank() }
+                    ?: item.changedFields.joinToString("; "),
+                displayDiff(item),
+                item.ipAddress ?: "",
+                // FIX (گروه۲/آیتم۸): ستون‌های جدید — کاربر تغییردهنده (با fallback) و نام‌ها
+                displayActor(item),
+                entityRefsLine(item)
             )
             builder.append(row.joinToString(",") { csvCell(it) }).append("\r\n")
         }
@@ -420,6 +437,46 @@ class AuditTrailActivity : BaseActivity() {
         "update" -> getString(R.string.audit_trail_action_update)
         "delete" -> getString(R.string.audit_trail_action_delete)
         else -> action
+    }
+
+    // ------------------------------------------------------------------
+    // FIX (گروه۲/آیتم۸): مصرف فیلدهای غنی‌شده‌ی سرور — نام‌ها به‌جای شناسه‌ی خام،
+    // نوع تغییر به زبان ساده، کاربر تغییردهنده (با fallback روی ActivityLog)،
+    // لینک صورت‌حساب دانش‌آموز و رنگ هر نوع تغییر. همه با fallback به رفتار قبلی
+    // (اگر سرور قدیمی باشد، فیلدها null می‌آیند و همان نمایش قبلی دیده می‌شود).
+    // ------------------------------------------------------------------
+    /** برچسب فارسی عملیات: اولویت با سرور؛ سرور قدیمی ⇒ همان mapping محلی. */
+    private fun displayActionLabel(item: AuditTrailLog): String =
+        item.actionLabel?.takeIf { it.isNotBlank() } ?: actionLabel(item.action)
+
+    /** «مربوط به: سینا مرادی • ریاضی کنکور • شعبه مرکزی» — خالی اگر سرور نامی نفرستاد. */
+    private fun entityRefsLine(item: AuditTrailLog): String {
+        val refs = item.entityRefs ?: return ""
+        val parts = listOfNotNull(
+            refs["student"]?.takeIf { it.isNotBlank() },
+            refs["teacher"]?.takeIf { it.isNotBlank() },
+            refs["course"]?.takeIf { it.isNotBlank() },
+            refs["enrollment"]?.takeIf { it.isNotBlank() && refs["student"].isNullOrBlank() },
+            refs["branch"]?.takeIf { it.isNotBlank() }
+        ).distinct()
+        return parts.joinToString(" • ")
+    }
+
+    /** خلاصه‌ی تغییر: جمله‌ی آماده‌ی سرور (با برچسب فارسی و هزارگان) یا ساخت محلی. */
+    private fun displayDiff(item: AuditTrailLog): String =
+        item.changeSummary?.takeIf { it.isNotBlank() } ?: diffSummaryFor(item)
+
+    /** نام کاربر تغییردهنده: `username` لاگ ممیزی، وگرنه fallback سرور از ActivityLog. */
+    private fun displayActor(item: AuditTrailLog): String =
+        item.username?.takeIf { it.isNotBlank() }
+            ?: item.actorUsername?.takeIf { it.isNotBlank() }
+            ?: ""
+
+    /** رنگ هر نوع تغییر (سرور Material color می‌فرستد) ⇒ null اگر قابل پارس نبود. */
+    private fun parseColor(hex: String?): Int? = try {
+        hex?.takeIf { it.startsWith("#") && it.length == 7 }?.let { android.graphics.Color.parseColor(it) }
+    } catch (_: Exception) {
+        null
     }
 
     private fun actionIcon(action: String): String = when (action) {
@@ -479,14 +536,29 @@ class AuditTrailActivity : BaseActivity() {
         } + if (changed.size > 3) " …" else ""
     }
 
-    /** دیالوگ دیف کامل: فقط فیلدهای واقعاً تغییریافته، قبل/بعد. */
+    /** دیالوگ دیف کامل: فقط فیلدهای واقعاً تغییریافته، قبل/بعد + نام‌ها و کاربر تغییردهنده. */
     private fun showDiffDialog(item: AuditTrailLog) {
         val changed = item.changedFields.filter { it != "id" }.ifEmpty { item.changedFields }
         val builder = StringBuilder()
         builder.append(getString(R.string.audit_trail_dialog_meta,
-            actionLabel(item.action), entityLabel(item.entityType), item.entityId ?: 0))
+            displayActionLabel(item), entityLabel(item.entityType), item.entityId ?: 0))
+        // FIX (گروه۲/آیتم۸): «کاربر تغییردهنده» — اگر لاگ ممیزی کاربر نداشت، سرور از
+        // ActivityLog همان عملیات نام را برگردانده (actor_source = activity_log).
+        val actor = displayActor(item)
+        builder.append("\n").append(
+            when {
+                actor.isBlank() -> getString(R.string.audit_trail_dialog_actor_unknown)
+                item.actorSource == "activity_log" && !item.actorAction.isNullOrBlank() ->
+                    getString(R.string.audit_trail_dialog_actor_activity, actor, item.actorAction)
+                else -> getString(R.string.audit_trail_dialog_actor, actor)
+            }
+        )
         builder.append("\n").append(getString(R.string.audit_trail_dialog_user, item.username ?: "—", item.timestamp))
         builder.append("\n").append(getString(R.string.audit_trail_dialog_ip, item.ipAddress ?: "—"))
+        val refs = entityRefsLine(item)
+        if (refs.isNotBlank()) {
+            builder.append("\n").append(getString(R.string.audit_trail_dialog_refs, refs))
+        }
         builder.append("\n\n")
         if (changed.isEmpty()) {
             builder.append(getString(R.string.audit_trail_no_field_detail))
@@ -494,18 +566,26 @@ class AuditTrailActivity : BaseActivity() {
             for (field in changed) {
                 val before = formatValue(item.oldValues?.get(field))
                 val after = formatValue(item.newValues?.get(field))
-                builder.append("• ${friendlyFieldName(field)}: $before → $after\n")
+                // برچسب فارسی ستون از سرور (labels) و در نبودش mapping محلی
+                val label = item.labels?.get(field)?.takeIf { it.isNotBlank() } ?: friendlyFieldName(field)
+                builder.append("• $label: $before → $after\n")
             }
         }
 
-        AlertDialog.Builder(this)
+        val dialog = AlertDialog.Builder(this)
             .setTitle(getString(R.string.audit_trail_dialog_title, actionIcon(item.action)))
             .setMessage(builder.toString())
             .setPositiveButton(getString(R.string.audit_trail_dialog_ok), null)
             .setNeutralButton(getString(R.string.audit_trail_dialog_open_entity)) { _, _ ->
                 openEntity(item)
             }
-            .show()
+        // «لینک مستقیم به صورت‌حساب دانش‌آموز» فقط وقتی سرور دانش‌آموز را پیدا کرده باشد
+        if (item.studentId != null) {
+            dialog.setNegativeButton(getString(R.string.audit_trail_dialog_open_statement)) { _, _ ->
+                openStudentStatement(item)
+            }
+        }
+        dialog.show()
     }
 
     /** باز کردن صفحه‌ی مرتبط — فقط لینک‌های امن و در دسترس (بدون پارامترِ ناشناخته). */
@@ -516,6 +596,19 @@ class AuditTrailActivity : BaseActivity() {
         } else {
             startActivity(Intent(this, TransactionManageActivity::class.java))
         }
+    }
+
+    /** FIX (گروه۲/آیتم۸): لینک مستقیم به صورت‌حساب دانش‌آموز — همان الگوی PersonListActivity
+     *  (`StudentProfileActivity` با extra «STUDENT_ID» که صورت‌حساب/پرداخت‌ها را نشان می‌دهد). */
+    private fun openStudentStatement(item: AuditTrailLog) {
+        val studentId = item.studentId
+        if (studentId == null) {
+            toast(getString(R.string.audit_trail_no_student_link))
+            return
+        }
+        val intent = Intent(this, StudentProfileActivity::class.java)
+        intent.putExtra("STUDENT_ID", studentId)
+        startActivity(intent)
     }
 
     private fun toast(message: String) = Toast.makeText(this, message, Toast.LENGTH_LONG).show()
@@ -532,6 +625,7 @@ class AuditTrailActivity : BaseActivity() {
             val tvAction: TextView = view.findViewById(R.id.tvAuditLogAction)
             val tvEntity: TextView = view.findViewById(R.id.tvAuditLogEntity)
             val tvMeta: TextView = view.findViewById(R.id.tvAuditLogMeta)
+            val tvRefs: TextView = view.findViewById(R.id.tvAuditLogRefs)
             val tvDiff: TextView = view.findViewById(R.id.tvAuditLogDiff)
             val tvIp: TextView = view.findViewById(R.id.tvAuditLogIp)
         }
@@ -547,18 +641,39 @@ class AuditTrailActivity : BaseActivity() {
         override fun onBindViewHolder(holder: VH, position: Int) {
             val item = items[position]
             holder.tvIcon.text = actionIcon(item.action)
-            holder.tvAction.text = actionLabel(item.action)
+            holder.tvAction.text = displayActionLabel(item)
             holder.tvEntity.text = getString(
                 R.string.audit_trail_item_entity, entityLabel(item.entityType), item.entityId ?: 0
             )
             holder.tvMeta.text = getString(
-                R.string.audit_trail_item_meta, item.username ?: "—", item.timestamp
+                R.string.audit_trail_item_meta, displayActor(item).ifBlank { "—" }, item.timestamp
             )
-            holder.tvDiff.text = diffSummaryFor(item)
+            // FIX (گروه۲/آیتم۸): نام‌ها به‌جای شناسه‌ی خام (course_id/branch_id/student_id)
+            val refs = entityRefsLine(item)
+            if (refs.isBlank()) {
+                holder.tvRefs.visibility = View.GONE
+            } else {
+                holder.tvRefs.visibility = View.VISIBLE
+                holder.tvRefs.text = getString(R.string.audit_trail_refs_line, refs)
+            }
+            holder.tvDiff.text = displayDiff(item)
             holder.tvIp.text = getString(R.string.audit_trail_item_ip, item.ipAddress ?: "—")
+
+            // رنگ آیکون/برچسب بر اساس «نوع تغییر» (سرور Material color می‌فرستد)
+            val iconColor = parseColor(item.iconColor)
+            if (iconColor != null) holder.tvIcon.setTextColor(iconColor)
+            val actionColor = parseColor(item.actionColor)
+            if (actionColor != null) holder.tvAction.setTextColor(actionColor)
 
             holder.card.setOnClickListener { showDiffDialog(item) }
             holder.tvEntity.setOnClickListener { openEntity(item) }
+            // FIX (گروه۲/آیتم۸): تپ روی نام دانش‌آموز ⇒ مستقیم به صورت‌حساب او
+            if (item.studentId != null) {
+                holder.tvRefs.setOnClickListener { openStudentStatement(item) }
+            } else {
+                holder.tvRefs.setOnClickListener(null)
+                holder.tvRefs.isClickable = false
+            }
         }
     }
 

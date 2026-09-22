@@ -159,6 +159,8 @@ interface AuditTrailApi {
         @Query("user_id") userId: Int? = null,
         @Query("start_date") startDate: String? = null,
         @Query("end_date") endDate: String? = null,
+        // FIX (گروه۲/آیتم۸): جست‌وجوی نام دانش‌آموز/معلم/کلاس/شعبه/گیرنده در سرور
+        @Query("search") search: String? = null,
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 50
     ): AuditTrailResponse
@@ -172,6 +174,7 @@ interface AuditTrailApi {
         @Query("action") action: String? = null,
         @Query("start_date") startDate: String? = null,
         @Query("end_date") endDate: String? = null,
+        @Query("search") search: String? = null,
         @Query("limit") limit: Int = 200
     ): Response<ResponseBody>
 }

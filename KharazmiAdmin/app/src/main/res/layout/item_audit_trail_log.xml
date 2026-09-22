@@ -60,6 +60,16 @@
             android:textColor="#B9BFCB"
             android:textSize="11sp" />
 
+        <!-- FIX (گروه۲/آیتم۸): نام‌ها به‌جای شناسه‌ی خام (دانش‌آموز/معلم/کلاس/شعبه) -->
+        <TextView
+            android:id="@+id/tvAuditLogRefs"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textColor="#CFD6E4"
+            android:textSize="11sp"
+            android:visibility="gone" />
+
         <TextView
             android:id="@+id/tvAuditLogDiff"
             android:layout_width="match_parent"

@@ -611,7 +611,12 @@ def get_pending_classes(db: Session = Depends(get_db), authorization: Optional[s
             raise HTTPException(status_code=403, detail="شما دسترسی لازم برای مشاهده کلاس‌های درانتظار را ندارید")
         _own_teacher_id = _me.id
     # 1. دریافت کلاس‌های تایید نشده از دیتابیس
-    courses = db.query(Course).filter(Course.is_admin_approved == False)
+    # FIX (گروه۱/آیتم۳): کلاس آرشیوشده (رد‌شده با DELETE /admin/reject_class یا حذف مستقیم ادمین)
+    # نباید در صف «منتظر تأیید» بماند. `reject_class` فقط is_deleted=True می‌گذارد و
+    # is_admin_approved همچنان False است ⇒ پیش‌تر ردیف رد‌شده در همین لیست دیده می‌شد و ادمین
+    # می‌توانست دوباره تأییدش کند. هم‌سیاست با نمای معلم (`incomplete_classes`) و H10
+    # (آرشیو مثل ناموجود است).
+    courses = db.query(Course).filter(Course.is_admin_approved == False, Course.is_deleted == False)
     if _own_teacher_id is not None:
         courses = courses.filter(Course.teacher_id == _own_teacher_id)
     courses = courses.all()
@@ -649,7 +654,10 @@ def get_pending_classes(db: Session = Depends(get_db), authorization: Optional[s
 
 @router.post("/admin/approve_class/{course_id}")
 def approve_class(course_id: int, db: Session = Depends(get_db), _: str = Depends(check_admin_or_secretary_access)):  # FIX H10-S2: تایید فقط ادمین/منشی (الگوی C1/H10-S)
-    c = db.query(Course).filter(Course.id == course_id).first()
+    # FIX (گروه۱/آیتم۳): کلاس آرشیوشده (رد‌شده/حذف‌شده) مثل ناموجود است ⇒ ۴۰۴ (سیاست H10،
+    # هم‌ترتیب با reject_class همسایه). پیش‌تر تأییدِ کلاسِ رد‌شده ۲۰۰ می‌داد و ردیفی را که از صف
+    # خارج شده بود دوباره «تأییدشده» می‌کرد (کلاس آرشیو با پرچم تأیید = وضعیت ناسازگار).
+    c = db.query(Course).filter(Course.id == course_id, Course.is_deleted == False).first()
     if not c:  # FIX H10-S2: قبلاً None-check نداشت (500) — هم‌سبک reject_class همسایه
         raise HTTPException(status_code=404, detail="کلاس یافت نشد")
     c.is_admin_approved = True

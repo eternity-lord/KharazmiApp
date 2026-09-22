@@ -152,19 +152,32 @@ class ClassSetupActivity : BaseActivity() {
                         .setTitle(getString(R.string.csetup_sum_title))
                         .setMessage(summaryMessage)
                         .setPositiveButton(getString(R.string.csetup_sum_send)) { _, _ ->
-                            AlertDialog.Builder(this@ClassSetupActivity)
+                            // FIX (گروه۳/آیتم۱۵): «رفتن به کلاس‌های منتظر تایید» معلم را به
+                            // `PendingClassesActivity` می‌برد؛ آن صفحه صفِ **تأیید ادمین** است
+                            // (رد/تایید کلاس‌ها) و در پنل معلم معنایی ندارد ⇒ دکمهٔ میانی فقط
+                            // برای ادمین ساخته می‌شود. پیام و دکمهٔ «باشه» برای همه می‌ماند.
+                            // چک نقش، همان الگوی موجودِ این فایل است (UserCreds → USER_SUB_ROLE؛
+                            // در آداپتر دانش‌آموزانِ همین Activity دکمهٔ حذف برای منشی GONE می‌شود).
+                            val credsPrefs = getSharedPreferences("UserCreds", Context.MODE_PRIVATE)
+                            val subRole = credsPrefs.getString("USER_SUB_ROLE", "admin") ?: "admin"
+
+                            val sentDialogBuilder = AlertDialog.Builder(this@ClassSetupActivity)
                                 .setTitle(getString(R.string.csetup_sent_title))
                                 .setMessage(getString(R.string.csetup_sent_msg))
                                 .setPositiveButton(getString(R.string.common_ok)) { _, _ ->
                                     finish()
                                 }
-                                .setNeutralButton(getString(R.string.csetup_sent_go)) { _, _ ->
+                                .setCancelable(false)
+
+                            if (subRole == "admin") {
+                                sentDialogBuilder.setNeutralButton(getString(R.string.csetup_sent_go)) { _, _ ->
                                     val intent = Intent(this@ClassSetupActivity, PendingClassesActivity::class.java)
                                     startActivity(intent)
                                     finish()
                                 }
-                                .setCancelable(false)
-                                .show()
+                            }
+
+                            sentDialogBuilder.show()
                         }
                         .setNegativeButton(getString(R.string.csetup_sent_edit), null)
                         .create()

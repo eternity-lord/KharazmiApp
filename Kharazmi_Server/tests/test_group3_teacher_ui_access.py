@@ -47,6 +47,12 @@ def layout(name: str) -> str:
         return handle.read()
 
 
+def kt_strings() -> str:
+    path = os.path.join(RES_DIR, "values", "strings.xml")
+    with open(path, encoding="utf-8") as handle:
+        return handle.read()
+
+
 def strip_comments(source: str) -> str:
     """کامنت‌ها را حذف می‌کند تا گارد روی کد واقعی باشد، نه توضیحات (الگوی test_android_resources_static)."""
     source = re.sub(r"/\*.*?\*/", lambda m: "\n" * m.group(0).count("\n"), source, flags=re.S)
@@ -248,6 +254,50 @@ class TestItem13TeacherClassPageAdminAffairs(unittest.TestCase):
         self.assertIn("امور مدیریتی و تنظیمات دوره", detail)
         self.assertEqual(strip_comments(kt("ClassDetailActivity.kt")).count("suspendClass()"), 2,
                          "فقط یک فراخوانی suspendClass() از دکمه می‌آید (تعریف + کلیک ادمین)")
+
+
+class TestItem15TeacherClassRegistrationPopup(unittest.TestCase):
+    """آیتم ۱۵ — پاپ‌آپ نهایی ثبت کلاس برای معلم: «رفتن به کلاس‌های منتظر تایید» حذف.
+
+    مسیر: پنل معلم → بنر کلاسِ در انتظار تأیید (یا «کلاس‌های ناقص») → `ClassSetupActivity`
+    → «ثبت نهایی و اتمام کلاس» → `showClassSummaryPage()`. بعد از «ارسال برای تأیید»،
+    دیالوگِ `csetup_sent_msg` **سه** دکمه دارد: «باشه» (positive) و
+    «رفتن به کلاس‌های منتظر تایید» (neutral) که `PendingClassesActivity` را باز می‌کند —
+    صفحه‌ای که صفِ **تأیید ادمین** است (رد/تایید کلاس‌ها) و معلم کارِ آن‌جا ندارد.
+    چک نقش، همان الگوی موجودِ خودِ این فایل است (UserCreds → USER_SUB_ROLE؛ در
+    آداپتر دانش‌آموزانِ همین Activity برای منشی دکمهٔ حذف را GONE می‌کند).
+    """
+
+    def test_15a_pending_classes_button_only_exists_for_admin(self):
+        body = function_body(kt("ClassSetupActivity.kt"), "showClassSummaryPage")
+        self.assertRegex(body, r'getSharedPreferences\("UserCreds"')
+        self.assertRegex(body, r'getString\("USER_SUB_ROLE",\s*"admin"\)')
+        gate = body[body.index("USER_SUB_ROLE"):]
+        self.assertRegex(gate, r'if\s*\(subRole\s*==\s*"admin"\)')
+        self.assertRegex(gate, r"setNeutralButton\(getString\(R\.string\.csetup_sent_go\)\)")
+        self.assertRegex(gate, r"PendingClassesActivity::class\.java")
+        # هر دو باید **بعد از** گارد نقش بیایند (قبلاً بی‌قیدوشرط ساخته می‌شد)
+        self.assertGreater(gate.index("setNeutralButton"), gate.index('subRole == "admin"'))
+        self.assertGreater(gate.index("PendingClassesActivity::class.java"), gate.index('subRole == "admin"'))
+
+    def test_15b_the_teacher_still_gets_the_confirmation_dialog(self):
+        """پیام «به مدیر اطلاع بده» و دکمهٔ «باشه» برای معلم سر جایشان می‌مانند."""
+        body = function_body(kt("ClassSetupActivity.kt"), "showClassSummaryPage")
+        gate = body[body.index("USER_SUB_ROLE"):]
+        self.assertLess(gate.index("csetup_sent_title"), gate.index('subRole == "admin"'),
+                        "دیالوگ باید برای همه ساخته شود؛ فقط دکمهٔ میانی ادمینی است")
+        self.assertLess(gate.index("csetup_sent_msg"), gate.index('subRole == "admin"'))
+        self.assertLess(gate.index("R.string.common_ok"), gate.index('subRole == "admin"'))
+        self.assertRegex(gate, r"\.show\(\)")
+
+    def test_15c_admin_path_and_strings_are_untouched(self):
+        self.assertIn('name="csetup_sent_go"', kt_strings())
+        self.assertIn('name="csetup_sent_msg"', kt_strings())
+        setup = strip_comments(kt("ClassSetupActivity.kt"))
+        # الگوی موجودِ پنهان‌کردن دکمهٔ حذف برای منشی دست‌نخورده می‌ماند
+        self.assertRegex(setup, r'if\s*\(subRole\s*==\s*"secretary"\)\s*\{\s*holder\.btnRemove\.visibility\s*=\s*View\.GONE')
+        # مقصد دکمهٔ ادمین همان صفحهٔ صف تأیید است
+        self.assertIn("PendingClassesActivity::class.java", setup)
 
 
 if __name__ == "__main__":

@@ -185,8 +185,9 @@ class TestDashboardPerformance(unittest.TestCase):
         self.assertIn("func.sum", content, "Should use func.sum for SUM queries")
         self.assertNotIn('like(f"{today_jalali}%"', content,
                          "LIKE روی تاریخ شمسی برای درآمد امروز باید حذف شده باشد (O-08)")
-        self.assertIn("calculate_institute_collected_revenue", content,
-                      "درآمد امروز باید از تعریف واحد لایهٔ مالی بیاید (O-08)")
+        self.assertIn("calculate_institute_cash_collected", content,
+                      "درآمد امروز باید از تعریف واحد لایهٔ مالی بیاید (O-08 + گروه۲/آیتم۴: "
+                      "همان تابعی که «پرداخت امروز» در /admin/today_summary استفاده می‌کند)")
         self.assertIn("jalali_date_string", content, "Should convert today to Jalali string")
         # Must NOT load all installments and loop with parse_project_date for overdue
         # The old bug was: db.query(Installment).filter(...).all() then for inst in unpaid: parse_project_date(due) < today

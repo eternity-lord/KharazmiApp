@@ -39,6 +39,88 @@ def _row_date_in_range(value, start, end) -> bool:
     return parsed is not None and start <= parsed <= end
 
 
+# =========================================================================
+# FIX (گروه۲/آیتم‌های ۶ و ۹): دامنهٔ شعبه برای ردیف‌های legacyِ بی‌شعبه
+# =========================================================================
+def branch_scope_clause(column, resolved_branch: Optional[int]):
+    """شرط SQL «این ستون در دامنهٔ شعبهٔ کاربر است» — ردیف بی‌شعبه شامل می‌شود.
+
+    چرا: در دادهٔ واقعی آموزشگاه (سنجش روی کپی `/tmp` از `gaj_db.db`) ستون `branch_id`
+    برای دانش‌آموزان/معلمان/تراکنش‌های legacy **NULL** است، درحالی‌که کاربر ادمین/منشی که با
+    `scripts/create_admin.py` ساخته شده `branch_id=1` دارد. کوئری‌هایی که
+    `Student.branch_id == resolved_branch` را سخت فیلتر می‌کردند، همهٔ آن ردیف‌ها را
+    بی‌صدا حذف می‌کردند ⇒ «خروجی بدهکاران خالی است با وجود داده» (آیتم ۶).
+
+    سیاست (هم‌جهت با H7 و `resolve_creation_branch`): رکورد **بی‌شعبه** = سراسری/legacy و
+    برای کاربر هر شعبه دیده می‌شود؛ رکوردِ شعبهٔ دیگر همچنان پنهان می‌ماند (تست نشت شعبه).
+    `resolved_branch is None` (کاربر بدون شعبه / مدیر کل) ⇒ بدون فیلتر، مثل قبل.
+    """
+    if resolved_branch is None:
+        return None
+    return or_(column == resolved_branch, column.is_(None))
+
+
+# =========================================================================
+# FIX (گروه۲/آیتم ۴): تعریف یگانهٔ «وصولی نقدی امروز/بازه» برای داشبورد
+# =========================================================================
+# انواع تراکنشِ «پولِ ورودی به سمت آموزشگاه». `session_charge` (بدهی شاگرد، منفی)،
+# `reversal` (برگشت) و `settlement_payout` (پرداخت به معلم) عمداً نیستند.
+INSTITUTE_CASH_TYPES = ("deposit", "enrollment_payment", "tuition")
+
+
+def institute_cash_rows(db: Session, start_date: str, end_date: str,
+                        branch_id: Optional[int] = None, include_undated: bool = False):
+    """ردیف‌های `(amount, date)` وصولی نقدی آموزشگاه در بازه — منبع یگانهٔ «پرداختی امروز».
+
+    تفاوت با `collected_revenue_rows` (که عمداً برای KPI/نمودار O-07/O-08 دست‌نخورده ماند):
+      ۱) `target_wallet in ("institute", None, "both")` ⇒ واریزی به **کیف معلم** شمرده نمی‌شود
+         (ریشهٔ باگ: پیش‌تر هر واریزی مثبتی، حتی سهم معلم، «پرداختی امروز» حساب می‌شد)، ولی
+         ردیف‌های legacy بدون کیف و رسیدهای قدیمی `both` حذف بی‌صدا نمی‌شوند (سیاست E1).
+      ۲) انواع `enrollment_payment` (پیش‌پرداخت ثبت‌نام از `enrollments/add`) و `tuition`
+         (ثبت پرداخت از CRM) هم پول ورودی آموزشگاه‌اند — در `classes.py:488` هر دو به کیف
+         آموزشگاه می‌روند.
+      ۳) ردیف legacy با `type IS NULL` (مثل تنها تراکنش موجود در `gaj_db.db`) پول واقعی است.
+    تاریخ با مبدل مرکزی پارس می‌شود (ستون دو تقویمه/دو قالبی است — H3-B3)، پس واریزی با
+    تاریخ میلادی، ارقام فارسی یا ساعت چسبیده به تاریخ هم درست در بازه می‌نشیند.
+    """
+    start, end = _parse_report_range(start_date, end_date)
+    if start is None:
+        return []
+    query = db.query(models.Transaction.amount, models.Transaction.date).filter(
+        models.Transaction.amount > 0,
+        models.Transaction.is_deleted == False,
+        models.Transaction.is_reversed == False,
+        or_(
+            models.Transaction.type.in_(INSTITUTE_CASH_TYPES),
+            models.Transaction.type.is_(None),
+        ),
+        or_(
+            models.Transaction.target_wallet.in_(("institute", "both")),
+            models.Transaction.target_wallet.is_(None),
+        ),
+    )
+    scope = branch_scope_clause(models.Transaction.branch_id, branch_id)
+    if scope is not None:
+        query = query.filter(scope)
+    rows = query.all()
+    if include_undated:
+        return [(int(amount or 0), date_value) for amount, date_value in rows
+                if _row_date_in_range(date_value, start, end)
+                or _parse_loose(date_value) is None]
+    return [(int(amount or 0), date_value) for amount, date_value in rows
+            if _row_date_in_range(date_value, start, end)]
+
+
+def calculate_institute_cash_collected(db: Session, start_date: str, end_date: str,
+                                       branch_id: Optional[int] = None) -> int:
+    """جمع وصولی نقدی آموزشگاه در بازه — همان ردیف‌های `institute_cash_rows`.
+
+    مصرف‌کننده‌ها: `GET /admin/today_summary` («پرداخت امروز») و `GET /dashboard/kpis`
+    («درآمد امروز») ⇒ دو عددِ یک روز در دو صفحهٔ اپ از یک تعریف می‌آیند (آیتم ۴).
+    """
+    return sum(amount for amount, _ in institute_cash_rows(db, start_date, end_date, branch_id))
+
+
 def calculate_institute_session_revenue(db: Session, start_date: str, end_date: str, branch_id: Optional[int] = None) -> int:
     """
     سود نظری آموزشگاه: مجموع سهم آموزشگاه از جلسات کلاسی برگزار شده (session_charge)

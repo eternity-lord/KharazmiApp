@@ -455,25 +455,29 @@ def build_admin_today_summary(
         )
     late_classes.sort(key=lambda item: item["minutes_late"], reverse=True)
 
-    date_filter_transactions = _date_prefix_filter(Transaction.date, [today])
-    payment_types = ("deposit", "enrollment_payment", "tuition", "payment")
-    payment_total = (
-        db.query(func.sum(Transaction.amount))
-        .filter(
-            Transaction.amount > 0,
-            Transaction.type.in_(payment_types),
-            or_(Transaction.is_deleted == False, Transaction.is_deleted.is_(None)),
-            or_(Transaction.is_reversed == False, Transaction.is_reversed.is_(None)),
-            date_filter_transactions,
-        )
-        .scalar()
-        or 0
-    )
+    # FIX (گروه۲/آیتم۴): «پرداخت امروز» از تعریف یگانهٔ وصولی نقدی آموزشگاه می‌آید
+    # (`financial_calculations.calculate_institute_cash_collected`) — همان چیزی که KPI
+    # «درآمد امروز» در `/dashboard/kpis` نشان می‌دهد.
+    # پیش‌تر اینجا `SUM(amount)` روی `type in (deposit, enrollment_payment, tuition, payment)`
+    # با `LIKE` روی سه پیشوند تاریخ بود ⇒ (الف) واریزی به **کیف معلم** هم «پرداخت امروز»
+    # حساب می‌شد (دقیقاً باگ O-08 که فقط در KPI فیکس شده بود)، (ب) ردیف legacy با
+    # `type=NULL` دیده نمی‌شد، (پ) دو عدد متفاوت برای یک روز در دو صفحهٔ اپ.
+    from financial_calculations import calculate_institute_cash_collected  # lazy (الگوی پروژه)
+    today_jalali = jalali_date_string(today)
+    try:
+        payment_total = int(calculate_institute_cash_collected(db, today_jalali, today_jalali) or 0)
+    except Exception as exc:  # هم‌سبک KPIهای dashboard: خطا ⇒ ۰ و لاگ، نه ۵۰۰
+        print(f"[TodaySummary] today_payments failed: {exc}")
+        payment_total = 0
 
-    enrollment_count = (
-        db.query(Enrollment)
-        .filter(_date_prefix_filter(Enrollment.register_date, [today]))
-        .count()
+    # FIX (گروه۲/آیتم۴): «ثبت‌نام امروز» با پارس مرکزی تاریخ (ستون دو تقویمه/دو قالبی است)
+    # و بدون شمردن ثبت‌نام‌های آرشیوشده — پیش‌تر `LIKE` روی register_date بود و
+    # `is_deleted` را نمی‌دید ⇒ ثبت‌نامِ رد/حذف‌شده هم «امروز» شمرده می‌شد.
+    enrollment_rows = db.query(Enrollment.register_date, Enrollment.is_deleted).all()
+    enrollment_count = sum(
+        1
+        for register_date, is_deleted in enrollment_rows
+        if not is_deleted and parse_project_date(register_date) == today
     )
 
     is_admin = sub_role == "admin"

@@ -18,7 +18,11 @@ from models import DeviceToken, Installment, Student
 from dependencies import get_db, check_admin_access
 from today_summary import jalali_date_string
 # FIX O-08: تعریف واحد «وصولی نقدی» از لایهٔ محاسبات مالی — همان تابعی که گزارش‌ها می‌خوانند.
-from financial_calculations import calculate_institute_collected_revenue
+# FIX (گروه۲/آیتم۴): تعریف یگانهٔ «وصولی نقدی آموزشگاه» — همان تابعی که
+# `/admin/today_summary` («پرداخت امروز») استفاده می‌کند، تا دو عددِ یک روز در دو صفحهٔ اپ
+# یکی باشد. `calculate_institute_collected_revenue` (O-07/O-08) برای گزارش‌های ماه/سال و
+# نمودار درآمد دست‌نخورده باقی می‌ماند.
+from financial_calculations import calculate_institute_cash_collected
 
 router = APIRouter()
 
@@ -72,8 +76,13 @@ def get_dashboard_kpis(
     # 1. Today's Revenue — FIX O-08: پیش‌تر SUM با LIKE روی تاریخ شمسی بود ⇒ شارژ جلسه
     #    (عدد منفی) از وصولی کم می‌شد، واریزی با تاریخ میلادی/بی‌تاریخ دیده نمی‌شد و عدد با
     #    گزارش‌های مالی نمی‌خواند. اکنون همان تعریف گزارش‌ها: وصولی نقدی امروز به کیف آموزشگاه.
+    #    FIX (گروه۲/آیتم۴): تابع مشترک با «پرداخت امروز» در `/admin/today_summary`
+    #    (`calculate_institute_cash_collected`) تا KPI و خلاصهٔ امروز هیچ‌وقت از هم واگرا نشوند؛
+    #    این تعریف علاوه بر `deposit`/کیف آموزشگاه، پیش‌پرداخت ثبت‌نام (`enrollment_payment`)،
+    #    پرداخت CRM (`tuition`) و ردیف‌های legacy (بدون type/کیف) را هم می‌بیند و واریزی به
+    #    کیف معلم و شارژ جلسه را نمی‌شمارد.
     try:
-        today_revenue = int(calculate_institute_collected_revenue(db, today_jalali, today_jalali) or 0)
+        today_revenue = int(calculate_institute_cash_collected(db, today_jalali, today_jalali) or 0)
     except Exception as e:
         print(f"[Dashboard] today_revenue failed: {e}")
         today_revenue = 0

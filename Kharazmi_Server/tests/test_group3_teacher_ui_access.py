@@ -147,5 +147,54 @@ class TestItem11TeacherDashboardInvoiceButton(unittest.TestCase):
                              f"listener {card} باید سر جایش بماند")
 
 
+class TestItem12TeacherClassBannerButtons(unittest.TestCase):
+    """آیتم ۱۲ — مخفی‌شدن «تعلیق» و «ثبت حواله» روی بنر کلاس‌ها در پنل معلم.
+
+    ریشه: `item_class_row.xml` دو دکمهٔ `btnSuspend` (تعلیق) و `btnRegisterInvoice`
+    (ثبت حواله) را **بدون `android:visibility`** یعنی به‌صورت پیش‌فرض نمایان دارد و
+    همین layout مشترک هم در `ClassManagementActivity` (ادمین) و هم در آداپتر
+    `TeacherClassAdapter` داخل `TeacherDashboardActivity` (پنل معلم) inflate می‌شود.
+    سمت ادمین این دو را مدیریت می‌کند (`holder.btnSuspend.visibility =
+    if (isAdminUser) View.VISIBLE else View.GONE` و listener ثبت حواله)، ولی آداپتر
+    معلم هرگز به آن‌ها دست نمی‌زد ⇒ در پنل معلم دو دکمهٔ نمایانِ **بی‌عملکرد**
+    روی هر بنر کلاس می‌نشست.
+
+    چون layout مشترک است، تغییر باید سمت آداپتر معلم باشد (نه خود layout)، و با همان
+    چک نقش موجود (`USER_SUB_ROLE`) — همان الگوی `isAdminUser` در ClassManagementActivity.
+    """
+
+    def test_12a_both_banner_buttons_are_hidden_for_teachers(self):
+        src = kt("TeacherDashboardActivity.kt")
+        body = function_body(src, "onBindViewHolder")
+        for btn in ("btnSuspend", "btnRegisterInvoice"):
+            self.assertIn(f"R.id.{btn}", src, f"آداپتر معلم باید {btn} را پیدا کند")
+            self.assertRegex(body,
+                             rf"{btn}\.visibility\s*=\s*if\s*\(isAdminUser\)\s*(android\.view\.)?View\.VISIBLE\s*else\s*(android\.view\.)?View\.GONE",
+                             f"{btn} باید با گارد isAdminUser روی بنر معلم پنهان شود")
+
+    def test_12b_the_role_flag_reaches_the_adapter(self):
+        """پرچم نقش از Activity (همان `USER_SUB_ROLE`) به آداپتر می‌رسد."""
+        src = strip_comments(kt("TeacherDashboardActivity.kt"))
+        self.assertRegex(src, r"class TeacherClassAdapter\([\s\S]{0,200}?isAdminUser\s*:\s*Boolean",
+                         "آداپتر باید پرچم isAdminUser را بگیرد")
+        # lambda انتهایی باید به onClick بخورد ⇒ پرچم نقش نباید آخرین پارامتر باشد
+        head = re.search(r"class TeacherClassAdapter\([\s\S]*?\n\) :", src).group(0)
+        self.assertLess(head.index("isAdminUser"), head.index("onClick"),
+                        "onClick باید آخرین پارامتر بماند (lambda انتهاییِ محل ساخت)")
+        self.assertRegex(src, r"TeacherClassAdapter\([^\n]*isAdminUser",
+                         "محل ساخت آداپتر باید پرچم را پاس بدهد")
+        self.assertRegex(src, r"isAdminUser\s*=\s*subRole\s*==\s*\"admin\"",
+                         "پرچم باید از همان USER_SUB_ROLE موجود ساخته شود")
+
+    def test_12c_admin_side_is_untouched(self):
+        """layout مشترک و گارد ادمین در ClassManagementActivity دست‌نخورده می‌ماند."""
+        row = layout("item_class_row.xml")
+        self.assertIn('@+id/btnSuspend', row)
+        self.assertIn('@+id/btnRegisterInvoice', row)
+        cm = strip_comments(kt("ClassManagementActivity.kt"))
+        self.assertRegex(cm, r"btnSuspend\.visibility\s*=\s*if\s*\(isAdminUser\)\s*View\.VISIBLE\s*else\s*View\.GONE")
+        self.assertRegex(cm, r"btnRegisterInvoice\.setOnClickListener")
+
+
 if __name__ == "__main__":
     unittest.main()

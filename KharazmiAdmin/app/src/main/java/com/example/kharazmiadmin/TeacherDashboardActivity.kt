@@ -50,6 +50,8 @@ class TeacherDashboardActivity : BaseActivity() {
     private lateinit var api: TeacherPanelApi
     private lateinit var rv: RecyclerView
     private var todaySummaryLoading = false
+    // FIX (گروه۳/آیتم۱۲): پرچم نقش برای آداپتر بنر کلاس‌ها — همان USER_SUB_ROLE موجود.
+    private var isAdminUser = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -112,6 +114,7 @@ class TeacherDashboardActivity : BaseActivity() {
         // ============================================================
         val credsPrefs = getSharedPreferences("UserCreds", Context.MODE_PRIVATE)
         val subRole = credsPrefs.getString("USER_SUB_ROLE", "admin") ?: "admin"
+        isAdminUser = subRole == "admin"
         val cardFastInvoice = findViewById<MaterialCardView>(R.id.cardFastInvoice)
         if (subRole != "admin") {
             cardFastInvoice.visibility = android.view.View.GONE
@@ -451,7 +454,7 @@ class TeacherDashboardActivity : BaseActivity() {
                     if (list.isEmpty()) {
                         // لیست خالی
                     }
-                    rv.adapter = TeacherClassAdapter(list) { selectedClass ->
+                    rv.adapter = TeacherClassAdapter(list, isAdminUser = isAdminUser) { selectedClass ->
                         if (selectedClass.is_suspended) {
                             Toast.makeText(this@TeacherDashboardActivity, getString(R.string.common_class_activate), Toast.LENGTH_LONG).show()
                         } else if (selectedClass.is_admin_approved) {
@@ -500,6 +503,10 @@ class TeacherDashboardActivity : BaseActivity() {
 // 2. Updated Adapter Logic
 class TeacherClassAdapter(
     private val list: List<TeacherClassItem>,
+    // FIX (گروه۳/آیتم۱۲): پرچم نقش از Activity می‌آید تا دکمه‌های مدیریتیِ بنر کلاس
+    // برای معلم پنهان شود (layout مشترک با ClassManagementActivity دست‌نخورده می‌ماند).
+    // نکته: عمداً **قبل از** onClick آمده تا lambda انتهاییِ محل ساخت همان onClick بماند.
+    private val isAdminUser: Boolean = false,
     private val onClick: (TeacherClassItem) -> Unit
 ) : RecyclerView.Adapter<TeacherClassAdapter.VH>() {
 
@@ -508,6 +515,10 @@ class TeacherClassAdapter(
         val code: TextView = v.findViewById(R.id.tvClassCode)
         val sub: TextView = v.findViewById(R.id.tvTeacherName)
         val llStudentPreview: LinearLayout = v.findViewById(R.id.ll_student_preview) // Added View Binding
+        // FIX (گروه۳/آیتم۱۲): این دو در layout پیش‌فرض نمایان‌اند و آداپتر معلم قبلاً
+        // هرگز به آن‌ها دست نمی‌زد ⇒ دو دکمهٔ نمایانِ بی‌عملکرد در پنل معلم.
+        val btnSuspend: android.view.View = v.findViewById(R.id.btnSuspend)
+        val btnRegisterInvoice: android.view.View = v.findViewById(R.id.btnRegisterInvoice)
     }
 
     override fun onCreateViewHolder(parent: android.view.ViewGroup, viewType: Int): VH {
@@ -546,6 +557,13 @@ class TeacherClassAdapter(
             holder.sub.setTextColor(android.graphics.Color.parseColor("#F57C00"))
             holder.itemView.alpha = 1.0f
         }
+
+        // FIX (گروه۳/آیتم۱۲): تعلیق و ثبت حواله از اختیارات ادمین/منشی‌اند؛ در پنل معلم
+        // پنهان می‌شوند (listener هم سمت ادمینِ ClassManagementActivity می‌ماند).
+        holder.btnSuspend.visibility =
+            if (isAdminUser) android.view.View.VISIBLE else android.view.View.GONE
+        holder.btnRegisterInvoice.visibility =
+            if (isAdminUser) android.view.View.VISIBLE else android.view.View.GONE
 
         // --- Student Preview Logic ---
         holder.llStudentPreview.removeAllViews()

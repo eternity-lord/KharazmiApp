@@ -120,6 +120,10 @@ interface ProfileApi {
 class StudentProfileActivity : BaseActivity() {
 
     private var studentId: Int = -1
+    // FIX (گروه۳/آیتم۱۴): این صفحه از دلِ کلاس در پنل معلم هم باز می‌شود
+    // (AttendanceActivity:934 / ClassSetupActivity:505 / LiveRosterActivity:160)؛
+    // برای معلم فقط خواندنی است ⇒ اکشن‌های پولی/مدیریتی پنهان و بدون listener.
+    private var isTeacherUser = false
     private lateinit var tvContent: TextView
     private lateinit var tvName: TextView
     private lateinit var tvPhone: TextView
@@ -204,10 +208,14 @@ class StudentProfileActivity : BaseActivity() {
             tabLayout.getTabAt(3)?.select()
         }
 
-        findViewById<FloatingActionButton>(R.id.fabEditProfile).setOnClickListener {
-            val intent = Intent(this, EditStudentActivity::class.java)
-            intent.putExtra("STUDENT_ID", studentId)
-            startActivity(intent)
+        // FIX (گروه۳/آیتم۱۴): ویرایش پروفایل برای معلم پنهان و بدون listener است
+        // (isTeacherUser در initViews() مقدار می‌گیرد که پیش از اینجا صدا زده شده).
+        if (!isTeacherUser) {
+            findViewById<FloatingActionButton>(R.id.fabEditProfile).setOnClickListener {
+                val intent = Intent(this, EditStudentActivity::class.java)
+                intent.putExtra("STUDENT_ID", studentId)
+                startActivity(intent)
+            }
         }
     }
 
@@ -261,32 +269,52 @@ class StudentProfileActivity : BaseActivity() {
             onRemind = { item -> confirmAndRemindInstallment(item) }
         )
         rvInstallments.adapter = installmentAdapter
-        btnAddInstallment.setOnClickListener { showCreateInstallmentDialog() }
-
-        findViewById<MaterialButton>(R.id.btnDeleteStudent).setOnClickListener {
-            showDeleteConfirmation()
-        }
-
-        findViewById<MaterialButton>(R.id.btnSendPortalLink).setOnClickListener {
-            sendPortalLinkToParent()
-        }
-
+        // FIX (گروه۳/آیتم۱۴): چک نقش — همان الگوی موجودِ پروژه (`UserCreds` → `USER_SUB_ROLE`).
+        // معلم از دلِ کلاس (حضور و غیاب / راه‌اندازی کلاس / کلاس زنده) به این صفحه می‌رسد و
+        // نباید هیچ اکشن پولی یا مدیریتی ببیند: «صدور فیش و ثبت حواله»، کلید «تعلیق
+        // دانش‌آموز»، «حذف کامل دانش‌آموز»، «افزودن قسط جدید»، «پرداخت/یادآوری قسط»،
+        // «ارسال لینک پورتال به اولیا» و ویرایش پروفایل (شامل تغییر عکس).
+        // نمای خواندنی (تب‌ها، آمار بدهی، کارنامه، اقساط، ارتباطات، تایم‌لاین) دست‌نخورده است.
+        // گارد عمداً روی `"teacher"` است نه `!= "admin"`: «منشی» در این اپ نقش وصول پول دارد
+        // (endpointهای مالی سرور `("admin","secretary")`) و رفتار قبلی‌اش حفظ می‌شود.
         val credsPrefs = getSharedPreferences("UserCreds", Context.MODE_PRIVATE)
         val subRole = credsPrefs.getString("USER_SUB_ROLE", "admin") ?: "admin"
+        isTeacherUser = subRole == "teacher"
+        if (isTeacherUser) {
+            btnInvoice.visibility = View.GONE
+            btnAddInstallment.visibility = View.GONE
+            findViewById<View>(R.id.cardSuspendStudent).visibility = View.GONE
+            findViewById<View>(R.id.btnDeleteStudent).visibility = View.GONE
+            findViewById<View>(R.id.btnSendPortalLink).visibility = View.GONE
+            findViewById<View>(R.id.fabEditProfile).visibility = View.GONE
+        }
         if (subRole == "secretary") {
             findViewById<View>(R.id.btnDeleteStudent).visibility = View.GONE
         }
 
-        findViewById<android.widget.ImageView>(R.id.imgProfile).setOnClickListener {
-            showImageSelectDialog()
-        }
+        // listenerها هم فقط برای غیر معلم ثبت می‌شوند (ویجت پنهانِ کلیک‌پذیر = راه فرار).
+        if (!isTeacherUser) {
+            btnAddInstallment.setOnClickListener { showCreateInstallmentDialog() }
 
-        switchSuspend.setOnClickListener {
-            toggleStudentSuspension()
-        }
+            findViewById<MaterialButton>(R.id.btnDeleteStudent).setOnClickListener {
+                showDeleteConfirmation()
+            }
 
-        btnInvoice.setOnClickListener {
-            launchInvoiceActivity()
+            findViewById<MaterialButton>(R.id.btnSendPortalLink).setOnClickListener {
+                sendPortalLinkToParent()
+            }
+
+            findViewById<android.widget.ImageView>(R.id.imgProfile).setOnClickListener {
+                showImageSelectDialog()
+            }
+
+            switchSuspend.setOnClickListener {
+                toggleStudentSuspension()
+            }
+
+            btnInvoice.setOnClickListener {
+                launchInvoiceActivity()
+            }
         }
     }
 
@@ -1188,9 +1216,15 @@ class StudentProfileActivity : BaseActivity() {
                 holder.tvStatus.text = if (overdue) holder.itemView.context.getString(R.string.profile_inst_overdue) else holder.itemView.context.getString(R.string.profile_inst_pending)
                 holder.tvStatus.setTextColor(if (overdue) Color.parseColor("#D32F2F") else Color.parseColor("#FF8F00"))
                 holder.tvPaidAt.visibility = View.GONE
-                holder.layoutActions.visibility = View.VISIBLE
-                holder.btnPay.setOnClickListener { onPay(item) }
-                holder.btnRemind.setOnClickListener { onRemind(item) }
+                // FIX (گروه۳/آیتم۱۴): «پرداخت» و «یادآوری» قسط اکشن مالی ادمین/منشی‌اند؛
+                // برای معلم ردیف قسط فقط خواندنی می‌ماند (isTeacherUser از Activity بیرونی).
+                if (isTeacherUser) {
+                    holder.layoutActions.visibility = View.GONE
+                } else {
+                    holder.layoutActions.visibility = View.VISIBLE
+                    holder.btnPay.setOnClickListener { onPay(item) }
+                    holder.btnRemind.setOnClickListener { onRemind(item) }
+                }
             }
         }
         fun update(newList: List<StudentInstallmentItem>) {

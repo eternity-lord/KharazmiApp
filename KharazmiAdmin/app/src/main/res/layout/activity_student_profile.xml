@@ -356,7 +356,10 @@
                 </com.google.android.material.card.MaterialCardView>
 
                 <!-- ========== تعلیق دانش‌آموز ========== -->
+                <!-- FIX (گروه۳/آیتم۱۴): id اضافه شد تا کلِ بخش تعلیق (کلید + عنوان + توضیح)
+                     در پنل معلم پنهان شود؛ برای ادمین/منشی هیچ تغییری نمی‌دهد. -->
                 <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardSuspendStudent"
                     style="@style/Widget.Kharazmi.DS.Card.Status.Warning"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

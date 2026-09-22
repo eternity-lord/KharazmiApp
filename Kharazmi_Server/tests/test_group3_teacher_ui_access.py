@@ -300,5 +300,86 @@ class TestItem15TeacherClassRegistrationPopup(unittest.TestCase):
         self.assertIn("PendingClassesActivity::class.java", setup)
 
 
+class TestItem14TeacherInsideClassAdminActions(unittest.TestCase):
+    """آیتم ۱۴ — داخل کلاس در پنل معلم: قسمت‌های ادمین مخفی (فقط ادمین باز باشد).
+
+    مسیر (طبق گفتهٔ کارفرما): پنل معلم → بنر کلاس → «۱) ثبت حضور و غیاب»
+    (`AttendanceActivity`) → نام دانش‌آموز در لیست حضور و غیاب (`AttendanceActivity:934`)
+    → `StudentProfileActivity`. همین صفحه از «راه‌اندازی کلاس» (`ClassSetupActivity:505`)
+    و «کلاس زنده» (`LiveRosterActivity:160` و `LiveClassActivity:287`) هم باز می‌شود.
+
+    قبل از فیکس، تنها چک نقشِ `StudentProfileActivity` این بود:
+    `if (subRole == "secretary")` → فقط «حذف کامل دانش‌آموز» GONE. یعنی **معلم** همهٔ
+    این‌ها را فعال می‌دید: «صدور فیش و ثبت حواله» (→ InvoiceActivity)، کلید «تعلیق
+    دانش‌آموز» (→ POST admin/students/{id}/toggle_suspend)، «حذف کامل دانش‌آموز»
+    (→ DELETE admin/students/{id})، «افزودن قسط جدید»، «پرداخت/یادآوری» روی هر قسط،
+    «ارسال لینک پورتال به اولیا» و ویرایش پروفایل (تغییر عکس هم روی imgProfile).
+
+    تصمیم دامنه: گارد روی `subRole == "teacher"` است نه `!= "admin"`، چون «منشی» در این
+    اپ نقش وصول پول است (endpointهای مالی سرور `("admin","secretary")` را می‌پذیرند) و
+    رفتار قبلی‌اش (فقط حذفِ «حذف کامل دانش‌آموز») عمداً دست‌نخورده می‌ماند.
+    """
+
+    ADMIN_VIEWS = ("btnInvoice", "btnAddInstallment", "cardSuspendStudent",
+                   "btnDeleteStudent", "btnSendPortalLink", "fabEditProfile")
+
+    def test_14a_teacher_gate_hides_every_admin_part(self):
+        body = function_body(kt("StudentProfileActivity.kt"), "initViews")
+        self.assertRegex(body, r'getSharedPreferences\("UserCreds"')
+        self.assertRegex(body, r'getString\("USER_SUB_ROLE",\s*"admin"\)')
+        self.assertRegex(body, r'isTeacherUser\s*=\s*subRole\s*==\s*"teacher"')
+        gate = body[body.index("isTeacherUser"):]
+        for view in self.ADMIN_VIEWS:
+            self.assertRegex(gate, rf"{view}[^{{}}]{{0,60}}?visibility\s*=\s*View\.GONE",
+                             f"{view} باید برای معلم پنهان شود")
+        # بخش تعلیق باید کامل پنهان شود (نه فقط کلید، که عنوان/توضیح هم بماند)
+        self.assertIn("@+id/cardSuspendStudent", layout("activity_student_profile.xml"))
+
+    def test_14b_admin_listeners_are_not_registered_for_teachers(self):
+        """پنهان + بدون listener ⇒ هیچ راه فراری برای معلم نمی‌ماند."""
+        src = kt("StudentProfileActivity.kt")
+        body = function_body(src, "initViews")
+        self.assertIn("if (!isTeacherUser)", body, "باید شاخهٔ «غیر معلم» برای listenerها باشد")
+        guarded = body[body.index("if (!isTeacherUser)"):]
+        for listener in ("btnAddInstallment.setOnClickListener",
+                         "R.id.btnDeleteStudent).setOnClickListener",
+                         "R.id.btnSendPortalLink).setOnClickListener",
+                         "imgProfile).setOnClickListener",
+                         "switchSuspend.setOnClickListener",
+                         "btnInvoice.setOnClickListener"):
+            self.assertIn(listener, guarded, f"{listener} باید داخل شاخهٔ غیرمعلم باشد")
+        # دکمهٔ ویرایش پروفایل در onCreate سیم‌کشی می‌شود (initViews پیش از آن صدا زده می‌شود)
+        create = function_body(src, "onCreate")
+        self.assertIn("if (!isTeacherUser)", create)
+        self.assertLess(create.index("if (!isTeacherUser)"), create.index("R.id.fabEditProfile"))
+
+    def test_14c_secretary_keeps_money_actions_and_old_behavior(self):
+        """منشی مثل قبل فقط «حذف کامل دانش‌آموز» را نمی‌بیند؛ حواله/تعلیق/قسط برایش می‌ماند."""
+        body = function_body(kt("StudentProfileActivity.kt"), "initViews")
+        self.assertRegex(body, r'if\s*\(subRole\s*==\s*"secretary"\)')
+        self.assertRegex(body, r'R\.id\.btnDeleteStudent\)\.visibility\s*=\s*View\.GONE')
+        self.assertNotRegex(body, re.compile(r'isTeacherUser\s*=\s*subRole\s*!=\s*"admin"'),
+                            "گارد باید روی «teacher» باشد تا منشی دسترسی وصول پول را از دست ندهد")
+
+    def test_14d_installment_pay_and_remind_hidden_for_teachers(self):
+        src = kt("StudentProfileActivity.kt")
+        body = function_body(src, "onBindViewHolder")  # تنها آداپتر این فایل: InstallmentAdapter
+        self.assertIn("isTeacherUser", body, "اکشن‌های هر قسط باید برای معلم پنهان شود")
+        self.assertRegex(body, r"holder\.layoutActions\.visibility\s*=\s*View\.GONE")
+        self.assertIn("holder.btnPay.setOnClickListener", body)
+        self.assertIn("holder.btnRemind.setOnClickListener", body)
+
+    def test_14e_readonly_profile_and_navigation_stay_intact(self):
+        src = kt("StudentProfileActivity.kt")
+        body = function_body(src, "initViews")
+        gate = body[body.index("isTeacherUser"):]
+        for keep in ("tabLayout", "cardContent", "tvContent", "rvInstallments", "cardInstallments"):
+            self.assertNotRegex(gate, re.compile(re.escape(keep) + r"[^\n]{0,40}View\.GONE"),
+                                f"{keep} بخشی از نمای خواندنی معلم است و نباید پنهان شود")
+        # مسیر ورود از دل کلاس/حضور و غیاب سر جایش می‌ماند (فقط اکشن‌ها پنهان شده‌اند)
+        self.assertIn("StudentProfileActivity::class.java", strip_comments(kt("AttendanceActivity.kt")))
+        self.assertIn("StudentProfileActivity::class.java", strip_comments(kt("ClassSetupActivity.kt")))
+
+
 if __name__ == "__main__":
     unittest.main()

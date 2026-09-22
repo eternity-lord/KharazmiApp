@@ -264,6 +264,8 @@ def start_live_session(
     # FIX H10: شروع جلسه‌ی زنده در کلاس معلق ممنوع.
     if course.is_suspended:
         raise HTTPException(status_code=403, detail="این کلاس معلق است و امکان شروع جلسه‌ی زنده برای آن وجود ندارد")
+    if course.is_paused:
+        raise HTTPException(status_code=403, detail="این کلاس موقتاً متوقف است و امکان شروع جلسه‌ی زنده وجود ندارد")
 
     _verify_live_course_teacher(db, course, authorization, sub_role)
 
@@ -572,6 +574,8 @@ def submit_session_and_calculate(
     # FIX H10: ثبت جلسه‌ی جدید در کلاس معلق ممنوع (قبل از هر محاسبه/شارژ).
     if course.is_suspended:
         raise HTTPException(status_code=403, detail="این کلاس معلق است و امکان ثبت جلسه‌ی جدید برای آن وجود ندارد")
+    if course.is_paused:
+        raise HTTPException(status_code=403, detail="این کلاس موقتاً متوقف است و امکان ثبت جلسه‌ی جدید وجود ندارد")
 
     # FIX (audit-v2/#13): تاریخ کانونیکال شمسی — ولیدیت + نرمالایز با مبدل مرکزی H3 (قبلاً رشته‌ی خام
     # کلاینت ذخیره/مقایسه می‌شد: «2026/09/12» در برابر «1405/06/21» روز متفاوت حساب می‌شد → دابل‌سشن

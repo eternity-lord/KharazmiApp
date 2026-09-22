@@ -161,6 +161,13 @@
                         android:orientation="vertical"
                         android:padding="@dimen/spacing_normal">
 
+                        <TextView
+                            android:id="@+id/tvClassCapacity"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="ظرفیت کلاس"
+                            android:contentDescription="capacity" />
+
                         <com.google.android.material.button.MaterialButton
                             android:id="@+id/btnEditClassInfoAction"
                             style="@style/Widget.Kharazmi.Button.Gold"

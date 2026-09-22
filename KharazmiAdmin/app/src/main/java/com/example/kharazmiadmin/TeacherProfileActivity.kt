@@ -24,6 +24,9 @@ import kotlinx.coroutines.withContext
 import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.PUT
+import retrofit2.http.Body
+import retrofit2.http.Query
 import retrofit2.http.Path
 import java.util.Locale
 
@@ -33,6 +36,14 @@ interface TeacherManagementApi {
 
     @DELETE("/admin/teachers/{teacher_id}")
     suspend fun deleteTeacher(@Path("teacher_id") teacherId: Int): SimpleResponse
+}
+
+data class SettlementEditRequest(val total_amount: Long? = null, val reason: String)
+interface SettlementSafetyApi {
+    @POST("teachers/{teacher_id}/settlements/{settlement_id}/reverse")
+    suspend fun reverseSettlement(@Path("teacher_id") teacherId: Int, @Path("settlement_id") settlementId: Int, @Query("reason") reason: String): SimpleResponse
+    @PUT("teachers/{teacher_id}/settlements/{settlement_id}/edit")
+    suspend fun editSettlement(@Path("teacher_id") teacherId: Int, @Path("settlement_id") settlementId: Int, @Body request: SettlementEditRequest): SimpleResponse
 }
 
 class TeacherProfileActivity : BaseActivity() {
@@ -395,13 +406,53 @@ class TeacherProfileActivity : BaseActivity() {
                 type = typeHistory,
                 networkCall = { api.getSettlementHistory(teacherId) },
                 onSuccess = { history, _, _ ->
-                    rvSettlementHistory.adapter = SettlementHistoryAdapter(history)
+                    rvSettlementHistory.adapter = SettlementHistoryAdapter(history,
+                        onReverse = { item -> reverseSettlement(item) },
+                        onEdit = { item -> editSettlement(item) })
                 },
                 onFailure = {
                     rvSettlementHistory.adapter = null
                 }
             )
         }
+    }
+
+    private fun reverseSettlement(item: SettlementHistoryItem) {
+        AlertDialog.Builder(this)
+            .setTitle("برگشت امن تسویه")
+            .setMessage("این عملیات سند برگشت ثبت می‌کند و کیف بدهی دانش‌آموز را تغییر نمی‌دهد.")
+            .setPositiveButton("ثبت برگشت") { _, _ ->
+                lifecycleScope.launch(Dispatchers.IO) {
+                    try {
+                        RetrofitClient.getInstance(this@TeacherProfileActivity).create(SettlementSafetyApi::class.java)
+                            .reverseSettlement(teacherId, item.id, "اصلاح مالی توسط ادمین")
+                        withContext(Dispatchers.Main) { fetchSettlementData() }
+                    } catch (error: Exception) {
+                        if (error is kotlinx.coroutines.CancellationException) throw error
+                        withContext(Dispatchers.Main) { Toast.makeText(this@TeacherProfileActivity, "برگشت انجام نشد", Toast.LENGTH_SHORT).show() }
+                    }
+                }
+            }
+            .setNegativeButton("انصراف", null).show()
+    }
+
+    private fun editSettlement(item: SettlementHistoryItem) {
+        val input = android.widget.EditText(this)
+        input.hint = "مبلغ تعدیل جدید"
+        AlertDialog.Builder(this).setTitle("تعدیل امن تسویه").setView(input)
+            .setPositiveButton("ثبت تعدیل") { _, _ ->
+                val amount = input.text.toString().toLongOrNull()
+                lifecycleScope.launch(Dispatchers.IO) {
+                    try {
+                        RetrofitClient.getInstance(this@TeacherProfileActivity).create(SettlementSafetyApi::class.java)
+                            .editSettlement(teacherId, item.id, SettlementEditRequest(amount, "تعدیل مالی توسط ادمین"))
+                        withContext(Dispatchers.Main) { fetchSettlementData() }
+                    } catch (error: Exception) {
+                        if (error is kotlinx.coroutines.CancellationException) throw error
+                        withContext(Dispatchers.Main) { Toast.makeText(this@TeacherProfileActivity, "تعدیل انجام نشد", Toast.LENGTH_SHORT).show() }
+                    }
+                }
+            }.setNegativeButton("انصراف", null).show()
     }
 
     private fun showSettlementConfirmationDialog() {
@@ -683,11 +734,17 @@ class PendingSessionsAdapter(private val list: List<PendingSettlementSession>) :
 }
 
 // آداپتور تاریخچه تسویه‌ها
-class SettlementHistoryAdapter(private val list: List<SettlementHistoryItem>) : RecyclerView.Adapter<SettlementHistoryAdapter.VH>() {
+class SettlementHistoryAdapter(
+    private val list: List<SettlementHistoryItem>,
+    private val onReverse: (SettlementHistoryItem) -> Unit,
+    private val onEdit: (SettlementHistoryItem) -> Unit
+) : RecyclerView.Adapter<SettlementHistoryAdapter.VH>() {
     class VH(v: View) : RecyclerView.ViewHolder(v) {
         val tvSettledAmount: TextView = v.findViewById(R.id.tvSettledAmount)
         val tvSettledDate: TextView = v.findViewById(R.id.tvSettledDate)
         val tvSessionCount: TextView = v.findViewById(R.id.tvSessionCount)
+        val btnReverseSettlement: View = v.findViewById(R.id.btnReverseSettlement)
+        val btnEditSettlement: View = v.findViewById(R.id.btnEditSettlement)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
@@ -703,6 +760,8 @@ class SettlementHistoryAdapter(private val list: List<SettlementHistoryItem>) : 
             holder.tvSettledAmount.text = holder.itemView.context.getString(R.string.portal_money, String.format(java.util.Locale.US, "%,d", amt))
             holder.tvSettledDate.text = holder.itemView.context.getString(R.string.tprof_settled_date, item.settled_at ?: "")
             holder.tvSessionCount.text = holder.itemView.context.getString(R.string.tprof_sessions, item.session_count)
+            holder.btnReverseSettlement.setOnClickListener { onReverse(item) }
+            holder.btnEditSettlement.setOnClickListener { onEdit(item) }
         } catch (e: Exception) {
             android.util.Log.e("SettlementHistoryAdapter", "Error binding row ${item.id}", e)
         }

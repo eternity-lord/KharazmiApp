@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:padding="16dp" android:layoutDirection="rtl">
+    <!-- filter controls; item rows expose tvProblemFlags and btnReopenSession. -->
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+        <EditText android:id="@+id/etSessionFlag" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:hint="فیلتر: attendance_missing / started_late / auto_ended" />
+        <Button android:id="@+id/btnFilterSessions" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="فیلتر" />
+        <Button android:id="@+id/btnExportSessions" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Excel" />
+    </LinearLayout>
+    <androidx.recyclerview.widget.RecyclerView android:id="@+id/rvAdminSessionHistory" android:layout_width="match_parent" android:layout_height="match_parent" />
+</LinearLayout>

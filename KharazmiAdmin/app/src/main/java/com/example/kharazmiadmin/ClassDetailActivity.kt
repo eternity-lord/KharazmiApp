@@ -130,11 +130,28 @@ interface ClassDetailActionsApi {
 
     @PUT("classes/update_info/{course_id}")
     suspend fun updateClassInfo(@Path("course_id") courseId: Int, @Body data: ClassUpdateInfo): SimpleResponse
+
+    @PUT("classes/update")
+    suspend fun updateClass(@Query("course_id") courseId: Int, @Body data: AdminClassUpdateRequest): SimpleResponse
 }
 
 data class ClassUpdateInfo(val title: String, val grade_level: String? = null)
 
 class ClassDetailActivity : BaseActivity() {
+
+    // تغییرات حساس کلاس از یک مسیر ادمین‌محور و قابل audit عبور می‌کند.
+    private fun updateClass(request: AdminClassUpdateRequest) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                RetrofitClient.getInstance(this@ClassDetailActivity).create(ClassDetailActionsApi::class.java)
+                    .updateClass(classId, request)
+                withContext(Dispatchers.Main) { Toast.makeText(this@ClassDetailActivity, "کلاس به‌روزرسانی شد", Toast.LENGTH_SHORT).show() }
+            } catch (error: Exception) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                withContext(Dispatchers.Main) { Toast.makeText(this@ClassDetailActivity, "ویرایش کلاس انجام نشد", Toast.LENGTH_SHORT).show() }
+            }
+        }
+    }
 
     private var classId: Int = -1
     private var reportData: FullClassReport? = null

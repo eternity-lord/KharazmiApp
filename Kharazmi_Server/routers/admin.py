@@ -645,6 +645,10 @@ def get_pending_classes(db: Session = Depends(get_db), authorization: Optional[s
                 "teacher_price": c.teacher_session_price,  # اندروید: teacher_price (در دیتابیس teacher_session_price است)
                 "days": c.days_of_week,  # اندروید: days (در دیتابیس days_of_week است)
                 "time": c.class_time,  # اندروید: time (در دیتابیس class_time است)
+                "capacity": c.capacity,
+                "status": "rejected" if c.rejection_reason else "pending",
+                "rejection_reason": c.rejection_reason,
+                "pending_since": c.pending_since.isoformat() if c.pending_since else None,
                 "base_institute_share": _base_inst_share,  # FIX (audit-v2/blind-approve-2b): مبنای واقعی H5؛ صفر یعنی پیش‌پرداخت/نبود تعرفه
             }
         )
@@ -2197,3 +2201,98 @@ def update_teacher_credentials(id: int, data: TeacherCredentialsUpdateRequest, d
     return {
         "message": "اطلاعات تماس و حساب بانکی معلم با موفقیت به‌روزرسانی شد"
     }
+
+
+# ===================== گروه ۶: تاریخچهٔ جلسهٔ ادمین =====================
+def _session_problem_flags(db: Session, session: SessionLog) -> list[str]:
+    enrollments = db.query(func.count(Enrollment.id)).filter(
+        Enrollment.course_id == session.course_id, Enrollment.is_deleted == False
+    ).scalar() or 0
+    attendance_count = db.query(func.count(Attendance.id)).filter(
+        Attendance.session_id == session.id, Attendance.is_deleted == False
+    ).scalar() or 0
+    flags = []
+    if enrollments and attendance_count < enrollments:
+        flags.append("attendance_missing")
+    if session.start_time and session.time and session.start_time != session.time:
+        flags.append("started_late")
+    if str(session.status or "").lower() in ("auto_ended", "auto-ended", "automatically_ended"):
+        flags.append("auto_ended")
+    return flags
+
+
+@router.get("/admin/session_history")
+def admin_session_history(
+    date_from: Optional[str] = None, date_to: Optional[str] = None,
+    teacher_id: Optional[int] = None, course_id: Optional[int] = None,
+    flag: Optional[str] = None, export: bool = False,
+    db: Session = Depends(get_db), _: str = Depends(check_admin_access)
+):
+    query = db.query(SessionLog).join(Course).filter(SessionLog.is_deleted == False)
+    if teacher_id is not None:
+        query = query.filter(Course.teacher_id == teacher_id)
+    if course_id is not None:
+        query = query.filter(SessionLog.course_id == course_id)
+    if date_from:
+        query = query.filter(SessionLog.date >= date_from)
+    if date_to:
+        query = query.filter(SessionLog.date <= date_to)
+    rows = query.order_by(desc(SessionLog.id)).all()
+    items = []
+    for session in rows:
+        flags = _session_problem_flags(db, session)
+        if flag and flag not in flags:
+            continue
+        items.append({
+            "id": session.id, "course_id": session.course_id,
+            "course_title": session.course.title if session.course else "کلاس نامشخص",
+            "date": session.date, "time": session.time, "start_time": session.start_time,
+            "end_time": session.end_time, "status": session.status,
+            "attendance_count": db.query(func.count(Attendance.id)).filter(
+                Attendance.session_id == session.id, Attendance.is_deleted == False
+            ).scalar() or 0,
+            "problem_flags": flags,
+            "attendance_missing": "attendance_missing" in flags,
+            "started_late": "started_late" in flags,
+            "auto_ended": "auto_ended" in flags,
+            "reopen_allowed": not db.query(Attendance).filter(
+                Attendance.session_id == session.id, Attendance.is_billed == True
+            ).first() and not session.is_penalty_settled,
+        })
+    if not export:
+        return {"items": items, "count": len(items), "filters": {
+            "date_from": date_from, "date_to": date_to, "teacher_id": teacher_id,
+            "course_id": course_id, "flag": flag
+        }}
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "session_history"
+    ws.append(["id", "course", "date", "time", "status", "flags", "attendance_count"])
+    for item in items:
+        ws.append([item["id"], item["course_title"], item["date"], item["time"],
+                   item["status"], ",".join(item["problem_flags"]), item["attendance_count"]])
+    stream = io.BytesIO()
+    wb.save(stream)
+    stream.seek(0)
+    return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                             headers={"Content-Disposition": "attachment; filename=session_history.xlsx"})
+
+
+@router.post("/admin/session_history/{session_id}/reopen")
+def reopen_admin_session(
+    session_id: int, reason: str, db: Session = Depends(get_db), _: str = Depends(check_admin_access)
+):
+    if not reason or not reason.strip():
+        raise HTTPException(status_code=400, detail="علت بازگشایی جلسه الزامی است")
+    session = db.query(SessionLog).filter(SessionLog.id == session_id, SessionLog.is_deleted == False).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="جلسه یافت نشد")
+    if session.is_penalty_settled or db.query(Attendance).filter(
+        Attendance.session_id == session.id, Attendance.is_billed == True
+    ).first():
+        raise HTTPException(status_code=409, detail="جلسهٔ دارای اثر مالی قابل بازگشایی نیست")
+    session.status = "Reopened"
+    db.add(ActivityLog(admin_username="group6", action="session_reopen",
+                        target_id=session.id, target_name=str(session.course_id), details=reason.strip()))
+    db.commit()
+    return {"message": "جلسه برای اصلاح حضور و غیاب باز شد", "session_id": session.id}

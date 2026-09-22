@@ -1021,6 +1021,7 @@
     <string name="rpt_stmt_error">خطا در دریافت جزئیات صورت‌حساب</string>
     <string name="rpt_rendering">در حال رندر و آماده‌سازی پنجره چاپ...</string>
     <string name="rpt_job_name">صورت‌حساب خوارزمی</string>
+    <string name="rpt_payment_link_fallback">https://kharazmi.local/payments/initiate</string>
     <string name="set_about_title">درباره ما</string>
     <string name="set_about_msg">سیستم مدیریت آموزشگاه خوارزمی\nطراحی و توسعه:توسط Aspect \n ایدی اینستاگرام: ma_mad.eros</string>
     <string name="set_logout_title">خروج</string>

@@ -14,7 +14,7 @@ from fastapi.responses import StreamingResponse
 
 import models
 from models import (
-    Attendance, Course, Enrollment, Grade, InstituteShare, SessionLog, SmsLog, Student, Teacher, Transaction, User, UserSession, Installment
+    Attendance, Course, Enrollment, Grade, InstituteShare, SessionLog, SmsLog, Student, Teacher, Transaction, User, UserSession, Installment, ActivityLog
 )
 from schemas import (
     HistoryRequest, LoginRequest, TeacherInfo, FullTeacherProfile, StudentCreate, TeacherCreate, CourseCreate, EnrollmentCreate, BulkEnrollmentCreate, GradeCreate, GradeItem, AttendanceLogRequest, AttendanceItem, AttendanceSubmitData, SmsSendRequest, ChangePasswordRequest, StudentProfileInfo, FullStudentProfile, TeacherProfileInfo, FullTeacherProfile, ClassReportInfo, ClassStudentData, ClassSessionHistory, FullClassReport, ShareConfigModel, StudentUpdate, TeacherUpdate, PersonListItem, TransactionUpdate, StudentAttendanceHistoryRequest, AdvancedSearchItem, FinanceSubmitData, PrintReceiptRequest, TransactionTestData
@@ -105,6 +105,11 @@ def create_class(course: CourseCreate, override: bool = False, db: Session = Dep
     course_data = course.dict()
     course_data["code"] = next_code
     course_data["branch_id"] = branch_id
+    # قرارداد legacy حفظ می‌شود: هر کلاس تازه تا تصمیم صریح approve در صف می‌ماند؛
+    # تفاوت جدید فقط metadata صف و علت رد است، نه تغییر وضعیت مالی/تأیید قبلی.
+    course_data["is_admin_approved"] = False
+    course_data["pending_since"] = datetime.datetime.utcnow()
+    course_data["rejection_reason"] = None
 
     if not override:
         # بررسی تداخل زمانی کلاس‌های غیرمعلق همین معلم
@@ -405,6 +410,8 @@ def add_enrollment(
     # FIX H10: ثبت‌نام جدید در کلاس معلق ممنوع.
     if course.is_suspended:
         raise HTTPException(status_code=403, detail="این کلاس در حال حاضر معلق است و ثبت‌نام جدید امکان‌پذیر نیست")
+    if course.is_paused:
+        raise HTTPException(status_code=403, detail="این کلاس موقتاً متوقف است و ثبت‌نام جدید امکان‌پذیر نیست")
 
     # چک تکراری نبودن
     exists = (
@@ -1229,3 +1236,179 @@ def update_class_info(
 # ==========================================
 # اصلاح شده: جستجوی پیشرفته با محاسبه دقیق بدهی
 # ==========================================
+
+
+# ===================== گروه ۶: صف تأیید و ویرایش امن کلاس =====================
+class BulkClassDecisionRequest(BaseModel):
+    course_ids: List[int]
+    reason: Optional[str] = None
+
+
+class ClassAdminUpdateModel(BaseModel):
+    title: Optional[str] = None
+    grade_level: Optional[str] = None
+    days_of_week: Optional[str] = None
+    class_time: Optional[str] = None
+    capacity: Optional[int] = None
+    teacher_id: Optional[int] = None
+    is_paused: Optional[bool] = None
+
+
+def check_scheduling_conflicts(db: Session, teacher_id: int, days_of_week: str,
+                               class_time: str, exclude_course_id: Optional[int] = None):
+    """Return active classes which overlap the proposed weekly slot."""
+    proposed = parse_time_to_minutes(class_time)
+    if not proposed:
+        raise HTTPException(status_code=400, detail="ساعت کلاس معتبر نیست")
+    result = []
+    for other in db.query(Course).filter(
+        Course.teacher_id == teacher_id, Course.is_deleted == False,
+        Course.is_suspended == False, Course.is_paused == False
+    ).all():
+        if exclude_course_id and other.id == exclude_course_id:
+            continue
+        if not days_overlap(other.days_of_week or "", days_of_week or ""):
+            continue
+        other_time = parse_time_to_minutes(other.class_time or "")
+        if other_time and proposed[0] < other_time[1] and other_time[0] < proposed[1]:
+            result.append(other)
+    return result
+
+
+@router.get("/classes/pending_approval")
+def pending_classes_for_admin(
+    db: Session = Depends(get_db), _: str = Depends(check_admin_access)
+):
+    rows = db.query(Course).filter(
+        Course.is_deleted == False, Course.is_admin_approved == False
+    ).order_by(desc(Course.pending_since), desc(Course.id)).all()
+    return [{
+        "id": c.id, "title": c.title, "code": c.code, "teacher_id": c.teacher_id,
+        "teacher_name": display_name(c.teacher, "نامشخص") if c.teacher else "نامشخص",
+        "days_of_week": c.days_of_week, "class_time": c.class_time,
+        "capacity": c.capacity, "rejection_reason": c.rejection_reason,
+        "pending_since": c.pending_since.isoformat() if c.pending_since else None,
+    } for c in rows]
+
+
+def _record_class_decision(db: Session, course: Course, action: str, reason: Optional[str]):
+    course.is_admin_approved = action == "approve"
+    course.rejection_reason = None if action == "approve" else (reason or "بدون توضیح")
+    course.pending_since = None
+    db.add(ActivityLog(
+        admin_username="group6", action=f"class_{action}", target_id=course.id,
+        target_name=course.title, details=course.rejection_reason
+    ))
+
+
+@router.post("/classes/pending_approval/bulk_approve")
+def bulk_approve_classes(
+    data: BulkClassDecisionRequest, db: Session = Depends(get_db),
+    _: str = Depends(check_admin_access)
+):
+    courses = db.query(Course).filter(
+        Course.id.in_(data.course_ids), Course.is_deleted == False,
+        Course.is_admin_approved == False
+    ).all()
+    conflicts = []
+    for course in courses:
+        conflict = check_scheduling_conflicts(
+            db, course.teacher_id, course.days_of_week or "", course.class_time or "", course.id
+        )
+        if conflict:
+            conflicts.append({"course_id": course.id, "conflict_course_ids": [c.id for c in conflict]})
+    if conflicts:
+        raise HTTPException(status_code=409, detail={"message": "تداخل زمان‌بندی وجود دارد", "conflicts": conflicts})
+    for course in courses:
+        _record_class_decision(db, course, "approve", data.reason)
+    db.commit()
+    return {"approved_count": len(courses), "course_ids": [c.id for c in courses]}
+
+
+@router.post("/classes/pending_approval/bulk_reject")
+def bulk_reject_classes(
+    data: BulkClassDecisionRequest, db: Session = Depends(get_db),
+    _: str = Depends(check_admin_access)
+):
+    if not data.reason or not data.reason.strip():
+        raise HTTPException(status_code=400, detail="علت رد کلاس الزامی است")
+    courses = db.query(Course).filter(
+        Course.id.in_(data.course_ids), Course.is_deleted == False,
+        Course.is_admin_approved == False
+    ).all()
+    for course in courses:
+        _record_class_decision(db, course, "reject", data.reason.strip())
+    db.commit()
+    return {"rejected_count": len(courses), "course_ids": [c.id for c in courses], "reason": data.reason.strip()}
+
+
+@router.put("/classes/update")
+def update_class_by_admin(
+    data: ClassAdminUpdateModel, course_id: int,
+    db: Session = Depends(get_db), _: str = Depends(check_admin_access)
+):
+    """Admin-only schedule/capacity/teacher transfer with conflict and finance guards."""
+    course = db.query(Course).filter(Course.id == course_id, Course.is_deleted == False).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="کلاس یافت نشد")
+    new_teacher = data.teacher_id if data.teacher_id is not None else course.teacher_id
+    new_days = data.days_of_week if data.days_of_week is not None else course.days_of_week
+    new_time = data.class_time if data.class_time is not None else course.class_time
+    if data.capacity is not None and data.capacity < 1:
+        raise HTTPException(status_code=400, detail="ظرفیت باید حداقل یک نفر باشد")
+    active_enrollments = db.query(Enrollment).filter(
+        Enrollment.course_id == course.id, Enrollment.is_deleted == False
+    ).count()
+    if data.capacity is not None and data.capacity < active_enrollments:
+        raise HTTPException(status_code=409, detail="ظرفیت جدید از ثبت‌نام‌های فعلی کمتر است")
+    if data.teacher_id is not None and data.teacher_id != course.teacher_id:
+        # انتقال مالک مالیِ کلاس پس از billing/settlement ممنوع است؛ اصلاحش باید از مسیر
+        # reversal همان ledger انجام شود، نه با تغییر retroactive teacher_id.
+        existing_session_ids = [row[0] for row in db.query(SessionLog.id).filter(
+            SessionLog.course_id == course.id, SessionLog.is_deleted == False
+        ).all()]
+        if existing_session_ids:
+            billed = db.query(Attendance).filter(
+                Attendance.session_id.in_(existing_session_ids), Attendance.is_billed == True,
+                Attendance.is_deleted == False
+            ).first()
+            settled = db.query(models.Settlement).filter(
+                models.Settlement.is_reversed == False,
+                models.Settlement.session_ids_json.isnot(None)
+            ).all()
+            settled_scope = False
+            for item in settled:
+                try:
+                    scope = {int(value) for value in json.loads(item.session_ids_json or "[]")}
+                except (TypeError, ValueError, json.JSONDecodeError):
+                    scope = set()
+                if set(existing_session_ids).intersection(scope):
+                    settled_scope = True
+                    break
+            if billed or settled_scope:
+                raise HTTPException(status_code=409, detail="انتقال معلم پس از اثر مالی جلسه نیازمند reversal/audit است")
+    conflicts = check_scheduling_conflicts(db, new_teacher, new_days or "", new_time or "", course.id)
+    if conflicts:
+        raise HTTPException(status_code=409, detail={
+            "message": "تداخل زمان‌بندی با کلاس فعال", "conflict_course_ids": [c.id for c in conflicts]
+        })
+    if data.title is not None:
+        course.title = data.title.strip() or course.title
+    if data.grade_level is not None:
+        course.grade_level = data.grade_level.strip() or course.grade_level
+    course.days_of_week = new_days
+    course.class_time = new_time
+    course.teacher_id = new_teacher
+    if data.capacity is not None:
+        course.capacity = data.capacity
+    if data.is_paused is not None:
+        course.is_paused = data.is_paused
+    db.add(ActivityLog(
+        admin_username="group6", action="class_update", target_id=course.id,
+        target_name=course.title,
+        details=json.dumps({"teacher_id": new_teacher, "days_of_week": new_days,
+                            "class_time": new_time, "capacity": course.capacity,
+                            "is_paused": course.is_paused}, ensure_ascii=False)
+    ))
+    db.commit()
+    return {"message": "کلاس با guardهای زمان‌بندی و مالی ویرایش شد", "course_id": course.id}

@@ -2674,9 +2674,10 @@ def get_revenue_summary(
     
     # تعداد تراکنش‌های استرداد شده (Refunds)
     # FIX: Bug 12 - exclude archived Transaction rows from this active view.
-    refund_count = db.query(Transaction).filter(Transaction.is_deleted == False, Transaction.is_reversed == False).filter(Transaction.type == "reversal").count()
+    # برگشت payout معلم ledger است و refund دانش‌آموز نیست؛ با settlement_id تفکیک می‌شود.
+    refund_count = db.query(Transaction).filter(Transaction.is_deleted == False, Transaction.is_reversed == False, Transaction.settlement_id.is_(None)).filter(Transaction.type == "reversal").count()
     # FIX: Bug 12 - exclude archived Transaction rows from this active view.
-    refund_amount = db.query(func.sum(Transaction.amount)).filter(Transaction.is_deleted == False, Transaction.is_reversed == False).filter(Transaction.type == "reversal").scalar() or 0
+    refund_amount = db.query(func.sum(Transaction.amount)).filter(Transaction.is_deleted == False, Transaction.is_reversed == False, Transaction.settlement_id.is_(None)).filter(Transaction.type == "reversal").scalar() or 0
     
     return {
         "revenue_by_wallet": {

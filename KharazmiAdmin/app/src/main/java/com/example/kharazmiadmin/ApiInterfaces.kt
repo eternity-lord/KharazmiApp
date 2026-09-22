@@ -6,6 +6,7 @@ import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 import retrofit2.http.Streaming
@@ -70,7 +71,28 @@ interface ClassApi {
 
     @POST("admin/classes/suspend_bulk")
     suspend fun suspendBulkClasses(@Body req: BulkSuspendRequest): SimpleResponse
+
+    @PUT("classes/update")
+    suspend fun updateClass(@Query("course_id") courseId: Int, @Body req: AdminClassUpdateRequest): SimpleResponse
+
+    @POST("classes/pending_approval/bulk_approve")
+    suspend fun bulkApprove(@Body req: BulkClassDecisionRequest): SimpleResponse
+
+    @POST("classes/pending_approval/bulk_reject")
+    suspend fun bulkReject(@Body req: BulkClassDecisionRequest): SimpleResponse
 }
+
+data class BulkClassDecisionRequest(val course_ids: List<Int>, val reason: String? = null)
+
+data class AdminClassUpdateRequest(
+    val title: String? = null,
+    val grade_level: String? = null,
+    val days_of_week: String? = null,
+    val class_time: String? = null,
+    val capacity: Int? = null,
+    val teacher_id: Int? = null,
+    val is_paused: Boolean? = null
+)
 
 // ———————————————— اقساط شهریه (A1) — سه endpoint موجود سرور بدون UI ————————————————
 interface InstallmentApi {

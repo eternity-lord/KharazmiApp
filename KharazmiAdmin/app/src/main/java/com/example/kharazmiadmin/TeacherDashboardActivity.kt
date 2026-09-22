@@ -34,12 +34,20 @@ data class TeacherClassItem(
     val debt_to_institute: Long = 0
 )
 
+data class TeacherPendingClassItem(
+    val id: Int, val title: String? = null, val code: String? = null,
+    val status: String? = null, val rejection_reason: String? = null
+)
+
 interface TeacherPanelApi {
     @GET("teachers/{id}/classes")
     suspend fun getMyClasses(@Path("id") id: Int): List<TeacherClassItem>
 
     @GET("teachers/{id}/incomplete_classes")
     suspend fun getTeacherIncompleteClasses(@Path("id") id: Int): List<TeacherClassItem>
+
+    @GET("teachers/{teacher_id}/pending_classes")
+    suspend fun getPendingClasses(@Path("teacher_id") teacherId: Int): List<TeacherPendingClassItem>
 }
 
 interface TeacherMeApi {
@@ -75,6 +83,7 @@ class TeacherDashboardActivity : BaseActivity() {
         // رفرش دستی
         findViewById<ImageView>(R.id.btnRefresh).setOnClickListener {
             fetchClasses()
+            fetchPendingClasses()
             fetchTeacherTodaySummary(forceRefresh = true)
             Toast.makeText(this, getString(R.string.tdash_updated), Toast.LENGTH_SHORT).show()
         }
@@ -148,6 +157,27 @@ class TeacherDashboardActivity : BaseActivity() {
         api = retrofit.create(TeacherPanelApi::class.java)
 
         fetchClasses()
+        fetchPendingClasses()
+    }
+
+    private fun fetchPendingClasses() {
+        if (teacherId == -1) return
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val pending_classes = api.getPendingClasses(teacherId)
+                withContext(Dispatchers.Main) {
+                    val card = findViewById<MaterialCardView>(R.id.cardPendingApproval)
+                    val text = findViewById<TextView>(R.id.tvPendingApproval)
+                    card.visibility = if (pending_classes.isEmpty()) android.view.View.GONE else android.view.View.VISIBLE
+                    text.text = pending_classes.joinToString("\n") {
+                        val reason = it.rejection_reason?.let { value -> " — رد: $value" } ?: " — در انتظار تأیید"
+                        "${it.title ?: "کلاس"}$reason"
+                    }
+                }
+            } catch (error: Exception) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+            }
+        }
     }
 
     override fun onResume() {

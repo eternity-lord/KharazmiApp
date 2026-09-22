@@ -213,6 +213,23 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardPendingApproval"
+                style="@style/Widget.Kharazmi.Card.Gold"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/spacing_normal"
+                android:visibility="gone">
+                <TextView
+                    android:id="@+id/tvPendingApproval"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="@dimen/spacing_normal"
+                    android:text="pending_classes"
+                    android:textStyle="bold"
+                    android:textColor="@color/gold_primary" />
+            </com.google.android.material.card.MaterialCardView>
+
             <!-- Teacher 6-menu Grid Layout -->
             <GridLayout
                 android:layout_width="match_parent"

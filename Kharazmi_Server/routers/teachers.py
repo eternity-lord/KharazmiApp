@@ -8,6 +8,7 @@ import uuid
 import os
 import datetime
 import secrets
+import json
 
 import models
 from models import (
@@ -1017,9 +1018,14 @@ def settle_teacher_sessions(
         teacher_id=teacher_id,
         total_amount=total_amount,
         session_count=len(session_ids),
+        session_ids_json=json.dumps(sorted(session_ids)),
         settled_by_user_id=settled_by
     )
     db.add(new_settlement)
+    # شناسهٔ settlement و payout هر دو در همان تراکنش به هم لینک می‌شوند.
+    db.flush()
+    payout.settlement_id = new_settlement.id
+    new_settlement.payout_transaction_id = payout.id
     db.commit()
     
     return {
@@ -1062,6 +1068,184 @@ def get_settlement_history(
             "id": h.id,
             "total_amount": h.total_amount,
             "session_count": h.session_count,
-            "settled_at": h.settled_at.strftime("%Y/%m/%d %H:%M") if h.settled_at else "---"
+            "settled_at": h.settled_at.strftime("%Y/%m/%d %H:%M") if h.settled_at else "---",
+            "is_reversed": bool(h.is_reversed),
+            "reversal_reason": h.reversal_reason,
+            "session_ids": _settlement_session_ids(h)
         })
     return result
+
+
+class SettlementEditRequest(BaseModel):
+    total_amount: Optional[int] = None
+    reason: str
+
+
+def _settlement_session_ids(settlement: Settlement) -> List[int]:
+    """Decode the immutable scope snapshot; malformed legacy rows have empty scope."""
+    try:
+        value = json.loads(settlement.session_ids_json or "[]")
+        return sorted({int(item) for item in value})
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return []
+
+
+def _settlement_actor_id(db: Session, authorization: Optional[str]) -> int:
+    from dependencies import get_session_from_token
+    try:
+        parts = (authorization or "").split()
+        token = parts[1] if len(parts) == 2 and parts[0].lower() == "bearer" else None
+        session, _ = get_session_from_token(db, token) if token else (None, None)
+        return int(session.user_id) if session and session.user_id else 1
+    except Exception:
+        return 1
+
+
+def _write_settlement_reversal(db: Session, settlement: Settlement, reason: str, actor_id: int):
+    """Reverse payout and reopen only this settlement's billing scope, atomically."""
+    if settlement.is_reversed:
+        raise HTTPException(status_code=409, detail="این تسویه قبلاً برگشت خورده است")
+    if not reason or not reason.strip():
+        raise HTTPException(status_code=400, detail="علت برگشت تسویه الزامی است")
+    session_ids = _settlement_session_ids(settlement)
+    if not session_ids:
+        raise HTTPException(status_code=409, detail="این تسویه دامنهٔ جلسهٔ قابل ردیابی ندارد")
+    active_other = db.query(Settlement).filter(
+        Settlement.teacher_id == settlement.teacher_id,
+        Settlement.id != settlement.id,
+        Settlement.is_reversed == False,
+    ).all()
+    for other in active_other:
+        if set(session_ids).intersection(_settlement_session_ids(other)):
+            raise HTTPException(status_code=409, detail="دامنهٔ این تسویه در تسویهٔ فعال دیگری استفاده شده است")
+    payout = db.query(Transaction).filter(Transaction.id == settlement.payout_transaction_id).first()
+    if not payout:
+        payout = db.query(Transaction).filter(
+            Transaction.settlement_id == settlement.id, Transaction.type == "settlement_payout"
+        ).first()
+    from today_summary import jalali_date_string
+    from dependencies import get_next_sequence_value
+    reversal = Transaction(
+        course_id=None,
+        amount=abs(int((payout.amount if payout else -settlement.total_amount) or 0)),
+        type="reversal",
+        target_wallet="teacher",
+        settlement_id=settlement.id,
+        date=jalali_date_string(datetime.date.today()),
+        description=f"برگشت تسویه {settlement.id}: {reason.strip()}",
+        remittance_number=get_next_sequence_value(db, "remittance_settlement_reversal", 100001),
+    )
+    db.add(reversal)
+    settlement.is_reversed = True
+    settlement.reversal_reason = reason.strip()
+    settlement.reversed_at = datetime.datetime.utcnow()
+    # Explicit scope only: never touch Student.wallet_teacher in this payout correction.
+    db.query(Attendance).filter(
+        Attendance.session_id.in_(session_ids), Attendance.is_deleted == False
+    ).update({Attendance.is_billed: False}, synchronize_session=False)
+    db.query(SessionLog).filter(SessionLog.id.in_(session_ids)).update(
+        {SessionLog.is_penalty_settled: False}, synchronize_session=False
+    )
+    db.add(models.ActivityLog(
+        admin_username=str(actor_id), action="settlement_reversal", target_id=settlement.id,
+        target_name=f"teacher:{settlement.teacher_id}", details=reason.strip()
+    ))
+    return session_ids, reversal
+
+
+@router.post("/teachers/{teacher_id}/settlements/{settlement_id}/reverse")
+def reverse_teacher_settlement(
+    teacher_id: int, settlement_id: int, reason: str,
+    db: Session = Depends(get_db), authorization: Optional[str] = Header(None),
+    _: str = Depends(check_admin_access)
+):
+    settlement = db.query(Settlement).filter(
+        Settlement.id == settlement_id, Settlement.teacher_id == teacher_id
+    ).first()
+    if not settlement:
+        raise HTTPException(status_code=404, detail="تسویه یافت نشد")
+    session_ids, reversal = _write_settlement_reversal(
+        db, settlement, reason, _settlement_actor_id(db, authorization)
+    )
+    db.commit()
+    return {"message": "تسویه با ثبت سند برگشت اصلاح شد", "settlement_id": settlement.id,
+            "reversal_transaction_id": reversal.id, "session_ids": session_ids}
+
+
+@router.put("/teachers/{teacher_id}/settlements/{settlement_id}/edit")
+def edit_teacher_settlement(
+    teacher_id: int, settlement_id: int, req: SettlementEditRequest,
+    db: Session = Depends(get_db), authorization: Optional[str] = Header(None),
+    _: str = Depends(check_admin_access)
+):
+    settlement = db.query(Settlement).filter(
+        Settlement.id == settlement_id, Settlement.teacher_id == teacher_id
+    ).first()
+    if not settlement:
+        raise HTTPException(status_code=404, detail="تسویه یافت نشد")
+    if req.total_amount is not None and req.total_amount < 0:
+        raise HTTPException(status_code=400, detail="مبلغ تسویه نمی‌تواند منفی باشد")
+    actor_id = _settlement_actor_id(db, authorization)
+    session_ids, reversal = _write_settlement_reversal(db, settlement, req.reason, actor_id)
+    new_amount = int(req.total_amount if req.total_amount is not None else settlement.total_amount)
+    from today_summary import jalali_date_string
+    from dependencies import get_next_sequence_value
+    payout = Transaction(
+        course_id=None, amount=-new_amount, type="settlement_payout", target_wallet="teacher",
+        date=jalali_date_string(datetime.date.today()), settlement_id=None,
+        description=f"تعدیل تسویه {settlement.id}: {req.reason.strip()}",
+        remittance_number=get_next_sequence_value(db, "remittance_settlement_adjustment", 100001)
+    )
+    db.add(payout)
+    db.flush()
+    adjustment = Settlement(
+        teacher_id=teacher_id, total_amount=new_amount, session_count=len(session_ids),
+        session_ids_json=json.dumps(session_ids), payout_transaction_id=payout.id,
+        settled_by_user_id=actor_id
+    )
+    db.add(adjustment)
+    db.flush()
+    payout.settlement_id = adjustment.id
+    # The replacement settlement owns the same scope, so its billing flags remain settled.
+    db.query(Attendance).filter(
+        Attendance.session_id.in_(session_ids), Attendance.is_deleted == False
+    ).update({Attendance.is_billed: True}, synchronize_session=False)
+    db.query(SessionLog).filter(SessionLog.id.in_(session_ids)).update(
+        {SessionLog.is_penalty_settled: True}, synchronize_session=False
+    )
+    db.add(models.ActivityLog(
+        admin_username=str(actor_id), action="settlement_adjustment", target_id=adjustment.id,
+        target_name=f"replaces:{settlement.id}", details=req.reason.strip()
+    ))
+    db.commit()
+    return {"message": "تسویه با سند برگشت و تعدیل جدید ثبت شد", "settlement_id": adjustment.id,
+            "reversed_settlement_id": settlement.id, "reversal_transaction_id": reversal.id,
+            "session_ids": session_ids, "total_amount": new_amount}
+
+
+@router.get("/teachers/{teacher_id}/pending_classes")
+def get_teacher_pending_classes(
+    teacher_id: int, db: Session = Depends(get_db),
+    authorization: Optional[str] = Header(None), sub_role: str = Depends(check_user_login)
+):
+    if sub_role not in ("admin", "secretary", "teacher"):
+        raise HTTPException(status_code=403, detail="دسترسی به صف کلاس‌ها مجاز نیست")
+    if sub_role == "teacher":
+        from routers.reports import get_logged_in_teacher
+        me = get_logged_in_teacher(db, authorization)
+        if not me or me.id != teacher_id:
+            raise HTTPException(status_code=403, detail="فقط صف کلاس‌های خودتان قابل مشاهده است")
+    teacher = db.query(Teacher).filter(Teacher.id == teacher_id, Teacher.is_deleted == False).first()
+    if not teacher:
+        raise HTTPException(status_code=404, detail="معلم یافت نشد")
+    rows = db.query(Course).filter(
+        Course.teacher_id == teacher_id, Course.is_deleted == False,
+        Course.is_admin_approved == False
+    ).order_by(desc(Course.pending_since), desc(Course.id)).all()
+    return [{
+        "id": c.id, "title": c.title, "code": c.code,
+        "days_of_week": c.days_of_week, "class_time": c.class_time,
+        "capacity": c.capacity, "rejection_reason": c.rejection_reason,
+        "status": "rejected" if c.rejection_reason else "pending",
+        "pending_since": c.pending_since.isoformat() if c.pending_since else None,
+    } for c in rows]

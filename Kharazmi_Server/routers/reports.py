@@ -12,7 +12,7 @@ from openpyxl.styles import Font, Alignment, PatternFill
 
 import models
 from models import (
-    Attendance, Course, Enrollment, Grade, InstituteShare, SessionLog, SmsLog, Student, Teacher, Transaction, User, UserSession, InstituteSettings
+    Attendance, Course, Enrollment, Grade, InstituteShare, SessionLog, SmsLog, Student, Teacher, Transaction, User, UserSession, InstituteSettings, Installment
 )
 from schemas import (
     HistoryRequest, LoginRequest, TeacherInfo, FullTeacherProfile, StudentCreate, TeacherCreate, CourseCreate, EnrollmentCreate, GradeCreate, GradeItem, AttendanceLogRequest, AttendanceItem, AttendanceSubmitData, SmsSendRequest, ChangePasswordRequest, StudentProfileInfo, FullStudentProfile, TeacherProfileInfo, FullTeacherProfile, ClassReportInfo, ClassStudentData, ClassSessionHistory, FullClassReport, ShareConfigModel, StudentUpdate, TeacherUpdate, PersonListItem, TransactionUpdate, StudentAttendanceHistoryRequest, AdvancedSearchItem, FinanceSubmitData, PrintReceiptRequest, TransactionTestData
@@ -662,14 +662,52 @@ def get_student_statement(
         db.commit()
         db.refresh(settings)
 
+    enrollments = db.query(Enrollment).filter(
+        Enrollment.student_id == student_id, Enrollment.is_deleted == False
+    ).all()
+    teacher_names = []
+    enrollment_ids = [e.id for e in enrollments]
+    for enrollment in enrollments:
+        if enrollment.course and enrollment.course.teacher:
+            name = display_name(enrollment.course.teacher, "نامشخص")
+            if name not in teacher_names:
+                teacher_names.append(name)
+    payment_rows = db.query(Transaction).filter(
+        Transaction.student_id == student_id, Transaction.is_deleted == False,
+        Transaction.is_reversed == False, Transaction.amount > 0
+    ).order_by(Transaction.id.desc()).all()
+    payment_timeline = [{
+        "transaction_id": row.id, "date": row.date, "amount": int(row.amount or 0),
+        "target_wallet": row.target_wallet, "description": row.description,
+        "payment_link": f"/finance/receipt/{row.id}"
+    } for row in payment_rows]
+    next_installment = None
+    if enrollment_ids:
+        installment = db.query(Installment).filter(
+            Installment.enrollment_id.in_(enrollment_ids), Installment.is_deleted == False,
+            Installment.is_paid == False
+        ).order_by(Installment.due_date.asc(), Installment.id.asc()).first()
+        if installment:
+            next_installment = {
+                "id": installment.id, "amount": int(installment.amount or 0),
+                "paid_amount": int(installment.paid_amount or 0),
+                "due_date": installment.due_date,
+                "remaining_amount": max(0, int((installment.amount or 0) - (installment.paid_amount or 0))),
+                "payment_link": f"/finance/payment/initiate?installment_id={installment.id}"
+            }
+
     return {
         "student_id": student.id,
         "student_name": display_name(student, "نامشخص"),
         "student_code": student.student_code or str(100000 + student.id),
+        "teacher_name": ", ".join(teacher_names) if teacher_names else "بدون معلم",
         "total_paid_institute": int(total_paid_institute),
         "total_debt_institute": int(total_debt_institute),
         # FIX: Bug 16 - expose contractual debt separately; do not assign all tuition to one wallet.
         "total_debt": calculate_student_debt(db, student),
+        "payment_timeline": payment_timeline,
+        "next_installment": next_installment,
+        "payment_link": (next_installment or {}).get("payment_link") if next_installment else "/payments/initiate",
         "institute_card_number": settings.card_number or "۶۰۳۷۹۹۷۹۷۹۷۹۷۹۷۹",
         "institute_name": settings.name,
         "address": settings.address,

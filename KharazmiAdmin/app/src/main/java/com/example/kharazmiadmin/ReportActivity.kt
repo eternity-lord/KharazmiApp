@@ -2,6 +2,8 @@ package com.example.kharazmiadmin
 
 import android.app.AlertDialog
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.print.PrintAttributes
 import android.print.PrintManager
@@ -37,12 +39,27 @@ data class FinancialMetrics(
     val uncollected: Long
 )
 
+data class PaymentTimelineItem(
+    val transaction_id: Int? = null, val date: String? = null,
+    val amount: Long? = null, val target_wallet: String? = null,
+    val payment_link: String? = null
+)
+
+data class NextInstallmentItem(
+    val id: Int? = null, val amount: Long? = null, val due_date: String? = null,
+    val remaining_amount: Long? = null, val payment_link: String? = null
+)
+
 data class StudentStatementResponse(
     val student_id: Int,
     val student_name: String,
     val student_code: String,
     val total_paid_institute: Long,
     val total_debt_institute: Long,
+    val teacher_name: String? = null,
+    val payment_timeline: List<PaymentTimelineItem> = emptyList(),
+    val next_installment: NextInstallmentItem? = null,
+    val payment_link: String? = null,
     val institute_card_number: String,
     val institute_name: String,
     val address: String,
@@ -126,6 +143,10 @@ class ReportActivity : BaseActivity() {
     private lateinit var tvStatementStudentCode: TextView
     private lateinit var tvStatementPaid: TextView
     private lateinit var tvStatementDebt: TextView
+    private lateinit var tvStatementTeacher: TextView
+    private lateinit var tvStatementNextDue: TextView
+    private lateinit var tvStatementTimeline: TextView
+    private lateinit var btnStatementPay: Button
     private lateinit var btnPrintStatement: Button
 
     // حالت‌ها و متغیرهای کمکی
@@ -167,6 +188,10 @@ class ReportActivity : BaseActivity() {
         tvStatementStudentCode = findViewById(R.id.tvStatementStudentCode)
         tvStatementPaid = findViewById(R.id.tvStatementPaid)
         tvStatementDebt = findViewById(R.id.tvStatementDebt)
+        tvStatementTeacher = findViewById(R.id.tvStatementTeacher)
+        tvStatementNextDue = findViewById(R.id.tvStatementNextDue)
+        tvStatementTimeline = findViewById(R.id.rvPaymentTimeline)
+        btnStatementPay = findViewById(R.id.btnStatementPay)
         btnPrintStatement = findViewById(R.id.btnPrintStatement)
         
         ButtonAnimator.applyPillScaleAnimation(btnFetchFinancialSummary)
@@ -221,6 +246,10 @@ class ReportActivity : BaseActivity() {
             currentStudentIdForPrint?.let { studentId ->
                 printStatementDirect(studentId)
             } ?: Toast.makeText(this, getString(R.string.rpt_no_student), Toast.LENGTH_SHORT).show()
+        }
+        btnStatementPay.setOnClickListener {
+            val url = getString(R.string.rpt_payment_link_fallback)
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
         }
     }
 
@@ -419,8 +448,25 @@ class ReportActivity : BaseActivity() {
                     llStatementResult.visibility = View.VISIBLE
                     tvStatementStudentName.text = getString(R.string.rpt_stmt_name, stmt.student_name)
                     tvStatementStudentCode.text = getString(R.string.rpt_stmt_code, stmt.student_code)
+                    tvStatementStudentName.setOnClickListener {
+                        startActivity(Intent(this@ReportActivity, StudentProfileActivity::class.java).apply {
+                            putExtra("STUDENT_ID", studentId)
+                        })
+                    }
                     tvStatementPaid.text = getString(R.string.common_toman_format, stmt.total_paid_institute)
                     tvStatementDebt.text = getString(R.string.common_toman_format, stmt.total_debt_institute)
+                    tvStatementTeacher.text = "معلم بدهکار: ${stmt.teacher_name ?: "بدون معلم"}"
+                    tvStatementNextDue.text = stmt.next_installment?.let {
+                        "قسط بعدی: ${it.due_date ?: "نامشخص"} | ${it.remaining_amount ?: it.amount ?: 0} تومان"
+                    } ?: "قسط بازی ندارد"
+                    tvStatementTimeline.text = stmt.payment_timeline.joinToString("\n") {
+                        "${it.date ?: "تاریخ نامشخص"} — ${it.amount ?: 0} تومان"
+                    }.ifEmpty { "تاریخچه پرداختی وجود ندارد" }
+                    btnStatementPay.visibility = if (stmt.next_installment != null) View.VISIBLE else View.GONE
+                    btnStatementPay.setOnClickListener {
+                        val link = stmt.next_installment?.payment_link ?: stmt.payment_link
+                        if (!link.isNullOrBlank()) startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link)))
+                    }
                 }
             } catch (e: Exception) {
                 // FIX: Bug 19 - cancellation is not a network/UI error.

@@ -672,6 +672,38 @@
                                 android:maxLines="1"/>
                         </LinearLayout>
 
+                        <TextView
+                            android:id="@+id/tvStatementTeacher"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/spacing_small"
+                            android:text="معلم بدهکار: —"
+                            android:textAppearance="@style/TextAppearance.Kharazmi.DS.Body" />
+
+                        <TextView
+                            android:id="@+id/tvStatementNextDue"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/spacing_xs"
+                            android:text="قسط بعدی: —"
+                            android:textAppearance="@style/TextAppearance.Kharazmi.DS.Body" />
+
+                        <TextView
+                            android:id="@+id/rvPaymentTimeline"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/spacing_small"
+                            android:text="تاریخچه پرداخت"
+                            android:textAppearance="@style/TextAppearance.Kharazmi.DS.Caption" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnStatementPay"
+                            style="@style/Widget.Kharazmi.DS.Button.Primary"
+                            android:layout_width="match_parent"
+                            android:layout_height="@dimen/min_touch_target"
+                            android:layout_marginTop="@dimen/spacing_small"
+                            android:text="پرداخت قسط بعدی" />
+
                         <!-- اکشن ثانویه: چاپ رسمی -->
                         <com.google.android.material.button.MaterialButton
                             android:id="@+id/btnPrintStatement"

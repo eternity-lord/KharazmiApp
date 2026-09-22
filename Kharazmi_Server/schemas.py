@@ -72,6 +72,7 @@ class CourseCreate(BaseModel):
     days_of_week: str = "نامشخص"
     class_time: str = "نامشخص"
     teacher_session_price: int = Field(ge=0)  # FIX: Bug 22 - a session price cannot be negative.
+    capacity: Optional[int] = Field(default=None, gt=0)
     rule_prepay_institute: bool = False
     rule_prepay_teacher: bool = False
     rule_calc_absent: bool = True

@@ -85,6 +85,10 @@
             android:exported="false"
             android:label="تاریخچه جلسات" />
         <activity
+            android:name=".AdminSessionHistoryActivity"
+            android:exported="false"
+            android:label="تاریخچه جلسات ادمین" />
+        <activity
             android:name=".InvoiceActivity"
             android:exported="false" />
         <activity

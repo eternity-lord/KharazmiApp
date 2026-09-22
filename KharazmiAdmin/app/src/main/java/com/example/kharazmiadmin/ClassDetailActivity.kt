@@ -511,6 +511,7 @@ class ClassDetailActivity : BaseActivity() {
             1 -> { // لیست دانش‌آموزان
                 scrollView.visibility = View.GONE
                 tabContainer.visibility = View.VISIBLE
+                rvStudents.visibility = View.VISIBLE
 
                 // Update students list with full data including attendance
                 if (studentsFullData != null) {

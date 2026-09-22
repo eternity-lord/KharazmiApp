@@ -353,34 +353,24 @@ def get_debtors_report(
     _: str = Depends(check_admin_access)
 ):
     resolved_branch = get_user_branch_filter(db, authorization, branch_id)
-    query = db.query(Student)
-    if resolved_branch is not None:
-        query = query.filter(Student.branch_id == resolved_branch)
-    all_students = query.all()
-    res = []
-    for student in all_students:
-        # Calculate debt from wallet_teacher and wallet_institute
-        w_t = student.wallet_teacher if student.wallet_teacher is not None else 0
-        w_i = student.wallet_institute if student.wallet_institute is not None else 0
-
-        debt_teacher = abs(w_t) if w_t < 0 else 0
-        debt_institute = abs(w_i) if w_i < 0 else 0
-        # FIX: Bug 16 - report unpaid discounted tuition, not only negative wallets.
-        total_debt = calculate_student_debt(db, student)
-
-        # Only include students with debt
-        if total_debt > 0:
-            res.append(
-                {
-                    "student_id": student.id,
-                    "student_name": display_name(student, "نامشخص"),
-                    "amount": total_debt,
-                    "date": "-",
-                    "description": "بدهی",
-                    "payment_method": "-",
-                }
-            )
-    return res
+    # FIX (گروه۲/آیتم ۶): فیلتر سختِ شعبه (`Student.branch_id == resolved_branch`) خروجی را
+    # با دادهٔ واقعی خالی می‌کرد — در پایگاه واقعی ردیف‌های `students` بی‌شعبه (NULL) هستند و
+    # ادمینِ شعبه‌دار `branch_id=1` دارد ⇒ `NULL == 1` هرگز درست نیست.
+    # حالا از منبع یگانهٔ `build_debtor_rows` استفاده می‌شود: ردیف بی‌شعبه = سراسری/legacy
+    # (دیده می‌شود)، ردیف شعبهٔ دیگر = پنهان (بدون نشت داده بین شعبه‌ها).
+    from routers.finance import build_debtor_rows  # lazy: بدون چرخهٔ import
+    rows = build_debtor_rows(db, resolved_branch)
+    return [
+        {
+            "student_id": row["student_id"],
+            "student_name": row["student_name"],
+            "amount": row["total_debt"],
+            "date": "-",
+            "description": "بدهی",
+            "payment_method": "-",
+        }
+        for row in rows
+    ]
 
 
 # Test endpoint to verify debt calculation
@@ -394,17 +384,18 @@ def get_debtors_excel(
     _: str = Depends(check_admin_access)
 ):
     resolved_branch = get_user_branch_filter(db, authorization, branch_id)
-    query = db.query(Student)
-    if resolved_branch is not None:
-        query = query.filter(Student.branch_id == resolved_branch)
-    all_students = query.all()
-    
+    # FIX (گروه۲/آیتم ۶): همان اصلاح لیست بدهکاران — فیلتر سختِ شعبه با دادهٔ واقعی
+    # (دانش‌آموزان بی‌شعبه/legacy) فایل Excel را هم خالی تحویل می‌داد. منبع یگانه: build_debtor_rows
+    from routers.finance import build_debtor_rows  # lazy: بدون چرخهٔ import
+    debtor_rows = build_debtor_rows(db, resolved_branch)
+
     wb = Workbook()
     ws = wb.active
     ws.title = "لیست بدهکاران"
     ws.views.sheetView[0].rightToLeft = True
-    
-    headers = ["شناسه", "نام و نام خانوادگی", "بدهی به معلم (تومان)", "بدهی به آموزشگاه (تومان)", "کل بدهی (تومان)", "تلفن همراه", "تلفن والدین"]
+
+    # FIX (گروه۲/آیتم ۹ — «پیشنهاد من»): ستون‌های جدید برای پیگیری عملی
+    headers = ["شناسه", "نام و نام خانوادگی", "بدهی به معلم (تومان)", "بدهی به آموزشگاه (تومان)", "کل بدهی (تومان)", "تلفن همراه", "تلفن والدین", "تاریخ آخرین پرداخت", "قدمت بدهی (روز)"]
     ws.append(headers)
     
     header_fill = PatternFill(start_color="00695C", end_color="00695C", fill_type="solid")
@@ -416,37 +407,30 @@ def get_debtors_excel(
         cell.alignment = Alignment(horizontal="center", vertical="center")
         
     row_num = 2
-    for student in all_students:
-        w_t = student.wallet_teacher if student.wallet_teacher is not None else 0
-        w_i = student.wallet_institute if student.wallet_institute is not None else 0
+    for row in debtor_rows:
+        row_data = [
+            row["student_id"],
+            row["student_name"],
+            row["debt_teacher"],
+            row["debt_institute"],
+            row["total_debt"],
+            row.get("student_mobile") or "",
+            row.get("parent_mobile") or "",
+            row.get("last_payment_date") or "بدون پرداخت",
+            row.get("debt_age_days") if row.get("debt_age_days") is not None else "بدون پرداخت",
+        ]
+        ws.append(row_data)
 
-        debt_teacher = abs(w_t) if w_t < 0 else 0
-        debt_institute = abs(w_i) if w_i < 0 else 0
-        # FIX: Bug 16 - report unpaid discounted tuition, not only negative wallets.
-        total_debt = calculate_student_debt(db, student)
+        ws.cell(row=row_num, column=3).number_format = '#,##0'
+        ws.cell(row=row_num, column=4).number_format = '#,##0'
+        ws.cell(row=row_num, column=5).number_format = '#,##0'
 
-        if total_debt > 0:
-            row_data = [
-                student.id,
-                display_name(student, "نامشخص"),
-                debt_teacher,
-                debt_institute,
-                total_debt,
-                student.student_mobile,
-                student.parent_mobile or ""
-            ]
-            ws.append(row_data)
-            
-            ws.cell(row=row_num, column=3).number_format = '#,##0'
-            ws.cell(row=row_num, column=4).number_format = '#,##0'
-            ws.cell(row=row_num, column=5).number_format = '#,##0'
-            
-            for col_num in range(1, len(headers) + 1):
-                cell = ws.cell(row=row_num, column=col_num)
-                cell.alignment = Alignment(horizontal="center", vertical="center")
-                cell.font = Font(name="Tahoma", size=10)
-                
-            row_num += 1
+        for col_num in range(1, len(headers) + 1):
+            cell = ws.cell(row=row_num, column=col_num)
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+            cell.font = Font(name="Tahoma", size=10)
+
+        row_num += 1
             
     for col in ws.columns:
         max_len = max(len(str(cell.value or '')) for cell in col)

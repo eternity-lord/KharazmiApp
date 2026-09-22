@@ -125,8 +125,11 @@ class TestExportsCSV(unittest.TestCase):
 
         rows = _rows(r.text)
         self.assertEqual(len(rows), 2, f"فقط یک بدهکار انتظار می‌رفت: {rows}")
+        # FIX (گروه۲/آیتم۹): دو ستون پیگیری جدید («تاریخ آخرین پرداخت»، «قدمت بدهی (روز)»)
+        # به انتهای هدر اضافه شده‌اند — ترتیب ستون‌های قبلی برای کلاینت منتشرشده دست‌نخورده است.
         self.assertEqual(rows[0], ["شناسه", "نام دانش‌آموز", "کد ملی", "موبایل ولی",
-                                   "بدهی معلم", "بدهی آموزشگاه", "بدهی کل", "کلاس‌های فعال"])
+                                   "بدهی معلم", "بدهی آموزشگاه", "بدهی کل", "کلاس‌های فعال",
+                                   "تاریخ آخرین پرداخت", "قدمت بدهی (روز)"])
         self.assertEqual(rows[1][0], "1")
         self.assertEqual(rows[1][1], "سینا مرادی")
         self.assertEqual(rows[1][2], "0000000001")
@@ -135,6 +138,9 @@ class TestExportsCSV(unittest.TestCase):
         self.assertEqual(rows[1][5], "0")
         self.assertEqual(rows[1][6], "1000000")    # بدهی شهریه
         self.assertEqual(rows[1][7], "ریاضی کنکور")
+        # هیچ تراکنش پرداختی در فیکسچر نیست ⇒ ستون‌های جدید خالی/بی‌مقدار می‌آیند (نه crash)
+        self.assertEqual(rows[1][8], "")
+        self.assertEqual(rows[1][9], "")
 
     def test_debtors_excludes_zero_debt_student(self):
         r = self.client.get("/exports/debtors", headers={"Authorization": "Bearer tok_admin"})

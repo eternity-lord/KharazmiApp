@@ -77,38 +77,22 @@ def _csv_response(filename: str, header: List[str], rows: Iterator[List[object]]
 # ۱) بدهکاران — GET /exports/debtors
 # ==========================================
 def _iter_debtor_rows(db: Session, resolved_branch: Optional[int]) -> Iterator[List[object]]:
-    """منطق کوئری عیناً از GET /finance/reports/debtors_list کپی شده (بدون تغییر آن فایل):
-    دانش‌آموزان غیرحذف‌شده → calculate_student_debt → رد کردن بدهی صفر/منفی →
-    تفکیک بدهی معلم/آموزشگاه از کیف پول منفی → کلاس‌های فعال."""
-    query = db.query(Student).filter(Student.is_deleted == False)  # noqa: E712 (سبک پروژه)
-    if resolved_branch is not None:
-        query = query.filter(Student.branch_id == resolved_branch)
-
-    for s in query.all():
-        w_t = s.wallet_teacher if s.wallet_teacher is not None else 0
-        w_i = s.wallet_institute if s.wallet_institute is not None else 0
-
-        total_debt = calculate_student_debt(db, s)
-        if total_debt <= 0:
-            continue
-
-        enrollments = (
-            db.query(Enrollment)
-            .filter(Enrollment.is_deleted == False)  # noqa: E712
-            .filter(Enrollment.student_id == s.id)
-            .all()
-        )
-        courses = [e.course.title for e in enrollments if e.course]
-
+    """FIX (گروه۲/آیتم ۶ و ۹): به‌جای کپی‌منطق، از منبع یگانهٔ `build_debtor_rows`
+    (finance.py) استفاده می‌شود ⇒ فیلتر شعبه (NULL = سراسری/legacy) و ستون‌های جدید
+    («تاریخ آخرین پرداخت»، «قدمت بدهی») با لیست و Excel یکسان می‌ماند و واگرا نمی‌شود."""
+    from routers.finance import build_debtor_rows  # lazy: بدون چرخهٔ import
+    for row in build_debtor_rows(db, resolved_branch):
         yield [
-            s.id,
-            f"{s.first_name} {s.last_name}",
-            s.national_code or "",
-            s.parent_mobile or "",
-            abs(w_t) if w_t < 0 else 0,
-            abs(w_i) if w_i < 0 else 0,
-            total_debt,
-            " | ".join(courses),
+            row["student_id"],
+            row["student_name"],
+            row["national_code"] or "",
+            row.get("parent_mobile") or "",
+            row["debt_teacher"],
+            row["debt_institute"],
+            row["total_debt"],
+            " | ".join(row["active_courses"]),
+            row.get("last_payment_date") or "",
+            row.get("debt_age_days") if row.get("debt_age_days") is not None else "",
         ]
 
 
@@ -133,6 +117,8 @@ def export_debtors(
         "بدهی آموزشگاه",
         "بدهی کل",
         "کلاس‌های فعال",
+        "تاریخ آخرین پرداخت",  # FIX (گروه۲/آیتم۹): ستون‌های پیگیری عملی
+        "قدمت بدهی (روز)",
     ]
     return _csv_response("debtors.csv", header, _iter_debtor_rows(db, resolved_branch))
 

@@ -2332,44 +2332,303 @@ def get_invoice_details(
 
 
 # --- ۱۴. گزارش جامع بدهکاران (Debt Report - ادمین و منشی) ---
-@router.get("/finance/reports/debtors_list")
-def get_debtors_list(
-    branch_id: Optional[int] = None,
-    authorization: Optional[str] = Header(None),
-    db: Session = Depends(get_db),
-    _: str = Depends(check_admin_or_secretary_access) # FIX (L14/Y4): کامنت «ادمین و منشی» حالا واقعاً اعمال می‌شود
-):
-    resolved_branch = get_user_branch_filter(db, authorization, branch_id)
-    # FIX: Bug 16 - positive/zero-wallet students can still owe contractual tuition.
-    query = db.query(Student).filter(Student.is_deleted == False)
-    if resolved_branch is not None:
-        query = query.filter(Student.branch_id == resolved_branch)
-    debtors = query.all()
+# FIX (گروه۲/آیتم ۶ و ۹): هلپر مشترک «ردیف بدهکار» — یک منطق برای لیست، نمای گروه‌بندی‌شده،
+# پیامک دسته‌جمعی و خروجی‌ها (CSV/Excel) تا عددها واگرا نشوند.
+DEBT_AGE_BUCKETS = (("0-7", 0, 7), ("8-30", 8, 30), ("over_30", 31, None))
+
+
+def _debtor_last_payment(db: Session, student_id: int):
+    """(تاریخ خام آخرین پرداخت، تاریخ پارس‌شده) — فقط پولِ ورودیِ واقعیِ همین دانش‌آموز.
+
+    انواع مجاز همان تعریف یگانهٔ وصولی نقدی است (`INSTITUTE_CASH_TYPES` + ردیف legacy بی‌type)
+    و واریزی به کیف معلم/شارژ جلسه/برگشت‌خورده/حذف‌شده «پرداخت» حساب نمی‌شود.
+    """
+    from financial_calculations import INSTITUTE_CASH_TYPES  # lazy، الگوی پروژه
+    from today_summary import parse_project_date
+    rows = (
+        db.query(models.Transaction.date)
+        .filter(
+            models.Transaction.student_id == student_id,
+            models.Transaction.amount > 0,
+            models.Transaction.is_deleted == False,
+            models.Transaction.is_reversed == False,
+            or_(models.Transaction.type.in_(INSTITUTE_CASH_TYPES),
+                models.Transaction.type.is_(None)),
+        )
+        .all()
+    )
+    dated = [(raw, parse_project_date(raw)) for raw, in rows]
+    dated = [(raw, parsed) for raw, parsed in dated if parsed is not None]
+    if not dated:
+        return "", None
+    dated.sort(key=lambda pair: (pair[1], pair[0]), reverse=True)
+    return dated[0][0] or "", dated[0][1]
+
+
+def _debtor_age_bucket(last_payment_day, today: datetime.date):
+    """دستهٔ قدمت بدهی: از آخرین پرداخت تا امروز؛ بی‌پرداخت ⇒ `no_payment`."""
+    if last_payment_day is None:
+        return "no_payment", None
+    age = (today - last_payment_day).days
+    if age < 0:
+        age = 0
+    for name, low, high in DEBT_AGE_BUCKETS:
+        if high is None or age <= high:
+            if age >= low:
+                return name, age
+    return "over_30", age
+
+
+def _debtor_teacher_rows(db: Session, student_id: int):
+    """(teacher_id, teacher_name, course_title, بدهیِ همان کلاس) برای ثبت‌نام‌های فعال.
+
+    منبع عدد: `calculate_enrollment_debt` — یعنی دقیقاً همان فرمولِ هر ثبت‌نام که
+    `calculate_student_debt` روی‌شان جمع می‌زند ⇒ جمع «بدهی به تفکیک معلم» با
+    «کل بدهی» دانش‌آموز هم‌خوان می‌ماند و عدد سومِ واگرا ساخته نمی‌شود.
+    (بدهیِ جلساتِ شارژشدهٔ معلم جداگانه در `debt_teacher` کیف پول گزارش می‌شود.)
+    """
+    from financial_calculations import calculate_enrollment_debt  # lazy، الگوی پروژه
+    enrollments = (
+        db.query(Enrollment)
+        .filter(Enrollment.student_id == student_id, Enrollment.is_deleted == False)
+        .all()
+    )
+    rows = []
+    for en in enrollments:
+        course = db.query(Course).filter(Course.id == en.course_id).first()
+        if course is None:
+            continue
+        teacher = db.query(Teacher).filter(Teacher.id == course.teacher_id).first()
+        rows.append({
+            "teacher_id": course.teacher_id,
+            "teacher_name": display_name(teacher, "نامشخص") if teacher else "بدون معلم",
+            "course_id": course.id,
+            "course_title": course.title or "کلاس بدون نام",
+            "debt": calculate_enrollment_debt(en),
+        })
+    return rows
+
+
+def build_debtor_rows(db: Session, resolved_branch: Optional[int], search: Optional[str] = None):
+    """فهرست بدهکاران با فیلدهای کامل — منبع یگانهٔ لیست/گروه‌بندی/پیامک/خروجی.
+
+    FIX (گروه۲/آیتم۶): `branch_scope_clause` به‌جای فیلتر سختِ شعبه؛ در دادهٔ واقعی آموزشگاه
+    `students.branch_id` برای ردیف‌های legacy NULL است و ادمینِ شعبه‌دار `branch_id=1` دارد ⇒
+    `NULL == 1` هرگز درست نیست و **خروجی بدهکاران با وجود داده خالی می‌شد**.
+    سیاست: ردیف بی‌شعبه = سراسری/legacy (دیده می‌شود) · ردیف شعبهٔ دیگر = پنهان (بدون نشت).
+    """
+    from financial_calculations import branch_scope_clause  # lazy، الگوی پروژه
+    from today_summary import parse_project_date
+    today = datetime.datetime.now().date()
+
+    query = db.query(Student).filter(Student.is_deleted == False)  # noqa: E712 (سبک پروژه)
+    scope = branch_scope_clause(Student.branch_id, resolved_branch)
+    if scope is not None:
+        query = query.filter(scope)
+    students = query.order_by(Student.id).all()
+
+    needle = (search or "").strip().lower()
     result = []
-    for s in debtors:
+    for s in students:
         w_t = s.wallet_teacher if s.wallet_teacher is not None else 0
         w_i = s.wallet_institute if s.wallet_institute is not None else 0
         # FIX: Bug 16 - include only positive outstanding tuition (or legacy unpriced debt).
         total_debt = calculate_student_debt(db, s)
         if total_debt <= 0:
             continue
-        
-        # دریافت نام کلاس‌های فعال
-        # FIX: Bug 13 - exclude archived Enrollment rows from this active view.
-        enrollments = db.query(Enrollment).filter(Enrollment.is_deleted == False).filter(Enrollment.student_id == s.id).all()
+
+        enrollments = db.query(Enrollment).filter(
+            Enrollment.is_deleted == False,  # noqa: E712
+            Enrollment.student_id == s.id).all()
         courses = [e.course.title for e in enrollments if e.course]
-        
+
+        student_name = display_name(s, "نامشخص")
+        teacher_rows = _debtor_teacher_rows(db, s.id)
+        teacher_names = sorted({r["teacher_name"] for r in teacher_rows})
+        if needle:
+            haystack = " ".join([student_name, *teacher_names, *(c or "" for c in courses)]).lower()
+            if needle not in haystack:
+                continue
+
+        last_payment_raw, last_payment_day = _debtor_last_payment(db, s.id)
+        bucket, age_days = _debtor_age_bucket(last_payment_day, today)
         result.append({
             "student_id": s.id,
-            "student_name": display_name(s, "نامشخص"),
+            "student_name": student_name,
             "national_code": s.national_code,
             "parent_mobile": s.parent_mobile,
+            "student_mobile": s.student_mobile,
+            "contact_mobile": s.parent_mobile or s.student_mobile or "",
             "debt_teacher": abs(w_t) if w_t < 0 else 0,
             "debt_institute": abs(w_i) if w_i < 0 else 0,
             "total_debt": total_debt,
-            "active_courses": courses
+            "active_courses": courses,
+            # FIX (گروه۲/آیتم۹): فیلدهای خواسته‌شده — تاریخ آخرین پرداخت، شماره تماس،
+            # قدمت بدهی (برای اولویت پیگیری) و تفکیک «بدهی به کدام معلم».
+            "last_payment_date": last_payment_raw if parse_project_date(last_payment_raw) is not None else "",
+            "debt_age_days": age_days,
+            "debt_age_bucket": bucket,
+            "teachers": teacher_rows,
         })
+    result.sort(key=lambda row: row["total_debt"], reverse=True)
     return result
+
+
+@router.get("/finance/reports/debtors_list")
+def get_debtors_list(
+    branch_id: Optional[int] = None,
+    search: Optional[str] = None,  # FIX (گروه۲/آیتم۹): جست‌وجو بر اساس نام دانش‌آموز/معلم/کلاس
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+    _: str = Depends(check_admin_or_secretary_access) # FIX (L14/Y4): کامنت «ادمین و منشی» حالا واقعاً اعمال می‌شود
+):
+    # FIX (گروه۲/آیتم ۶ و ۹): بدنهٔ تکراری با هلپر مشترک `build_debtor_rows` جایگزین شد —
+    # همان فیلدهای قبلی (کلیدهای موجود برای کلاینت منتشرشده حفظ شده) به‌علاوهٔ فیلدهای جدید.
+    resolved_branch = get_user_branch_filter(db, authorization, branch_id)
+    return build_debtor_rows(db, resolved_branch, search)
+
+
+@router.get("/finance/reports/debtors_grouped")
+def get_debtors_grouped(
+    branch_id: Optional[int] = None,
+    search: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+    _: str = Depends(check_admin_or_secretary_access),
+):
+    """FIX (گروه۲/آیتم۹ — «پیشنهاد من»): نمای مدیریتی بدهکاران، نه فقط لیست تخت.
+
+    * `by_teacher`: کدام معلم بیشترین بدهی معوقهٔ کلاس‌هایش را دارد (برای تصمیم مدیریتی).
+    * `by_age`: دستهٔ قدمت بدهی (`0-7` / `8-30` / `over_30` / `no_payment`) برای اولویت پیگیری.
+    منبع عددها دقیقاً همان `build_debtor_rows` است ⇒ با لیست/خروجی‌ها واگرا نمی‌شود.
+    """
+    resolved_branch = get_user_branch_filter(db, authorization, branch_id)
+    rows = build_debtor_rows(db, resolved_branch, search)
+
+    teacher_groups: dict = {}
+    for row in rows:
+        teacher_entries = row["teachers"] or [
+            {"teacher_id": None, "teacher_name": "بدون کلاس فعال", "course_title": "", "debt": 0}
+        ]
+        for entry in teacher_entries:
+            key = entry["teacher_id"]
+            group = teacher_groups.setdefault(key, {
+                "teacher_id": key,
+                "teacher_name": entry["teacher_name"],
+                "debt": 0,
+                "students_count": 0,
+                "student_ids": [],
+                "courses": [],
+            })
+            group["debt"] += int(entry["debt"] or 0)
+            group["students_count"] += 1
+            group["student_ids"].append(row["student_id"])
+            label = entry.get("course_title") or "کلاس بدون نام"
+            if label not in group["courses"]:
+                group["courses"].append(label)
+
+    bucket_groups = {
+        name: {"bucket": name, "debt": 0, "students_count": 0, "student_ids": []}
+        for name, _low, _high in DEBT_AGE_BUCKETS
+    }
+    bucket_groups["no_payment"] = {"bucket": "no_payment", "debt": 0, "students_count": 0,
+                                   "student_ids": []}
+    for row in rows:
+        group = bucket_groups[row["debt_age_bucket"]]
+        group["debt"] += int(row["total_debt"])
+        group["students_count"] += 1
+        group["student_ids"].append(row["student_id"])
+
+    return {
+        "total_debt": sum(int(row["total_debt"]) for row in rows),
+        "debtors_count": len(rows),
+        "by_teacher": sorted(teacher_groups.values(),
+                             key=lambda g: (-g["debt"], g["teacher_id"] or 0)),
+        "by_age": [bucket_groups[name] for name in ("0-7", "8-30", "over_30", "no_payment")],
+        "rows": rows,
+    }
+
+
+class DebtorsRemindRequest(BaseModel):
+    student_ids: List[int]
+    message: Optional[str] = None
+
+
+@router.post("/finance/debtors/remind")
+def remind_debtors(
+    req: DebtorsRemindRequest,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+    _: str = Depends(check_admin_access),
+):
+    """FIX (گروه۲/آیتم۹ — «پیشنهاد من»): پیامک یادآوری دسته‌جمعی به بدهکارانِ فیلترشده.
+
+    عمداً روی **همان زیرساخت موجود** dunning سوار است (نه موتور جدید): `SmsLog` +
+    `ActivityLog` + idempotency «۴۸ ساعت گذشته یادآوری شده» + الگوی متن پیام.
+    تفاوت فقط کلید هدف است: `dunning_<installment_id>` در برابر `debtor_<student_id>`
+    (بدهکار ممکن است اصلاً قسط نداشته باشد). ارسال واقعی مثل بقیهٔ پروژه mock است
+    (بدون `FCM_SERVER_KEY`/درگاه پیامک فعال) و فقط رکورد/لاگ می‌سازد. فقط ادمین.
+    """
+    from routers.dunning import _jalali_now_str, _get_admin_username  # lazy: استفادهٔ مجدد، نه بازنویسی
+
+    ids = list(dict.fromkeys(int(sid) for sid in (req.student_ids or [])))
+    if not ids:
+        raise HTTPException(status_code=400, detail="لیست بدهکاران خالی است")
+
+    resolved_branch = get_user_branch_filter(db, authorization, None)
+    debtors = {row["student_id"]: row for row in build_debtor_rows(db, resolved_branch)}
+
+    cutoff = datetime.datetime.utcnow() - datetime.timedelta(hours=48)
+    recent_rows = db.query(ActivityLog.target_id).filter(
+        ActivityLog.action == "debtors_reminder",
+        ActivityLog.target_id.in_(ids),
+        ActivityLog.timestamp >= cutoff,
+    ).all()
+    recent_ids = {row[0] for row in recent_rows}
+
+    admin_username = _get_admin_username(db, authorization)
+    sent_ids: List[int] = []
+    skipped_ids: List[int] = []
+    skipped_reasons: dict = {}
+
+    for sid in ids:
+        row = debtors.get(sid)
+        if row is None:
+            skipped_ids.append(sid)
+            skipped_reasons[str(sid)] = "بدهی فعالی ندارد یا در شعبهٔ شما نیست"
+            continue
+        mobile = (row.get("contact_mobile") or "").strip()
+        if not mobile:
+            skipped_ids.append(sid)
+            skipped_reasons[str(sid)] = "موبایل ولی یافت نشد"
+            continue
+        if sid in recent_ids:
+            skipped_ids.append(sid)
+            skipped_reasons[str(sid)] = "۴۸ ساعت گذشته یادآوری شده"
+            continue
+        amount = f"{int(row['total_debt']):,}"
+        text_message = (req.message or "").strip() or (
+            f"سلام ولی محترم {row['student_name']}، ماندهٔ بدهی فرزند شما {amount} تومان است. "
+            f"لطفاً در اسرع وقت نسبت به پرداخت اقدام فرمایید. - آموزشگاه خوارزمی"
+        )
+        db.add(SmsLog(target_group=f"debtor_{sid}", message_text=text_message, sent_count=1,
+                      date=_jalali_now_str()))
+        db.add(ActivityLog(admin_username=admin_username, action="debtors_reminder",
+                           target_id=sid, target_name=row["student_name"], details=text_message,
+                           timestamp=datetime.datetime.utcnow()))
+        sent_ids.append(sid)
+        recent_ids.add(sid)
+
+    if sent_ids:
+        db.commit()
+    return {
+        "message": f"{len(sent_ids)} یادآوری بدهی ثبت شد",
+        "sent_count": len(sent_ids),
+        "skipped_count": len(skipped_ids),
+        "sent": sent_ids,
+        "skipped": skipped_ids,
+        "skipped_reasons": skipped_reasons,
+    }
 
 
 # --- ۱۵. گزارش درآمدهای آموزشگاه (Revenue Report - فقط ادمین) ---

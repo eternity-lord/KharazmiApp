@@ -691,7 +691,14 @@ data class LiveEndResponse(
     @SerializedName("ended_automatically") val endedAutomatically: Boolean,
     @SerializedName("session_id") val sessionId: Int? = null,
     @SerializedName("session_code") val sessionCode: Int? = null,
-    val details: SessionFinancialDetails? = null
+    val details: SessionFinancialDetails? = null,
+    // FIX (گروه۱/آیتم۱): وقتی جلسهٔ این کلاس در این تاریخ از قبل ثبت شده باشد، سرور کلاس زنده را
+    // می‌بندد و به‌جای ۴۰۹ این پرچم + شناسهٔ جلسهٔ موجود را می‌دهد. همه اختیاری با پیش‌فرض ⇒
+    // پاسخ سرور قدیمی هم همان‌طور که بود پارس می‌شود (قرارداد نشکسته).
+    @SerializedName("duplicate_date") val duplicateDate: Boolean? = null,
+    @SerializedName("existing_session_id") val existingSessionId: Int? = null,
+    @SerializedName("existing_session_code") val existingSessionCode: Int? = null,
+    @SerializedName("duplicate_date_str") val duplicateDateStr: String? = null
 )
 
 // وضعیت جلسه‌ی زنده‌ی فعلی معلم (برای رزومه و تایمر داشبورد معلم)

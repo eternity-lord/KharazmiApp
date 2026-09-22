@@ -1100,6 +1100,9 @@
     <string name="lcls_end_msg">آیا از پایان این کلاس زنده و ثبت نهایی حضور و غیاب (با محاسبه‌ی شهریه) اطمینان دارید؟</string>
     <string name="lcls_done_msg">✅ جلسه ثبت شد. سهم معلم: %1$s | سهم آموزشگاه: %2$s</string>
     <string name="lcls_end_error">خطا در پایان کلاس: %1$s</string>
+    <!-- FIX (گروه۱/آیتم۱): وقتی جلسهٔ این تاریخ قبلاً ثبت شده، پایان کلاس زنده خطا نیست؛
+         سرور پیام گویا می‌فرستد و همین‌جا نمایش داده می‌شود (بدون هاردکد متن در Activity). -->
+    <string name="lcls_duplicate_msg">⚠️ %1$s</string>
     <!-- FIX(admin-notifications): ورودی منو + حالت خالی + شمارش خوانده‌نشده + عنوان نامشخص -->
     <string name="nav_notifications">اعلان‌ها</string>
     <string name="notif_unread_count">%1$d اعلان خوانده‌نشده</string>

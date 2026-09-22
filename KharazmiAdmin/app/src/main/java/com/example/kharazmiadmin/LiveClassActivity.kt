@@ -226,6 +226,18 @@ class LiveClassActivity : BaseActivity() {
                 val res = api.endLive(liveSessionId, LiveEndPayload())
                 CacheManager.clearByPrefix(this@LiveClassActivity, "today_summary_teacher_")
                 withContext(Dispatchers.Main) {
+                    // FIX (گروه۱/آیتم۱): «جلسهٔ این تاریخ قبلاً ثبت شده» دیگر ۴۰۹ نیست؛ سرور کلاس
+                    // زنده را بسته و پیام گویا فرستاده ⇒ همان پیام را نشان می‌دهیم، نه «سهم معلم: ۰»
+                    // (که پیش‌تر معلم را گمراه می‌کرد) و نه خطای خام.
+                    if (res.duplicateDate == true) {
+                        Toast.makeText(
+                            this@LiveClassActivity,
+                            getString(R.string.lcls_duplicate_msg, res.message),
+                            Toast.LENGTH_LONG
+                        ).show()
+                        finish()
+                        return@withContext
+                    }
                     val teacherShare = res.details?.teacher_share ?: 0
                     val instShare = res.details?.institute_share ?: 0
                     Toast.makeText(

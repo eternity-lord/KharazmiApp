@@ -97,6 +97,29 @@ def claim_live_session_for_finalize(db: Session, session_id: int, auto: bool = F
     return claimed_rows == 1
 
 
+class DuplicateSessionDate(Exception):
+    """FIX (گروه۱/آیتم۱): جلسهٔ این کلاس در این تاریخ **قبلاً** ثبت شده است.
+
+    چرا لازم است: `finalize_live_session` محاسبهٔ مالی را به `submit_session_and_calculate`
+    واگذار می‌کند و گارد یکتایی (course, date) آن `HTTPException(409)` می‌دهد (attendance.py:477).
+    پیش‌تر آن ۴۰۹ از `end_live` به کلاینت نشت می‌کرد ⇒ «پایان کلاس زنده» با خطا رد می‌شد و جلسهٔ
+    زنده LIVE می‌ماند؛ ورکر auto-end هم هر ۶۰ ثانیه claim → ۴۰۹ → rollback → LIVE را تکرار می‌کرد
+    (همان الگویی که F-C9 برای کلاس معلق حل کرد). این استثنا اطلاعات جلسهٔ موجود را حمل می‌کند تا
+    فراخوان (end_live / ورکر) تصمیم درست بگیرد: بستن جلسهٔ زنده **بدون** ساخت SessionLog دوم و
+    **بدون** هیچ اثر مالی، و ارجاع کاربر به همان جلسهٔ ثبت‌شده (مسیر ویرایش جلسه موجود است).
+
+    نکته: این ۴۰۹ قفل optimistic-lock پروفایل نیست (آن در teachers.py/students.py است و فقط
+    PUT پروفایل را می‌گیرد)؛ همان گارد «جلسهٔ تکراری در این تاریخ» است.
+    """
+
+    def __init__(self, course_id: int, date: str, session_id=None, session_code=None):
+        super().__init__(f"جلسهٔ کلاس {course_id} در تاریخ {date} قبلاً ثبت شده است")
+        self.course_id = course_id
+        self.date = date
+        self.session_id = session_id
+        self.session_code = session_code
+
+
 def finalize_live_session(db: Session, live: LiveSession) -> dict:
     """
     پایان‌دادن یک جلسه‌ی زنده و واگذاری محاسبه‌ی مالی به مسیر موجود.
@@ -164,6 +187,24 @@ def finalize_live_session(db: Session, live: LiveSession) -> dict:
     # بسته می‌شود و SessionLog خالی ساخته نمی‌شود تا تاریخ کلاس قفل نشود.
     start_ts = float(live.started_at_ts or time_module.time())
     date_str = _greg_date_from_ts(start_ts)
+
+    # FIX (گروه۱/آیتم۱): اگر جلسهٔ این کلاس در همین تاریخ قبلاً ثبت شده باشد (ثبت دستی از
+    # AttendanceActivity یا کلاس زندهٔ دیگری که زودتر بسته شده)، ادامه‌ی مسیر فقط ۴۰۹ می‌سازد؛
+    # پس زودتر و صریح اطلاع می‌دهیم تا فراخوان جلسهٔ زنده را بدون ثبت تکراری ببندد.
+    # تاریخ باید با همان مبدل مرکزیِ submit کانونیکال شود (audit-v2/#13): SessionLog.date شمسیِ
+    # نرمال‌شده است ولی date_str اینجا میلادیِ ساخته‌شده از started_at_ts ⇒ بدون این نرمال‌سازی
+    # مقایسهٔ رشته‌ای هرگز نمی‌خورد و گارد بی‌اثر می‌ماند (هم‌ریشه با باگ دابل‌سشن cross-client).
+    from today_summary import parse_project_date, jalali_date_string  # lazy، مثل submit
+    _sday = parse_project_date(date_str)
+    _canon_date = jalali_date_string(_sday) if _sday is not None else date_str
+    _existing = (
+        db.query(SessionLog)
+        .filter(SessionLog.course_id == course.id, SessionLog.date == _canon_date,
+                SessionLog.is_deleted == False)
+        .first()
+    )
+    if _existing is not None:
+        raise DuplicateSessionDate(course.id, _canon_date, _existing.id, _existing.session_code)
 
     if not items:
         live.status = "ENDED"
@@ -296,10 +337,38 @@ def end_live_session(
 
     try:
         result = finalize_live_session(db, live)
-    except Exception:
+    except Exception as exc:
         # FIX F-C6(c): شکست finalize نباید جلسه را در FINALIZING قفل کند — برگردان به LIVE تا retry ممکن شود.
         # (submit داخلی روی خطا rollback می‌کند، پس در عمل مالیِ نصفه‌ای برای دوباره‌ثبتی وجود ندارد.)
         db.rollback()
+        if isinstance(exc, DuplicateSessionDate):
+            # FIX (گروه۱/آیتم۱): تنها خطایی که retry برایش بی‌معناست — جلسهٔ این تاریخ از قبل
+            # ثبت شده است. جلسهٔ زنده را می‌بندیم (ENDED) تا در لیست «کلاس زنده»/تایمر معلم گیر
+            # نکند و ورکر auto-end هم لوپ نزند؛ هیچ SessionLog/تراکنش دومی ساخته نمی‌شود و
+            # جلسهٔ موجود دست‌نخورده می‌ماند. پاسخ ۲۰۰ با پرچم صریح + شناسهٔ جلسهٔ موجود تا
+            # کلاینت پیام درست را نشان دهد (کلیدهای قبلی پاسخ حفظ شده‌اند ⇒ قرارداد نشکسته).
+            db.query(LiveSession).filter(LiveSession.id == session_id).update(
+                {LiveSession.status: "ENDED", LiveSession.end_time: _now_str()},
+                synchronize_session=False,
+            )
+            db.commit()
+            db.refresh(live)
+            return {
+                "message": (
+                    f"جلسهٔ این کلاس در تاریخ {exc.date} قبلاً ثبت شده است؛ کلاس زنده بدون ثبت "
+                    f"جلسهٔ تکراری بسته شد. برای اصلاح حضور/غیاب یا مبالغ، همان جلسهٔ ثبت‌شده "
+                    f"(کد {exc.session_code}) را ویرایش کنید."
+                ),
+                "live_session_id": live.id,
+                "ended_automatically": bool(live.ended_automatically),
+                "session_id": None,
+                "session_code": None,
+                "details": None,
+                "duplicate_date": True,
+                "existing_session_id": exc.session_id,
+                "existing_session_code": exc.session_code,
+                "duplicate_date_str": exc.date,
+            }
         db.query(LiveSession).filter(LiveSession.id == session_id).update(
             {LiveSession.status: "LIVE"}, synchronize_session=False
         )

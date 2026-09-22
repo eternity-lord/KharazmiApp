@@ -582,7 +582,7 @@ def _live_auto_end_worker():
     import time as _t
 
     def _loop():
-        from routers.attendance import finalize_live_session, _get_live_max_minutes, claim_live_session_for_finalize, _now_str
+        from routers.attendance import finalize_live_session, _get_live_max_minutes, claim_live_session_for_finalize, _now_str, DuplicateSessionDate
         from models import LiveSession, SessionLocal, Course
         while True:
             try:
@@ -630,6 +630,22 @@ def _live_auto_end_worker():
                             print(f"🤖 [Live Auto-End] بستن خودکار کلاس زنده #{live.id} (خیلی طولانی شد)")
                             try:
                                 finalize_live_session(db, live)
+                            except DuplicateSessionDate as dup:
+                                # FIX (گروه۱/آیتم۱): جلسهٔ این تاریخ قبلاً ثبت شده ⇒ retry بی‌معناست.
+                                # بدون ساخت SessionLog/تراکنش، جلسهٔ زنده مستقیم بسته می‌شود تا ورکر
+                                # هر ۶۰ ثانیه claim → خطا → rollback → LIVE را تکرار نکند (هم‌الگو با F-C9).
+                                db.rollback()
+                                db.query(LiveSession).filter(LiveSession.id == live.id).update(
+                                    {
+                                        LiveSession.status: "ENDED",
+                                        LiveSession.ended_automatically: True,
+                                        LiveSession.end_time: _now_str(),
+                                    },
+                                    synchronize_session=False,
+                                )
+                                db.commit()
+                                print(f"🤖 [Live Auto-End] جلسه‌ی #{live.id} بسته شد؛ جلسهٔ کلاس در تاریخ "
+                                      f"{dup.date} از قبل ثبت شده بود (کد {dup.session_code}).")
                             except Exception as fe:
                                 print(f"⚠️ [Live Auto-End] خطا در بستن جلسه {live.id}: {fe}")
                                 db.rollback()

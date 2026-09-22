@@ -226,6 +226,33 @@ data class AddStudentToClassData(
 
 data class AddStudentResponse(val message: String, val enrollment_id: Int)
 
+data class BulkEnrollmentData(
+    val student_ids: List<Int>,
+    val course_id: Int,
+    val register_date: String,
+    val shift: String,
+    val total_tuition: Int,
+    val paid_amount: Int,
+    val payment_method: String,
+    val receiver: String,
+    val discount_type: String = "none",
+    val discount_value: Int = 0,
+    val installments: List<InstallmentCreate>? = null
+)
+
+data class BulkEnrollmentRejected(
+    val student_id: Int,
+    val reason: String
+)
+
+data class BulkEnrollmentResponse(
+    val message: String,
+    val added_count: Int,
+    val rejected_count: Int,
+    val added_student_ids: List<Int> = emptyList(),
+    val rejected: List<BulkEnrollmentRejected> = emptyList()
+)
+
 // ==========================================
 // 7. حضور و غیاب (Attendance)
 // ==========================================
@@ -699,6 +726,13 @@ data class LiveEndResponse(
     @SerializedName("existing_session_id") val existingSessionId: Int? = null,
     @SerializedName("existing_session_code") val existingSessionCode: Int? = null,
     @SerializedName("duplicate_date_str") val duplicateDateStr: String? = null
+)
+
+// پاسخ لغو کلاس زنده؛ لغو هیچ SessionLog یا اثر مالی ایجاد نمی‌کند.
+data class LiveCancelResponse(
+    val message: String,
+    @SerializedName("live_session_id") val liveSessionId: Int,
+    val status: String
 )
 
 // وضعیت جلسه‌ی زنده‌ی فعلی معلم (برای رزومه و تایمر داشبورد معلم)

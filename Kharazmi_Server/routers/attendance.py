@@ -385,6 +385,49 @@ def end_live_session(
     }
 
 
+@router.post("/attendance/{session_id}/cancel_live")
+def cancel_live_session(
+    session_id: int,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+    sub_role: str = Depends(check_user_login),
+):
+    """لغو اتمیک جلسه‌ی زنده بدون finalize و بدون هیچ اثر مالی/حضور و غیاب."""
+    live = db.query(LiveSession).filter(LiveSession.id == session_id).first()
+    if not live:
+        raise HTTPException(status_code=404, detail="جلسه‌ی زنده یافت نشد")
+
+    course = db.query(Course).filter(Course.id == live.course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="کلاس یافت نشد")
+    # احراز هویت پیش از اعلام وضعیت/جهش؛ همان سیاست end_live.
+    _verify_live_course_teacher(db, course, authorization, sub_role)
+
+    # فقط LIVE قابل لغو است؛ UPDATE مشروط، دو درخواست هم‌زمان را اتمیک می‌کند.
+    cancelled = (
+        db.query(LiveSession)
+        .filter(LiveSession.id == session_id, LiveSession.status == "LIVE")
+        .update(
+            {
+                LiveSession.status: "CANCELLED",
+                LiveSession.end_time: _now_str(),
+                # snapshot لحظه‌ای نیز برای یک جلسه‌ی لغوشده قابل استفاده نیست.
+                LiveSession.live_roster: "{}",
+            },
+            synchronize_session=False,
+        )
+    )
+    if cancelled != 1:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="این جلسه از قبل بسته یا لغو شده است")
+    db.commit()
+    return {
+        "message": "کلاس زنده لغو شد و هیچ شهریه، حضور و غیاب یا تراکنشی ثبت نشد.",
+        "live_session_id": session_id,
+        "status": "CANCELLED",
+    }
+
+
 @router.post("/attendance/{session_id}/live_status")
 def save_live_status(
     session_id: int,

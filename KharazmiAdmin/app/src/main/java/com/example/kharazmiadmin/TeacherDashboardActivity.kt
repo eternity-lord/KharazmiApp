@@ -252,35 +252,11 @@ class TeacherDashboardActivity : BaseActivity() {
     }
 
     private fun startUpcomingLiveClass(next: TeacherTodayNextClass) {
-        val liveApi = RetrofitClient.getInstance(this).create(LiveApi::class.java)
-        // FIX: Bug 19 - cancel screen work when this Activity is destroyed.
-        lifecycleScope.launch(Dispatchers.IO) {
-            try {
-                val response = liveApi.startLive(next.courseId)
-                CacheManager.clear(this@TeacherDashboardActivity, "today_summary_teacher_$teacherId")
-                withContext(Dispatchers.Main) {
-                    val intent = Intent(this@TeacherDashboardActivity, LiveClassActivity::class.java)
-                    intent.putExtra("TARGET_COURSE_ID", next.courseId)
-                    intent.putExtra("TARGET_COURSE_NAME", next.className)
-                    intent.putExtra("LIVE_SESSION_ID", response.liveSessionId)
-                    intent.putExtra(
-                        "STARTED_AT_TS",
-                        response.startedAtTs ?: System.currentTimeMillis() / 1000
-                    )
-                    startActivity(intent)
-                }
-            } catch (ignoredError: Exception) {
-                // FIX: Bug 19 - cancellation is not a network/UI error.
-                if (ignoredError is kotlinx.coroutines.CancellationException) throw ignoredError;
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(
-                        this@TeacherDashboardActivity,
-                        getString(R.string.tdash_start_failed),
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-            }
-        }
+        // فقط صفحه‌ی آماده‌سازی باز می‌شود؛ شروع واقعی پشت دکمه‌ی «شروع کلاس» است.
+        val intent = Intent(this, LiveClassActivity::class.java)
+        intent.putExtra("TARGET_COURSE_ID", next.courseId)
+        intent.putExtra("TARGET_COURSE_NAME", next.className)
+        startActivity(intent)
     }
 
     // 🎥 کارت «کلاس زنده» معلم: شروع/رزومه جلسه
@@ -300,7 +276,7 @@ class TeacherDashboardActivity : BaseActivity() {
                     if (cur != null) {
                         openLiveClass(cur)
                     } else {
-                        chooseClassToStart(liveApi)
+                        chooseClassToStart()
                     }
                 }
 
@@ -324,7 +300,7 @@ class TeacherDashboardActivity : BaseActivity() {
         startActivity(intent)
     }
 
-    private fun chooseClassToStart(liveApi: LiveApi) {
+    private fun chooseClassToStart() {
         // FIX: Bug 19 - cancel screen work when this Activity is destroyed.
         lifecycleScope.launch(Dispatchers.IO) {
             try {
@@ -340,7 +316,7 @@ class TeacherDashboardActivity : BaseActivity() {
                         .setTitle(getString(R.string.tdash_pick_live))
                         .setItems(names) { _, which ->
                             val selected = eligible[which]
-                            startLive(liveApi, selected)
+                            startLive(selected)
                         }
                         .show()
                 }
@@ -354,38 +330,12 @@ class TeacherDashboardActivity : BaseActivity() {
         }
     }
 
-    private fun startLive(liveApi: LiveApi, cls: TeacherClassItem) {
-        // FIX: Bug 19 - cancel screen work when this Activity is destroyed.
-        lifecycleScope.launch(Dispatchers.IO) {
-            try {
-                val res = liveApi.startLive(cls.id)
-                CacheManager.clear(this@TeacherDashboardActivity, "today_summary_teacher_$teacherId")
-                withContext(Dispatchers.Main) {
-                    val intent = Intent(this@TeacherDashboardActivity, LiveClassActivity::class.java)
-                    intent.putExtra("TARGET_COURSE_ID", cls.id)
-                    intent.putExtra("TARGET_COURSE_NAME", cls.title ?: "")
-                    intent.putExtra("LIVE_SESSION_ID", res.liveSessionId)
-                    intent.putExtra("STARTED_AT_TS", res.startedAtTs ?: System.currentTimeMillis() / 1000)
-                    startActivity(intent)
-                }
-            } catch (e: Exception) {
-                // FIX: Bug 19 - cancellation is not a network/UI error.
-                if (e is kotlinx.coroutines.CancellationException) throw e;
-                // اگر کلاس از قبل زنده بود، به سمت جلسه‌ی موجود برویم
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(this@TeacherDashboardActivity, getString(R.string.tdash_already_live), Toast.LENGTH_SHORT).show()
-                }
-                try {
-                    val cur = liveApi.getCurrentLive()
-                    if (cur != null) {
-                        CacheManager.clear(this@TeacherDashboardActivity, "today_summary_teacher_$teacherId")
-                        withContext(Dispatchers.Main) { openLiveClass(cur) }
-                    }
-                } catch (e2: Exception) {
-                // FIX: Bug 19 - cancellation is not a network/UI error.
-                if (e2 is kotlinx.coroutines.CancellationException) throw e2; }
-            }
-        }
+    private fun startLive(cls: TeacherClassItem) {
+        // ورود به صفحه نباید side effect داشته باشد؛ endpoint فقط از دکمه‌ی شروع آن صفحه صدا زده می‌شود.
+        val intent = Intent(this, LiveClassActivity::class.java)
+        intent.putExtra("TARGET_COURSE_ID", cls.id)
+        intent.putExtra("TARGET_COURSE_NAME", cls.title ?: "")
+        startActivity(intent)
     }
 
     private fun showIncompleteClassesDialog() {

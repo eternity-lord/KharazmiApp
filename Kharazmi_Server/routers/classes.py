@@ -17,7 +17,7 @@ from models import (
     Attendance, Course, Enrollment, Grade, InstituteShare, SessionLog, SmsLog, Student, Teacher, Transaction, User, UserSession, Installment
 )
 from schemas import (
-    HistoryRequest, LoginRequest, TeacherInfo, FullTeacherProfile, StudentCreate, TeacherCreate, CourseCreate, EnrollmentCreate, GradeCreate, GradeItem, AttendanceLogRequest, AttendanceItem, AttendanceSubmitData, SmsSendRequest, ChangePasswordRequest, StudentProfileInfo, FullStudentProfile, TeacherProfileInfo, FullTeacherProfile, ClassReportInfo, ClassStudentData, ClassSessionHistory, FullClassReport, ShareConfigModel, StudentUpdate, TeacherUpdate, PersonListItem, TransactionUpdate, StudentAttendanceHistoryRequest, AdvancedSearchItem, FinanceSubmitData, PrintReceiptRequest, TransactionTestData
+    HistoryRequest, LoginRequest, TeacherInfo, FullTeacherProfile, StudentCreate, TeacherCreate, CourseCreate, EnrollmentCreate, BulkEnrollmentCreate, GradeCreate, GradeItem, AttendanceLogRequest, AttendanceItem, AttendanceSubmitData, SmsSendRequest, ChangePasswordRequest, StudentProfileInfo, FullStudentProfile, TeacherProfileInfo, FullTeacherProfile, ClassReportInfo, ClassStudentData, ClassSessionHistory, FullClassReport, ShareConfigModel, StudentUpdate, TeacherUpdate, PersonListItem, TransactionUpdate, StudentAttendanceHistoryRequest, AdvancedSearchItem, FinanceSubmitData, PrintReceiptRequest, TransactionTestData
 )
 from dependencies import (get_db, check_admin_access, check_admin_or_secretary_access,
                             check_admin_secretary_or_teacher_access, resolve_session_teacher,
@@ -502,6 +502,54 @@ def add_enrollment(
     return {
         "message": "ثبت نام انجام شد و حساب شارژ شد",
         "enrollment_id": new_enroll.id,
+    }
+
+
+@router.post("/enrollments/add_bulk")
+def add_enrollments_bulk(
+    data: BulkEnrollmentCreate,
+    db: Session = Depends(get_db),
+    sub_role: str = Depends(check_admin_secretary_or_teacher_access),
+    authorization: Optional[str] = Header(None),
+):
+    """افزودن چندتایی با reuse کامل مسیر تکی و گزارش موفق/ردشده برای هر شناسه."""
+    added_student_ids = []
+    rejected = []
+    for student_id in data.student_ids:
+        try:
+            # ساخت schema تکی عمداً validationهای مسیر /enrollments/add را حفظ می‌کند.
+            single_data = EnrollmentCreate(
+                student_id=student_id,
+                course_id=data.course_id,
+                register_date=data.register_date,
+                shift=data.shift,
+                total_tuition=data.total_tuition,
+                paid_amount=data.paid_amount,
+                payment_method=data.payment_method,
+                receiver=data.receiver,
+                discount_type=data.discount_type,
+                discount_value=data.discount_value,
+                installments=data.installments,
+            )
+            add_enrollment(single_data, db=db, sub_role=sub_role, authorization=authorization)
+            added_student_ids.append(student_id)
+        except HTTPException as exc:
+            db.rollback()
+            detail = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
+            rejected.append({"student_id": student_id, "reason": detail})
+        except Exception:
+            # خطای یک شاگرد نباید موفقیت قبلی‌ها را rollback کند؛ commit مسیر تکی مستقل است.
+            db.rollback()
+            rejected.append({"student_id": student_id, "reason": "خطای غیرمنتظره هنگام ثبت"})
+
+    added_count = len(added_student_ids)
+    rejected_count = len(rejected)
+    return {
+        "message": f"{added_count} اضافه شد، {rejected_count} رد شد",
+        "added_count": added_count,
+        "rejected_count": rejected_count,
+        "added_student_ids": added_student_ids,
+        "rejected": rejected,
     }
 
 

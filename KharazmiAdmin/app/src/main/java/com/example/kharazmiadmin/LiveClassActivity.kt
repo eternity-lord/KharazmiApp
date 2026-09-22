@@ -38,6 +38,9 @@ class LiveClassActivity : BaseActivity() {
     private lateinit var rv: RecyclerView
     private lateinit var tvLiveIndicator: TextView
     private lateinit var tvStartedAt: TextView
+    private lateinit var btnStartLive: MaterialButton
+    private lateinit var btnEndLive: MaterialButton
+    private lateinit var btnCancelLive: MaterialButton
 
     private val statusMap = HashMap<Int, String>()   // student_id -> Present/Absent/Late
     private val excusedMap = HashMap<Int, Boolean>() // student_id -> excused
@@ -72,28 +75,74 @@ class LiveClassActivity : BaseActivity() {
         tvStartedAt = findViewById(R.id.tvLiveStartedAt)
         rv = findViewById(R.id.rvLiveStudents)
         rv.layoutManager = LinearLayoutManager(this)
+        btnStartLive = findViewById(R.id.btnStartLive)
+        btnEndLive = findViewById(R.id.btnEndLive)
+        btnCancelLive = findViewById(R.id.btnCancelLive)
 
         val retrofit = RetrofitClient.getInstance(this)
         api = retrofit.create(LiveApi::class.java)
         apiDetails = retrofit.create(InvoiceApi::class.java)
 
-        findViewById<MaterialButton>(R.id.btnEndLive).setOnClickListener { promptEndLive() }
+        findViewById<TextView>(R.id.tvLiveTitle).text = getString(R.string.lcls_title, classTitle)
+        btnStartLive.setOnClickListener { startLive() }
+        btnEndLive.setOnClickListener { promptEndLive() }
+        btnCancelLive.setOnClickListener { promptCancelLive() }
 
-        // اگر live_session_id داده نشد، از سرور بازیابی کن
-        if (liveSessionId <= 0) {
-            resolveCurrentLive()
-        } else {
-            findViewById<TextView>(R.id.tvLiveTitle).text = getString(R.string.lcls_title, classTitle)
-            fetchStudents()
+        // نبودن session برای کلاس انتخاب‌شده یعنی «آماده‌ی شروع»؛ هرگز start خودکار نیست.
+        when {
+            liveSessionId > 0 -> activateLiveUi()
+            courseId > 0 -> showPreStartUi()
+            else -> resolveCurrentLive()
         }
-
-        handler.post(timerRunnable)
     }
 
     override fun onDestroy() {
         super.onDestroy()
         handler.removeCallbacks(timerRunnable)
         syncHandler.removeCallbacks(syncRunnable)
+    }
+
+    private fun showPreStartUi() {
+        btnStartLive.visibility = View.VISIBLE
+        btnStartLive.isEnabled = true
+        btnEndLive.visibility = View.GONE
+        btnCancelLive.visibility = View.GONE
+        rv.visibility = View.GONE
+        tvLiveIndicator.text = getString(R.string.lcls_not_started)
+        tvStartedAt.text = getString(R.string.lcls_not_started_hint)
+    }
+
+    private fun activateLiveUi() {
+        btnStartLive.visibility = View.GONE
+        btnEndLive.visibility = View.VISIBLE
+        btnCancelLive.visibility = View.VISIBLE
+        rv.visibility = View.VISIBLE
+        updateElapsed()
+        handler.removeCallbacks(timerRunnable)
+        handler.post(timerRunnable)
+        fetchStudents()
+    }
+
+    private fun startLive() {
+        if (courseId <= 0 || liveSessionId > 0) return
+        btnStartLive.isEnabled = false
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val response = api.startLive(courseId)
+                CacheManager.clearByPrefix(this@LiveClassActivity, "today_summary_teacher_")
+                withContext(Dispatchers.Main) {
+                    liveSessionId = response.liveSessionId
+                    startedAtTs = response.startedAtTs ?: System.currentTimeMillis() / 1000
+                    activateLiveUi()
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                withContext(Dispatchers.Main) {
+                    btnStartLive.isEnabled = true
+                    Toast.makeText(this@LiveClassActivity, getString(R.string.lcls_start_error, e.message), Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
     }
 
     private fun resolveCurrentLive() {
@@ -108,7 +157,7 @@ class LiveClassActivity : BaseActivity() {
                         classTitle = cur.classTitle
                         startedAtTs = cur.startedAtTs ?: startedAtTs
                         findViewById<TextView>(R.id.tvLiveTitle).text = getString(R.string.lcls_title_fallback, classTitle.ifEmpty { cur.courseCode })
-                        fetchStudents()
+                        activateLiveUi()
                     } else {
                         Toast.makeText(this@LiveClassActivity, getString(R.string.lcls_none), Toast.LENGTH_SHORT).show()
                         finish()
@@ -200,6 +249,41 @@ class LiveClassActivity : BaseActivity() {
                 syncInFlight.set(false)
                 if (syncPending.getAndSet(false)) {
                     withContext(Dispatchers.Main) { scheduleSync() }
+                }
+            }
+        }
+    }
+
+    private fun promptCancelLive() {
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(getString(R.string.lcls_cancel_title))
+            .setMessage(getString(R.string.lcls_cancel_msg))
+            .setPositiveButton(getString(R.string.lcls_cancel_button)) { _, _ -> cancelLive() }
+            .setNegativeButton(getString(R.string.common_no), null)
+            .create()
+        dialog.show()
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(android.graphics.Color.parseColor("#F44336"))
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(android.graphics.Color.parseColor("#4CAF50"))
+    }
+
+    private fun cancelLive() {
+        if (liveSessionId <= 0) return
+        btnCancelLive.isEnabled = false
+        btnEndLive.isEnabled = false
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val response = api.cancelLive(liveSessionId)
+                CacheManager.clearByPrefix(this@LiveClassActivity, "today_summary_teacher_")
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@LiveClassActivity, response.message.ifEmpty { getString(R.string.lcls_cancel_done) }, Toast.LENGTH_LONG).show()
+                    finish()
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                withContext(Dispatchers.Main) {
+                    btnCancelLive.isEnabled = true
+                    btnEndLive.isEnabled = true
+                    Toast.makeText(this@LiveClassActivity, getString(R.string.lcls_cancel_error, e.message), Toast.LENGTH_SHORT).show()
                 }
             }
         }

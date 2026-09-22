@@ -126,6 +126,21 @@ class EnrollmentCreate(BaseModel):
         return value
 
 
+class BulkEnrollmentCreate(BaseModel):
+    """ورودی مشترک شهریه برای افزودن چند دانش‌آموز به یک کلاس."""
+    student_ids: List[int] = Field(min_length=1)
+    course_id: int
+    register_date: str
+    shift: str
+    total_tuition: int
+    paid_amount: int = Field(ge=0)
+    payment_method: str
+    receiver: str
+    discount_type: Optional[str] = "none"
+    discount_value: Optional[int] = 0
+    installments: Optional[List[InstallmentCreate]] = None
+
+
 # مدل‌های مربوط به نمره
 
 class GradeCreate(BaseModel):

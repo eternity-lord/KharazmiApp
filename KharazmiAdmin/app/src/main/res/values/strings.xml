@@ -782,6 +782,9 @@
     <string name="csetup_disc_range">درصد تخفیف باید بین ۰ و ۱۰۰ باشد</string>
     <string name="csetup_disc_over">مبلغ تخفیف ثابت نمی‌تواند بیشتر از شهریه پایه باشد</string>
     <string name="csetup_no_pick">دانش‌آموزی انتخاب نشد</string>
+    <string name="csetup_bulk_selected">تعداد انتخاب‌شده: %1$d نفر</string>
+    <string name="csetup_bulk_summary">%1$d نفر اضافه شد، %2$d نفر رد شد</string>
+    <string name="csetup_bulk_error">خطا در افزودن گروهی دانش‌آموزان</string>
     <string name="csetup_add_error">خطا در افزودن دانش‌آموز</string>
     <string name="csetup_del_title">حذف دانش‌آموز</string>
     <string name="csetup_del_msg">آیا مطمئن هستید %1$s حذف شود؟</string>
@@ -1096,10 +1099,18 @@
     <string name="lcls_list_error">خطا در دریافت لیست کلاس</string>
     <string name="lcls_live_row">🔴 در حال برگزاری — %1$s دقیقه گذشته</string>
     <string name="lcls_started">شروع: %1$s</string>
+    <string name="lcls_not_started">کلاس هنوز شروع نشده است</string>
+    <string name="lcls_not_started_hint">برای شروع، دکمهٔ «شروع کلاس» را بزنید</string>
+    <string name="lcls_start_error">شروع کلاس انجام نشد: %1$s</string>
     <string name="lcls_end_title">پایان کلاس</string>
     <string name="lcls_end_msg">آیا از پایان این کلاس زنده و ثبت نهایی حضور و غیاب (با محاسبه‌ی شهریه) اطمینان دارید؟</string>
     <string name="lcls_done_msg">✅ جلسه ثبت شد. سهم معلم: %1$s | سهم آموزشگاه: %2$s</string>
     <string name="lcls_end_error">خطا در پایان کلاس: %1$s</string>
+    <string name="lcls_cancel_title">لغو کلاس زنده</string>
+    <string name="lcls_cancel_msg">کلاس زنده بدون ثبت شهریه، حضور و غیاب یا تراکنش مالی لغو می‌شود. ادامه می‌دهید؟</string>
+    <string name="lcls_cancel_button">لغو بدون ثبت</string>
+    <string name="lcls_cancel_done">کلاس زنده لغو شد و هیچ محاسبه‌ای ثبت نشد.</string>
+    <string name="lcls_cancel_error">خطا در لغو کلاس: %1$s</string>
     <!-- FIX (گروه۱/آیتم۱): وقتی جلسهٔ این تاریخ قبلاً ثبت شده، پایان کلاس زنده خطا نیست؛
          سرور پیام گویا می‌فرستد و همین‌جا نمایش داده می‌شود (بدون هاردکد متن در Activity). -->
     <string name="lcls_duplicate_msg">⚠️ %1$s</string>

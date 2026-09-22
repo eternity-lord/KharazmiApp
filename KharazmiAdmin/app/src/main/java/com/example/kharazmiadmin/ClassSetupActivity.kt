@@ -15,6 +15,7 @@ import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
 import android.widget.CheckBox
+import android.widget.LinearLayout
 import android.content.Context
 import androidx.appcompat.app.AlertDialog
 import androidx.lifecycle.lifecycleScope
@@ -42,6 +43,9 @@ interface ClassSetupNetworkApi {
 
     @POST("enrollments/add")
     suspend fun addEnrollment(@Body data: AddStudentToClassData): AddStudentResponse
+
+    @POST("enrollments/add_bulk")
+    suspend fun addEnrollmentsBulk(@Body data: BulkEnrollmentData): BulkEnrollmentResponse
 
     @GET("classes/{id}/full_report")
     suspend fun getClassReport(@Path("id") id: Int): FullClassReport
@@ -201,7 +205,10 @@ class ClassSetupActivity : BaseActivity() {
         val view = LayoutInflater.from(this).inflate(R.layout.dialog_search_student, null)
         val acSearch = view.findViewById<AutoCompleteTextView>(R.id.acStudentSearch)
         val tvInfo = view.findViewById<TextView>(R.id.tvSelectedInfo)
-        
+        val multiSelectContainer = view.findViewById<LinearLayout>(R.id.llStudentMultiSelect)
+        val bulkSelectionSummary = view.findViewById<TextView>(R.id.tvBulkSelectionSummary)
+        val selectedStudentIds = linkedSetOf<Int>()
+
         // فیلدهای جدید تخفیف و شهریه پایه
         val etBaseTuition = view.findViewById<EditText>(R.id.etBaseTuition)
         val acDiscountType = view.findViewById<AutoCompleteTextView>(R.id.acDiscountType)
@@ -266,7 +273,9 @@ class ClassSetupActivity : BaseActivity() {
                 pendingSearch?.let { view.removeCallbacks(it) }
                 if (q.length >= 2) {
                     val captured = q
-                    val runnable = Runnable { searchServer(captured, acSearch) }
+                    val runnable = Runnable {
+                        searchServer(captured, acSearch, multiSelectContainer, selectedStudentIds, bulkSelectionSummary)
+                    }
                     pendingSearch = runnable
                     view.postDelayed(runnable, 300L)
                 }
@@ -331,10 +340,18 @@ class ClassSetupActivity : BaseActivity() {
                     )
                 }
 
-                if (selectedId != -1) {
-                    addToClass(selectedId, baseTuition, dType, dVal, installmentList)
+                val selectedIds = if (selectedStudentIds.isNotEmpty()) {
+                    selectedStudentIds.toList()
+                } else if (selectedId != -1) {
+                    listOf(selectedId)
                 } else {
-                    Toast.makeText(this, getString(R.string.csetup_no_pick), Toast.LENGTH_SHORT).show()
+                    emptyList()
+                }
+
+                when {
+                    selectedIds.isEmpty() -> Toast.makeText(this, getString(R.string.csetup_no_pick), Toast.LENGTH_SHORT).show()
+                    selectedIds.size == 1 -> addToClass(selectedIds.first(), baseTuition, dType, dVal, installmentList)
+                    else -> addMultipleToClass(selectedIds, baseTuition, dType, dVal, installmentList)
                 }
             }
             .setNegativeButton(getString(R.string.common_cancel), null)
@@ -346,7 +363,13 @@ class ClassSetupActivity : BaseActivity() {
         return JalaliUtils.jalaliStringDaysFromNow(daysAhead)
     }
 
-    private fun searchServer(query: String, ac: AutoCompleteTextView) {
+    private fun searchServer(
+        query: String,
+        ac: AutoCompleteTextView,
+        multiSelectContainer: LinearLayout? = null,
+        selectedStudentIds: MutableSet<Int>? = null,
+        bulkSelectionSummary: TextView? = null
+    ) {
         // FIX: Bug 19 - cancel screen work when this Activity is destroyed.
         // FIX(search): شمارنده‌ی نسلی — پاسخِ request کهنه (تایپ سریع) بی‌اثر می‌شود
         val requestId = ++searchRequestSeq
@@ -374,8 +397,33 @@ class ClassSetupActivity : BaseActivity() {
                             else fetched.map { "${it.name} (${it.id})" }
                 ac.setAdapter(ArrayAdapter(this@ClassSetupActivity, android.R.layout.simple_dropdown_item_1line, names))
                 ac.showDropDown()
+                if (multiSelectContainer != null && selectedStudentIds != null && bulkSelectionSummary != null) {
+                    renderStudentChoices(fetched, multiSelectContainer, selectedStudentIds, bulkSelectionSummary)
+                }
             }
         }
+    }
+
+    private fun renderStudentChoices(
+        students: List<StudentSearchItem>,
+        container: LinearLayout,
+        selectedIds: MutableSet<Int>,
+        summary: TextView
+    ) {
+        container.removeAllViews()
+        container.visibility = if (students.isEmpty()) View.GONE else View.VISIBLE
+        students.forEach { student ->
+            val checkBox = CheckBox(this)
+            checkBox.text = "${student.name} (${student.id})"
+            checkBox.tag = student.id
+            checkBox.isChecked = selectedIds.contains(student.id)
+            checkBox.setOnCheckedChangeListener { _, checked ->
+                if (checked) selectedIds.add(student.id) else selectedIds.remove(student.id)
+                summary.text = getString(R.string.csetup_bulk_selected, selectedIds.size)
+            }
+            container.addView(checkBox)
+        }
+        summary.text = getString(R.string.csetup_bulk_selected, selectedIds.size)
     }
 
     private fun addToClass(studentId: Int, baseTuition: Int, dType: String, dVal: Int, installments: List<InstallmentCreate>?) {
@@ -420,6 +468,57 @@ class ClassSetupActivity : BaseActivity() {
                 if (e is kotlinx.coroutines.CancellationException) throw e;
                 withContext(Dispatchers.Main) {
                     Toast.makeText(this@ClassSetupActivity, getString(R.string.csetup_add_error), Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    private fun addMultipleToClass(
+        studentIds: List<Int>,
+        baseTuition: Int,
+        dType: String,
+        dVal: Int,
+        installments: List<InstallmentCreate>?
+    ) {
+        val data = BulkEnrollmentData(
+            student_ids = studentIds,
+            course_id = classId,
+            register_date = SimpleDateFormat("yyyy/MM/dd", Locale.US).format(Date()),
+            shift = "-",
+            total_tuition = baseTuition,
+            paid_amount = 0,
+            payment_method = "-",
+            receiver = "-",
+            discount_type = dType,
+            discount_value = dVal,
+            installments = installments
+        )
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                if (isSuspended) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@ClassSetupActivity, getString(R.string.common_class_activate), Toast.LENGTH_LONG).show()
+                    }
+                    return@launch
+                }
+                val result = api.addEnrollmentsBulk(data)
+                withContext(Dispatchers.Main) {
+                    val reasons = result.rejected.joinToString("؛ ") { "${it.student_id}: ${it.reason}" }
+                    val detail = if (reasons.isEmpty()) "" else "\n$reasons"
+                    Toast.makeText(
+                        this@ClassSetupActivity,
+                        getString(R.string.csetup_bulk_summary, result.added_count, result.rejected_count) + detail,
+                        Toast.LENGTH_LONG
+                    ).show()
+                    CacheManager.clear(this@ClassSetupActivity, "class_report_$classId")
+                    CacheManager.clear(this@ClassSetupActivity, "class_students_full_$classId")
+                    refreshStudentList()
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@ClassSetupActivity, getString(R.string.csetup_bulk_error), Toast.LENGTH_SHORT).show()
                 }
             }
         }

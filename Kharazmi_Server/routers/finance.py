@@ -2379,13 +2379,20 @@ def _debtor_age_bucket(last_payment_day, today: datetime.date):
     return "over_30", age
 
 
-def _debtor_teacher_rows(db: Session, student_id: int):
+def _debtor_teacher_rows(db: Session, student_id: int, wallet_teacher_debt: int = 0):
     """(teacher_id, teacher_name, course_title, بدهیِ همان کلاس) برای ثبت‌نام‌های فعال.
 
     منبع عدد: `calculate_enrollment_debt` — یعنی دقیقاً همان فرمولِ هر ثبت‌نام که
     `calculate_student_debt` روی‌شان جمع می‌زند ⇒ جمع «بدهی به تفکیک معلم» با
     «کل بدهی» دانش‌آموز هم‌خوان می‌ماند و عدد سومِ واگرا ساخته نمی‌شود.
     (بدهیِ جلساتِ شارژشدهٔ معلم جداگانه در `debt_teacher` کیف پول گزارش می‌شود.)
+
+    حالت legacy (ثبت‌نام بی‌قیمت + کیف معلم منفی): `calculate_enrollment_debt` صفر
+    می‌دهد ولی `calculate_student_debt` از fallback کیف پول بدهی گزارش می‌کند ⇒ اگر
+    دانش‌آموز **دقیقاً یک کلاس فعال** داشته باشد، همان بدهیِ کیف معلم به آن یک معلم
+    نسبت داده می‌شود (بدون حدسِ تقسیم بین چند معلم)؛ در غیر این صورت مبلغ
+    تخصیص‌نیافته می‌ماند و در نمای گروه‌بندی به‌صورت `unassigned_debt` گزارش می‌شود تا
+    `sum(by_teacher.debt) + unassigned_debt == total_debt` همیشه برقرار بماند.
     """
     from financial_calculations import calculate_enrollment_debt  # lazy، الگوی پروژه
     enrollments = (
@@ -2406,6 +2413,9 @@ def _debtor_teacher_rows(db: Session, student_id: int):
             "course_title": course.title or "کلاس بدون نام",
             "debt": calculate_enrollment_debt(en),
         })
+    if rows and wallet_teacher_debt > 0 and sum(int(r["debt"] or 0) for r in rows) == 0:
+        if len(rows) == 1:
+            rows[0]["debt"] = int(wallet_teacher_debt)
     return rows
 
 
@@ -2443,7 +2453,7 @@ def build_debtor_rows(db: Session, resolved_branch: Optional[int], search: Optio
         courses = [e.course.title for e in enrollments if e.course]
 
         student_name = display_name(s, "نامشخص")
-        teacher_rows = _debtor_teacher_rows(db, s.id)
+        teacher_rows = _debtor_teacher_rows(db, s.id, abs(w_t) if w_t < 0 else 0)
         teacher_names = sorted({r["teacher_name"] for r in teacher_rows})
         if needle:
             haystack = " ".join([student_name, *teacher_names, *(c or "" for c in courses)]).lower()
@@ -2539,12 +2549,18 @@ def get_debtors_grouped(
         group["students_count"] += 1
         group["student_ids"].append(row["student_id"])
 
+    total_debt = sum(int(row["total_debt"]) for row in rows)
+    by_teacher = sorted(teacher_groups.values(), key=lambda g: (-g["debt"], g["teacher_id"] or 0))
+    assigned = sum(int(group["debt"]) for group in by_teacher)
     return {
-        "total_debt": sum(int(row["total_debt"]) for row in rows),
+        "total_debt": total_debt,
         "debtors_count": len(rows),
-        "by_teacher": sorted(teacher_groups.values(),
-                             key=lambda g: (-g["debt"], g["teacher_id"] or 0)),
+        "by_teacher": by_teacher,
         "by_age": [bucket_groups[name] for name in ("0-7", "8-30", "over_30", "no_payment")],
+        # FIX (گروه۲/آیتم۹): بخشی از بدهی که قطعی به معلمِ خاصی نسبت داده نمی‌شود
+        # (دادهٔ legacy با چند کلاس فعال و بدهیِ کیف پول) ⇒ عدد گزارش همیشه می‌خواند:
+        # `sum(by_teacher.debt) + unassigned_debt == total_debt`
+        "unassigned_debt": max(0, total_debt - assigned),
         "rows": rows,
     }
 

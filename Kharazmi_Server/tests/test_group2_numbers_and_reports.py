@@ -573,6 +573,37 @@ class TestDebtorsReportEnriched(Group2World):
         self.assertIn(self.client.post("/finance/debtors/remind", json={"student_ids": [41]},
                                        headers=hdr("tok-teacher")).status_code, (401, 403))
 
+    def test_9h_legacy_wallet_only_debtor_reconciles_in_the_grouped_view(self):
+        """دادهٔ legacy: بدهی فقط از کیف پول منفی (ثبت‌نام بدون شهریهٔ قیمت‌گذاری‌شده).
+
+        در این حالت `total_debt` از fallback کیف پول می‌آید ولی تفکیک «بدهی به کدام معلم»
+        از `calculate_enrollment_debt` (که برای ثبت‌نام بی‌قیمت صفر است) ⇒ جمع ستون معلم‌ها
+        با کل بدهی نمی‌خواند. قرارداد فیکس: اگر یک کلاس فعال/یک معلم باشد، بدهیِ کیف معلم
+        به همان معلم نسبت داده می‌شود؛ در غیر این صورت در `unassigned_debt` گزارش می‌شود تا
+        همیشه `sum(by_teacher.debt) + unassigned_debt == total_debt` برقرار بماند.
+        """
+        cid = self.create_class(teacher_id=51, title="ریاضی")
+        self.assertEqual(self.enroll(cid, 41, tuition=0, paid=0).status_code, 200,
+                         "ثبت‌نام با شهریهٔ صفر باید مجاز باشد (آیتم ۲ گروه ۱)")
+        self.debtor.wallet_teacher = -100000
+        self.db.commit()
+
+        body = self.client.get("/finance/reports/debtors_grouped", headers=hdr("tok-admin")).json()
+        self.assertEqual(body["total_debt"], 100000, body)
+        self.assertEqual(sum(g["debt"] for g in body["by_teacher"]), 100000, body["by_teacher"])
+        self.assertEqual(body["unassigned_debt"], 0, body)
+        self.assertEqual(body["by_teacher"][0]["teacher_id"], 51, body["by_teacher"])
+
+        # دو کلاس فعال با دو معلم ⇒ نسبت‌دادن قطعی ممکن نیست ⇒ unassigned
+        c2 = self.create_class(teacher_id=52, title="فیزیک", days="یکشنبه", time="19:00")
+        self.assertEqual(self.enroll(c2, 41, tuition=0, paid=0).status_code, 200)
+        body2 = self.client.get("/finance/reports/debtors_grouped", headers=hdr("tok-admin")).json()
+        self.assertEqual(body2["total_debt"], 100000, body2)
+        self.assertEqual(sum(g["debt"] for g in body2["by_teacher"]), 0, body2["by_teacher"])
+        self.assertEqual(body2["unassigned_debt"], 100000, body2)
+        # دانش‌آموز در هر دو گروه معلم دیده می‌شود (فقط مبلغش تخصیص‌نیافته است)
+        self.assertEqual(sorted(g["teacher_id"] for g in body2["by_teacher"]), [51, 52], body2)
+
     def test_9f_excel_export_includes_mobile_and_last_payment(self):
         self.make_debtors()
         resp = self.client.get("/reports/debtors/excel", headers=hdr("tok-admin"))

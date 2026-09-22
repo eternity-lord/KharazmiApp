@@ -99,13 +99,31 @@ class EnrollmentCreate(BaseModel):
     course_id: int
     register_date: str
     shift: str
-    total_tuition: int = Field(gt=0)  # شهریه ثبت‌نام باید مثبت باشد
+    # FIX (گروه۱/آیتم۲): شهریهٔ پایه «صفر» = دانش‌آموز رایگان/معاف و باید مجاز باشد؛ فقط منفی
+    # نامعتبر است. پیش‌تر `gt=0` بود ⇒ ثبت دانش‌آموز معاف با ۴۲۲ و پیام خام انگلیسی pydantic رد
+    # می‌شد (خطای عمومی برای کاربر). این ناسازگاری با مسیر `register_and_enroll` هم بود که همان
+    # مقدار را `Optional[int] = 0` می‌پذیرد. پیام خطای منفی فارسی و گویا است (۴۲۲ مثل قبل).
+    total_tuition: int
     paid_amount: int = Field(ge=0)  # FIX: Bug 22 - zero means no initial payment; negatives are invalid.
     payment_method: str
     receiver: str
     discount_type: Optional[str] = "none"
     discount_value: Optional[int] = 0
     installments: Optional[List[InstallmentCreate]] = None
+
+    @field_validator("total_tuition", mode="before")
+    @classmethod
+    def _validate_total_tuition(cls, value):
+        # mode="before" عمداً است: اگر محدودیت روی Field باشد (ge/gt)، pydantic اول همان را اجرا
+        # می‌کند و پیام خام انگلیسی می‌سازد ⇒ پیام فارسیِ این validator هرگز دیده نمی‌شد.
+        if isinstance(value, bool) or not isinstance(value, int):
+            try:
+                value = int(value)
+            except (TypeError, ValueError):
+                raise ValueError("شهریهٔ ثبت‌نام باید یک عدد صحیح باشد")
+        if value < 0:
+            raise ValueError("شهریهٔ ثبت‌نام نمی‌تواند منفی باشد؛ برای دانش‌آموز رایگان یا معاف عدد ۰ را وارد کنید")
+        return value
 
 
 # مدل‌های مربوط به نمره

@@ -19,6 +19,9 @@ on:
     branches:
       - main
       - arena/01a0bf8d-kharazmiapp
+      # شاخهٔ کاری نشست جاری (محتوای یکسان با arena/01a0bf8d-kharazmiapp) تا CI
+      # روی pushهای آن هم اجرا شود؛ توکن این نشست اجازهٔ workflow_dispatch ندارد.
+      - arena/01a0c867-kharazmiapp
   workflow_dispatch:
 
 permissions:

@@ -79,6 +79,24 @@ class TestItem22TeacherLiveClass(unittest.TestCase):
         self.assertNotIn("finalize_live_session", body)
         self.assertIn('"CANCELLED"', body)
 
+    def test_22e_end_flushes_final_roster_before_financial_finalize(self):
+        src = kt("LiveClassActivity.kt")
+        body = function_body(src, "endLive")
+        self.assertIn("api.saveLiveStatus(liveSessionId, finalPayload)", body)
+        self.assertIn("api.endLive(liveSessionId", body)
+        self.assertLess(
+            body.index("api.saveLiveStatus(liveSessionId, finalPayload)"),
+            body.index("api.endLive(liveSessionId"),
+            "پایان جلسه نباید قبل از ذخیره‌ی آخرین وضعیت حضور اجرا شود",
+        )
+
+    def test_22f_live_actions_use_live_session_identifier_and_legacy_fallback_is_server_side(self):
+        api = kt("LiveApi.kt")
+        self.assertIn('Path("session_id") sessionId: Int', api)
+        attendance = py("routers/attendance.py")
+        self.assertIn("_resolve_live_session_for_action", attendance)
+        self.assertIn('LiveSession.course_id == identifier', attendance)
+
 
 class TestItem23BulkStudentEnrollment(unittest.TestCase):
     """ثبت چند دانش‌آموز با چک‌باکس، بدون حذف مسیر ثبت تکی."""

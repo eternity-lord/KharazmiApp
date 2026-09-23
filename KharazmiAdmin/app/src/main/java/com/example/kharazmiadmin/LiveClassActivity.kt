@@ -18,6 +18,8 @@ import com.google.android.material.button.MaterialButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.atomic.AtomicBoolean
 
 // ==========================================
@@ -57,6 +59,10 @@ class LiveClassActivity : BaseActivity() {
     // برای جلوگیری از هم‌زمانی ارسال چند snapshot (جلوگیری از بار اضافه)
     private val syncInFlight = AtomicBoolean(false)
     private val syncPending = AtomicBoolean(false)
+    // همه‌ی save/status و پایان/لغو از یک قفل عبور می‌کنند تا snapshot قدیمی
+    // بعد از snapshot نهایی یا بعد از لغو روی سرور ننشیند.
+    private val liveApiMutex = Mutex()
+    private var endingLive = false
     private val syncHandler = Handler(Looper.getMainLooper())
     private val syncRunnable = object : Runnable {
         override fun run() { pushSnapshot() }
@@ -224,23 +230,29 @@ class LiveClassActivity : BaseActivity() {
         syncHandler.postDelayed(syncRunnable, 800)
     }
 
-    private fun pushSnapshot() {
-        if (liveSessionId <= 0) return
-        if (syncInFlight.get()) {
-            syncPending.set(true)
-            return
-        }
-        // ساخت snapshot روی همان ترد فراخوان (Main) تا HashMap امن بماند
+    private fun buildSnapshotPayload(): LiveStatusPayload {
+        // ساخت snapshot روی ترد UI؛ HashMapها فقط از همین مسیر تغییر می‌کنند.
         val payloadItems = LinkedHashMap<String, LiveStatusEntry>()
         statusMap.forEach { (key, status) ->
             payloadItems[key.toString()] = LiveStatusEntry(status = status, excused = excusedMap[key] ?: false)
         }
-        val payload = LiveStatusPayload(items = payloadItems)
+        return LiveStatusPayload(items = payloadItems)
+    }
+
+    private fun pushSnapshot() {
+        if (endingLive || liveSessionId <= 0) return
+        if (syncInFlight.get()) {
+            syncPending.set(true)
+            return
+        }
+        val payload = buildSnapshotPayload()
         syncInFlight.set(true)
         // FIX: Bug 19 - cancel screen work when this Activity is destroyed.
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                api.saveLiveStatus(liveSessionId, payload)
+                liveApiMutex.withLock {
+                    api.saveLiveStatus(liveSessionId, payload)
+                }
             } catch (e: Exception) {
                 // FIX: Bug 19 - cancellation is not a network/UI error.
                 if (e is kotlinx.coroutines.CancellationException) throw e;
@@ -268,11 +280,16 @@ class LiveClassActivity : BaseActivity() {
 
     private fun cancelLive() {
         if (liveSessionId <= 0) return
+        endingLive = true
+        syncPending.set(false)
+        syncHandler.removeCallbacks(syncRunnable)
         btnCancelLive.isEnabled = false
         btnEndLive.isEnabled = false
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                val response = api.cancelLive(liveSessionId)
+                val response = liveApiMutex.withLock {
+                    api.cancelLive(liveSessionId)
+                }
                 CacheManager.clearByPrefix(this@LiveClassActivity, "today_summary_teacher_")
                 withContext(Dispatchers.Main) {
                     Toast.makeText(this@LiveClassActivity, response.message.ifEmpty { getString(R.string.lcls_cancel_done) }, Toast.LENGTH_LONG).show()
@@ -281,6 +298,7 @@ class LiveClassActivity : BaseActivity() {
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 withContext(Dispatchers.Main) {
+                    endingLive = false
                     btnCancelLive.isEnabled = true
                     btnEndLive.isEnabled = true
                     Toast.makeText(this@LiveClassActivity, getString(R.string.lcls_cancel_error, e.message), Toast.LENGTH_SHORT).show()
@@ -302,12 +320,20 @@ class LiveClassActivity : BaseActivity() {
     }
 
     private fun endLive() {
-        // آخرین snapshot را هم ارسال کن
-        pushSnapshot()
+        // ارسال snapshot و پایان باید در یک coroutine و به‌ترتیب انجام شوند؛
+        // pushSnapshot قبلاً fire-and-forget بود و end_live می‌توانست زودتر برسد
+        // و جلسه را با roster خالی، بدون محاسبه‌ی شهریه ببندد.
+        endingLive = true
+        syncPending.set(false)
+        syncHandler.removeCallbacks(syncRunnable)
+        val finalPayload = buildSnapshotPayload()
         // FIX: Bug 19 - cancel screen work when this Activity is destroyed.
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                val res = api.endLive(liveSessionId, LiveEndPayload())
+                val res = liveApiMutex.withLock {
+                    api.saveLiveStatus(liveSessionId, finalPayload)
+                    api.endLive(liveSessionId, LiveEndPayload())
+                }
                 CacheManager.clearByPrefix(this@LiveClassActivity, "today_summary_teacher_")
                 withContext(Dispatchers.Main) {
                     // FIX (گروه۱/آیتم۱): «جلسهٔ این تاریخ قبلاً ثبت شده» دیگر ۴۰۹ نیست؛ سرور کلاس
@@ -335,6 +361,7 @@ class LiveClassActivity : BaseActivity() {
                 // FIX: Bug 19 - cancellation is not a network/UI error.
                 if (e is kotlinx.coroutines.CancellationException) throw e;
                 withContext(Dispatchers.Main) {
+                    endingLive = false
                     Toast.makeText(this@LiveClassActivity, getString(R.string.lcls_end_error, e.message), Toast.LENGTH_SHORT).show()
                 }
             }

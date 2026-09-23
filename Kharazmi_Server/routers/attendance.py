@@ -97,6 +97,77 @@ def claim_live_session_for_finalize(db: Session, session_id: int, auto: bool = F
     return claimed_rows == 1
 
 
+def _resolve_live_session_for_action(db: Session, identifier: int):
+    """Resolve the live-session identifier used by teacher live endpoints.
+
+    The public contract is ``LiveSession.id``. Older app builds sometimes sent
+    ``course_id`` in the same path, so use that only when no live row has the
+    identifier and only for an active session. Ownership is still checked by
+    every caller after this lookup.
+    """
+    live = db.query(LiveSession).filter(LiveSession.id == identifier).first()
+    if live is not None:
+        return live
+    return (
+        db.query(LiveSession)
+        .filter(
+            LiveSession.course_id == identifier,
+            LiveSession.status.in_(("LIVE", "FINALIZING")),
+        )
+        .order_by(desc(LiveSession.id))
+        .first()
+    )
+
+
+def _live_canonical_date(course_id: int, started_at_ts) -> str:
+    """Return the canonical date used by manual session registration."""
+    start_ts = float(started_at_ts or time_module.time())
+    date_str = _greg_date_from_ts(start_ts)
+    from today_summary import parse_project_date, jalali_date_string
+    day = parse_project_date(date_str)
+    return jalali_date_string(day) if day is not None else date_str
+
+
+def _existing_live_date_session(db: Session, course_id: int, started_at_ts):
+    canonical_date = _live_canonical_date(course_id, started_at_ts)
+    existing = (
+        db.query(SessionLog)
+        .filter(
+            SessionLog.course_id == course_id,
+            SessionLog.date == canonical_date,
+            SessionLog.is_deleted == False,
+        )
+        .first()
+    )
+    return canonical_date, existing
+
+
+def _close_live_as_duplicate(db: Session, live_id: int, duplicate: "DuplicateSessionDate") -> dict:
+    """Close a duplicate live attempt without creating a second financial record."""
+    db.query(LiveSession).filter(LiveSession.id == live_id).update(
+        {LiveSession.status: "ENDED", LiveSession.end_time: _now_str()},
+        synchronize_session=False,
+    )
+    db.commit()
+    live = db.query(LiveSession).filter(LiveSession.id == live_id).first()
+    return {
+        "message": (
+            f"جلسهٔ این کلاس در تاریخ {duplicate.date} قبلاً ثبت شده است؛ کلاس زنده بدون ثبت "
+            f"جلسهٔ تکراری بسته شد. برای اصلاح حضور/غیاب یا مبالغ، همان جلسهٔ ثبت‌شده "
+            f"(کد {duplicate.session_code}) را ویرایش کنید."
+        ),
+        "live_session_id": live_id,
+        "ended_automatically": bool(live.ended_automatically) if live else False,
+        "session_id": None,
+        "session_code": None,
+        "details": None,
+        "duplicate_date": True,
+        "existing_session_id": duplicate.session_id,
+        "existing_session_code": duplicate.session_code,
+        "duplicate_date_str": duplicate.date,
+    }
+
+
 class DuplicateSessionDate(Exception):
     """FIX (گروه۱/آیتم۱): جلسهٔ این کلاس در این تاریخ **قبلاً** ثبت شده است.
 
@@ -188,21 +259,10 @@ def finalize_live_session(db: Session, live: LiveSession) -> dict:
     start_ts = float(live.started_at_ts or time_module.time())
     date_str = _greg_date_from_ts(start_ts)
 
-    # FIX (گروه۱/آیتم۱): اگر جلسهٔ این کلاس در همین تاریخ قبلاً ثبت شده باشد (ثبت دستی از
-    # AttendanceActivity یا کلاس زندهٔ دیگری که زودتر بسته شده)، ادامه‌ی مسیر فقط ۴۰۹ می‌سازد؛
-    # پس زودتر و صریح اطلاع می‌دهیم تا فراخوان جلسهٔ زنده را بدون ثبت تکراری ببندد.
-    # تاریخ باید با همان مبدل مرکزیِ submit کانونیکال شود (audit-v2/#13): SessionLog.date شمسیِ
-    # نرمال‌شده است ولی date_str اینجا میلادیِ ساخته‌شده از started_at_ts ⇒ بدون این نرمال‌سازی
-    # مقایسهٔ رشته‌ای هرگز نمی‌خورد و گارد بی‌اثر می‌ماند (هم‌ریشه با باگ دابل‌سشن cross-client).
-    from today_summary import parse_project_date, jalali_date_string  # lazy، مثل submit
-    _sday = parse_project_date(date_str)
-    _canon_date = jalali_date_string(_sday) if _sday is not None else date_str
-    _existing = (
-        db.query(SessionLog)
-        .filter(SessionLog.course_id == course.id, SessionLog.date == _canon_date,
-                SessionLog.is_deleted == False)
-        .first()
-    )
+    # FIX (گروه۱/آیتم۱): همان گارد یکتاییِ ثبت دستی، با تاریخ کانونیکال شمسی.
+    # این pre-check علاوه بر ایندکس/گارد مسیر submit، خطای duplicate را پیش از هر
+    # محاسبه یا تغییر کیف به یک پاسخ قابل‌مدیریت برای end_live تبدیل می‌کند.
+    _canon_date, _existing = _existing_live_date_session(db, course.id, live.started_at_ts)
     if _existing is not None:
         raise DuplicateSessionDate(course.id, _canon_date, _existing.id, _existing.session_code)
 
@@ -314,11 +374,16 @@ def end_live_session(
     db: Session = Depends(get_db),
     sub_role: str = Depends(check_user_login),
 ):
-    live = db.query(LiveSession).filter(LiveSession.id == session_id).first()
+    # شناسه‌ی رسمی path، LiveSession.id است؛ برای buildهای قدیمی که course_id
+    # را فرستاده‌اند فقط یک جلسه‌ی فعال resolve می‌شود.
+    live = _resolve_live_session_for_action(db, session_id)
     if not live:
         raise HTTPException(status_code=404, detail="جلسه‌ی زنده یافت نشد")
+    live_id = live.id
+    live_course_id = live.course_id
+    live_started_at_ts = live.started_at_ts
 
-    course = db.query(Course).filter(Course.id == live.course_id).first()
+    course = db.query(Course).filter(Course.id == live_course_id).first()
     if not course:
         raise HTTPException(status_code=404, detail="کلاس یافت نشد")
 
@@ -329,7 +394,7 @@ def end_live_session(
     # FIX F-C6(c): تسخیر اتمیک LIVE→FINALIZING — مشترک با ورکر auto-end (الگوی H8-P4).
     # فقط یکی از دو مسیرِ هم‌زمان (دستی/ورکر) finalize را اجرا می‌کند؛ بازنده rowcount صفر
     # می‌گیرد (همان پیام «از قبل بسته شده»). finalize در انتها وضعیت را ENDED می‌کند.
-    if not claim_live_session_for_finalize(db, session_id):
+    if not claim_live_session_for_finalize(db, live_id):
         db.rollback()
         raise HTTPException(status_code=400, detail="این جلسه از قبل بسته شده است")
     db.refresh(live)  # UPDATE خام آبجکت را stale کرد؛ finalize باید وضعیت تازه ببیند.
@@ -340,38 +405,32 @@ def end_live_session(
     try:
         result = finalize_live_session(db, live)
     except Exception as exc:
-        # FIX F-C6(c): شکست finalize نباید جلسه را در FINALIZING قفل کند — برگردان به LIVE تا retry ممکن شود.
-        # (submit داخلی روی خطا rollback می‌کند، پس در عمل مالیِ نصفه‌ای برای دوباره‌ثبتی وجود ندارد.)
+        # finalize و submit در یک تراکنش هستند؛ هر خطا ابتدا rollback می‌شود تا
+        # اثر مالی نیمه‌کاره باقی نماند. 409های مسیر ثبت جلسه فقط وقتی duplicate
+        # محسوب می‌شوند که رکورد موجود واقعاً قابل مشاهده باشد (برای race هم).
         db.rollback()
-        if isinstance(exc, DuplicateSessionDate):
-            # FIX (گروه۱/آیتم۱): تنها خطایی که retry برایش بی‌معناست — جلسهٔ این تاریخ از قبل
-            # ثبت شده است. جلسهٔ زنده را می‌بندیم (ENDED) تا در لیست «کلاس زنده»/تایمر معلم گیر
-            # نکند و ورکر auto-end هم لوپ نزند؛ هیچ SessionLog/تراکنش دومی ساخته نمی‌شود و
-            # جلسهٔ موجود دست‌نخورده می‌ماند. پاسخ ۲۰۰ با پرچم صریح + شناسهٔ جلسهٔ موجود تا
-            # کلاینت پیام درست را نشان دهد (کلیدهای قبلی پاسخ حفظ شده‌اند ⇒ قرارداد نشکسته).
-            db.query(LiveSession).filter(LiveSession.id == session_id).update(
-                {LiveSession.status: "ENDED", LiveSession.end_time: _now_str()},
-                synchronize_session=False,
+        duplicate = exc if isinstance(exc, DuplicateSessionDate) else None
+        if duplicate is None and isinstance(exc, HTTPException) and exc.status_code == 409:
+            duplicate_date, existing = _existing_live_date_session(
+                db, live_course_id, live_started_at_ts
             )
-            db.commit()
-            db.refresh(live)
-            return {
-                "message": (
-                    f"جلسهٔ این کلاس در تاریخ {exc.date} قبلاً ثبت شده است؛ کلاس زنده بدون ثبت "
-                    f"جلسهٔ تکراری بسته شد. برای اصلاح حضور/غیاب یا مبالغ، همان جلسهٔ ثبت‌شده "
-                    f"(کد {exc.session_code}) را ویرایش کنید."
-                ),
-                "live_session_id": live.id,
-                "ended_automatically": bool(live.ended_automatically),
-                "session_id": None,
-                "session_code": None,
-                "details": None,
-                "duplicate_date": True,
-                "existing_session_id": exc.session_id,
-                "existing_session_code": exc.session_code,
-                "duplicate_date_str": exc.date,
-            }
-        db.query(LiveSession).filter(LiveSession.id == session_id).update(
+            if existing is not None:
+                duplicate = DuplicateSessionDate(
+                    live_course_id, duplicate_date, existing.id, existing.session_code
+                )
+        if duplicate is None and isinstance(exc, IntegrityError):
+            duplicate_date, existing = _existing_live_date_session(
+                db, live_course_id, live_started_at_ts
+            )
+            if existing is not None:
+                duplicate = DuplicateSessionDate(
+                    live_course_id, duplicate_date, existing.id, existing.session_code
+                )
+        if duplicate is not None:
+            return _close_live_as_duplicate(db, live_id, duplicate)
+
+        # شکست قابل‌اصلاح: جلسه‌ی زنده باید برای retry به LIVE برگردد.
+        db.query(LiveSession).filter(LiveSession.id == live_id).update(
             {LiveSession.status: "LIVE"}, synchronize_session=False
         )
         db.commit()
@@ -394,10 +453,11 @@ def cancel_live_session(
     db: Session = Depends(get_db),
     sub_role: str = Depends(check_user_login),
 ):
-    """لغو اتمیک جلسه‌ی زنده بدون finalize و بدون هیچ اثر مالی/حضور و غیاب."""
-    live = db.query(LiveSession).filter(LiveSession.id == session_id).first()
+    """Cancel a live session without attendance, tuition, wallet, or transactions."""
+    live = _resolve_live_session_for_action(db, session_id)
     if not live:
         raise HTTPException(status_code=404, detail="جلسه‌ی زنده یافت نشد")
+    live_id = live.id
 
     course = db.query(Course).filter(Course.id == live.course_id).first()
     if not course:
@@ -406,9 +466,18 @@ def cancel_live_session(
     _verify_live_course_teacher(db, course, authorization, sub_role)
 
     # فقط LIVE قابل لغو است؛ UPDATE مشروط، دو درخواست هم‌زمان را اتمیک می‌کند.
+    if live.status == "CANCELLED":
+        return {
+            "message": "کلاس زنده قبلاً لغو شده بود؛ هیچ اثر مالی یا حضور و غیابی ثبت نشده است.",
+            "live_session_id": live_id,
+            "status": "CANCELLED",
+        }
+    if live.status != "LIVE":
+        raise HTTPException(status_code=409, detail="این جلسه قبلاً پایان یافته و قابل لغو نیست")
+
     cancelled = (
         db.query(LiveSession)
-        .filter(LiveSession.id == session_id, LiveSession.status == "LIVE")
+        .filter(LiveSession.id == live_id, LiveSession.status == "LIVE")
         .update(
             {
                 LiveSession.status: "CANCELLED",
@@ -421,11 +490,18 @@ def cancel_live_session(
     )
     if cancelled != 1:
         db.rollback()
-        raise HTTPException(status_code=400, detail="این جلسه از قبل بسته یا لغو شده است")
+        latest = db.query(LiveSession).filter(LiveSession.id == live_id).first()
+        if latest is not None and latest.status == "CANCELLED":
+            return {
+                "message": "کلاس زنده قبلاً لغو شده بود؛ هیچ اثر مالی یا حضور و غیابی ثبت نشده است.",
+                "live_session_id": live_id,
+                "status": "CANCELLED",
+            }
+        raise HTTPException(status_code=409, detail="این جلسه هم‌زمان بسته شد و دیگر قابل لغو نیست")
     db.commit()
     return {
         "message": "کلاس زنده لغو شد و هیچ شهریه، حضور و غیاب یا تراکنشی ثبت نشد.",
-        "live_session_id": session_id,
+        "live_session_id": live_id,
         "status": "CANCELLED",
     }
 
@@ -438,7 +514,7 @@ def save_live_status(
     db: Session = Depends(get_db),
     sub_role: str = Depends(check_user_login),
 ):
-    live = db.query(LiveSession).filter(LiveSession.id == session_id).first()
+    live = _resolve_live_session_for_action(db, session_id)
     if not live:
         raise HTTPException(status_code=404, detail="جلسه‌ی زنده یافت نشد")
     if live.status != "LIVE":

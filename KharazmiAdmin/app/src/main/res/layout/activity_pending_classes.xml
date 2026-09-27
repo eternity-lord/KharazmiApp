@@ -25,6 +25,25 @@
         </androidx.appcompat.widget.Toolbar>
     </com.google.android.material.appbar.AppBarLayout>
 
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="@dimen/spacing_small">
+        <Button
+            android:id="@+id/btnPendingBulkApprove"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="تأیید انتخاب‌شده‌ها" />
+        <Button
+            android:id="@+id/btnPendingBulkReject"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="رد انتخاب‌شده‌ها" />
+    </LinearLayout>
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvPendingClasses"
         android:layout_width="match_parent"

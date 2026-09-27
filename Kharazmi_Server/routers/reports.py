@@ -12,7 +12,7 @@ from openpyxl.styles import Font, Alignment, PatternFill
 
 import models
 from models import (
-    Attendance, Course, Enrollment, Grade, InstituteShare, SessionLog, SmsLog, Student, Teacher, Transaction, User, UserSession, InstituteSettings
+    Attendance, Course, Enrollment, Grade, InstituteShare, SessionLog, SmsLog, Student, Teacher, Transaction, User, UserSession, InstituteSettings, Installment
 )
 from schemas import (
     HistoryRequest, LoginRequest, TeacherInfo, FullTeacherProfile, StudentCreate, TeacherCreate, CourseCreate, EnrollmentCreate, GradeCreate, GradeItem, AttendanceLogRequest, AttendanceItem, AttendanceSubmitData, SmsSendRequest, ChangePasswordRequest, StudentProfileInfo, FullStudentProfile, TeacherProfileInfo, FullTeacherProfile, ClassReportInfo, ClassStudentData, ClassSessionHistory, FullClassReport, ShareConfigModel, StudentUpdate, TeacherUpdate, PersonListItem, TransactionUpdate, StudentAttendanceHistoryRequest, AdvancedSearchItem, FinanceSubmitData, PrintReceiptRequest, TransactionTestData
@@ -20,7 +20,7 @@ from schemas import (
 from dependencies import get_db, check_admin_access, check_admin_or_secretary_access, check_user_login, check_student_access, get_enrollment_tuition_and_discount, SESSION_EXPIRY_DAYS, resolve_effective_sub_role, display_name, safe_person_name
 
 # FIX: Bug 16 - share the tuition-minus-payment debt calculation across financial views.
-from financial_calculations import calculate_student_debt
+from financial_calculations import calculate_student_debt, branch_scope_clause
 
 router = APIRouter()
 
@@ -182,8 +182,28 @@ def get_chart_data(
     # نمی‌آمد. حالا همان تعریف واحد وصولی (O-08) در قلم‌های زمانی واقعی.
     # FIX: Bug 12 - ردیف‌های آرشیوشده/برگشتی در این نمای فعال نمی‌آیند (داخل helper).
     _chart_today = datetime.date.today()
-    _chart_start = start_day if start_day is not None else _chart_today - datetime.timedelta(days=29)
-    _chart_end = end_day if end_day is not None else _chart_today
+    _chart_fallback_end = None
+    if start_day is None:
+        # قرارداد UI «۳۰ روز اخیر» حفظ می‌شود. فقط وقتی این بازه هیچ تراکنش تاریخ‌داری
+        # ندارد، برای جلوگیری از گزارش صفر، به قدیمی‌ترین تاریخ legacy fallback می‌کنیم.
+        _default_start = _chart_today - datetime.timedelta(days=29)
+        _known_chart_dates = [
+            parsed for parsed in (_parsed_project_date(value) for (value,) in
+                                  db.query(Transaction.date).filter(
+                                      Transaction.is_deleted == False,
+                                      Transaction.is_reversed == False,
+                                  ).all())
+            if parsed is not None
+        ]
+        has_recent = any(_default_start <= value <= _chart_today for value in _known_chart_dates)
+        if has_recent or not _known_chart_dates:
+            _chart_start = _default_start
+        else:
+            _chart_start = min(_known_chart_dates)
+            _chart_fallback_end = max(_known_chart_dates)
+    else:
+        _chart_start = start_day
+    _chart_end = end_day if end_day is not None else (_chart_fallback_end or _chart_today)
     if _chart_end < _chart_start:
         _chart_start, _chart_end = _chart_end, _chart_start
     _income_rows = collected_revenue_rows(db, _chart_start.isoformat(), _chart_end.isoformat(),
@@ -296,6 +316,7 @@ def get_financial_report(
     start_date: str = None,
     end_date: str = None,
     branch_id: Optional[int] = None,
+    teacher_id: Optional[int] = None,
     authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
     _: str = Depends(check_admin_access)
@@ -312,7 +333,14 @@ def get_financial_report(
     # FIX: Bug 12 - exclude archived Transaction rows from this active view.
     query = db.query(Transaction).filter(Transaction.is_deleted == False, Transaction.is_reversed == False)
     if resolved_branch is not None:
-        query = query.filter(Transaction.branch_id == resolved_branch)
+        scope = branch_scope_clause(Transaction.branch_id, resolved_branch)
+        if scope is not None:
+            query = query.filter(scope)
+    if teacher_id is not None:
+        teacher_course_ids = [row[0] for row in db.query(Course.id).filter(Course.teacher_id == teacher_id).all()]
+        if not teacher_course_ids:
+            return []
+        query = query.filter(Transaction.course_id.in_(teacher_course_ids))
 
     trans = [t for t in query.order_by(desc(Transaction.id)).all() if _in_range(t.date)]
     report = []
@@ -331,18 +359,88 @@ def get_financial_report(
             if st:
                 st_name = display_name(st, "نامشخص")
                 student_id = st.id
+        course = db.query(Course).filter(Course.id == t.course_id).first() if t.course_id else None
+        teacher = db.query(Teacher).filter(Teacher.id == course.teacher_id).first() if course and course.teacher_id else None
+        effective_branch_id = t.branch_id if t.branch_id is not None else (course.branch_id if course else None)
+        branch = db.query(models.Branch).filter(models.Branch.id == effective_branch_id).first() if effective_branch_id else None
         report.append(
             {
+                "transaction_id": t.id,
                 "student_id": student_id,
                 "student_name": st_name,
-                "amount": t.amount,
+                "amount": int(t.amount or 0),
                 # FIX(A3): تاریخ نامعلوم ⇒ "" (نه null؛ نه تاریخ جعلی)
                 "date": _api_date_or_blank(t.date),
-                "description": t.description,
-                "payment_method": t.payment_method,
+                "description": t.description or "",
+                "payment_method": t.payment_method or "",
+                "target_wallet": t.target_wallet,
+                "type": t.type,
+                "course_id": t.course_id,
+                "course_title": course.title if course else "کلاس عمومی/نامشخص",
+                "teacher_id": course.teacher_id if course else None,
+                "teacher_name": display_name(teacher, "بدون معلم") if teacher else "بدون معلم",
+                "branch_id": effective_branch_id,
+                "branch_name": branch.name if branch else "شعبهٔ legacy/نامشخص",
+                "share_teacher": int(t.share_teacher or 0),
+                "share_institute": int(t.share_institute or 0),
+                "student_statement_path": f"/reports/student_statement?student_id={student_id}" if student_id else "",
             }
         )
     return report
+
+
+@router.get("/reports/financial/excel")
+def get_financial_report_excel(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    branch_id: Optional[int] = None,
+    teacher_id: Optional[int] = None,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+    _: str = Depends(check_admin_access),
+):
+    """خروجی Excel همان دادهٔ گزارش مالی، با همان scope/تاریخ و بدون محاسبهٔ جداگانه."""
+    rows = get_financial_report(
+        start_date=start_date, end_date=end_date, branch_id=branch_id, teacher_id=teacher_id,
+        authorization=authorization, db=db, _=_
+    )
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "گزارش مالی"
+    ws.views.sheetView[0].rightToLeft = True
+    headers = [
+        "شناسه تراکنش", "دانش‌آموز", "معلم", "کلاس", "شعبه", "مبلغ (تومان)",
+        "کیف مقصد", "نوع", "تاریخ", "روش پرداخت", "شرح", "سهم معلم", "سهم آموزشگاه",
+    ]
+    ws.append(headers)
+    for row in rows:
+        ws.append([
+            row.get("transaction_id"), row.get("student_name") or "نامشخص",
+            row.get("teacher_name") or "بدون معلم", row.get("course_title") or "—",
+            row.get("branch_name") or "شعبهٔ legacy/نامشخص", row.get("amount", 0),
+            row.get("target_wallet") or "—", row.get("type") or "—", row.get("date") or "بی‌تاریخ",
+            row.get("payment_method") or "—", row.get("description") or "—",
+            row.get("share_teacher", 0), row.get("share_institute", 0),
+        ])
+    for cell in ws[1]:
+        cell.font = Font(name="Tahoma", size=11, bold=True, color="FFFFFF")
+        cell.fill = PatternFill(start_color="00695C", end_color="00695C", fill_type="solid")
+        cell.alignment = Alignment(horizontal="center")
+    for row in ws.iter_rows(min_row=2):
+        for cell in row:
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+            cell.font = Font(name="Tahoma", size=10)
+    for col in ws.columns:
+        width = max(len(str(cell.value or "")) for cell in col) + 3
+        ws.column_dimensions[col[0].column_letter].width = min(max(width, 12), 42)
+    stream = io.BytesIO()
+    wb.save(stream)
+    stream.seek(0)
+    return StreamingResponse(
+        stream,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=financial_report.xlsx"},
+    )
 
 
 @router.get("/reports/debtors")
@@ -550,10 +648,20 @@ def get_financial_summary(
     year_prefix = f"{year}/%"
 
     start_date = f"{year}/{month:02d}/01"
-    end_date = f"{year}/{month:02d}/31"
-    
+    # روز ۳۱ برای ماه‌های ۷ تا ۱۱ جلالی نامعتبر است و helper مرکزی عمداً
+    # بازهٔ نامعتبر را صفر می‌کند. آخرین روز معتبر ماه را بدون حدس تقویمی پیدا کن.
+    month_last_day = 31 if month <= 6 else 30
+    if month == 12:
+        month_last_day = 30
+    while month_last_day > 1 and _parsed_project_date(f"{year}/{month:02d}/{month_last_day:02d}") is None:
+        month_last_day -= 1
+    end_date = f"{year}/{month:02d}/{month_last_day:02d}"
+
     start_year_date = f"{year}/01/01"
-    end_year_date = f"{year}/12/30"
+    year_last_day = 30
+    while year_last_day > 1 and _parsed_project_date(f"{year}/12/{year_last_day:02d}") is None:
+        year_last_day -= 1
+    end_year_date = f"{year}/12/{year_last_day:02d}"
 
     if user_type == "institute":
         # گزارش ماهانه آموزشگاه با استفاده از توابع متمرکز
@@ -662,14 +770,115 @@ def get_student_statement(
         db.commit()
         db.refresh(settings)
 
+    enrollments = db.query(Enrollment).filter(
+        Enrollment.student_id == student_id, Enrollment.is_deleted == False
+    ).all()
+    teacher_names = []
+    enrollment_ids = [e.id for e in enrollments]
+    teacher_details = []
+    for enrollment in enrollments:
+        course = enrollment.course
+        if not course:
+            continue
+        teacher = course.teacher
+        name = display_name(teacher, "نامشخص") if teacher else "بدون معلم"
+        if name not in teacher_names:
+            teacher_names.append(name)
+        linked_paid = db.query(Transaction).filter(
+            Transaction.enrollment_id == enrollment.id,
+            Transaction.is_deleted == False, Transaction.is_reversed == False,
+            Transaction.amount > 0,
+        ).all()
+        paid_teacher = sum(int(t.amount or 0) for t in linked_paid if t.target_wallet == "teacher")
+        paid_institute = sum(int(t.amount or 0) for t in linked_paid if t.target_wallet == "institute")
+        for t in linked_paid:
+            if t.target_wallet == "both":
+                share_t = int(t.share_teacher or 0)
+                share_i = int(t.share_institute or 0)
+                if share_t + share_i != int(t.amount or 0):
+                    share_t = int(t.amount or 0) // 2
+                    share_i = int(t.amount or 0) - share_t
+                paid_teacher += share_t
+                paid_institute += share_i
+        final_tuition, _ = get_enrollment_tuition_and_discount(enrollment)
+        remaining = max(0, int(final_tuition or 0) - paid_teacher - paid_institute)
+        charge_rows = db.query(Transaction).filter(
+            Transaction.student_id == student_id, Transaction.course_id == course.id,
+            Transaction.type == "session_charge", Transaction.is_deleted == False,
+            Transaction.is_reversed == False,
+        ).all()
+        billed_teacher = sum(int(t.share_teacher or 0) for t in charge_rows)
+        billed_institute = sum(int(t.share_institute or 0) for t in charge_rows)
+        debt_teacher = max(0, billed_teacher - paid_teacher)
+        debt_institute = max(0, billed_institute - paid_institute)
+        # Legacy/no-session rows have no per-course charge split. In that case the
+        # contractual remainder is shown as institute debt rather than copied to every class.
+        if not charge_rows and remaining:
+            debt_teacher = 0
+            debt_institute = remaining
+        teacher_details.append({
+            "enrollment_id": enrollment.id,
+            "teacher_id": course.teacher_id,
+            "teacher_name": name,
+            "course_id": course.id,
+            "course_title": course.title or "کلاس بدون نام",
+            "course_code": course.code or "",
+            "branch_id": enrollment.branch_id if enrollment.branch_id is not None else course.branch_id,
+            "paid_teacher": paid_teacher,
+            "paid_institute": paid_institute,
+            "debt_teacher": debt_teacher,
+            "debt_institute": debt_institute,
+            "debt": remaining,
+            "tuition": int(final_tuition or 0),
+            "enrollment_status": "فعال" if not enrollment.is_deleted else "آرشیو",
+            "teacher_profile_path": f"/teachers/{course.teacher_id}/full_profile" if course.teacher_id else "",
+            "student_profile_path": f"/admin/students/{student_id}/full_profile",
+        })
+    payment_rows = db.query(Transaction).filter(
+        Transaction.student_id == student_id, Transaction.is_deleted == False,
+        Transaction.is_reversed == False, Transaction.amount > 0
+    ).order_by(Transaction.id.desc()).all()
+    payment_timeline = [{
+        "transaction_id": row.id, "date": row.date, "amount": int(row.amount or 0),
+        "target_wallet": row.target_wallet, "description": row.description,
+        "payment_link": f"/finance/receipt/{row.id}"
+    } for row in payment_rows]
+    next_installment = None
+    if enrollment_ids:
+        installment = db.query(Installment).filter(
+            Installment.enrollment_id.in_(enrollment_ids), Installment.is_deleted == False,
+            Installment.is_paid == False
+        ).order_by(Installment.due_date.asc(), Installment.id.asc()).first()
+        if installment:
+            next_installment = {
+                "id": installment.id, "amount": int(installment.amount or 0),
+                "paid_amount": int(installment.paid_amount or 0),
+                "due_date": installment.due_date,
+                "remaining_amount": max(0, int((installment.amount or 0) - (installment.paid_amount or 0))),
+                "payment_link": f"/finance/payment/initiate?installment_id={installment.id}"
+            }
+
     return {
         "student_id": student.id,
         "student_name": display_name(student, "نامشخص"),
         "student_code": student.student_code or str(100000 + student.id),
+        "teacher_name": ", ".join(teacher_names) if teacher_names else "بدون معلم",
+        "teachers": teacher_details,
+        "active_enrollments": [
+            {
+                "enrollment_id": e.id, "course_id": e.course_id,
+                "status": "فعال" if not e.is_deleted else "آرشیو",
+                "register_date": e.register_date, "branch_id": e.branch_id,
+            }
+            for e in enrollments
+        ],
         "total_paid_institute": int(total_paid_institute),
         "total_debt_institute": int(total_debt_institute),
         # FIX: Bug 16 - expose contractual debt separately; do not assign all tuition to one wallet.
         "total_debt": calculate_student_debt(db, student),
+        "payment_timeline": payment_timeline,
+        "next_installment": next_installment,
+        "payment_link": (next_installment or {}).get("payment_link") if next_installment else "/payments/initiate",
         "institute_card_number": settings.card_number or "۶۰۳۷۹۹۷۹۷۹۷۹۷۹۷۹",
         "institute_name": settings.name,
         "address": settings.address,

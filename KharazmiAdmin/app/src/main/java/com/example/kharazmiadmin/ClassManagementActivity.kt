@@ -126,6 +126,37 @@ class ClassManagementActivity : BaseActivity() {
         }
     }
 
+    // صف تأیید ادمین: تصمیم گروهی با علت رد قابل audit است.
+    private fun bulkApprove(courseIds: List<Int>) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            RetrofitClient.getInstance(this@ClassManagementActivity).create(ClassApi::class.java)
+                .bulkApprove(BulkClassDecisionRequest(courseIds))
+            withContext(Dispatchers.Main) { fetchClasses() }
+        }
+    }
+
+    private fun bulkReject(courseIds: List<Int>, rejectionReason: String) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            RetrofitClient.getInstance(this@ClassManagementActivity).create(ClassApi::class.java)
+                .bulkReject(BulkClassDecisionRequest(courseIds, rejectionReason))
+            withContext(Dispatchers.Main) { fetchClasses() }
+        }
+    }
+
+    // ویرایش زمان‌بندی/ظرفیت/انتقال معلم فقط از endpoint ادمین و با guardهای سرور.
+    private fun updateClass(courseId: Int, request: AdminClassUpdateRequest) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                RetrofitClient.getInstance(this@ClassManagementActivity).create(ClassApi::class.java)
+                    .updateClass(courseId, request)
+                withContext(Dispatchers.Main) { fetchClasses() }
+            } catch (error: Exception) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                withContext(Dispatchers.Main) { Toast.makeText(this@ClassManagementActivity, "ویرایش کلاس انجام نشد", Toast.LENGTH_SHORT).show() }
+            }
+        }
+    }
+
     private fun filterList(query: String) {
         if (!::adapter.isInitialized) return
 
@@ -221,7 +252,10 @@ class ClassManagementActivity : BaseActivity() {
             holder.tvTitle.text = item.title
             holder.tvCode.text = getString(R.string.cmgmt_code_row, item.code)
             holder.tvGradeLevel.text = item.grade_level
-            holder.tvGender.text = item.gender
+            // سیستم برای کلاس جنسیت ثبت نمی‌کند؛ فقط چیپ همین بنر ادمین مخفی می‌شود.
+            // مدل/endpoint مشترک دست‌نخورده می‌ماند تا پنل معلم رفتار ناخواسته نگیرد.
+            holder.tvGender.text = ""
+            holder.tvGender.visibility = View.GONE
             holder.tvSessionCount.text = getString(R.string.cmgmt_sessions_row, item.session_count)
 
             // اعمال رنگ پس‌زمینه کارت کلاس بر اساس bg_color ثبت شده

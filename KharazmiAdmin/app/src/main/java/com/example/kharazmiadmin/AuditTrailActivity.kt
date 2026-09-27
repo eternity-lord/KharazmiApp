@@ -506,7 +506,20 @@ class AuditTrailActivity : BaseActivity() {
         "target_wallet" -> getString(R.string.audit_trail_field_target_wallet)
         "student_id" -> getString(R.string.audit_trail_field_student)
         "enrollment_id" -> getString(R.string.audit_trail_field_enrollment)
+        "course_id" -> getString(R.string.audit_trail_field_course)
+        "branch_id" -> getString(R.string.audit_trail_field_branch)
+        "teacher_id" -> getString(R.string.audit_trail_field_teacher)
+        "session_id" -> getString(R.string.audit_trail_field_session)
         else -> field
+    }
+
+    private fun formatReferenceValue(item: AuditTrailLog, field: String, value: Any?): String {
+        if (field == "course_id") return item.entityRefs?.get("course")?.takeIf { it.isNotBlank() } ?: formatValue(value)
+        if (field == "branch_id") return item.entityRefs?.get("branch")?.takeIf { it.isNotBlank() } ?: formatValue(value)
+        if (field == "student_id") return item.entityRefs?.get("student")?.takeIf { it.isNotBlank() } ?: formatValue(value)
+        if (field == "teacher_id") return item.entityRefs?.get("teacher")?.takeIf { it.isNotBlank() } ?: formatValue(value)
+        if (field == "enrollment_id") return item.entityRefs?.get("enrollment")?.takeIf { it.isNotBlank() } ?: formatValue(value)
+        return formatValue(value)
     }
 
     private fun formatValue(value: Any?): String {
@@ -529,9 +542,9 @@ class AuditTrailActivity : BaseActivity() {
             val before = item.oldValues?.get(field)
             val after = item.newValues?.get(field)
             when (item.action) {
-                "create" -> "${friendlyFieldName(field)}: ${formatValue(after)}"
-                "delete" -> "${friendlyFieldName(field)}: ${formatValue(before)}"
-                else -> "${friendlyFieldName(field)}: ${formatValue(before)} → ${formatValue(after)}"
+                "create" -> "${friendlyFieldName(field)}: ${formatReferenceValue(item, field, after)}"
+                "delete" -> "${friendlyFieldName(field)}: ${formatReferenceValue(item, field, before)}"
+                else -> "${friendlyFieldName(field)}: ${formatReferenceValue(item, field, before)} → ${formatReferenceValue(item, field, after)}"
             }
         } + if (changed.size > 3) " …" else ""
     }
@@ -564,8 +577,8 @@ class AuditTrailActivity : BaseActivity() {
             builder.append(getString(R.string.audit_trail_no_field_detail))
         } else {
             for (field in changed) {
-                val before = formatValue(item.oldValues?.get(field))
-                val after = formatValue(item.newValues?.get(field))
+                val before = formatReferenceValue(item, field, item.oldValues?.get(field))
+                val after = formatReferenceValue(item, field, item.newValues?.get(field))
                 // برچسب فارسی ستون از سرور (labels) و در نبودش mapping محلی
                 val label = item.labels?.get(field)?.takeIf { it.isNotBlank() } ?: friendlyFieldName(field)
                 builder.append("• $label: $before → $after\n")

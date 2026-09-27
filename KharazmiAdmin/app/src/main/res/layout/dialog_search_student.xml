@@ -49,6 +49,23 @@
         android:textStyle="bold"
         android:layout_marginTop="10dp"/>
 
+    <TextView
+        android:id="@+id/tvBulkSelectionSummary"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="برای افزودن چند نفر، چک‌باکس دانش‌آموزان نتیجه را تیک بزنید"
+        android:textColor="@color/gold_primary"
+        android:textStyle="bold"
+        android:layout_marginTop="8dp"/>
+
+    <LinearLayout
+        android:id="@+id/llStudentMultiSelect"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone"
+        android:layout_marginTop="4dp" />
+
     <!-- شهریه پایه کلاسی -->
     <com.google.android.material.textfield.TextInputLayout
         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"

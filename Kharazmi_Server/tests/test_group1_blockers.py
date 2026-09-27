@@ -217,6 +217,58 @@ class TestLiveEnd409(Group1World):
         self.assertEqual(self.live_row(live_id).status, "ENDED")
 
 
+class TestLiveCancelAndIdentifierCompatibility(Group1World):
+    """لغو live باید فقط وضعیت LiveSession را عوض کند؛ شناسه‌ی legacy هم امن resolve شود."""
+
+    def setUp(self):
+        super().setUp()
+        self.course_id = self.create_class(title="کلاس زندهٔ لغوشدنی")
+        self.assertEqual(self.enroll(self.course_id, 41, paid=0).status_code, 200)
+        # عمداً id جلسهٔ زنده را از course_id جدا می‌کنیم تا fallback واقعاً تست شود.
+        self.db.add(models.LiveSession(
+            id=700, course_id=self.course_id, teacher_id=self.teacher.id,
+            status="ENDED", ended_automatically=False, live_roster="{}",
+        ))
+        self.db.commit()
+
+    def test_cancel_by_live_id_has_no_attendance_or_financial_effect_and_is_idempotent(self):
+        started = self.start_live(self.course_id)
+        self.assertEqual(started.status_code, 200, started.text)
+        live_id = started.json()["live_session_id"]
+        self.assertNotEqual(live_id, self.course_id)
+        self.assertEqual(self.save_live_status(live_id, {"41": {"status": "Present"}}).status_code, 200)
+        before = (self.student.wallet_teacher, self.student.wallet_institute, self.student.wallet_balance)
+
+        cancelled = self.client.post(f"/attendance/{live_id}/cancel_live", headers=hdr("tok-teacher"))
+        self.assertEqual(cancelled.status_code, 200, cancelled.text)
+        self.assertEqual(cancelled.json()["status"], "CANCELLED")
+        row = self.live_row(live_id)
+        self.assertEqual(row.status, "CANCELLED")
+        self.assertEqual(self.db.query(models.SessionLog).count(), 0)
+        self.assertEqual(self.db.query(models.Attendance).count(), 0)
+        self.assertEqual(self.db.query(models.Transaction).count(), 0)
+        self.db.refresh(self.student)
+        self.assertEqual(before, (self.student.wallet_teacher, self.student.wallet_institute, self.student.wallet_balance))
+
+        again = self.client.post(f"/attendance/{live_id}/cancel_live", headers=hdr("tok-teacher"))
+        self.assertEqual(again.status_code, 200, again.text)
+        self.assertEqual(again.json()["status"], "CANCELLED")
+
+    def test_legacy_course_id_path_resolves_same_live_session_for_end_and_finance(self):
+        started = self.start_live(self.course_id)
+        self.assertEqual(started.status_code, 200, started.text)
+        live_id = started.json()["live_session_id"]
+        self.assertEqual(self.save_live_status(self.course_id, {"41": {"status": "Present"}}).status_code, 200)
+
+        ended = self.end_live(self.course_id)
+        self.assertEqual(ended.status_code, 200, ended.text)
+        self.assertEqual(ended.json()["live_session_id"], live_id)
+        self.assertEqual(self.live_row(live_id).status, "ENDED")
+        self.assertEqual(len(self.sessions_of(self.course_id)), 1)
+        self.db.refresh(self.student)
+        self.assertLess(self.student.wallet_teacher, 0)
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # آیتم ۲ — شهریهٔ پایه = ۰ (دانش‌آموز رایگان/معاف)
 # ═══════════════════════════════════════════════════════════════════════════════

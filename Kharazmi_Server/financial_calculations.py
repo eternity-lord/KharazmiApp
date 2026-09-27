@@ -136,7 +136,9 @@ def calculate_institute_session_revenue(db: Session, start_date: str, end_date: 
         models.Transaction.is_reversed == False
     )
     if branch_id is not None:
-        query = query.filter(models.Transaction.branch_id == branch_id)
+        scope = branch_scope_clause(models.Transaction.branch_id, branch_id)
+        if scope is not None:
+            query = query.filter(scope)
     return sum(int(share or 0) for share, date_value in query.all() if _row_date_in_range(date_value, start, end))
 
 
@@ -165,7 +167,9 @@ def collected_revenue_rows(db: Session, start_date: str, end_date: str,
         models.Transaction.is_reversed == False
     )
     if branch_id is not None:
-        query = query.filter(models.Transaction.branch_id == branch_id)
+        scope = branch_scope_clause(models.Transaction.branch_id, branch_id)
+        if scope is not None:
+            query = query.filter(scope)
     if course_id is not None:
         query = query.filter(models.Transaction.course_id == course_id)
     rows = query.all()
@@ -205,7 +209,9 @@ def count_undated_payments(db: Session, target_wallet: Optional[str] = None,
     if target_wallet is not None:
         query = query.filter(models.Transaction.target_wallet == target_wallet)
     if branch_id is not None:
-        query = query.filter(models.Transaction.branch_id == branch_id)
+        scope = branch_scope_clause(models.Transaction.branch_id, branch_id)
+        if scope is not None:
+            query = query.filter(scope)
     if course_ids is not None:
         # مثل منطق کارکرد معلم: هم پرداخت‌های همان کلاس‌ها، هم پرداخت‌های عمومی (بدون کلاس)
         query = query.filter(or_(models.Transaction.course_id.in_(course_ids),
@@ -231,7 +237,9 @@ def calculate_total_turnover(db: Session, start_date: str, end_date: str, branch
         models.Transaction.is_reversed == False
     )
     if branch_id is not None:
-        query = query.filter(models.Transaction.branch_id == branch_id)
+        scope = branch_scope_clause(models.Transaction.branch_id, branch_id)
+        if scope is not None:
+            query = query.filter(scope)
     return sum(int(amount or 0) for amount, date_value in query.all() if _row_date_in_range(date_value, start, end))
 
 
@@ -319,6 +327,67 @@ def calculate_student_debt(db: Session, student) -> int:
     if enrollments and not active:
         return 0
     return max(0, -(student.wallet_teacher or 0)) + max(0, -(student.wallet_institute or 0))
+
+
+def calculate_enrollment_debt_breakdown(db: Session, enrollment) -> dict:
+    """بدهی یک ثبت‌نام را بدون کپی‌کردن کیف کل دانش‌آموز بین چند کلاس گزارش می‌کند.
+
+    مبنا همان ledger موجود است: پرداخت‌های لینک‌شده به enrollment و سهم‌های واقعی
+    session_charge. برای دادهٔ legacy که هنوز charge تفکیکی ندارد، ماندهٔ قراردادی
+    فقط به سهم آموزشگاه نسبت داده می‌شود؛ به کلاس‌های دیگر سرایت نمی‌کند.
+    این helper فقط خواندنی است و هیچ wallet/ledger را تغییر نمی‌دهد.
+    """
+    if enrollment is None:
+        return {"tuition": 0, "paid_teacher": 0, "paid_institute": 0,
+                "debt_teacher": 0, "debt_institute": 0, "debt": 0}
+    from dependencies import get_enrollment_tuition_and_discount
+    final_tuition, _ = get_enrollment_tuition_and_discount(enrollment)
+    payments = db.query(models.Transaction).filter(
+        models.Transaction.enrollment_id == enrollment.id,
+        models.Transaction.is_deleted == False,
+        models.Transaction.is_reversed == False,
+        models.Transaction.amount > 0,
+    ).all()
+    paid_teacher = 0
+    paid_institute = 0
+    for payment in payments:
+        amount = int(payment.amount or 0)
+        if payment.target_wallet == "teacher":
+            paid_teacher += amount
+        elif payment.target_wallet == "institute":
+            paid_institute += amount
+        elif payment.target_wallet == "both":
+            share_teacher = int(payment.share_teacher or 0)
+            share_institute = int(payment.share_institute or 0)
+            if share_teacher + share_institute != amount:
+                share_teacher = amount // 2
+                share_institute = amount - share_teacher
+            paid_teacher += share_teacher
+            paid_institute += share_institute
+    charges = db.query(models.Transaction).filter(
+        models.Transaction.student_id == enrollment.student_id,
+        models.Transaction.course_id == enrollment.course_id,
+        models.Transaction.type == "session_charge",
+        models.Transaction.is_deleted == False,
+        models.Transaction.is_reversed == False,
+    ).all()
+    billed_teacher = sum(int(row.share_teacher or 0) for row in charges)
+    billed_institute = sum(int(row.share_institute or 0) for row in charges)
+    debt = max(0, int(final_tuition or 0) - paid_teacher - paid_institute)
+    if charges:
+        debt_teacher = max(0, billed_teacher - paid_teacher)
+        debt_institute = max(0, billed_institute - paid_institute)
+    else:
+        debt_teacher = 0
+        debt_institute = debt
+    return {
+        "tuition": int(final_tuition or 0),
+        "paid_teacher": paid_teacher,
+        "paid_institute": paid_institute,
+        "debt_teacher": debt_teacher,
+        "debt_institute": debt_institute,
+        "debt": debt,
+    }
 
 
 # FIX: H5/H6 - منطق یگانه‌ی تقسیم سهم جلسه؛ استخراج‌شده از submit/edit تا فقط یک‌بار نوشته/تست شود.

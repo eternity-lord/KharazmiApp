@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Header
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Header, Query
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional, Union
 from sqlalchemy import desc, or_, text, func, case
@@ -338,6 +338,7 @@ def reject_class(
     db: Session = Depends(get_db),
     _: str = Depends(check_admin_access),
     authorization: Optional[str] = Header(None),
+    reason: Optional[str] = Query(None, description="علت رد درخواست کلاس"),
 ):
     """رد و آرشیو کلاس (مسیر «کلاس در انتظار تایید» در اپ).
 
@@ -358,6 +359,10 @@ def reject_class(
     if not c:
         raise HTTPException(status_code=404, detail="کلاس یافت نشد")
 
+    clean_reason = (reason or "").strip()
+    if not clean_reason:
+        clean_reason = "رد درخواست توسط مدیر"
+    c.rejection_reason = clean_reason
     snapshot = _build_class_deletion_snapshot(db, c)
     # idempotent: اعمال دوباره بی‌اثر است (حذف‌های نرم، claim اتمیک در perform_delete_enrollment)
     _apply_class_deletion(db, c, True)
@@ -381,8 +386,12 @@ def reject_class(
             decided_at=datetime.datetime.now(),
             decided_by_user_id=_actor_user_id,
         ))
+    db.add(ActivityLog(
+        admin_username="group6", action="class_reject", target_id=c.id,
+        target_name=c.title, details=clean_reason
+    ))
     db.commit()
-    return {"message": "کلاس رد و حذف شد و ترازهای مالی اصلاح گردید."}
+    return {"message": "کلاس رد و حذف شد و ترازهای مالی اصلاح گردید.", "reason": clean_reason}
 
 
 # ==========================================
@@ -622,10 +631,16 @@ def get_pending_classes(db: Session = Depends(get_db), authorization: Optional[s
     courses = courses.all()
 
     result = []
+    # صف قدیمیِ اپ با قرارداد backward-compatible غنی می‌شود؛ تصمیم نهایی همچنان
+    # از endpoint امن approve/bulk انجام می‌شود.
+    from routers.classes import check_scheduling_conflicts
     for c in courses:
         # 2. پیدا کردن نام معلم برای نمایش
         teacher = db.query(Teacher).filter(Teacher.id == c.teacher_id).first()
-        t_name = f"{teacher.first_name} {teacher.last_name}" if teacher else "نامشخص"
+        t_name = f"{teacher.first_name or ''} {teacher.last_name or ''}".strip() if teacher else "نامشخص"
+        conflicts = check_scheduling_conflicts(
+            db, c.teacher_id, c.days_of_week or "", c.class_time or "", c.id
+        )
 
         # 3. ساخت دیکشنری دقیقاً با کلیدهایی که اندروید منتظر آن است
         # نکته کلیدی: نام سمت چپ (داخل گیومه) باید با متغیرهای AppModels.kt یکی باشد
@@ -641,10 +656,21 @@ def get_pending_classes(db: Session = Depends(get_db), authorization: Optional[s
             {
                 "id": c.id,
                 "title": c.title,
+                "code": c.code,
+                "teacher_id": c.teacher_id,
                 "teacher_name": t_name,  # اندروید: teacher_name
                 "teacher_price": c.teacher_session_price,  # اندروید: teacher_price (در دیتابیس teacher_session_price است)
                 "days": c.days_of_week,  # اندروید: days (در دیتابیس days_of_week است)
+                "days_of_week": c.days_of_week,
                 "time": c.class_time,  # اندروید: time (در دیتابیس class_time است)
+                "class_time": c.class_time,
+                "capacity": c.capacity,
+                "branch_id": c.branch_id,
+                "status": "rejected" if c.rejection_reason else "pending",
+                "rejection_reason": c.rejection_reason,
+                "pending_since": c.pending_since.isoformat() if c.pending_since else None,
+                "conflict_course_ids": [item.id for item in conflicts],
+                "has_schedule_conflict": bool(conflicts),
                 "base_institute_share": _base_inst_share,  # FIX (audit-v2/blind-approve-2b): مبنای واقعی H5؛ صفر یعنی پیش‌پرداخت/نبود تعرفه
             }
         )
@@ -660,7 +686,24 @@ def approve_class(course_id: int, db: Session = Depends(get_db), _: str = Depend
     c = db.query(Course).filter(Course.id == course_id, Course.is_deleted == False).first()
     if not c:  # FIX H10-S2: قبلاً None-check نداشت (500) — هم‌سبک reject_class همسایه
         raise HTTPException(status_code=404, detail="کلاس یافت نشد")
+    # همان guard صف گروهی برای تأیید تکی؛ تأیید کلاسِ متداخل نباید با مسیر قدیمی
+    # دور زده شود.
+    from routers.classes import check_scheduling_conflicts
+    conflicts = check_scheduling_conflicts(
+        db, c.teacher_id, c.days_of_week or "", c.class_time or "", c.id
+    )
+    if conflicts:
+        raise HTTPException(
+            status_code=409,
+            detail={"message": "تداخل زمان‌بندی وجود دارد", "conflict_course_ids": [item.id for item in conflicts]},
+        )
     c.is_admin_approved = True
+    c.rejection_reason = None
+    c.pending_since = None
+    db.add(ActivityLog(
+        admin_username="group6", action="class_approve", target_id=c.id,
+        target_name=c.title, details="تأیید تکی پس از بررسی ظرفیت و تداخل زمان‌بندی"
+    ))
     db.commit()
     # FIX (audit-v2/blind-approve-2c): هشدار غیرمسدودکننده برای نرخ بالای سقف (اشتباه تایپی
     # موقع ثبت). مسدود نکردیم: کلاس VIP مشروع هم می‌تواند بالای سقف باشد و 400 فلو تأیید اپ را
@@ -2197,3 +2240,134 @@ def update_teacher_credentials(id: int, data: TeacherCredentialsUpdateRequest, d
     return {
         "message": "اطلاعات تماس و حساب بانکی معلم با موفقیت به‌روزرسانی شد"
     }
+
+
+# ===================== گروه ۶: تاریخچهٔ جلسهٔ ادمین =====================
+def _session_problem_flags(db: Session, session: SessionLog) -> list[str]:
+    enrollments = db.query(func.count(Enrollment.id)).filter(
+        Enrollment.course_id == session.course_id, Enrollment.is_deleted == False
+    ).scalar() or 0
+    attendance_count = db.query(func.count(Attendance.id)).filter(
+        Attendance.session_id == session.id, Attendance.is_deleted == False
+    ).scalar() or 0
+    flags = []
+    if enrollments and attendance_count < enrollments:
+        flags.append("attendance_missing")
+    if session.start_time and session.time and session.start_time != session.time:
+        flags.append("started_late")
+    if str(session.status or "").lower() in ("auto_ended", "auto-ended", "automatically_ended"):
+        flags.append("auto_ended")
+    return flags
+
+
+@router.get("/admin/session_history")
+def admin_session_history(
+    date_from: Optional[str] = None, date_to: Optional[str] = None,
+    teacher_id: Optional[int] = None, course_id: Optional[int] = None,
+    flag: Optional[str] = None, status: Optional[str] = None,
+    search: Optional[str] = None, export: bool = False,
+    db: Session = Depends(get_db), _: str = Depends(check_admin_access)
+):
+    query = db.query(SessionLog).join(Course).filter(SessionLog.is_deleted == False)
+    if teacher_id is not None:
+        query = query.filter(Course.teacher_id == teacher_id)
+    if course_id is not None:
+        query = query.filter(SessionLog.course_id == course_id)
+    if status:
+        query = query.filter(SessionLog.status == status)
+    rows = query.order_by(desc(SessionLog.id)).all()
+    from today_summary import parse_project_date
+    date_from_parsed = parse_project_date(date_from) if date_from else None
+    date_to_parsed = parse_project_date(date_to) if date_to else None
+    search_term = (search or "").strip().lower()
+    items = []
+    for session in rows:
+        session_date = parse_project_date(session.date)
+        if date_from_parsed and (session_date is None or session_date < date_from_parsed):
+            continue
+        if date_to_parsed and (session_date is None or session_date > date_to_parsed):
+            continue
+        teacher = db.query(Teacher).filter(Teacher.id == session.course.teacher_id).first() if session.course else None
+        teacher_name = f"{teacher.first_name or ''} {teacher.last_name or ''}".strip() if teacher else "بدون معلم"
+        course_title = session.course.title if session.course else "کلاس نامشخص"
+        if search_term and search_term not in " ".join((course_title or "", teacher_name, str(session.course_id))).lower():
+            continue
+        flags = _session_problem_flags(db, session)
+        if flag and flag not in flags:
+            continue
+        attendance_rows = db.query(Attendance).filter(
+            Attendance.session_id == session.id, Attendance.is_deleted == False
+        ).all()
+        charge_total = db.query(func.coalesce(func.sum(Transaction.amount * -1), 0)).filter(
+            Transaction.session_id == session.id, Transaction.type == "session_charge",
+            Transaction.is_deleted == False, Transaction.is_reversed == False,
+        ).scalar() or 0
+        billed_count = sum(1 for attendance in attendance_rows if attendance.is_billed)
+        items.append({
+            "id": session.id, "course_id": session.course_id,
+            "course_title": course_title, "teacher_id": session.course.teacher_id if session.course else None,
+            "teacher_name": teacher_name,
+            "branch_id": session.course.branch_id if session.course else None,
+            "date": session.date, "time": session.time, "start_time": session.start_time,
+            "end_time": session.end_time, "status": session.status,
+            "attendance_count": len(attendance_rows),
+            "attendance": [
+                {"student_id": row.student_id,
+                 "student_name": (f"{row.student.first_name or ''} {row.student.last_name or ''}".strip()
+                                   if row.student else "دانش‌آموز نامشخص"),
+                 "status": row.status, "excused": bool(row.excused), "is_billed": bool(row.is_billed)}
+                for row in attendance_rows
+            ],
+            "financial_status": {
+                "charge_amount": int(charge_total), "billed_attendance_count": billed_count,
+                "penalty_settled": bool(session.is_penalty_settled),
+                "has_financial_effect": bool(charge_total or billed_count or session.is_penalty_settled),
+            },
+            "problem_flags": flags,
+            "attendance_missing": "attendance_missing" in flags,
+            "started_late": "started_late" in flags,
+            "auto_ended": "auto_ended" in flags,
+            "reopen_allowed": not db.query(Attendance).filter(
+                Attendance.session_id == session.id, Attendance.is_billed == True
+            ).first() and not session.is_penalty_settled,
+        })
+    if not export:
+        return {"items": items, "count": len(items), "filters": {
+            "date_from": date_from, "date_to": date_to, "teacher_id": teacher_id,
+            "course_id": course_id, "flag": flag, "status": status, "search": search
+        }}
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "session_history"
+    ws.append(["id", "course", "teacher", "date", "time", "status", "flags", "attendance_count",
+               "billed_attendance_count", "charge_amount", "penalty_settled"])
+    for item in items:
+        financial = item["financial_status"]
+        ws.append([item["id"], item["course_title"], item["teacher_name"], item["date"], item["time"],
+                   item["status"], ",".join(item["problem_flags"]), item["attendance_count"],
+                   financial["billed_attendance_count"], financial["charge_amount"], financial["penalty_settled"]])
+    stream = io.BytesIO()
+    wb.save(stream)
+    stream.seek(0)
+    return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                             headers={"Content-Disposition": "attachment; filename=session_history.xlsx"})
+
+
+@router.post("/admin/session_history/{session_id}/reopen")
+def reopen_admin_session(
+    session_id: int, reason: str, db: Session = Depends(get_db), _: str = Depends(check_admin_access)
+):
+    if not reason or not reason.strip():
+        raise HTTPException(status_code=400, detail="علت بازگشایی جلسه الزامی است")
+    session = db.query(SessionLog).filter(SessionLog.id == session_id, SessionLog.is_deleted == False).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="جلسه یافت نشد")
+    if session.is_penalty_settled or db.query(Attendance).filter(
+        Attendance.session_id == session.id, Attendance.is_billed == True
+    ).first():
+        raise HTTPException(status_code=409, detail="جلسهٔ دارای اثر مالی قابل بازگشایی نیست")
+    session.status = "Reopened"
+    db.add(ActivityLog(admin_username="group6", action="session_reopen",
+                        target_id=session.id, target_name=str(session.course_id), details=reason.strip()))
+    db.commit()
+    return {"message": "جلسه برای اصلاح حضور و غیاب باز شد", "session_id": session.id}

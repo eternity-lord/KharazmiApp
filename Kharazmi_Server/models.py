@@ -207,6 +207,11 @@ class Course(Base):
 
     # 👇👇👇 فیلد جدید: وضعیت تعلیق کلاس 👇👇👇
     is_suspended = Column(Boolean, default=False)
+    # گروه ۶: توقف موقت مستقل از تعلیق کامل؛ ثبت‌نام‌های فعلی حفظ می‌شوند.
+    is_paused = Column(Boolean, default=False)
+    capacity = Column(Integer, nullable=True)
+    rejection_reason = Column(Text, nullable=True)
+    pending_since = Column(DateTime, nullable=True)
     is_deleted = Column(Boolean, default=False) # جدید 🆕
 
     teacher = relationship("Teacher", back_populates="courses")
@@ -252,6 +257,8 @@ class Transaction(Base):
     remittance_number = Column(Integer, index=True, nullable=True) # جدید 🆕
     branch_id = Column(Integer, ForeignKey("branches.id"), nullable=True)
     session_id = Column(Integer, ForeignKey("session_logs.id"), nullable=True) # جدید برای رهگیری جلسات 🆕
+    # گروه ۶: link قابل‌ردگیری بین payout/reversal و aggregate settlement.
+    settlement_id = Column(Integer, nullable=True, index=True)
 
     student_id = Column(Integer, ForeignKey("students.id"), nullable=True)
     enrollment_id = Column(Integer, ForeignKey("enrollments.id"), nullable=True)
@@ -472,6 +479,13 @@ class Settlement(Base):
     teacher_id = Column(Integer, ForeignKey("teachers.id"))
     total_amount = Column(BigInteger, default=0)
     session_count = Column(Integer, default=0)
+    # گروه ۶: snapshot شناسهٔ sessionها؛ immutable audit scope برای reverse/edit.
+    session_ids_json = Column(Text, nullable=True)
+    payout_transaction_id = Column(Integer, nullable=True)
+    is_reversed = Column(Boolean, default=False)
+    # نوع سند برگشت در Transaction با مقدار settlement_reversal/reversal ثبت می‌شود.
+    reversal_reason = Column(Text, nullable=True)
+    reversed_at = Column(DateTime, nullable=True)
     settled_at = Column(DateTime, default=datetime.datetime.utcnow)
     settled_by_user_id = Column(Integer, ForeignKey("users.id"))
 

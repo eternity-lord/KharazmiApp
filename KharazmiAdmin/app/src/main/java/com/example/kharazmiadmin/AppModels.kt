@@ -629,7 +629,10 @@ data class SettlementHistoryItem(
     // FIX(null-data): مبالغ/تاریخ legacy ممکن است null باشند — null‌پذیر + فال‌بک امن در نمایش.
     val total_amount: Long? = null,
     val session_count: Int = 0,
-    val settled_at: String? = null
+    val settled_at: String? = null,
+    val is_reversed: Boolean = false,
+    val reversal_reason: String? = null,
+    val session_ids: List<Int> = emptyList()
 )
 
 data class BulkSmsRequest(val student_ids: List<Int>)

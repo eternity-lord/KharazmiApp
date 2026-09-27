@@ -21,6 +21,7 @@ import com.google.android.material.tabs.TabLayout
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import retrofit2.HttpException
 import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
@@ -417,6 +418,17 @@ class TeacherProfileActivity : BaseActivity() {
         }
     }
 
+    private fun settlementError(action: String, error: Exception): String {
+        if (error is HttpException) {
+            val body = error.response()?.errorBody()?.string().orEmpty()
+            val detail = try {
+                org.json.JSONObject(body).optString("detail")
+            } catch (_: Exception) { "" }
+            return "$action ناموفق بود (HTTP ${error.code()})" + if (detail.isNotBlank()) ": $detail" else ""
+        }
+        return "$action ناموفق بود: ${error.message ?: "خطای شبکه"}"
+    }
+
     private fun reverseSettlement(item: SettlementHistoryItem) {
         AlertDialog.Builder(this)
             .setTitle("برگشت امن تسویه")
@@ -429,7 +441,9 @@ class TeacherProfileActivity : BaseActivity() {
                         withContext(Dispatchers.Main) { fetchSettlementData() }
                     } catch (error: Exception) {
                         if (error is kotlinx.coroutines.CancellationException) throw error
-                        withContext(Dispatchers.Main) { Toast.makeText(this@TeacherProfileActivity, "برگشت انجام نشد", Toast.LENGTH_SHORT).show() }
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(this@TeacherProfileActivity, settlementError("برگشت تسویه", error), Toast.LENGTH_LONG).show()
+                        }
                     }
                 }
             }
@@ -449,7 +463,9 @@ class TeacherProfileActivity : BaseActivity() {
                         withContext(Dispatchers.Main) { fetchSettlementData() }
                     } catch (error: Exception) {
                         if (error is kotlinx.coroutines.CancellationException) throw error
-                        withContext(Dispatchers.Main) { Toast.makeText(this@TeacherProfileActivity, "تعدیل انجام نشد", Toast.LENGTH_SHORT).show() }
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(this@TeacherProfileActivity, settlementError("تعدیل تسویه", error), Toast.LENGTH_LONG).show()
+                        }
                     }
                 }
             }.setNegativeButton("انصراف", null).show()
@@ -741,6 +757,7 @@ class SettlementHistoryAdapter(
 ) : RecyclerView.Adapter<SettlementHistoryAdapter.VH>() {
     class VH(v: View) : RecyclerView.ViewHolder(v) {
         val tvSettledAmount: TextView = v.findViewById(R.id.tvSettledAmount)
+        val tvSettlementDocument: TextView = v.findViewById(R.id.tvSettlementDocument)
         val tvSettledDate: TextView = v.findViewById(R.id.tvSettledDate)
         val tvSessionCount: TextView = v.findViewById(R.id.tvSessionCount)
         val btnReverseSettlement: View = v.findViewById(R.id.btnReverseSettlement)
@@ -758,8 +775,12 @@ class SettlementHistoryAdapter(
         try {
             val amt = item.total_amount ?: 0L
             holder.tvSettledAmount.text = holder.itemView.context.getString(R.string.portal_money, String.format(java.util.Locale.US, "%,d", amt))
+            holder.tvSettlementDocument.text = "سند تسویه #${item.id} | ${if (item.is_reversed) "برگشت‌خورده" else "فعال"}" +
+                (item.reversal_reason?.let { " | علت: $it" } ?: "")
             holder.tvSettledDate.text = holder.itemView.context.getString(R.string.tprof_settled_date, item.settled_at ?: "")
             holder.tvSessionCount.text = holder.itemView.context.getString(R.string.tprof_sessions, item.session_count)
+            holder.btnReverseSettlement.visibility = if (item.is_reversed) View.GONE else View.VISIBLE
+            holder.btnEditSettlement.visibility = if (item.is_reversed) View.GONE else View.VISIBLE
             holder.btnReverseSettlement.setOnClickListener { onReverse(item) }
             holder.btnEditSettlement.setOnClickListener { onEdit(item) }
         } catch (e: Exception) {

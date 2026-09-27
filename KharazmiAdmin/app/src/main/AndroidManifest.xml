@@ -204,6 +204,10 @@
             android:name=".AdminDashboardActivity"
             android:exported="false"
             android:label="داشبورد مدیریت" />
+        <activity
+            android:name=".DebtorsActivity"
+            android:exported="false"
+            android:label="داشبورد بدهکاران" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

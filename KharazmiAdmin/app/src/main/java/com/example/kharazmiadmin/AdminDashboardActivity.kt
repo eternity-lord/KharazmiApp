@@ -134,9 +134,9 @@ class AdminDashboardActivity : BaseActivity() {
             startActivity(Intent(this, AuditDashboardActivity::class.java))
         }
         btnDebtors.setOnClickListener {
-            Toast.makeText(this, getString(R.string.dashboard_debtors_coming_soon), Toast.LENGTH_LONG).show()
-            // Optionally open ReportActivity with debtors tab if exists
-            // startActivity(Intent(this, ReportActivity::class.java))
+            // این کارت قبلاً فقط پیام «به‌زودی» نشان می‌داد؛ حالا به گزارش واقعی
+            // بدهکاران با جست‌وجو، تفکیک معلم/سن بدهی و پروفایل دانش‌آموز وصل است.
+            startActivity(Intent(this, DebtorsActivity::class.java))
         }
 
         // Financial Audit Trail — تاریخچه تغییرات مالی (admin only)

@@ -13,5 +13,10 @@
         <EditText android:id="@+id/etSessionDateTo" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:hint="تا تاریخ 1405/12/29" />
         <EditText android:id="@+id/etSessionSearch" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:hint="جستجوی کلاس/معلم" />
     </LinearLayout>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+        <EditText android:id="@+id/etSessionStatus" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:hint="وضعیت جلسه" />
+        <EditText android:id="@+id/etSessionTeacherId" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:hint="شناسه معلم" android:inputType="number" />
+        <EditText android:id="@+id/etSessionCourseId" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:hint="شناسه کلاس" android:inputType="number" />
+    </LinearLayout>
     <androidx.recyclerview.widget.RecyclerView android:id="@+id/rvAdminSessionHistory" android:layout_width="match_parent" android:layout_height="match_parent" />
 </LinearLayout>

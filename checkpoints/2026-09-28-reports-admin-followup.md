@@ -23,7 +23,7 @@
 
 - `ast.parse` روی همهٔ فایل‌های Python موفق.
 - import واقعی `main` روی copy از `Kharazmi_Server/gaj_db.db` موفق؛ OpenAPI مسیرهای settlement، financial، financial Excel و session history را ثبت کرد. DB اصلی برای probe تغییر نکرد.
-- سوئیت کامل backend با virtualenv موقت و DB خارج از repository: **1183 passed, 75 warnings**.
+- سوئیت کامل backend با virtualenv موقت و DB خارج از repository: **1185 passed, 76 warnings**.
 - `git diff --check` موفق.
 - Android compile طبق قرارداد پروژه اجرا نشد؛ بررسی Android با مدل‌های backward-compatible، routeها و تست‌های static انجام شد.
 

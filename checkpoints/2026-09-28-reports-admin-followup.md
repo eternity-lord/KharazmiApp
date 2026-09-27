@@ -17,6 +17,7 @@
 - تاریخچه settlement پروفایل معلم اکنون شماره سند، وضعیت active/reversed و علت reversal را نمایش می‌دهد و خطای HTTP واقعی را به ادمین نشان می‌دهد؛ probe با دادهٔ ساختگی معتبر برای reverse و edit هر دو HTTP 200 بود.
 - بازبینی نهایی یک مسیر ثبت‌نام دیگر را پیدا کرد: `students/register_and_enroll` هنوز شهریهٔ صفر را رد می‌کرد؛ شرط به «فقط منفی ممنوع» اصلاح و regression مستقل اضافه شد.
 - خروجی بدهکاران با هدر authorization شعبهٔ مؤثر را رعایت می‌کند؛ برای `branch_id` ناموجود به‌جای نشان دادن legacyهای بی‌شعبه خروجی خالی می‌دهد تا scope اشتباه نشود.
+- probe فقط روی `/tmp/kharazmi-real-copy.db` انجام شد: DB source در زمان probe فقط ۱ teacher، ۰ settlement، ۱ transaction و ۰ session داشت؛ `GET /teachers/1/settlement_history` پاسخ ۲۰۰ با لیست خالی داد و هیچ settlement واقعی برای بازتولید ۴۰۴ وجود نداشت. خروجی CSV بدهکاران روی همین copy با HTTP ۲۰۰ تولید شد.
 
 ## بررسی و تست
 

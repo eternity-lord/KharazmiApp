@@ -21,12 +21,12 @@ import datetime
 import io
 from typing import Iterator, List, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header
 from fastapi.responses import StreamingResponse
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
-from models import Enrollment, Installment, Student
+from models import Branch, Enrollment, Installment, Student
 from dependencies import get_db, check_admin_access
 from financial_calculations import calculate_student_debt
 from today_summary import jalali_date_string, parse_project_date
@@ -99,6 +99,7 @@ def _iter_debtor_rows(db: Session, resolved_branch: Optional[int]) -> Iterator[L
 @router.get("/exports/debtors")
 def export_debtors(
     branch_id: Optional[int] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
     _: str = Depends(check_admin_access),
 ):
@@ -106,7 +107,10 @@ def export_debtors(
     # lazy import (سبک dashboard.py): از finance.py فقط تابع هلپر خوانده می‌شود، نه اندپوینت
     from routers.finance import get_user_branch_filter
 
-    resolved_branch = get_user_branch_filter(db, None, branch_id)
+    # شعبهٔ ناموجود نباید با سیاست legacy (`branch_id=NULL`) اشتباه شود و ردیف سراسری برگرداند.
+    # برای شعبهٔ معتبر، ردیف‌های legacy همچنان طبق قرارداد گزارش بدهکاران قابل مشاهده‌اند.
+    invalid_requested_branch = branch_id is not None and db.query(Branch).filter(Branch.id == branch_id).first() is None
+    resolved_branch = get_user_branch_filter(db, authorization, branch_id)
 
     header = [
         "شناسه",
@@ -120,7 +124,8 @@ def export_debtors(
         "تاریخ آخرین پرداخت",  # FIX (گروه۲/آیتم۹): ستون‌های پیگیری عملی
         "قدمت بدهی (روز)",
     ]
-    return _csv_response("debtors.csv", header, _iter_debtor_rows(db, resolved_branch))
+    rows = iter(()) if invalid_requested_branch else _iter_debtor_rows(db, resolved_branch)
+    return _csv_response("debtors.csv", header, rows)
 
 
 # ==========================================

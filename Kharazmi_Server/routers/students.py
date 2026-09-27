@@ -172,9 +172,10 @@ def register_and_enroll_student(
                 if course.teacher_id != _teacher.id:
                     raise HTTPException(status_code=403, detail="شما فقط می‌توانید برای کلاس‌های خودتان دانش‌آموز ثبت کنید")
 
-            # شهریه ثبت‌نام واقعی باید مثبت باشد (ثبت بدون کلاس اصلاً وارد این شاخه نمی‌شود)
-            if req.total_tuition is None or req.total_tuition <= 0:
-                raise HTTPException(status_code=400, detail="شهریه ثبت‌نام باید بیشتر از صفر باشد")
+            # شهریهٔ پایهٔ صفر یعنی دانش‌آموز رایگان/معاف و باید با مسیر
+            # /enrollments/add و EnrollmentCreate یک قرارداد داشته باشد؛ فقط منفی نامعتبر است.
+            if req.total_tuition is None or req.total_tuition < 0:
+                raise HTTPException(status_code=400, detail="شهریه ثبت‌نام نمی‌تواند منفی باشد")
                 
             # بررسی تکراری نبودن ثبت‌نام
             # FIX: Bug 13 - exclude archived Enrollment rows from this active view.

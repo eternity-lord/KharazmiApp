@@ -3,7 +3,6 @@ package com.example.kharazmiadmin
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.print.PrintAttributes
 import android.print.PrintManager
@@ -281,10 +280,8 @@ class ReportActivity : BaseActivity() {
                 printStatementDirect(studentId)
             } ?: Toast.makeText(this, getString(R.string.rpt_no_student), Toast.LENGTH_SHORT).show()
         }
-        btnStatementPay.setOnClickListener {
-            val url = getString(R.string.rpt_payment_link_fallback)
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-        }
+        // دکمهٔ پرداخت فقط پس از دریافت صورت‌حساب و با شناسهٔ واقعی دانش‌آموز فعال می‌شود.
+        btnStatementPay.visibility = View.GONE
     }
 
     private fun setupDateDropdowns() {
@@ -540,8 +537,20 @@ class ReportActivity : BaseActivity() {
                     }.ifEmpty { "تاریخچه پرداختی وجود ندارد" }
                     btnStatementPay.visibility = if (stmt.next_installment != null) View.VISIBLE else View.GONE
                     btnStatementPay.setOnClickListener {
-                        val link = stmt.next_installment?.payment_link ?: stmt.payment_link
-                        if (!link.isNullOrBlank()) startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link)))
+                        // لینک‌های server-side برای پرداخت، POST هستند و نباید با ACTION_VIEW
+                        // به‌صورت GET باز شوند؛ کاربر را به فرم امن ثبت حواله با دادهٔ واقعی می‌بریم.
+                        val teacherRow = stmt.teachers.firstOrNull()
+                        startActivity(Intent(this@ReportActivity, InvoiceActivity::class.java).apply {
+                            putExtra(InvoiceActivity.EXTRA_IS_ADMIN, true)
+                            putExtra(InvoiceActivity.EXTRA_PREFILL_STUDENT_ID, studentId)
+                            putExtra(InvoiceActivity.EXTRA_PREFILL_STUDENT_NAME, stmt.student_name)
+                            putExtra(InvoiceActivity.EXTRA_PREFILL_CLASS_NAME, teacherRow?.course_title ?: "کلاس نامشخص")
+                            putExtra(InvoiceActivity.EXTRA_PREFILL_DEBT, teacherRow?.debt ?: stmt.total_debt_institute)
+                            putExtra(InvoiceActivity.EXTRA_PREFILL_DEBT_TEACHER, teacherRow?.debt_teacher ?: 0L)
+                            putExtra(InvoiceActivity.EXTRA_PREFILL_DEBT_INSTITUTE, teacherRow?.debt_institute ?: stmt.total_debt_institute)
+                            putExtra(InvoiceActivity.EXTRA_PREFILL_ENROLLMENT_ID, teacherRow?.enrollment_id ?: -1)
+                            putExtra(InvoiceActivity.EXTRA_PREFILL_COURSE_ID, teacherRow?.course_id ?: -1)
+                        })
                     }
                 }
             } catch (e: Exception) {

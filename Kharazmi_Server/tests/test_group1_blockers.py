@@ -297,6 +297,25 @@ class TestZeroTuitionEnrollment(Group1World):
         self.assertEqual(self.student.wallet_institute, 0)
         self.assertEqual(self.student.wallet_balance, 0)
 
+    def test_2a_register_and_enroll_route_allows_zero_tuition(self):
+        """رگرسیون مسیر ثبت دانش‌آموز از پنل معلم/ادمین؛ این مسیر قبلاً صفر را با 400 رد می‌کرد."""
+        response = self.client.post("/students/register_and_enroll", json={
+            "first_name": "رایگان", "last_name": "آزمایشی", "father_name": "پدر",
+            "national_code": "1000000001", "birth_date": "1390/01/01",
+            "student_mobile": "09121112223", "parent_mobile": "09123334445",
+            "home_phone": "02100000000", "address": "تهران", "study_status": "فعال",
+            "gender": "male", "course_id": self.course_id, "total_tuition": 0,
+            "paid_amount": 0, "payment_method": "-", "receiver": "-",
+            "discount_type": "none", "discount_value": 0,
+        }, headers=hdr("tok-admin"))
+        self.assertEqual(response.status_code, 200, response.text)
+        row = self.db.query(models.Enrollment).filter(
+            models.Enrollment.course_id == self.course_id,
+            models.Enrollment.total_tuition == 0,
+            models.Enrollment.is_deleted == False,
+        ).first()
+        self.assertIsNotNone(row)
+
     def test_2b_zero_tuition_with_zero_installment_and_discount_still_coherent(self):
         """تخفیف ثابت روی شهریهٔ صفر باید مثل قبل رد شود (پیام واضح، نه خطای عمومی)."""
         resp = self.client.post("/enrollments/add", json={

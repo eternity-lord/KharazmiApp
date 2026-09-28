@@ -219,3 +219,52 @@ def test_invoice_applies_fixed_discount_as_a_fixed_amount(client, auth_headers):
     assert body["final_tuition"] == 1_300_000
     assert body["total_paid"] == 250_000
     assert body["balance_due"] == 1_050_000
+
+
+def test_direct_payment_decrements_each_installment_cover_once(client, auth_headers, db):
+    """Independent FIFO oracle: a 50,000 payment covers only installment 1."""
+    import models
+
+    inst_one = db.get(models.Installment, 1)
+    inst_two = db.get(models.Installment, 2)
+    enrollment = db.get(models.Enrollment, 1)
+    student = db.get(models.Student, 1)
+    before_installments = ((inst_one.is_paid, inst_one.paid_amount, inst_one.paid_at), (inst_two.is_paid, inst_two.paid_amount, inst_two.paid_at))
+    before_paid = enrollment.total_paid
+    before_wallet = (student.wallet_teacher, student.wallet_institute, student.wallet_balance)
+    before_transactions = {row.id for row in db.query(models.Transaction).all()}
+    try:
+        response = client.post(
+            "/finance/pay",
+            json={
+                "student_id": 1, "enrollment_id": 1, "amount": 50_000,
+                "target_wallet": "institute", "description": "پرداخت FIFO ممیزی",
+                "payment_method": "نقدی", "date": "1405/07/06",
+            },
+            headers=_h(auth_headers),
+        )
+        assert response.status_code == 200, response.text
+        db.expire_all()
+        inst_one, inst_two = db.get(models.Installment, 1), db.get(models.Installment, 2)
+        assert (inst_one.is_paid, inst_one.paid_amount) == (False, 50_000)
+        assert (inst_two.is_paid, inst_two.paid_amount) == (False, 100_000)
+        allocation = db.query(models.TransactionInstallmentAllocation).filter(
+            models.TransactionInstallmentAllocation.installment_id == 1,
+            ~models.TransactionInstallmentAllocation.transaction_id.in_(before_transactions),
+        ).one()
+        assert allocation.amount == 50_000
+    finally:
+        new_transactions = db.query(models.Transaction).filter(~models.Transaction.id.in_(before_transactions)).all()
+        new_ids = [row.id for row in new_transactions]
+        if new_ids:
+            db.query(models.TransactionInstallmentAllocation).filter(models.TransactionInstallmentAllocation.transaction_id.in_(new_ids)).delete(synchronize_session=False)
+            for row in new_transactions:
+                db.delete(row)
+        inst_one, inst_two = db.get(models.Installment, 1), db.get(models.Installment, 2)
+        inst_one.is_paid, inst_one.paid_amount, inst_one.paid_at = before_installments[0]
+        inst_two.is_paid, inst_two.paid_amount, inst_two.paid_at = before_installments[1]
+        enrollment = db.get(models.Enrollment, 1)
+        enrollment.total_paid = before_paid
+        student = db.get(models.Student, 1)
+        student.wallet_teacher, student.wallet_institute, student.wallet_balance = before_wallet
+        db.commit()

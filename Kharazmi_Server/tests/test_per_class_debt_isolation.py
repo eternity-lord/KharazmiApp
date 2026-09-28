@@ -6,6 +6,7 @@ an unrelated class row when the student is enrolled in more than one class.
 import asyncio
 import datetime
 import io
+import json
 import unittest
 
 from fastapi import HTTPException
@@ -385,6 +386,64 @@ class TestPerClassDebtIsolation(unittest.TestCase):
         self.assertEqual(teacher_rows[self.course_b.id]["debt_to_institute"], 0)
         self.assertEqual(teacher_rows[self.course_b.id]["course_title"], "کلاس B")
         self.assertEqual(teacher_rows[self.course_b.id]["teacher_name"], "معلم مشترک")
+
+    def test_class_row_sums_equal_class_totals_on_every_export_path(self):
+        classes = {row["id"]: row for row in get_all_classes(db=self.db, _="admin")}
+        for course_id in (self.course_a.id, self.course_b.id):
+            details = get_class_details(
+                course_id=course_id, db=self.db,
+                authorization=self._admin(), sub_role="admin",
+            )
+            full_report = get_class_full_report(
+                id=course_id, db=self.db,
+                authorization=self._admin(), sub_role="admin",
+            )
+            students_full = get_class_students_full(
+                id=course_id, db=self.db,
+                authorization=self._admin(), sub_role="admin",
+            )
+            excel = self._excel_rows(course_id)
+
+            class_total = classes[course_id]["total_debt"]
+            self.assertEqual(sum(row["debt"] for row in details["students"]), class_total)
+            self.assertEqual(sum(row.debt for row in full_report.students), full_report.info.total_debt)
+            self.assertEqual(sum(row["debt"] for row in students_full["students"]), class_total)
+            self.assertEqual(sum(row[10] or 0 for row in excel), class_total)
+            self.assertEqual(full_report.info.total_debt, class_total)
+
+    def test_kotlin_gson_like_response_contract_uses_per_enrollment_debt(self):
+        """Validate the JSON keys consumed by Android without running Android compile."""
+        full = get_class_students_full(
+            id=self.course_b.id, db=self.db,
+            authorization=self._admin(), sub_role="admin",
+        )
+        wire = json.loads(json.dumps(full, ensure_ascii=False))
+        student = wire["students"][0]
+        for key in (
+            "enrollment_id", "debt", "debt_teacher", "debt_institute",
+            "paid", "paid_teacher", "paid_institute", "wallet_teacher", "wallet_institute",
+        ):
+            self.assertIn(key, student)
+        self.assertEqual(student["enrollment_id"], self.enrollment_b.id)
+        self.assertEqual(student["debt"], 0)
+        self.assertEqual(student["debt_teacher"], 0)
+        self.assertEqual(student["debt_institute"], 0)
+        self.assertEqual(student["wallet_teacher"], -300)
+        self.assertEqual(student["wallet_institute"], -200)
+
+        source_root = __import__("pathlib").Path(__file__).parents[2]
+        class_detail = (source_root / "KharazmiAdmin/app/src/main/java/com/example/kharazmiadmin/ClassDetailActivity.kt").read_text()
+        attendance = (source_root / "KharazmiAdmin/app/src/main/java/com/example/kharazmiadmin/AttendanceActivity.kt").read_text()
+        profile = (source_root / "KharazmiAdmin/app/src/main/java/com/example/kharazmiadmin/StudentProfileActivity.kt").read_text()
+        self.assertIn("String.format(\"%,d\", student.debt)", class_detail)
+        self.assertIn("val totalDebt = fullStudent.debt", class_detail)
+        self.assertIn("it.enrollment_id == student.enrollment_id", class_detail)
+        self.assertIn("sumOf { it.paid_teacher }", attendance)
+        self.assertIn("val debtTeacher = student.debt_teacher", attendance)
+        self.assertIn("s.paid_teacher, s.paid_institute", attendance)
+        self.assertIn("val debt = row.debt", profile)
+        self.assertNotIn("student.wallet_teacher", attendance)
+        self.assertNotIn("student.wallet_institute", attendance)
 
     def test_payment_for_b_does_not_change_a_and_legacy_course_payment_is_scoped(self):
         before_a = calculate_enrollment_debt_breakdown(self.db, self.enrollment_a)

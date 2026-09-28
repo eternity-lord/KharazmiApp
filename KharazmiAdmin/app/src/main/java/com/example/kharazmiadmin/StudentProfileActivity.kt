@@ -502,7 +502,7 @@ class StudentProfileActivity : BaseActivity() {
                 if (rows.isNotEmpty()) {
                     sb.append("\nبدهی کلاس‌ها:\n")
                     rows.forEach { row ->
-                        val debt = row.debt_teacher + row.debt_institute
+                        val debt = row.debt
                         if (row.is_unassigned) {
                             sb.append("بدهی بدون کلاس: ${formatCurrency(debt)}\n")
                         } else {

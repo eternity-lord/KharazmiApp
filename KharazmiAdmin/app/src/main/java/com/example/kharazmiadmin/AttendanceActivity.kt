@@ -711,19 +711,17 @@ class AttendanceActivity : BaseActivity() {
                     
                     val totalDebtTeacher = studentsFull.students.sumOf { it.debt_teacher }
                     val totalDebtInstitute = studentsFull.students.sumOf { it.debt_institute }
-                    val totalPaidTeacher = studentsFull.students.sumOf { if ((it.wallet_teacher ?: 0L) > 0) it.wallet_teacher ?: 0L else 0L }
-                    val totalPaidInstitute = studentsFull.students.sumOf { if ((it.wallet_institute ?: 0L) > 0) it.wallet_institute ?: 0L else 0L }
+                    val totalPaidTeacher = studentsFull.students.sumOf { it.paid_teacher }
+                    val totalPaidInstitute = studentsFull.students.sumOf { it.paid_institute }
 
                     // ساخت قالب HTML فیش حضور و غیاب باریک (عرض ۸۰ میلی‌متر)
                     val webView = android.webkit.WebView(this@AttendanceActivity)
                     
                     val studentRows = studentsFull.students.mapIndexed { index, student ->
-                        val balanceTeacher = student.wallet_teacher ?: 0L
-                        val balanceInstitute = student.wallet_institute ?: 0L
-                        val paidTeacher = if (balanceTeacher > 0) balanceTeacher else 0L
-                        val paidInstitute = if (balanceInstitute > 0) balanceInstitute else 0L
-                        val debtTeacher = if (balanceTeacher < 0) abs(balanceTeacher) else 0L
-                        val debtInstitute = if (balanceInstitute < 0) abs(balanceInstitute) else 0L
+                        val paidTeacher = student.paid_teacher
+                        val paidInstitute = student.paid_institute
+                        val debtTeacher = student.debt_teacher
+                        val debtInstitute = student.debt_institute
 
                         """
                         <tr>
@@ -857,9 +855,9 @@ class AttendanceActivity : BaseActivity() {
 
                         paint.textSize = 8f
                         studentsFull.students.forEach { s ->
-                            val balT = s.wallet_teacher ?: 0L
-                            val balI = s.wallet_institute ?: 0L
-                            canvas.drawText(getString(R.string.attendance_pdf_row, s.student_name, if(balT<0) abs(balT) else 0L, if(balI<0) abs(balI) else 0L, if(balT>0) balT else 0L, if(balI>0) balI else 0L), 260f, startY, paint)
+                            val debtT = s.debt_teacher
+                            val debtI = s.debt_institute
+                            canvas.drawText(getString(R.string.attendance_pdf_row, s.student_name, debtT, debtI, s.paid_teacher, s.paid_institute), 260f, startY, paint)
                             startY += 15f
                         }
 

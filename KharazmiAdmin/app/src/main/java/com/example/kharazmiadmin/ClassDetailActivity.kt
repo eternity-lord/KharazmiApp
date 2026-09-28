@@ -274,7 +274,7 @@ class ClassDetailActivity : BaseActivity() {
                     student.student_name,
                     String.format("%,d", student.total_tuition),
                     String.format("%,d", student.paid),
-                    String.format("%,d", student.debt_teacher + student.debt_institute),
+                    String.format("%,d", student.debt),
                     "${String.format("%.1f", student.attendance_rate)}%"
                 )
             }
@@ -743,7 +743,7 @@ class ClassStudentAdapter(
 
         // Try to get full student data if available
         val activity = holder.itemView.context as? ClassDetailActivity
-        val fullStudent = activity?.studentsFullData?.students?.find { it.student_id == student.student_id }
+        val fullStudent = activity?.studentsFullData?.students?.find { it.enrollment_id == student.enrollment_id }
 
         if (fullStudent != null) {
             val dType = fullStudent.discount_type ?: "none"
@@ -765,7 +765,7 @@ class ClassStudentAdapter(
             holder.tvStudentPaid.visibility = View.VISIBLE
 
             // Show detailed debt information
-            val totalDebt = fullStudent.debt_teacher + fullStudent.debt_institute
+            val totalDebt = fullStudent.debt
             if (totalDebt > 0) {
                 val breakdown = holder.itemView.context.getString(R.string.cdetail_debt_break, String.format("%,d", fullStudent.debt_teacher), String.format("%,d", fullStudent.debt_institute))
                 holder.tvStudentDebt.text = holder.itemView.context.getString(R.string.cdetail_debt_total, String.format("%,d", totalDebt), breakdown)

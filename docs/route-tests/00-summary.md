@@ -77,4 +77,4 @@
 - ۳۳ route سه router اول در `blockers.md` assertion مستقل ندارند.
 - exports هنوز به openpyxl/PDF value audit عمیق نشده است؛ sweep فقط response/shape را ثبت کرده است.
 - device checklist عددهای screenهای مهم را دارد، اما اجرای گوشی/compile انجام نشده است.
-- CI remote برای commit sweep سبز است: [run 36408844870](https://github.com/eternity-lord/KharazmiApp/actions/runs/36408844870). Android compile اجرا نشده است.
+- CI remote برای commit sweep سبز است: [run 36409223688](https://github.com/eternity-lord/KharazmiApp/actions/runs/36409223688). Android compile اجرا نشده است.

@@ -41,6 +41,6 @@ Retrofit contract: 151 unique؛ dynamic=1؛ unmatched=0؛ RA-sweep=4 entry
 retry guards: direct payment=1؛ installment=1؛ session charge=1؛ settlement in-scope=0
 ```
 
-آخرین commit ممیزی: `00a13c870e992b2add86f94fa4170ebc20a0fcac` — [CI run 36408844870](https://github.com/eternity-lord/KharazmiApp/actions/runs/36408844870) سبز است.
+آخرین commit ممیزی: `a55bc9aa6cea793dbccf659356a075926390b6cb` — [CI run 36409223688](https://github.com/eternity-lord/KharazmiApp/actions/runs/36409223688) سبز است.
 
 این sweep جای ممیزی عمیق را نمی‌گیرد: registry همهٔ routeها را اجباری کرده، ۳۳ route از finance/attendance/classes در blockers با دلیل صریح بسته شده‌اند و ۱۵۱ route سایر routerها در انتظار نوبت هستند.

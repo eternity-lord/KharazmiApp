@@ -30,11 +30,13 @@ def test_oracle_does_not_need_production_db(db):
     assert_invariants(snapshot)
 
 
-def test_kotlin_contract_detects_known_contract_risk():
+def test_kotlin_contract_accepts_fixed_parent_decimal_score():
     models = discover_models()
-    # ParentExamItem is the known max_score Int/decimal mismatch when present.
+    # RA-parent-01 is fixed: the Android model accepts a fractional max_score.
     if "ParentExamItem" in models:
-        issues = audit_payload("ParentExamItem", {"max_score": 12.5})
-        assert any(issue.kind == "int-parse" and issue.field == "max_score" for issue in issues)
+        issues = audit_payload("ParentExamItem", {
+            "course_title": "ریاضی", "title": "آزمون", "date": "1405/06/25", "max_score": 12.5,
+        })
+        assert not issues
     else:
         pytest.skip("ParentExamItem is not present in the checked-out Android source")

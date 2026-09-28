@@ -1397,14 +1397,7 @@
       "response_class": "List<TeacherClassItem>",
       "role": "teacher",
       "status": 200,
-      "issues": [
-        {
-          "field": "students_preview",
-          "kind": "missing-list",
-          "detail": "کلید لیست در پاسخ نیست؛ UI آن را خالی می‌بیند",
-          "line": 30
-        }
-      ],
+      "issues": [],
       "model": "TeacherClassItem"
     },
     {
@@ -1525,6 +1518,6 @@
     "parse": 0,
     "npe": 0,
     "silent_zero": 0,
-    "missing_key": 1
+    "missing_key": 0
   }
 }

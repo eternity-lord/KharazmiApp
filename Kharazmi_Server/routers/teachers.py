@@ -370,6 +370,7 @@ def get_teacher_incomplete_classes(
                 "code": c.code,
                 "grade_level": c.grade_level,
                 "bg_color": c.bg_color or "#FFFFFF",
+                "students_preview": [],
             })
     return result
 

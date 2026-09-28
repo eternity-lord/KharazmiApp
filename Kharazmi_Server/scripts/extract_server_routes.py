@@ -136,19 +136,23 @@ def extract(output: Path | None) -> list[dict[str, str]]:
     document = main.app.openapi()
     rows: list[dict[str, str]] = []
 
-    def registered_routes(routes):
+    def registered_routes(routes, inherited_prefix=""):
         # FastAPI 0.141 stores included routers as _IncludedRouter objects;
-        # their original_router.routes contain the APIRoute objects used by
-        # OpenAPI and by Starlette dispatch.
+        # their original_router.routes contain the APIRoute objects.  The
+        # include context carries a prefix that is not always copied into
+        # APIRoute.path, so retain it explicitly for the full-path contract.
         for item in routes:
             if isinstance(item, APIRoute):
-                yield item
+                full_path = inherited_prefix.rstrip("/") + item.path
+                yield item, (full_path or "/")
             else:
                 nested = getattr(item, "original_router", None)
                 if nested is not None:
-                    yield from registered_routes(nested.routes)
+                    context = getattr(item, "include_context", None)
+                    prefix = getattr(context, "prefix", "") if context is not None else ""
+                    yield from registered_routes(nested.routes, inherited_prefix + prefix)
 
-    for route in registered_routes(main.app.routes):
+    for route, full_path in registered_routes(main.app.routes):
         endpoint = route.endpoint
         while hasattr(endpoint, "__wrapped__"):
             endpoint = endpoint.__wrapped__
@@ -172,11 +176,13 @@ def extract(output: Path | None) -> list[dict[str, str]]:
                 relative = str(resolved_source.relative_to(root))
             except ValueError:
                 relative = str(resolved_source)
-        operation = next((document.get("paths", {}).get(route.path, {}).get(method.lower()) for method in route.methods), {}) or {}
+        operation = next((document.get("paths", {}).get(full_path, {}).get(method.lower()) for method in route.methods), {}) or {}
+        if not operation:
+            operation = next((document.get("paths", {}).get(route.path, {}).get(method.lower()) for method in route.methods), {}) or {}
         reads, writes, columns, effects = _source_facts(source)
         rows.append({
             "method": ",".join(sorted(route.methods or [])),
-            "path": route.path,
+            "path": full_path,
             "handler": f"{endpoint.__module__}.{endpoint.__qualname__}",
             "file:line": f"{relative}:{line}",
             "input": _operation_inputs(operation),

@@ -15,7 +15,7 @@
 | اولویت | router | route | وضعیت | commit گزارش |
 |---:|---|---:|---|---|
 | 1 | finance | 26 | **ممیزی اولیه انجام شد**؛ 11 route تست مقداری/DB دارند و همهٔ 26 route در inventory حاضرند | این turn |
-| 2 | attendance | 15 | scaffold صریح؛ functional audit هنوز انجام نشده | — |
+| 2 | attendance | 15 | **ممیزی اولیه انجام شد**؛ 10 route تست مقداری/ماشین‌حالت دارند و همهٔ 15 route در inventory حاضرند | این turn |
 | 3 | classes | 21 | scaffold صریح؛ functional audit هنوز انجام نشده | — |
 | 4 | admin | 41 | scaffold صریح؛ functional audit هنوز انجام نشده | — |
 | 5 | teachers | 18 | scaffold صریح؛ functional audit هنوز انجام نشده | — |
@@ -38,4 +38,4 @@ command: /tmp/route-audit-venv/bin/python -m pytest tests/route_audit -q
 result: 36 passed, 4 xfailed
 ```
 
-این عدد به معنی ممیزی کامل رفتاری ۲۲۱ route نیست: registry همهٔ routeها را اجباری کرده، اما routeهای غیر finance در docs به‌صورت «مسدود/در انتظار نوبت router» ثبت شده‌اند.
+این عدد به معنی ممیزی کامل رفتاری ۲۲۱ route نیست: registry همهٔ routeها را اجباری کرده، اما routeهای غیر finance/attendance در docs به‌صورت «مسدود/در انتظار نوبت router» ثبت شده‌اند.

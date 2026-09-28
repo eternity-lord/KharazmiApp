@@ -114,13 +114,10 @@ class TestItem10SettlementPopupButton(unittest.TestCase):
 class TestItem11TeacherDashboardInvoiceButton(unittest.TestCase):
     """آیتم ۱۱ — حذف «ثبت حواله» از داشبورد معلم.
 
-    ریشه: `TeacherDashboardActivity` کارت `cardFastInvoice` را **بدون هیچ چک نقشی**
-    به `InvoiceActivity` وصل می‌کرد، در حالی که این صفحه فقط پنل معلم است
-    (`LoginActivity` تنها وقتی `response.role == "teacher"` باشد اینجا می‌آید و
-    `EditStudentActivity.returnToDashboard` هم فقط برای `userRole == "teacher"`).
-    ثبت حواله/وصول پول کار ادمین/منشی است ⇒ نباید در پنل معلم دیده شود.
-    چک نقش، همان الگوی غالب پروژه است: `UserCreds` → `USER_SUB_ROLE`
-    (مثل `ClassDetailActivity:334` و `StudentProfileActivity:275`) — الگوی جدید نساختیم.
+    ریشه: کارت `cardFastInvoice` هنوز در layout وجود دارد، اما ثبت حواله/وصول پول
+    کار ادمین/منشی است و نباید در پنل معلم دیده شود. رفتار درست فعلی با همان الگوی
+    موجود پروژه پیاده شده است: `UserCreds` → `USER_SUB_ROLE` و گارد `isAdminUser`؛
+    غیرادمین کارت را نمی‌بیند و listener فقط در شاخهٔ ادمین نصب می‌شود.
     """
 
     def test_11a_fast_invoice_card_is_role_gated_and_hidden(self):
@@ -130,18 +127,26 @@ class TestItem11TeacherDashboardInvoiceButton(unittest.TestCase):
         self.assertRegex(body, r'getSharedPreferences\("UserCreds"')
         self.assertRegex(body, r'getString\("USER_SUB_ROLE",\s*"admin"\)')
         gate = body[body.index("USER_SUB_ROLE"):]
-        self.assertRegex(gate, r'subRole\s*!=\s*"admin"',
-                         "باید شاخهٔ «غیر ادمین» داشته باشد")
-        self.assertRegex(gate, r"cardFastInvoice\.visibility\s*=\s*(android\.view\.)?View\.GONE",
-                         "کارت ثبت حواله باید برای معلم پنهان شود")
+        self.assertRegex(
+            gate,
+            r'isAdminUser\s*=\s*subRole\s*==\s*"admin"\s*&&\s*userRole\s*!=\s*"teacher"',
+            "گارد باید ادمین را از معلم تشخیص دهد",
+        )
+        self.assertRegex(
+            gate,
+            r"cardFastInvoice\.visibility\s*=\s*(android\.view\.)?View\.GONE",
+            "کارت ثبت حواله باید برای معلم پنهان شود",
+        )
 
     def test_11b_the_invoice_shortcut_only_stays_for_admin(self):
-        """listener باید **بعد از** گارد نقش بیاید ⇒ برای معلم هرگز ثبت نمی‌شود."""
+        """listener باید فقط داخل شاخهٔ ادمین باشد و برای معلم نصب نشود."""
         body = function_body(kt("TeacherDashboardActivity.kt"), "onCreate")
         gate = body[body.index("USER_SUB_ROLE"):]
-        self.assertGreater(gate.index("cardFastInvoice.setOnClickListener"),
-                           gate.index('subRole != "admin"'),
-                           "ثبت listener باید داخل شاخهٔ ادمین باشد، نه قبل از گارد نقش")
+        self.assertRegex(
+            gate,
+            r"(?s)if\s*\(!isAdminUser\)\s*\{.*?cardFastInvoice\.visibility\s*=\s*(?:android\.view\.)?View\.GONE.*?\}\s*else\s*\{.*?cardFastInvoice\.setOnClickListener",
+            "listener ثبت حواله باید فقط در شاخهٔ ادمین باشد",
+        )
 
     def test_11c_other_teacher_dashboard_shortcuts_are_untouched(self):
         """فقط «ثبت حواله» حذف می‌شود؛ بقیهٔ میان‌برهای پنل معلم سر جایشان می‌مانند."""

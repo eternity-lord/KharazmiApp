@@ -18,6 +18,7 @@ CLASSES_ROUTES = [
     ("GET", "/classes/{id}/full_report"), ("GET", "/classes/{id}/students_full"),
     ("POST", "/enrollments/add"), ("POST", "/enrollments/add_bulk"), ("DELETE", "/enrollments/{enrollment_id}"),
 ]
+ROUTE_IDS = [f"{method} {path}" for method, path in CLASSES_ROUTES]
 
 
 def test_classes_route_inventory_is_explicit(client):

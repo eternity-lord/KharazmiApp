@@ -21,6 +21,7 @@ ATTENDANCE_ROUTES = [
     ("POST", "/attendance/{session_id}/end_live"),
     ("POST", "/attendance/{session_id}/live_status"),
 ]
+ROUTE_IDS = [f"{method} {path}" for method, path in ATTENDANCE_ROUTES]
 
 
 def test_attendance_route_inventory_is_explicit(client):

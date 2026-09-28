@@ -11,7 +11,7 @@
 | route با functional assertion مقداری در این نوبت | 29 | finance: 11؛ attendance: 10؛ classes: 8 route با read، state و Excel |
 | route functional باقی‌مانده | 192 | finance، attendance و classes از inventory عبور کرده‌اند؛ routerهای بعدی هنوز در انتظارند |
 | router پردازش‌شده | 3 | finance، attendance و classes، ممیزی اولیه |
-| تست‌های pass | 46 | آخرین اجرای routerهای زیرساخت + finance + attendance + classes |
+| تست‌های pass | 44 | آخرین اجرای `pytest tests/route_audit -q`؛ ۴۸ تست جمعاً، ۴ مورد strict xfail |
 | تست‌های strict xfail | 4 | O-02، O-12، O-14، O-19 |
 | باگ‌های ثبت‌شده | 4 | همان چهار مورد شناخته‌شده؛ باگ جدید finance ثبت نشد |
 

@@ -579,32 +579,7 @@
       "response_class": "List<HomeworkItem>",
       "role": "student",
       "status": 200,
-      "issues": [
-        {
-          "field": "description",
-          "kind": "missing-non-null",
-          "detail": "کلید غیرnullable وجود ندارد و استفاده می‌تواند NPE بدهد",
-          "line": 49
-        },
-        {
-          "field": "due_date",
-          "kind": "missing-non-null",
-          "detail": "کلید غیرnullable وجود ندارد و استفاده می‌تواند NPE بدهد",
-          "line": 50
-        },
-        {
-          "field": "description",
-          "kind": "missing-non-null",
-          "detail": "کلید غیرnullable وجود ندارد و استفاده می‌تواند NPE بدهد",
-          "line": 49
-        },
-        {
-          "field": "due_date",
-          "kind": "missing-non-null",
-          "detail": "کلید غیرnullable وجود ندارد و استفاده می‌تواند NPE بدهد",
-          "line": 50
-        }
-      ],
+      "issues": [],
       "model": "HomeworkItem"
     },
     {
@@ -1555,7 +1530,7 @@
     "unmatched": 0,
     "route_non_success": 49,
     "parse": 0,
-    "npe": 5,
+    "npe": 1,
     "silent_zero": 0,
     "missing_key": 1
   }

@@ -49,7 +49,7 @@ _CONTRACT_CASES = [
     ("RA-sweep-03", "GET", "homework/parent/child/{student_id}"),
     ("RA-sweep-04", "GET", "teachers/{id}/incomplete_classes"),
 ]
-_FIXED_CONTRACT_CASES = {"RA-sweep-01"}
+_FIXED_CONTRACT_CASES = {"RA-sweep-01", "RA-sweep-02"}
 
 
 def _contract_entry(method: str, path: str) -> dict:

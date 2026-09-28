@@ -153,6 +153,10 @@ def get_student_exams_list(
             "course_title": course.title if course else "کلاس حذف شده",
             "date": ex.date,
             "duration": ex.duration,
+            # Retrofit currently decodes this endpoint with HomeworkItem; keep the
+            # non-null legacy fields present while the Android model is migrated.
+            "description": "",
+            "due_date": "",
             "max_score": ex.max_score,
             "status": status_text,
             "score": attempt.score if attempt else None

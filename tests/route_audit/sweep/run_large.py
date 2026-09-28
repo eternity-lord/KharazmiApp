@@ -43,9 +43,23 @@ def run() -> dict:
             except Exception:
                 payload = None
             response[name] = {"status": result.status_code, "payload": payload}
+        response_summary = {}
+        for name, row in response.items():
+            payload = row["payload"]
+            if isinstance(payload, list):
+                response_summary[name] = {
+                    "status": row["status"], "count": len(payload),
+                    "first_ids": [item.get("id") for item in payload[:3] if isinstance(item, dict)],
+                }
+            else:
+                pending = (payload or {}).get("pending_sessions", [])
+                response_summary[name] = {
+                    "status": row["status"], "pending_count": len(pending),
+                    "first_session_ids": [item.get("session_id") for item in pending[:3]],
+                }
         report = {
             "fixture": {"students": 300, "classes": 30, "extra_transactions": 300, "extra_sessions": 300},
-            "responses": response,
+            "responses": response_summary,
             "checks": {
                 "student_limit_20": len(response["students"]["payload"]) == 20,
                 "student_order_desc": [row["id"] for row in response["students"]["payload"]] == list(range(300, 280, -1)),

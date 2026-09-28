@@ -141,3 +141,56 @@ def test_suspended_course_cannot_start_live_without_writing(client, auth_headers
     assert response.status_code == 403
     db.expire_all()
     assert db.query(models.LiveSession).count() == before
+
+
+
+def test_session_charge_uses_the_declared_teacher_share_value(client, auth_headers, db):
+    """Numeric oracle: a one-student class priced at 260,000 charges exactly 260,000."""
+    import models
+
+    course = db.get(models.Course, 1)
+    original_rule, original_price = course.rule_prepay_teacher, course.teacher_session_price
+    course.rule_prepay_teacher = False
+    course.teacher_session_price = 260_000
+    db.commit()
+    student = db.get(models.Student, 1)
+    before_wallet = (student.wallet_teacher, student.wallet_institute, student.wallet_balance)
+    before_sessions = {row.id for row in db.query(models.SessionLog).all()}
+    before_attendance = {row.id for row in db.query(models.Attendance).all()}
+    before_transactions = {row.id for row in db.query(models.Transaction).all()}
+    created_session = None
+    created_transaction = None
+    try:
+        response = client.post(
+            "/attendance/submit_session",
+            json={"course_id": 1, "date": "1403/08/04", "items": [{"student_id": 1, "status": "Present", "excused": False}]},
+            headers=auth_headers["admin"],
+        )
+        assert response.status_code == 200, response.text
+        db.expire_all()
+        created_session = db.query(models.SessionLog).filter(~models.SessionLog.id.in_(before_sessions)).one()
+        created_transaction = db.query(models.Transaction).filter(~models.Transaction.id.in_(before_transactions)).one()
+        assert created_session.final_teacher_cost == 260_000
+        assert created_session.final_institute_share == 0
+        assert created_transaction.amount == -260_000
+        assert created_transaction.share_teacher == 260_000
+        assert created_transaction.share_institute == 0
+        student = db.get(models.Student, 1)
+        assert (student.wallet_teacher, student.wallet_institute) == (-270_000, 5_000)
+    finally:
+        if created_transaction is None:
+            created_transaction = next((row for row in db.query(models.Transaction).all() if row.id not in before_transactions), None)
+        if created_session is None:
+            created_session = next((row for row in db.query(models.SessionLog).all() if row.id not in before_sessions), None)
+        if created_transaction is not None:
+            db.query(models.TransactionInstallmentAllocation).filter(models.TransactionInstallmentAllocation.transaction_id == created_transaction.id).delete(synchronize_session=False)
+            db.delete(created_transaction)
+        for row in db.query(models.Attendance).filter(~models.Attendance.id.in_(before_attendance)).all():
+            db.delete(row)
+        if created_session is not None:
+            db.delete(created_session)
+        course = db.get(models.Course, 1)
+        course.rule_prepay_teacher, course.teacher_session_price = original_rule, original_price
+        student = db.get(models.Student, 1)
+        student.wallet_teacher, student.wallet_institute, student.wallet_balance = before_wallet
+        db.commit()

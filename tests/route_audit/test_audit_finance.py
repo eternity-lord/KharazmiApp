@@ -205,3 +205,17 @@ def test_invoice_ignores_archived_payment_rows_in_debt_oracle(client, auth_heade
     finally:
         db.delete(archived)
         db.commit()
+
+
+def test_invoice_applies_fixed_discount_as_a_fixed_amount(client, auth_headers):
+    """Independent oracle: 1,500,000 minus fixed 200,000 equals 1,300,000."""
+    response = client.get("/finance/invoice/4", headers=_h(auth_headers))
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["base_tuition"] == 1_500_000
+    assert body["discount_type"] == "fixed"
+    assert body["discount_value"] == 200_000
+    assert body["discount_amount"] == 200_000
+    assert body["final_tuition"] == 1_300_000
+    assert body["total_paid"] == 250_000
+    assert body["balance_due"] == 1_050_000

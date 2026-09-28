@@ -36,7 +36,7 @@
 | `PUT /admin/transactions/{id}` | handler `routers.admin.update_transaction`؛ منبع `Kharazmi_Server/routers/admin.py:1113` | 1 | success,value,DB,ledger,restore | سبز؛ delta مبلغ، wallet invariant و restore assert شد | — |
 | `GET /config/share` | handler `routers.admin.get_share_config`؛ منبع `Kharazmi_Server/routers/admin.py:591` | 1 | success,value,shape | سبز؛ count_1/count_15 دقیق assert شد | — |
 | `POST /config/share/update` | handler `routers.admin.update_share_config`؛ منبع `Kharazmi_Server/routers/admin.py:604` | 1 | success,value,DB,restore | سبز؛ update و restore سهم‌ها assert شد | — |
-| `GET /dashboard/stats` | handler `routers.admin.get_dashboard_stats`؛ منبع `Kharazmi_Server/routers/admin.py:51` | 1 | success,value,shape | سبز؛ count/last course/transaction shape assert شد؛ RA-admin-01 xfail جداست | — |
+| `GET /dashboard/stats` | handler `routers.admin.get_dashboard_stats`؛ منبع `Kharazmi_Server/routers/admin.py:51` | 1 | success,value,shape | سبز؛ count/last course/transaction shape assert شد؛ RA-admin-01 xfail جداست | RA-admin-01 |
 | `GET /sms/history` | handler `routers.admin.get_sms_history`؛ منبع `Kharazmi_Server/routers/admin.py:183` | 1 | success,value,redaction,shape | سبز؛ log و mask عددی assert شد | — |
 | `POST /sms/send` | handler `routers.admin.send_sms`؛ منبع `Kharazmi_Server/routers/admin.py:151` | 1 | success,value,DB,local-only | سبز؛ فقط SmsLog محلی و cleanup؛ شبکه/SMS واقعی ممنوع | — |
 | `POST /sms/send_bulk` | handler `routers.admin.send_bulk_sms`؛ منبع `Kharazmi_Server/routers/admin.py:1495` | 1 | success,value,DB,local-only | سبز؛ success/failed و SmsLog محلی assert شد | — |

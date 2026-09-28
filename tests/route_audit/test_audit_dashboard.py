@@ -30,3 +30,28 @@ def test_dashboard_kpis_have_independent_seed_values_and_push_is_local(client, a
     assert push.status_code == 200
     assert push.json() == {"fcm_configured": False, "device_token_count": 0}
     assert "private_key" not in push.text and "api_key" not in push.text
+
+
+def test_today_summary_excludes_reversed_institute_cash(client, auth_headers, db):
+    """Independent oracle: reversing a 111,111 receipt leaves today's cash total unchanged."""
+    import models
+
+    before = client.get("/admin/today_summary", headers=auth_headers["admin"])
+    assert before.status_code == 200, before.text
+    baseline = before.json()["today_payments"]
+    reversed_receipt = models.Transaction(
+        student_id=1, enrollment_id=1, course_id=1, branch_id=1,
+        amount=111_111, payment_method="نقدی", tracking_code="AUD-REVERSED-TODAY",
+        date="1405/07/06", receiver="آموزشگاه", description="وصول برگشتی ممیزی",
+        type="deposit", target_wallet="institute", share_teacher=0,
+        share_institute=111_111, is_deleted=False, is_reversed=True,
+    )
+    db.add(reversed_receipt)
+    db.commit()
+    try:
+        after = client.get("/admin/today_summary", headers=auth_headers["admin"])
+        assert after.status_code == 200, after.text
+        assert after.json()["today_payments"] == baseline
+    finally:
+        db.delete(reversed_receipt)
+        db.commit()

@@ -34,7 +34,8 @@
 ## آخرین اجرای ثبت‌شده
 
 ```text
-pytest tests/route_audit -q: 50 passed, 8 xfailed, 3 warnings
+pytest tests/route_audit -q: 61 passed, 9 xfailed, 3 warnings
+admin deep audit: 33/41 route assertion؛ 8 blocker؛ RA-admin-01 strict xfail
 route sweep: 221 route؛ status 500=0؛ invalid-target=220؛ invalid status 500=0
 Retrofit contract: 151 unique؛ dynamic=1؛ unmatched=0؛ RA-sweep=4 entry
 retry guards: direct payment=1؛ installment=1؛ session charge=1؛ settlement in-scope=0
@@ -42,4 +43,4 @@ retry guards: direct payment=1؛ installment=1؛ session charge=1؛ settlement i
 
 آخرین commit ممیزی: `dec7b1678d29a9267a9b86273400b06532930243` — [CI run 36408060558](https://github.com/eternity-lord/KharazmiApp/actions/runs/36408060558) سبز است.
 
-این sweep جای ممیزی عمیق را نمی‌گیرد: registry همهٔ routeها را اجباری کرده، اما ۳۳ route از finance/attendance/classes در blockers با دلیل صریح بسته شده‌اند و ۱۹۲ route سایر routerها در انتظار نوبت هستند.
+این sweep جای ممیزی عمیق را نمی‌گیرد: registry همهٔ routeها را اجباری کرده، ۳۳ route از finance/attendance/classes در blockers با دلیل صریح بسته شده‌اند، admin هشت blocker دارد و ۱۵۱ route سایر routerها در انتظار نوبت هستند.

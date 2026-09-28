@@ -13,10 +13,11 @@
 | RA-sweep-02 | اندروید/سرور | قرارداد، نمایش | بالا | `test_gson_contract_issue_is_absent[GET exams/student/list]` | هر item آزمون باید فیلدهای لازم مدل Android را داشته باشد یا مدل درست آزمون مصرف شود | `ExamNetworkApi` آن را `List<HomeworkItem>` می‌خواند و response آزمون `description/due_date` ندارد؛ ۴ issue برای دو item؛ xfail | `ExamActivity.kt:75`؛ مدل `ParentPortalActivity.kt:64-66`؛ `Kharazmi_Server/routers/exams.py:132-158` | ExamActivity و ParentPortalActivity |
 | RA-sweep-03 | اندروید/سرور | قرارداد، نمایش | بالا | `test_gson_contract_issue_is_absent[GET homework/parent/child/{student_id}]` | `HomeworkItem.description` باید در response وجود داشته باشد یا nullable باشد | response واقعی description ندارد؛ non-null missing و NPE بالقوه؛ xfail | `HomeworkActivity.kt:45-55,86-87`؛ handler homework در route inventory | HomeworkActivity / ParentPortalActivity |
 | RA-sweep-04 | اندروید/سرور | قرارداد، نمایش | متوسط | `test_gson_contract_issue_is_absent[GET teachers/{id}/incomplete_classes]` | `students_preview` در پاسخ باشد یا UI نبودنش را به‌صورت صریح مدیریت کند | کلید list در response نیست و simulator آن را لیست خالی می‌بیند؛ xfail | `TeacherDashboardActivity.kt:23-35,48`؛ handler `Kharazmi_Server/routers/teachers.py:343-374` | TeacherDashboardActivity |
+| RA-admin-01 | سرور/داشبورد | مقدار/قرارداد | متوسط | `test_dashboard_last_transaction_uses_direct_student_link` | `last_transaction.student_name` باید با `Transaction.student_id` هم resolve شود، حتی اگر `enrollment_id` خالی باشد | برای transaction id=6 که student_id دارد ولی enrollment ندارد، `/dashboard/stats` مقدار `ناشناس` برمی‌گرداند؛ strict xfail | `Kharazmi_Server/routers/admin.py:51-91`؛ seed transaction id=6 | Dashboard و summary مالی |
 
 ## نتیجهٔ finance/attendance/classes در این نوبت
 
-در ۲۹ route دارای assertion مقداری، failure جدید سمت سرور ثبت نشد. ۳۳ route باقی‌ماندهٔ این سه router در جدول زیر و `blockers.md` با علت دقیق «sweep/registry فقط، assertion عمیق هنوز نوشته نشده» بسته شده‌اند؛ این «بدون باگ» محسوب نمی‌شود.
+در ۲۹ route دارای assertion مقداری finance/attendance/classes، failure جدید سمت سرور ثبت نشد. deep audit اولیهٔ admin یک باگ مستقل (`RA-admin-01`) در dashboard پیدا کرد و ۲۵ route admin assertion مقداری/اثری دارند؛ routeهای باقیمانده همچنان در جدول route admin به‌عنوان مسدود مشخص شده‌اند.
 
 ## نتیجهٔ sweep
 

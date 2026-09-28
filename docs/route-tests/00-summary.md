@@ -32,7 +32,7 @@
 
 | آزمون/موضوع | نتیجهٔ عددی | تفسیر |
 |---|---:|---|
-| payload نامعتبر تولیدشده از OpenAPI | 220 route دارای body/parameter؛ 0 status 500 | sweep در `report.json` ثبت شده؛ assertion معنایی هر route هنوز فقط در 29 route است |
+| payload نامعتبر تولیدشده از OpenAPI | 220 route دارای body/parameter؛ 0 status 500 | sweep در `report.json` ثبت شده؛ assertion معنایی 29 route سه router اول و 33 route admin جداگانه ثبت شده است |
 | retry پرداخت مستقیم/قسط | 2 سناریوی صریح، `/finance/pay` و `/finance/installments/{id}/pay` | پرداخت مستقیم دوباره همان `transaction_id` را می‌دهد و فقط 1 transaction ساخته می‌شود؛ retry قسط 400 و receipt دوم ندارد |
 | retry شارژ جلسه | 1 سناریوی صریح، `/attendance/submit_session` | retry همان تاریخ 409؛ فقط یک SessionLog/Attendance/ledger جدید و wallet به‌صورت snapshot بازگردانده شد؛ این guard جای value audit کامل route نیست |
 | retry تسویهٔ معلم | 0 سناریوی صریح | route settlement در این سه router assertion مستقل ندارد |
@@ -67,7 +67,7 @@
 
 ## موارد ناتمام
 
-- ۱۹۲ route functional سایر routerها هنوز باید طبق ترتیب `progress.md` تکمیل شوند.
+- ۱۵۹ route functional باقی مانده است: ۸ route admin در blocker و ۱۵۱ route سایر routerها باید طبق ترتیب `progress.md` تکمیل شوند.
 - ۳۳ route سه router اول در `blockers.md` assertion مستقل ندارند.
 - exports هنوز به openpyxl/PDF value audit عمیق نشده است؛ sweep فقط response/shape را ثبت کرده است.
 - device checklist عددهای screenهای مهم را دارد، اما اجرای گوشی/compile انجام نشده است.

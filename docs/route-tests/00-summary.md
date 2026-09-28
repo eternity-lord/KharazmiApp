@@ -10,11 +10,11 @@
 |---|---:|---|
 | کل routeهای inventory | 221 | از `docs/app-map/server-routes.csv` |
 | route دارای registry تست | 221 | meta-test اجباری است و missing route را fail می‌کند |
-| route با functional assertion مقداری در این نوبت | 70 | finance: 11؛ attendance: 10؛ classes: 8؛ admin: 41 route با read، state، ledger، export، conflict و guard |
+| route با functional assertion مقداری در این نوبت | **72** | finance: 11؛ attendance: **12**؛ classes: 8؛ admin: 41 route با read، state، ledger، export، conflict و guard؛ mutation validation در [`mutation-validation.md`](mutation-validation.md) |
 | route از همین سه router بدون assertion مستقل | 33 | فهرست کامل و دلیل هر مورد در `blockers.md` آمده است؛ sweep جای assertion کسب‌وکار را نگرفته است |
-| route functional باقی‌ماندهٔ سایر routerها | 151 | 80 تست route-audit اکنون شامل deep audit teachers/students/dashboard/reports/analytics/exports/exams/homework/parent و fixtureهای مرزی/حجیم است؛ همهٔ routeها هنوز deep نشده‌اند |
+| route functional باقی‌ماندهٔ سایر routerها | 151 | 86 تست route-audit اکنون شامل deep audit teachers/students/dashboard/reports/analytics/exports/exams/homework/parent و fixtureهای مرزی/حجیم است؛ همهٔ routeها هنوز deep نشده‌اند |
 | router پردازش‌شده | 13 | finance، attendance، classes، admin و deep sliceهای teachers/students/dashboard/reports/analytics/exports/exams/homework/parent؛ calendar/branches/timeline/audit فقط sweep |
-| تست‌های pass | 80 | آخرین اجرای `pytest tests/route_audit -q` |
+| تست‌های pass | **86** | آخرین اجرای `pytest tests/route_audit -q` پس از mutation oracleها |
 | تست‌های strict xfail | 3 | فقط O-02، O-12 و O-19؛ O-14، RA-sweep-01..04 و RA-admin-01 سبز و assertion عادی هستند |
 | باگ‌های contract/deep audit | 0 issue باز | هر 4 sweep، RA-admin-01 و RA-parent-01 اصلاح شدند؛ contract post-fix هیچ issue ندارد |
 | باگ‌های status 500 در sweep | 0 | در 221 اجرای معتبر و 220 payload نامعتبر، status 500 مشاهده نشد |
@@ -26,6 +26,7 @@
 - کلاس‌ها: list/detail/full report/students، pending/deletion، suspend و Excel با openpyxl بررسی شد.
 - oracle مستقل برای tuition/discount/payment/due و wallet سهم‌ها استفاده شد.
 - atomic update و retry برای پرداخت مستقیم، پرداخت قسط و شارژ جلسه بررسی شد؛ retry تسویه در این سه router route ندارد.
+- mutation validation: هر ۱۰ mutation مالی/وضعیتی در کپی مستقل `/tmp` گرفته شد؛ ۶ oracle مستقل برای mutationهای escaped اولیه اضافه شد و مجموع routeهای دارای assertion مقداری به 72/221 رسید.
 - invalid amount بررسی شد و عدم ایجاد transaction assert شد.
 - پاسخ خالی installments به‌صورت `[]` بررسی شد.
 - dynamic URL، امنیت token و نفوذ خارج از scope باقی ماندند.
@@ -83,4 +84,4 @@
 - ۳۳ route سه router اول در `blockers.md` assertion مستقل ندارند.
 - exports هنوز به openpyxl/PDF value audit عمیق نشده است؛ sweep فقط response/shape را ثبت کرده است.
 - device checklist عددهای screenهای مهم را دارد، اما اجرای گوشی/compile انجام نشده است.
-- CI post-fix سبز است: [run 36411439389](https://github.com/eternity-lord/KharazmiApp/actions/runs/36411439389). Android compile عمداً اجرا نشده است.
+- CI commit پایه سبز است: [run 36411727281](https://github.com/eternity-lord/KharazmiApp/actions/runs/36411727281). CI mutation commits پس از push دوباره بررسی می‌شود؛ Android compile عمداً اجرا نشده است.

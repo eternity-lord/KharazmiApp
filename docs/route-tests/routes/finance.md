@@ -11,10 +11,10 @@
 | `PUT /finance/installments/{installment_id}` | handler `routers.finance.update_installment`؛ منبع `Kharazmi_Server/routers/finance.py:1698` | 0 | inventory/fixture | مسدود: تست رفتاری این route در نوبت router آن نوشته می‌شود | — |
 | `POST /finance/installments/{installment_id}/pay` | handler `routers.finance.pay_installment_manually`؛ منبع `Kharazmi_Server/routers/finance.py:1809` | 1 | success,value,DB,oracle,idempotency | سبزِ اولیه | — |
 | `POST /finance/installments/{installment_id}/remind` | handler `routers.finance.send_installment_payment_reminder`؛ منبع `Kharazmi_Server/routers/finance.py:1960` | 0 | inventory/fixture | مسدود: تست رفتاری این route در نوبت router آن نوشته می‌شود | — |
-| `GET /finance/invoice/{enrollment_id}` | handler `routers.finance.get_invoice_details`؛ منبع `Kharazmi_Server/routers/finance.py:2264` | 1 | success,value,oracle | سبزِ اولیه | — |
+| `GET /finance/invoice/{enrollment_id}` | handler `routers.finance.get_invoice_details`؛ منبع `Kharazmi_Server/routers/finance.py:2264` | 3 | success,value,oracle,archived-filter,discount | سبز؛ fixed discount و archived payment oracle نیز سبزند | — |
 | `GET /finance/mock_payment_page` | handler `routers.finance.mock_payment_page`؛ منبع `Kharazmi_Server/routers/finance.py:1355` | 0 | inventory/fixture | مسدود: تست رفتاری این route در نوبت router آن نوشته می‌شود | — |
 | `GET /finance/parent/dashboard` | handler `routers.finance.get_parent_financial_dashboard`؛ منبع `Kharazmi_Server/routers/finance.py:2189` | 0 | inventory/fixture | مسدود: تست رفتاری این route در نوبت router آن نوشته می‌شود | — |
-| `POST /finance/pay` | handler `routers.finance.submit_payment`؛ منبع `Kharazmi_Server/routers/finance.py:222` | 1 | success,value,DB,oracle,idempotency | سبزِ اولیه | — |
+| `POST /finance/pay` | handler `routers.finance.submit_payment`؛ منبع `Kharazmi_Server/routers/finance.py:222` | 2 | success,value,DB,oracle,idempotency,FIFO | سبز؛ decrement پوشش FIFO oracle نیز سبز است | — |
 | `GET /finance/payment/callback` | handler `routers.finance.payment_callback`؛ منبع `Kharazmi_Server/routers/finance.py:879` | 0 | inventory/fixture | مسدود: تست رفتاری این route در نوبت router آن نوشته می‌شود | — |
 | `POST /finance/payment/initiate` | handler `routers.finance.initiate_online_payment`؛ منبع `Kharazmi_Server/routers/finance.py:799` | 0 | inventory/fixture | مسدود: تست رفتاری این route در نوبت router آن نوشته می‌شود | — |
 | `POST /finance/receipt/pdf` | handler `routers.finance.generate_pdf_receipt`؛ منبع `Kharazmi_Server/routers/finance.py:609` | 0 | inventory/fixture | مسدود: تست رفتاری این route در نوبت router آن نوشته می‌شود | — |
@@ -35,3 +35,4 @@
 
 - `tests/route_audit/test_audit_finance.py:128-153` retry مستقیم `/finance/pay` را بررسی می‌کند: دو پاسخ با `transaction_id` یکسان، فقط یک ledger row و restore installment/enrollment/wallet.
 - `tests/route_audit/test_audit_finance.py:156-182` پرداخت قسط، مبلغ/receiver/DB و retry بدون receipt دوم را بررسی می‌کند.
+- `tests/route_audit/test_audit_finance.py:185-221` archived-payment و fixed-discount invoice oracle؛ `:224-270` FIFO decrement oracle را بررسی می‌کنند. mutation کامل در [`../mutation-validation.md`](../mutation-validation.md) است.

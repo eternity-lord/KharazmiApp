@@ -342,8 +342,20 @@ def calculate_enrollment_debt_breakdown(db: Session, enrollment) -> dict:
                 "debt_teacher": 0, "debt_institute": 0, "debt": 0}
     from dependencies import get_enrollment_tuition_and_discount
     final_tuition, _ = get_enrollment_tuition_and_discount(enrollment)
-    payments = db.query(models.Transaction).filter(
+    # قرارداد اتصال پرداخت به کلاس: ابتدا enrollment_id واقعی؛ برای legacyهایی که
+    # enrollment_id ندارند اما course_id دارند، تطبیق دقیق student_id + course_id.
+    # پرداخت عمومیِ بدون course/enrollment عمداً به هیچ کلاس نسبت داده نمی‌شود.
+    from sqlalchemy import and_, or_
+    payment_scope = or_(
         models.Transaction.enrollment_id == enrollment.id,
+        and_(
+            models.Transaction.enrollment_id.is_(None),
+            models.Transaction.student_id == enrollment.student_id,
+            models.Transaction.course_id == enrollment.course_id,
+        ),
+    )
+    payments = db.query(models.Transaction).filter(
+        payment_scope,
         models.Transaction.is_deleted == False,
         models.Transaction.is_reversed == False,
         models.Transaction.amount > 0,
@@ -364,6 +376,20 @@ def calculate_enrollment_debt_breakdown(db: Session, enrollment) -> dict:
                 share_institute = amount - share_teacher
             paid_teacher += share_teacher
             paid_institute += share_institute
+
+    # Enrollment.total_paid is the only payment record in older databases, while
+    # some legacy receipts are the reverse (a receipt exists but total_paid was not
+    # backfilled). Reconcile both without counting the smaller source twice; any
+    # unattributed delta stays in the institute side for backward-compatible totals.
+    ledger_paid = paid_teacher + paid_institute
+    recorded_paid = int(enrollment.total_paid or 0)
+    if ledger_paid > 0 and ledger_paid > recorded_paid:
+        effective_paid = ledger_paid
+    else:
+        effective_paid = recorded_paid
+        if recorded_paid > ledger_paid:
+            paid_institute += recorded_paid - ledger_paid
+
     charges = db.query(models.Transaction).filter(
         models.Transaction.student_id == enrollment.student_id,
         models.Transaction.course_id == enrollment.course_id,
@@ -373,7 +399,7 @@ def calculate_enrollment_debt_breakdown(db: Session, enrollment) -> dict:
     ).all()
     billed_teacher = sum(int(row.share_teacher or 0) for row in charges)
     billed_institute = sum(int(row.share_institute or 0) for row in charges)
-    debt = max(0, int(final_tuition or 0) - paid_teacher - paid_institute)
+    debt = max(0, int(final_tuition or 0) - effective_paid)
     if charges:
         debt_teacher = max(0, billed_teacher - paid_teacher)
         debt_institute = max(0, billed_institute - paid_institute)

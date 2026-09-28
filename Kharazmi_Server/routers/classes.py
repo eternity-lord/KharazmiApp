@@ -25,7 +25,10 @@ from dependencies import (get_db, check_admin_access, check_admin_or_secretary_a
                             SESSION_EXPIRY_DAYS, display_name, safe_person_name)
 
 # FIX: Bug 16 - share the tuition-minus-payment debt calculation across financial views.
-from financial_calculations import calculate_student_debt, calculate_enrollment_debt, MAX_TEACHER_SESSION_PRICE
+from financial_calculations import (
+    calculate_enrollment_debt_breakdown,
+    MAX_TEACHER_SESSION_PRICE,
+)
 # FIX (F-T1): اعتبارسنجی مرکزی اقساط — همان قاعده‌ی مسیر مستقل قسط، برای مسیر ثبت‌نام همراه اقساط.
 from validation import normalize_installments
 
@@ -226,33 +229,26 @@ def get_all_classes(
         for en in all_enrollments:
             st = db.query(Student).filter(Student.id == en.student_id, Student.is_deleted == False).first()
             if st:
-                # Calculate student's debt
-                w_t = st.wallet_teacher if st.wallet_teacher is not None else 0
-                w_i = st.wallet_institute if st.wallet_institute is not None else 0
-
-                # If negative, it's debt
-                student_debt_teacher = abs(w_t) if w_t < 0 else 0
-                student_debt_institute = abs(w_i) if w_i < 0 else 0
-
-                # If positive, it's paid amount (credit)
-                student_paid_teacher = w_t if w_t > 0 else 0
-                student_paid_institute = w_i if w_i > 0 else 0
+                # کیف‌های Student سراسری‌اند؛ برای بنر کلاس فقط breakdown همین enrollment
+                # مجاز است. کیف کل فقط در لاگ تشخیصی حفظ می‌شود و در اعداد کلاس وارد نمی‌شود.
+                breakdown = calculate_enrollment_debt_breakdown(db, en)
+                student_debt_teacher = breakdown["debt_teacher"]
+                student_debt_institute = breakdown["debt_institute"]
+                student_paid_teacher = breakdown["paid_teacher"]
+                student_paid_institute = breakdown["paid_institute"]
 
                 print(
-                    f"  دانش‌آموز {st.id}: wallet_teacher={w_t}, wallet_institute={w_i}"
+                    f"  دانش‌آموز {st.id}: class_paid_teacher={student_paid_teacher}, "
+                    f"class_paid_institute={student_paid_institute}"
                 )
                 print(
-                    f"    بدهی به معلم: {student_debt_teacher}, بدهی به آموزشگاه: {student_debt_institute}"
-                )
-                print(
-                    f"    پرداخت به معلم: {student_paid_teacher}, پرداخت به آموزشگاه: {student_paid_institute}"
+                    f"    بدهی همین کلاس به معلم: {student_debt_teacher}, "
+                    f"به آموزشگاه: {student_debt_institute}"
                 )
 
                 debt_to_teacher += student_debt_teacher
                 debt_to_institute += student_debt_institute
-                # FIX: Bug 16 - a class owes its own remaining tuition, not another class's wallet debt.
-                total_debt += calculate_enrollment_debt(en) if en.total_tuition else student_debt_teacher + student_debt_institute
-
+                total_debt += breakdown["debt"]
                 paid_to_teacher += student_paid_teacher
                 paid_to_institute += student_paid_institute
                 total_paid += student_paid_teacher + student_paid_institute
@@ -319,9 +315,7 @@ def get_class_details(course_id: int, db: Session = Depends(get_db), authorizati
         if not st:
             continue
         final_tuition, discount_amt = get_enrollment_tuition_and_discount(enroll)
-        # FIX(null-data): total_paid legacy ممکن است NULL باشد — مثل 0 حساب می‌شود
-        # (صرفاً در محاسبه/نمایش؛ داده‌ی واقعی دیتابیس بدون تغییر می‌ماند).
-        debt = final_tuition - (enroll.total_paid or 0)
+        breakdown = calculate_enrollment_debt_breakdown(db, enroll)
         students_list.append(
             {
                 # FIX(null-data): نام‌های legacy NULL → فال‌بک نمایشی امن (نه «None None»).
@@ -329,8 +323,12 @@ def get_class_details(course_id: int, db: Session = Depends(get_db), authorizati
                 "student_id": st.id,
                 "student_code": st.student_code,
                 "total_tuition": final_tuition,
-                "paid": enroll.total_paid or 0,
-                "debt": debt,
+                "paid": breakdown["paid_teacher"] + breakdown["paid_institute"],
+                "paid_teacher": breakdown["paid_teacher"],
+                "paid_institute": breakdown["paid_institute"],
+                "debt": breakdown["debt"],
+                "debt_teacher": breakdown["debt_teacher"],
+                "debt_institute": breakdown["debt_institute"],
                 "enrollment_id": enroll.id,
                 "discount_type": getattr(enroll, "discount_type", "none") or "none",
                 "discount_value": getattr(enroll, "discount_value", 0) or 0,
@@ -606,17 +604,20 @@ def get_class_full_report(id: int, db: Session = Depends(get_db), authorization:
         st = db.query(Student).filter(Student.id == en.student_id, Student.is_deleted == False).first()
         if not st:
             continue
-        # FIX: Bug 16 - do not overwrite discounted tuition minus paid with a wallet-only estimate.
-        debt = calculate_enrollment_debt(en) if en.total_tuition else calculate_student_debt(db, st)
+        # بدهی گزارش کلاس باید متعلق به همین enrollment باشد؛ بدهی کل دانش‌آموز
+        # عمداً برای نمای کلاس استفاده نمی‌شود.
+        breakdown = calculate_enrollment_debt_breakdown(db, en)
+        paid = breakdown["paid_teacher"] + breakdown["paid_institute"]
+        debt = breakdown["debt"]
 
-        total_rev += en.total_paid
+        total_rev += paid
         total_deb += debt
 
         student_list.append(
             ClassStudentData(
                 name=display_name(st, "نامشخص"),
                 mobile=st.student_mobile,
-                paid=en.total_paid,
+                paid=paid,
                 debt=debt,
             )
         )
@@ -724,13 +725,10 @@ def get_class_students_excel(class_id: int, db: Session = Depends(get_db), _: st
         st = db.query(Student).filter(Student.id == enroll.student_id, Student.is_deleted == False).first()
         if st:
             final_tuition, discount_amt = get_enrollment_tuition_and_discount(enroll)
-            w_t = st.wallet_teacher if st.wallet_teacher is not None else 0
-            w_i = st.wallet_institute if st.wallet_institute is not None else 0
-
-            debt_teacher = abs(w_t) if w_t < 0 else 0
-            debt_institute = abs(w_i) if w_i < 0 else 0
-            # FIX: Bug 16 - prefer this enrollment's tuition balance; keep unpriced legacy billing.
-            total_debt = calculate_enrollment_debt(enroll) if enroll.total_tuition else debt_teacher + debt_institute
+            breakdown = calculate_enrollment_debt_breakdown(db, enroll)
+            debt_teacher = breakdown["debt_teacher"]
+            debt_institute = breakdown["debt_institute"]
+            total_debt = breakdown["debt"]
 
             # FIX: Bug 14 - exclude archived SessionLog rows from this active view.
             sessions = db.query(SessionLog).filter(SessionLog.is_deleted == False).filter(SessionLog.course_id == class_id).all()
@@ -759,7 +757,7 @@ def get_class_students_excel(class_id: int, db: Session = Depends(get_db), _: st
                 d_val_disp,
                 discount_amt,
                 final_tuition,
-                enroll.total_paid,
+                breakdown["paid_teacher"] + breakdown["paid_institute"],
                 debt_teacher,
                 debt_institute,
                 total_debt,
@@ -823,14 +821,14 @@ def get_class_students_full(id: int, db: Session = Depends(get_db), authorizatio
         st = db.query(Student).filter(Student.id == enroll.student_id, Student.is_deleted == False).first()
         if st:
             final_tuition, discount_amt = get_enrollment_tuition_and_discount(enroll)
-            # محاسبه دقیق بدهی‌ها از کیف پول
+            # کیف‌های Student سراسری‌اند؛ اعداد این ردیف فقط برای همین enrollment هستند.
+            breakdown = calculate_enrollment_debt_breakdown(db, enroll)
+            debt_teacher = breakdown["debt_teacher"]
+            debt_institute = breakdown["debt_institute"]
+            total_debt = breakdown["debt"]
+            # این دو مقدار برای سازگاری response، کیف کلی دانش‌آموزند و منبع بدهی کلاس نیستند.
             w_t = st.wallet_teacher if st.wallet_teacher is not None else 0
             w_i = st.wallet_institute if st.wallet_institute is not None else 0
-
-            debt_teacher = abs(w_t) if w_t < 0 else 0
-            debt_institute = abs(w_i) if w_i < 0 else 0
-            # FIX: Bug 16 - prefer this enrollment's tuition balance; keep unpriced legacy billing.
-            total_debt = calculate_enrollment_debt(enroll) if enroll.total_tuition else debt_teacher + debt_institute
 
             # محاسبه تعداد جلسات حاضر و غایب
             # دریافت تمام جلسات این کلاس
@@ -864,7 +862,9 @@ def get_class_students_full(id: int, db: Session = Depends(get_db), authorizatio
                     "national_code": st.national_code,
                     "mobile": st.student_mobile,
                     "total_tuition": final_tuition,
-                    "paid": enroll.total_paid,
+                    "paid": breakdown["paid_teacher"] + breakdown["paid_institute"],
+                    "paid_teacher": breakdown["paid_teacher"],
+                    "paid_institute": breakdown["paid_institute"],
                     "debt": total_debt,
                     "debt_teacher": debt_teacher,
                     "debt_institute": debt_institute,
@@ -996,8 +996,9 @@ def _build_class_deletion_snapshot(db: Session, course) -> dict:
                 Attendance.status.in_(["Present", "Late"])
             ).scalar() or 0
         final_tuition, _ = get_enrollment_tuition_and_discount(en)
-        paid = en.total_paid or 0
-        debt = calculate_enrollment_debt(en)
+        breakdown = calculate_enrollment_debt_breakdown(db, en)
+        paid = breakdown["paid_teacher"] + breakdown["paid_institute"]
+        debt = breakdown["debt"]
         total_debt += debt
         total_paid += paid
         students_rows.append({

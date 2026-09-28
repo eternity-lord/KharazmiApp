@@ -22,7 +22,11 @@ from schemas import (
 from dependencies import get_db, check_admin_access, check_admin_or_secretary_access, check_user_login, check_student_access, get_enrollment_tuition_and_discount, SESSION_EXPIRY_DAYS, get_current_user, hash_password, verify_password, get_next_sequence_value, normalize_mobile
 
 # FIX: Bug 16 - share the tuition-minus-payment debt calculation across financial views.
-from financial_calculations import calculate_student_debt, MAX_TEACHER_SESSION_PRICE
+from financial_calculations import (
+    calculate_student_debt,
+    calculate_enrollment_debt_breakdown,
+    MAX_TEACHER_SESSION_PRICE,
+)
 
 router = APIRouter()
 
@@ -462,46 +466,14 @@ def get_student_full_profile(id: int, authorization: Optional[str] = Header(None
         teacher = db.query(Teacher).filter(Teacher.id == course.teacher_id).first()
         teacher_name = f"{teacher.first_name} {teacher.last_name}" if teacher else "بدون معلم"
         
-        # 1. مجموع کل پرداختی مربی برای این کلاس - فیلتر استاندارد is_deleted و is_reversed
-        paid_teacher = db.query(func.sum(Transaction.amount)).filter(
-            Transaction.student_id == id,
-            Transaction.course_id == course.id,
-            Transaction.target_wallet == "teacher",
-            Transaction.amount > 0,
-            Transaction.is_deleted == False,
-            Transaction.is_reversed == False
-        ).scalar() or 0
-        
-        # 2. مجموع کل هزینه برگزاری جلسات برای این مربی - فیلتر استاندارد
-        billed_teacher = db.query(func.sum(Transaction.share_teacher)).filter(
-            Transaction.student_id == id,
-            Transaction.course_id == course.id,
-            Transaction.type == "session_charge",
-            Transaction.is_deleted == False,
-            Transaction.is_reversed == False
-        ).scalar() or 0
-        
-        # 3. مجموع کل پرداختی آموزشگاه برای این کلاس - فیلتر استاندارد
-        paid_inst = db.query(func.sum(Transaction.amount)).filter(
-            Transaction.student_id == id,
-            Transaction.course_id == course.id,
-            Transaction.target_wallet == "institute",
-            Transaction.amount > 0,
-            Transaction.is_deleted == False,
-            Transaction.is_reversed == False
-        ).scalar() or 0
-        
-        # 4. مجموع کل هزینه برگزاری جلسات برای این آموزشگاه - فیلتر استاندارد مثل calculate_institute_session_revenue
-        billed_inst = db.query(func.sum(Transaction.share_institute)).filter(
-            Transaction.student_id == id,
-            Transaction.course_id == course.id,
-            Transaction.type == "session_charge",
-            Transaction.is_deleted == False,
-            Transaction.is_reversed == False
-        ).scalar() or 0
-        
-        debt_teacher_course = max(0, billed_teacher - paid_teacher)
-        debt_inst_course = max(0, billed_inst - paid_inst)
+        # breakdown به enrollment متصل است؛ کیف کلی دانش‌آموز و پرداخت عمومی
+        # در بدهی این کلاس وارد نمی‌شوند. سهم پرداخت‌های target_wallet=both نیز
+        # داخل helper با share_teacher/share_institute تفکیک می‌شود.
+        breakdown = calculate_enrollment_debt_breakdown(db, en)
+        paid_teacher = breakdown["paid_teacher"]
+        paid_inst = breakdown["paid_institute"]
+        debt_teacher_course = breakdown["debt_teacher"]
+        debt_inst_course = breakdown["debt_institute"]
         
         teachers_financial.append({
             "course_title": course.title,

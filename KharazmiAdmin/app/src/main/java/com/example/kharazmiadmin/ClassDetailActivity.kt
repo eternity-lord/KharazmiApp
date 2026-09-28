@@ -84,6 +84,8 @@ data class StudentFullItem(
     val debt: Long,
     val debt_teacher: Long,
     val debt_institute: Long,
+    val paid_teacher: Long = 0,
+    val paid_institute: Long = 0,
     val wallet_teacher: Long? = 0,
     val wallet_institute: Long? = 0,
     val student_code: Int? = null,
@@ -504,8 +506,10 @@ class ClassDetailActivity : BaseActivity() {
                     val totalDebtTeacher = fullData.students.sumOf { it.debt_teacher }
                     val totalDebtInstitute = fullData.students.sumOf { it.debt_institute }
                     
-                    val totalPaidTeacher = fullData.students.sumOf { if ((it.wallet_teacher ?: 0L) > 0) it.wallet_teacher ?: 0L else 0L }
-                    val totalPaidInstitute = fullData.students.sumOf { if ((it.wallet_institute ?: 0L) > 0) it.wallet_institute ?: 0L else 0L }
+                    // wallet_teacher/wallet_institute کل دانش‌آموز هستند؛ برای جمع کلاس
+                    // فقط فیلدهای پرداخت per-enrollment را مصرف کن.
+                    val totalPaidTeacher = fullData.students.sumOf { it.paid_teacher }
+                    val totalPaidInstitute = fullData.students.sumOf { it.paid_institute }
                     
                     sb.append("\n===========================\n")
                     sb.append(getString(R.string.cdetail_fin_teacher_title))

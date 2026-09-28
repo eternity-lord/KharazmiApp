@@ -97,6 +97,12 @@ def search_finance_advanced(
                         "total_debt": breakdown["debt"],
                         "debt_teacher": breakdown["debt_teacher"],
                         "debt_institute": breakdown["debt_institute"],
+                        "enrollment_id": en.id,
+                        "course_id": c.id,
+                        "course_title": c.title,
+                        "teacher_id": c.teacher_id,
+                        "teacher_name": t_name,
+                        "is_unassigned": False,
                     }
                 )
 
@@ -685,6 +691,10 @@ def get_student_class_status(student_id: int, course_id: Optional[int] = None, c
         "remaining_tuition": breakdown["debt"],
         "credit_balance": max(0, paid_total - final_tuition),
         "course_id": course_id,
+        "course_title": enroll.course.title if enroll.course else None,
+        "teacher_id": enroll.course.teacher_id if enroll.course else None,
+        "teacher_name": display_name(enroll.course.teacher, "نامشخص") if enroll.course and enroll.course.teacher else None,
+        "is_unassigned": False,
         # لینک دقیق ثبت‌نام فعال (همان سطری که شهریه از آن خوانده شد) برای اتصال پرداخت بعدی
         "enrollment_id": enroll.id
     }
@@ -2094,12 +2104,18 @@ def get_student_financial_dashboard(
         final_tuition, discount = get_enrollment_tuition_and_discount(en)
         breakdown = calculate_enrollment_debt_breakdown(db, en)
         c_title = en.course.title if en.course else "کلاس حذف شده"
+        class_teacher = en.course.teacher if en.course else None
+        class_teacher_name = display_name(class_teacher, "نامشخص") if class_teacher else None
         paid_for_class = breakdown["paid_teacher"] + breakdown["paid_institute"]
         total_paid_all += paid_for_class
         
         enroll_list.append({
             "enrollment_id": en.id,
+            "course_id": en.course_id,
             "course_title": c_title,
+            "teacher_id": en.course.teacher_id if en.course else None,
+            "teacher_name": class_teacher_name,
+            "is_unassigned": False,
             "total_tuition": en.total_tuition,
             "discount": discount,
             "final_tuition": final_tuition,
@@ -2275,8 +2291,12 @@ def get_invoice_details(
     
     return {
         "enrollment_id": enroll.id,
+        "course_id": course.id if course else enroll.course_id,
         "student_name": display_name(student, "نامشخص"),
         "course_title": course.title if course else "کلاس حذف شده",
+        "teacher_id": course.teacher_id if course else None,
+        "teacher_name": display_name(course.teacher, "نامشخص") if course and course.teacher else None,
+        "is_unassigned": False,
         "base_tuition": enroll.total_tuition,
         "discount_type": enroll.discount_type,
         "discount_value": enroll.discount_value,
@@ -2375,7 +2395,26 @@ def _debtor_teacher_rows(db: Session, student_id: int, wallet_teacher_debt: int 
             "course_id": course.id,
             "course_title": course.title or "کلاس بدون نام",
             "debt": breakdown["debt"],
+            "enrollment_id": en.id,
+            "is_unassigned": False,
         })
+    # A legacy wallet balance has no enrollment scope. Keep its remainder as an
+    # explicit row instead of assigning it to an arbitrary active class.
+    student = db.query(Student).filter(Student.id == student_id).first()
+    if student is not None:
+        total_debt = calculate_student_debt(db, student)
+        assigned = sum(int(row["debt"] or 0) for row in rows)
+        unassigned = max(0, int(total_debt) - assigned)
+        if unassigned:
+            rows.append({
+                "teacher_id": None,
+                "teacher_name": None,
+                "course_id": None,
+                "course_title": None,
+                "debt": unassigned,
+                "enrollment_id": None,
+                "is_unassigned": True,
+            })
     return rows
 
 
@@ -2414,7 +2453,7 @@ def build_debtor_rows(db: Session, resolved_branch: Optional[int], search: Optio
 
         student_name = display_name(s, "نامشخص")
         teacher_rows = _debtor_teacher_rows(db, s.id, abs(w_t) if w_t < 0 else 0)
-        teacher_names = sorted({r["teacher_name"] for r in teacher_rows})
+        teacher_names = sorted({r["teacher_name"] for r in teacher_rows if r.get("teacher_name")})
         if needle:
             haystack = " ".join([student_name, *teacher_names, *(c or "" for c in courses)]).lower()
             if needle not in haystack:
@@ -2481,6 +2520,10 @@ def get_debtors_grouped(
             {"teacher_id": None, "teacher_name": "بدون کلاس فعال", "course_title": "", "debt": 0}
         ]
         for entry in teacher_entries:
+            # The explicit unassigned row is reported through the top-level
+            # unassigned_debt field, not as a teacher group.
+            if entry.get("is_unassigned"):
+                continue
             key = entry["teacher_id"]
             group = teacher_groups.setdefault(key, {
                 "teacher_id": key,

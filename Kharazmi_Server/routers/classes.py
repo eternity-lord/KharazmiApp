@@ -286,6 +286,11 @@ def get_all_classes(
                 "total_paid": total_paid,
                 "paid_to_teacher": paid_to_teacher,
                 "paid_to_institute": paid_to_institute,
+                # این ردیف aggregate کلاس است؛ enrollment_id عمداً null می‌ماند.
+                "enrollment_id": None,
+                "course_id": c.id,
+                "course_title": c.title,
+                "is_unassigned": False,
                 "is_suspended": c.is_suspended if c.is_suspended is not None else False,
             }
         )
@@ -307,6 +312,8 @@ def get_class_details(course_id: int, db: Session = Depends(get_db), authorizati
         _me = get_logged_in_teacher(db, authorization)
         if not _me or course.teacher_id != _me.id:
             raise HTTPException(status_code=403, detail="شما مجاز به مشاهده اطلاعات این کلاس نیستید")
+    class_teacher = db.query(Teacher).filter(Teacher.id == course.teacher_id).first()
+    class_teacher_name = display_name(class_teacher, "نامشخص")
     # FIX: Bug 13 - exclude archived Enrollment rows from this active view.
     enrollments = db.query(Enrollment).filter(Enrollment.is_deleted == False).filter(Enrollment.course_id == course_id).all()
     students_list = []
@@ -330,6 +337,11 @@ def get_class_details(course_id: int, db: Session = Depends(get_db), authorizati
                 "debt_teacher": breakdown["debt_teacher"],
                 "debt_institute": breakdown["debt_institute"],
                 "enrollment_id": enroll.id,
+                "course_id": course.id,
+                "course_title": course.title,
+                "teacher_id": course.teacher_id,
+                "teacher_name": class_teacher_name,
+                "is_unassigned": False,
                 "discount_type": getattr(enroll, "discount_type", "none") or "none",
                 "discount_value": getattr(enroll, "discount_value", 0) or 0,
                 "discount_amount": discount_amt
@@ -619,6 +631,12 @@ def get_class_full_report(id: int, db: Session = Depends(get_db), authorization:
                 mobile=st.student_mobile,
                 paid=paid,
                 debt=debt,
+                enrollment_id=en.id,
+                course_id=course.id,
+                course_title=course.title,
+                teacher_id=course.teacher_id,
+                teacher_name=t_name,
+                is_unassigned=False,
             )
         )
 
@@ -813,6 +831,8 @@ def get_class_students_full(id: int, db: Session = Depends(get_db), authorizatio
         if not _me or course.teacher_id != _me.id:
             raise HTTPException(status_code=403, detail="شما مجاز به مشاهده اطلاعات این کلاس نیستید")
 
+    class_teacher = db.query(Teacher).filter(Teacher.id == course.teacher_id).first()
+    class_teacher_name = display_name(class_teacher, "نامشخص")
     # FIX: Bug 13 - exclude archived Enrollment rows from this active view.
     enrollments = db.query(Enrollment).filter(Enrollment.is_deleted == False).filter(Enrollment.course_id == id).all()
     students_list = []
@@ -870,6 +890,11 @@ def get_class_students_full(id: int, db: Session = Depends(get_db), authorizatio
                     "debt_institute": debt_institute,
                     "wallet_teacher": w_t,
                     "wallet_institute": w_i,
+                    "course_id": course.id,
+                    "course_title": course.title,
+                    "teacher_id": course.teacher_id,
+                    "teacher_name": class_teacher_name,
+                    "is_unassigned": False,
                     "present_count": present_count,
                     "absent_count": absent_count,
                     "total_sessions": len(sessions),

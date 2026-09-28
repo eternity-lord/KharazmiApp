@@ -311,6 +311,11 @@ def get_my_classes(
             total_debt += breakdown["debt"]
 
         # 4. Build Result Dictionary
+        class_teacher = c.teacher
+        class_teacher_name = (
+            f"{class_teacher.first_name} {class_teacher.last_name}".strip()
+            if class_teacher else "بدون معلم"
+        )
         result.append(
             {
                 "id": c.id,
@@ -324,6 +329,12 @@ def get_my_classes(
                 "total_debt": total_debt,
                 "debt_to_teacher": debt_to_teacher,
                 "debt_to_institute": debt_to_institute,
+                "enrollment_id": None,
+                "course_id": c.id,
+                "course_title": c.title,
+                "teacher_id": c.teacher_id,
+                "teacher_name": class_teacher_name,
+                "is_unassigned": False,
             }
         )
 

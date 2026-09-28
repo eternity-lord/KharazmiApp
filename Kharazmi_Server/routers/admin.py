@@ -422,17 +422,29 @@ def get_student_full_profile(id: int, authorization: Optional[str] = Header(None
     # FIX(invoice): enrollmentهای فعال با شناسه‌های واقعی — کلاینت (صدور فیش) enrollment درست را
     # انتخاب/می‌فرستد؛ دیگر حدس از روی نام نمایشی کلاس لازم نیست و backend مجبور به حدس‌زدن
     # برای دانش‌آموز چندکلاسه نمی‌شود (400 «چند ثبت‌نام فعال» فقط واقعاً مبهم می‌ماند).
-    enrollments_list = [
-        {
+    enrollments_list = []
+    for en in st.enrollments:
+        if en.is_deleted or en.course is None:
+            continue
+        course = en.course
+        teacher = db.query(Teacher).filter(Teacher.id == course.teacher_id).first()
+        teacher_name = f"{teacher.first_name} {teacher.last_name}" if teacher else "بدون معلم"
+        breakdown = calculate_enrollment_debt_breakdown(db, en)
+        enrollments_list.append({
             "enrollment_id": en.id,
             "course_id": en.course_id,
-            "title": en.course.title or "",
-            "code": en.course.code or "",
+            "title": course.title or "",
+            "course_title": course.title,
+            "code": course.code or "",
             "branch_id": en.branch_id,
-        }
-        for en in st.enrollments
-        if not en.is_deleted and en.course is not None
-    ]
+            "teacher_id": course.teacher_id,
+            "teacher_name": teacher_name,
+            "debt": int(breakdown["debt"]),
+            "debt_teacher": int(breakdown["debt_teacher"]),
+            "debt_institute": int(breakdown["debt_institute"]),
+            "total_debt": int(breakdown["debt"]),
+            "is_unassigned": False,
+        })
 
     # لیست تراکنش‌ها
     trans = (
@@ -458,6 +470,7 @@ def get_student_full_profile(id: int, authorization: Optional[str] = Header(None
 
     # محاسبات تفکیک شده مالی به ازای مربیان و آموزشگاه
     teachers_financial = []
+    class_debt_total = 0
     for en in st.enrollments:
         # FIX: Bug 13 - do not include archived enrollments in financial class balances.
         if en.is_deleted or not en.course:
@@ -474,14 +487,36 @@ def get_student_full_profile(id: int, authorization: Optional[str] = Header(None
         paid_inst = breakdown["paid_institute"]
         debt_teacher_course = breakdown["debt_teacher"]
         debt_inst_course = breakdown["debt_institute"]
+        class_debt_total += int(breakdown["debt"])
         
         teachers_financial.append({
+            "enrollment_id": en.id,
+            "course_id": course.id,
             "course_title": course.title,
+            "teacher_id": course.teacher_id,
             "teacher_name": teacher_name,
             "paid_teacher": int(paid_teacher),
             "debt_teacher": int(debt_teacher_course),
             "paid_institute": int(paid_inst),
-            "debt_institute": int(debt_inst_course)
+            "debt_institute": int(debt_inst_course),
+            "is_unassigned": False,
+        })
+
+    # Legacy wallet debt has no class scope. Keep it visible as a separate row rather
+    # than leaking it into any enrollment (course_title is intentionally null).
+    unassigned_debt = max(0, int(total_d) - class_debt_total)
+    if unassigned_debt:
+        teachers_financial.append({
+            "enrollment_id": None,
+            "course_id": None,
+            "course_title": None,
+            "teacher_id": None,
+            "teacher_name": None,
+            "paid_teacher": 0,
+            "debt_teacher": 0,
+            "paid_institute": int(unassigned_debt),
+            "debt_institute": int(unassigned_debt),
+            "is_unassigned": True,
         })
 
     # مجموع کل پرداخت دانش‌آموز به آموزشگاه (همه کلاس‌ها). سهم institute از
@@ -527,6 +562,7 @@ def get_student_full_profile(id: int, authorization: Optional[str] = Header(None
         "wallet_institute": w_i,
         "wallet_total": wallet_total,
         "total_paid_institute": int(total_paid_institute_overall),
+        "unassigned_debt": int(unassigned_debt),
         "teachers_financial": teachers_financial,
     }
 

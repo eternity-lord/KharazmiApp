@@ -214,6 +214,14 @@ class StudentActiveEnrollment(BaseModel):
     title: str = ""
     code: str = ""
     branch_id: Optional[int] = None
+    course_title: Optional[str] = None
+    teacher_id: Optional[int] = None
+    teacher_name: Optional[str] = None
+    debt: Optional[int] = None
+    debt_teacher: Optional[int] = None
+    debt_institute: Optional[int] = None
+    total_debt: Optional[int] = None
+    is_unassigned: bool = False
 
 class FullStudentProfile(BaseModel):
     info: StudentProfileInfo
@@ -221,6 +229,13 @@ class FullStudentProfile(BaseModel):
     enrollments: List[StudentActiveEnrollment] = []
     transactions: List[str]
     total_debt: int
+    wallet_total: int = 0
+    wallet_teacher: int = 0
+    wallet_institute: int = 0
+    debt_teacher: int = 0
+    debt_institute: int = 0
+    unassigned_debt: int = 0
+    teachers_financial: Optional[List[dict]] = None
 
 class TeacherProfileInfo(BaseModel):
     name: str
@@ -266,6 +281,13 @@ class ClassStudentData(BaseModel):
     mobile: str
     paid: int
     debt: int
+    # Per-enrollment identity; optional defaults keep old clients/responses compatible.
+    enrollment_id: Optional[int] = None
+    course_id: Optional[int] = None
+    course_title: Optional[str] = None
+    teacher_id: Optional[int] = None
+    teacher_name: Optional[str] = None
+    is_unassigned: bool = False
 
 class ClassSessionHistory(BaseModel):
     date: str

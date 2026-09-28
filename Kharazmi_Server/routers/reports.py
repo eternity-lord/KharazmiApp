@@ -20,7 +20,7 @@ from schemas import (
 from dependencies import get_db, check_admin_access, check_admin_or_secretary_access, check_user_login, check_student_access, get_enrollment_tuition_and_discount, SESSION_EXPIRY_DAYS, resolve_effective_sub_role, display_name, safe_person_name
 
 # FIX: Bug 16 - share the tuition-minus-payment debt calculation across financial views.
-from financial_calculations import calculate_student_debt, branch_scope_clause
+from financial_calculations import calculate_student_debt, calculate_enrollment_debt_breakdown, branch_scope_clause
 
 router = APIRouter()
 
@@ -784,38 +784,7 @@ def get_student_statement(
         name = display_name(teacher, "نامشخص") if teacher else "بدون معلم"
         if name not in teacher_names:
             teacher_names.append(name)
-        linked_paid = db.query(Transaction).filter(
-            Transaction.enrollment_id == enrollment.id,
-            Transaction.is_deleted == False, Transaction.is_reversed == False,
-            Transaction.amount > 0,
-        ).all()
-        paid_teacher = sum(int(t.amount or 0) for t in linked_paid if t.target_wallet == "teacher")
-        paid_institute = sum(int(t.amount or 0) for t in linked_paid if t.target_wallet == "institute")
-        for t in linked_paid:
-            if t.target_wallet == "both":
-                share_t = int(t.share_teacher or 0)
-                share_i = int(t.share_institute or 0)
-                if share_t + share_i != int(t.amount or 0):
-                    share_t = int(t.amount or 0) // 2
-                    share_i = int(t.amount or 0) - share_t
-                paid_teacher += share_t
-                paid_institute += share_i
-        final_tuition, _ = get_enrollment_tuition_and_discount(enrollment)
-        remaining = max(0, int(final_tuition or 0) - paid_teacher - paid_institute)
-        charge_rows = db.query(Transaction).filter(
-            Transaction.student_id == student_id, Transaction.course_id == course.id,
-            Transaction.type == "session_charge", Transaction.is_deleted == False,
-            Transaction.is_reversed == False,
-        ).all()
-        billed_teacher = sum(int(t.share_teacher or 0) for t in charge_rows)
-        billed_institute = sum(int(t.share_institute or 0) for t in charge_rows)
-        debt_teacher = max(0, billed_teacher - paid_teacher)
-        debt_institute = max(0, billed_institute - paid_institute)
-        # Legacy/no-session rows have no per-course charge split. In that case the
-        # contractual remainder is shown as institute debt rather than copied to every class.
-        if not charge_rows and remaining:
-            debt_teacher = 0
-            debt_institute = remaining
+        breakdown = calculate_enrollment_debt_breakdown(db, enrollment)
         teacher_details.append({
             "enrollment_id": enrollment.id,
             "teacher_id": course.teacher_id,
@@ -824,15 +793,38 @@ def get_student_statement(
             "course_title": course.title or "کلاس بدون نام",
             "course_code": course.code or "",
             "branch_id": enrollment.branch_id if enrollment.branch_id is not None else course.branch_id,
-            "paid_teacher": paid_teacher,
-            "paid_institute": paid_institute,
-            "debt_teacher": debt_teacher,
-            "debt_institute": debt_institute,
-            "debt": remaining,
-            "tuition": int(final_tuition or 0),
+            "paid_teacher": int(breakdown["paid_teacher"]),
+            "paid_institute": int(breakdown["paid_institute"]),
+            "debt_teacher": int(breakdown["debt_teacher"]),
+            "debt_institute": int(breakdown["debt_institute"]),
+            "debt": int(breakdown["debt"]),
+            "tuition": int(breakdown["tuition"]),
             "enrollment_status": "فعال" if not enrollment.is_deleted else "آرشیو",
             "teacher_profile_path": f"/teachers/{course.teacher_id}/full_profile" if course.teacher_id else "",
             "student_profile_path": f"/admin/students/{student_id}/full_profile",
+            "is_unassigned": False,
+        })
+    assigned_debt = sum(int(row.get("debt") or 0) for row in teacher_details)
+    unassigned_debt = max(0, int(calculate_student_debt(db, student)) - assigned_debt)
+    if unassigned_debt:
+        teacher_details.append({
+            "enrollment_id": None,
+            "teacher_id": None,
+            "teacher_name": None,
+            "course_id": None,
+            "course_title": None,
+            "course_code": None,
+            "branch_id": None,
+            "paid_teacher": 0,
+            "paid_institute": 0,
+            "debt_teacher": 0,
+            "debt_institute": int(unassigned_debt),
+            "debt": int(unassigned_debt),
+            "tuition": 0,
+            "enrollment_status": "بدون کلاس",
+            "teacher_profile_path": "",
+            "student_profile_path": f"/admin/students/{student_id}/full_profile",
+            "is_unassigned": True,
         })
     payment_rows = db.query(Transaction).filter(
         Transaction.student_id == student_id, Transaction.is_deleted == False,
@@ -874,6 +866,7 @@ def get_student_statement(
         ],
         "total_paid_institute": int(total_paid_institute),
         "total_debt_institute": int(total_debt_institute),
+        "unassigned_debt": int(unassigned_debt),
         # FIX: Bug 16 - expose contractual debt separately; do not assign all tuition to one wallet.
         "total_debt": calculate_student_debt(db, student),
         "payment_timeline": payment_timeline,

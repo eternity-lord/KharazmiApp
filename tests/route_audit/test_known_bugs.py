@@ -25,7 +25,6 @@ def test_O12_unpublished_exam_is_hidden_from_student(client, auth_headers):
     assert all(row["id"] != 2 for row in response.json())
 
 
-@pytest.mark.xfail(strict=True, reason="RA-parent-01")
 def test_O14_parent_exam_decimal_max_score_is_not_parsed_as_Int():
     issues = audit_payload("ParentExamItem", {"course_title": "ریاضی", "title": "آزمون", "date": "1405/06/25", "max_score": 12.5})
     assert not any(issue.kind == "int-parse" and issue.field == "max_score" for issue in issues)

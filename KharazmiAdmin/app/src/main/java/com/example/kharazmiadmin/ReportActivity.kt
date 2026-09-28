@@ -67,7 +67,8 @@ data class StudentStatementTeacher(
     val debt: Long = 0,
     val tuition: Long = 0,
     val enrollment_status: String? = null,
-    val teacher_profile_path: String? = null
+    val teacher_profile_path: String? = null,
+    val is_unassigned: Boolean = false
 )
 
 data class StudentStatementResponse(
@@ -76,6 +77,7 @@ data class StudentStatementResponse(
     val student_code: String,
     val total_paid_institute: Long,
     val total_debt_institute: Long,
+    val unassigned_debt: Long = 0,
     val teacher_name: String? = null,
     val teachers: List<StudentStatementTeacher> = emptyList(),
     val payment_timeline: List<PaymentTimelineItem> = emptyList(),
@@ -554,20 +556,43 @@ class ReportActivity : BaseActivity() {
                     }.ifEmpty { "تاریخچه پرداختی وجود ندارد" }
                     btnStatementPay.visibility = if (stmt.next_installment != null) View.VISIBLE else View.GONE
                     btnStatementPay.setOnClickListener {
-                        // لینک‌های server-side برای پرداخت، POST هستند و نباید با ACTION_VIEW
-                        // به‌صورت GET باز شوند؛ کاربر را به فرم امن ثبت حواله با دادهٔ واقعی می‌بریم.
-                        val teacherRow = stmt.teachers.firstOrNull()
-                        startActivity(Intent(this@ReportActivity, InvoiceActivity::class.java).apply {
-                            putExtra(InvoiceActivity.EXTRA_IS_ADMIN, true)
-                            putExtra(InvoiceActivity.EXTRA_PREFILL_STUDENT_ID, studentId)
-                            putExtra(InvoiceActivity.EXTRA_PREFILL_STUDENT_NAME, stmt.student_name)
-                            putExtra(InvoiceActivity.EXTRA_PREFILL_CLASS_NAME, teacherRow?.course_title ?: "کلاس نامشخص")
-                            putExtra(InvoiceActivity.EXTRA_PREFILL_DEBT, teacherRow?.debt ?: stmt.total_debt_institute)
-                            putExtra(InvoiceActivity.EXTRA_PREFILL_DEBT_TEACHER, teacherRow?.debt_teacher ?: 0L)
-                            putExtra(InvoiceActivity.EXTRA_PREFILL_DEBT_INSTITUTE, teacherRow?.debt_institute ?: stmt.total_debt_institute)
-                            putExtra(InvoiceActivity.EXTRA_PREFILL_ENROLLMENT_ID, teacherRow?.enrollment_id ?: -1)
-                            putExtra(InvoiceActivity.EXTRA_PREFILL_COURSE_ID, teacherRow?.course_id ?: -1)
-                        })
+                        // گزارش می‌تواند چند enrollment داشته باشد؛ ابتدا کلاس را انتخاب می‌کنیم
+                        // تا prefill بدهی و enrollment_id همیشه از همان ردیف بیاید.
+                        val teacherRows = stmt.teachers
+                        if (teacherRows.isEmpty()) {
+                            Toast.makeText(this@ReportActivity, "برای پرداخت، کلاس فعالی وجود ندارد", Toast.LENGTH_LONG).show()
+                            return@setOnClickListener
+                        }
+                        val labels = teacherRows.map { row ->
+                            "${row.course_title ?: "بدون کلاس"} — معلم ${row.teacher_name ?: "بدون معلم"}"
+                        }.toTypedArray()
+                        fun openSelected(row: StudentStatementTeacher) {
+                            val enrollmentId = row.enrollment_id
+                            if (enrollmentId == null || enrollmentId <= 0) {
+                                Toast.makeText(this@ReportActivity, "برای بدهی بدون کلاس امکان ثبت پرداخت کلاس‌محور وجود ندارد", Toast.LENGTH_LONG).show()
+                                return
+                            }
+                            startActivity(Intent(this@ReportActivity, InvoiceActivity::class.java).apply {
+                                putExtra(InvoiceActivity.EXTRA_IS_ADMIN, true)
+                                putExtra(InvoiceActivity.EXTRA_PREFILL_STUDENT_ID, studentId)
+                                putExtra(InvoiceActivity.EXTRA_PREFILL_STUDENT_NAME, stmt.student_name)
+                                putExtra(InvoiceActivity.EXTRA_PREFILL_CLASS_NAME, labels[teacherRows.indexOf(row)])
+                                putExtra(InvoiceActivity.EXTRA_PREFILL_DEBT, row.debt)
+                                putExtra(InvoiceActivity.EXTRA_PREFILL_DEBT_TEACHER, row.debt_teacher)
+                                putExtra(InvoiceActivity.EXTRA_PREFILL_DEBT_INSTITUTE, row.debt_institute)
+                                putExtra(InvoiceActivity.EXTRA_PREFILL_ENROLLMENT_ID, enrollmentId)
+                                putExtra(InvoiceActivity.EXTRA_PREFILL_COURSE_ID, row.course_id ?: -1)
+                            })
+                        }
+                        if (teacherRows.size == 1) {
+                            openSelected(teacherRows[0])
+                        } else {
+                            AlertDialog.Builder(this@ReportActivity)
+                                .setTitle("انتخاب کلاس برای ثبت پرداخت")
+                                .setItems(labels) { _, which -> openSelected(teacherRows[which]) }
+                                .setNegativeButton(getString(R.string.common_cancel), null)
+                                .show()
+                        }
                     }
                 }
             } catch (e: Exception) {

@@ -207,7 +207,11 @@ class EditStudentActivity : BaseActivity() {
                                 addView(border)
                                 
                                 val tvTitle = TextView(this@EditStudentActivity).apply {
-                                    text = getString(R.string.estudent_course_row, tf.course_title, tf.teacher_name)
+                                    text = if (tf.is_unassigned) {
+                                        "بدهی بدون کلاس"
+                                    } else {
+                                        "بدهی کلاس ${tf.course_title} — معلم ${tf.teacher_name ?: "بدون معلم"}"
+                                    }
                                     textStyleBold()
                                     setTextColor(Color.BLACK)
                                     textSize = 13f
@@ -227,7 +231,7 @@ class EditStudentActivity : BaseActivity() {
                                 val hlDebt = LinearLayout(this@EditStudentActivity).apply {
                                     orientation = LinearLayout.HORIZONTAL
                                     val l = TextView(this@EditStudentActivity).apply { text = getString(R.string.estudent_debt_label); textSize = 12f; setTextColor(Color.GRAY) }
-                                    val v = TextView(this@EditStudentActivity).apply { text = getString(R.string.common_toman_format, tf.debt_teacher); textSize = 12f; setTextColor(Color.parseColor("#D32F2F")); textStyleBold() }
+                                    val v = TextView(this@EditStudentActivity).apply { text = getString(R.string.common_toman_format, tf.debt_teacher + tf.debt_institute); textSize = 12f; setTextColor(Color.parseColor("#D32F2F")); textStyleBold() }
                                     addView(l)
                                     addView(View(this@EditStudentActivity).apply { layoutParams = LinearLayout.LayoutParams(0, 1, 1f) })
                                     addView(v)

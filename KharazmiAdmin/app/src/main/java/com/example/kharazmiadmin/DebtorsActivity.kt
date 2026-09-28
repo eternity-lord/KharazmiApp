@@ -34,9 +34,12 @@ data class DebtorAgeSummary(
 
 data class DebtorTeacherRow(
     val teacher_id: Int? = null,
-    val teacher_name: String = "بدون معلم",
+    val teacher_name: String? = "بدون معلم",
+    val course_id: Int? = null,
     val course_title: String? = null,
-    val debt: Long = 0
+    val enrollment_id: Int? = null,
+    val debt: Long = 0,
+    val is_unassigned: Boolean = false
 )
 
 data class DebtorRow(
@@ -162,7 +165,7 @@ private class DebtorsAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val row = rows[position]
-        val teacher = row.teachers.orEmpty().joinToString("، ") { "${it.teacher_name}: ${it.debt}" }
+        val teacher = row.teachers.orEmpty().joinToString("، ") { "${it.course_title ?: "بدون کلاس"} — معلم ${it.teacher_name ?: "بدون معلم"}: ${it.debt}" }
         holder.text.text = buildString {
             append("${row.student_name} — بدهی کل: ${row.total_debt} تومان\n")
             append("معلم: ${if (teacher.isBlank()) "نامشخص" else teacher}\n")

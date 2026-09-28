@@ -613,14 +613,16 @@ class InvoiceActivity : BaseActivity() {
 
     // FIX(invoice): برچسب نمایشی فقط برای UI — هیچ‌جا از روی این متن شناسه استخراج نمی‌شود
     private fun enrollmentLabel(en: ActiveStudentEnrollment): String {
-        val title = en.title?.trim().orEmpty()
+        val title = (en.course_title ?: en.title)?.trim().orEmpty()
         val code = en.code?.trim().orEmpty()
-        return when {
+        val teacher = en.teacher_name?.trim().orEmpty()
+        val classLabel = when {
             title.isNotEmpty() && code.isNotEmpty() -> "$title (کد: $code)"
             title.isNotEmpty() -> title
             code.isNotEmpty() -> code
             else -> getString(R.string.common_unknown_class)
         }
+        return if (teacher.isNotEmpty()) "$classLabel — معلم $teacher" else classLabel
     }
 
     // FIX(invoice): «detail» کنترل‌شده‌ی سرور از بدنه‌ی خطا (پیام فارسی قابل فهم)؛ بدنه‌ی غیرJSON → null

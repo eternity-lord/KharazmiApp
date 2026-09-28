@@ -407,7 +407,7 @@ class StudentProfileActivity : BaseActivity() {
             enrollments.size == 1 -> {
                 // FIX(invoice): تنها کلاس فعال → شناسه‌ی واقعی همان enrollment می‌رود (نه نام نمایشی)
                 val en = enrollments[0]
-                openInvoice(en.enrollment_id, en.course_id, en.title?.trim()?.takeIf { it.isNotEmpty() } ?: fallbackName)
+                openInvoice(en.enrollment_id, en.course_id, enrollmentLabel(en), en)
             }
             enrollments.size > 1 -> {
                 // FIX(invoice): چند کلاس فعال → اول انتخاب کلاس (با شناسه واقعی)؛ فیش هرگز با نام کلاس حدس‌زده نمی‌شود
@@ -416,27 +416,29 @@ class StudentProfileActivity : BaseActivity() {
                     .setTitle(getString(R.string.invoice_pick_class, profile.info.name))
                     .setItems(labels.toTypedArray()) { _, which ->
                         val en = enrollments[which]
-                        openInvoice(en.enrollment_id, en.course_id, en.title?.trim()?.takeIf { it.isNotEmpty() } ?: fallbackName)
+                        openInvoice(en.enrollment_id, en.course_id, enrollmentLabel(en), en)
                     }
                     .setNegativeButton(R.string.common_cancel, null)
                     .show()
             }
             else -> {
                 // enrollment فعالی نیست (سرور قدیمی یا واقعاً بدون کلاس) → رفتار قبلی: فیش عمومی
-                openInvoice(null, -1, fallbackName)
+                openInvoice(null, -1, fallbackName, null)
             }
         }
     }
 
-    private fun openInvoice(enrollmentId: Int?, courseId: Int, className: String) {
+    private fun openInvoice(enrollmentId: Int?, courseId: Int, className: String, selected: ActiveStudentEnrollment? = null) {
         val profile = cachedProfile ?: return
         val intent = Intent(this, InvoiceActivity::class.java).apply {
             putExtra(InvoiceActivity.EXTRA_PREFILL_STUDENT_ID, studentId)
             putExtra(InvoiceActivity.EXTRA_PREFILL_STUDENT_NAME, profile.info.name)
             putExtra(InvoiceActivity.EXTRA_PREFILL_CLASS_NAME, className)
-            putExtra(InvoiceActivity.EXTRA_PREFILL_DEBT, profile.totalDebt)
-            putExtra(InvoiceActivity.EXTRA_PREFILL_DEBT_TEACHER, profile.debtTeacher)
-            putExtra(InvoiceActivity.EXTRA_PREFILL_DEBT_INSTITUTE, profile.debtInstitute)
+            // Prefill is scoped to the selected enrollment; the profile totals remain
+            // the fallback only for legacy responses that omit enrollment debt fields.
+            putExtra(InvoiceActivity.EXTRA_PREFILL_DEBT, selected?.total_debt ?: profile.totalDebt)
+            putExtra(InvoiceActivity.EXTRA_PREFILL_DEBT_TEACHER, selected?.debt_teacher ?: profile.debtTeacher)
+            putExtra(InvoiceActivity.EXTRA_PREFILL_DEBT_INSTITUTE, selected?.debt_institute ?: profile.debtInstitute)
             putExtra(InvoiceActivity.EXTRA_PREFILL_UNPAID_SESSIONS, 0)
             putExtra(InvoiceActivity.EXTRA_PREFILL_SEARCH_NAME, profile.info.name)
             putExtra(InvoiceActivity.EXTRA_IS_ADMIN, true)
@@ -451,14 +453,16 @@ class StudentProfileActivity : BaseActivity() {
 
     // FIX(invoice): برچسب نمایشی فقط برای UI — هیچ‌جا از روی این متن شناسه استخراج نمی‌شود
     private fun enrollmentLabel(en: ActiveStudentEnrollment): String {
-        val title = en.title?.trim().orEmpty()
+        val title = (en.course_title ?: en.title)?.trim().orEmpty()
         val code = en.code?.trim().orEmpty()
-        return when {
+        val teacher = en.teacher_name?.trim().orEmpty()
+        val classLabel = when {
             title.isNotEmpty() && code.isNotEmpty() -> "$title (کد: $code)"
             title.isNotEmpty() -> title
             code.isNotEmpty() -> code
             else -> getString(R.string.common_unknown_class)
         }
+        return if (teacher.isNotEmpty()) "$classLabel — معلم $teacher" else classLabel
     }
 
     private fun showInfo() {
@@ -492,6 +496,22 @@ class StudentProfileActivity : BaseActivity() {
             sb.append(getString(R.string.profile_bullet_row, buildTotalStatus(data.walletTotal, data.totalDebt)))
             sb.append(getString(R.string.profile_wallet_row, buildWalletStatus(getString(R.string.profile_wallet_teacher), data.walletTeacher, data.debtTeacher)))
             sb.append(getString(R.string.profile_wallet_row_plain, buildWalletStatus(getString(R.string.profile_wallet_institute), data.walletInstitute, data.debtInstitute)))
+
+            // بدهی هر enrollment جداگانه؛ بدهی legacy بدون کلاس هم ردیف مستقل دارد.
+            data.teachers_financial?.let { rows ->
+                if (rows.isNotEmpty()) {
+                    sb.append("\nبدهی کلاس‌ها:\n")
+                    rows.forEach { row ->
+                        val debt = row.debt_teacher + row.debt_institute
+                        if (row.is_unassigned) {
+                            sb.append("بدهی بدون کلاس: ${formatCurrency(debt)}\n")
+                        } else {
+                            sb.append("بدهی کلاس ${row.course_title ?: "کلاس نامشخص"} — معلم ${row.teacher_name ?: "بدون معلم"}: ${formatCurrency(debt)}\n")
+                        }
+                    }
+                    sb.append("جمع کل بدهی: ${formatCurrency(data.totalDebt)}\n")
+                }
+            }
 
             tvContent.text = sb.toString()
             tvContent.setOnClickListener(null)

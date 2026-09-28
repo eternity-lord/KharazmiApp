@@ -34,6 +34,10 @@ data class StudentClassStatus(
     val due_to_institute: Long,
     val course_id: Int? = null,
     val enrollment_id: Int? = null,
+    val course_title: String? = null,
+    val teacher_id: Int? = null,
+    val teacher_name: String? = null,
+    val is_unassigned: Boolean = false,
     // O-09: باقی‌ماندهٔ شهریه و اعتبار (هر دو نامنفی) — nullable با پیش‌فرض تا اپ با پاسخ سرورِ
     // قدیمی/ناقص هم نشکند؛ مبلغ پیش‌فرض پرداخت از remaining_tuition خوانده می‌شود.
     val remaining_tuition: Long? = null,

@@ -162,8 +162,11 @@ def seed_database(path: str | Path, *, large: bool = False) -> dict[str, Any]:
         ])
 
         LiveSession = models.LiveSession
+        # Keep the fixture's active live session fresh enough that the app's real auto-end
+        # worker cannot race the read-contract tests when the suite runs later in the day.
+        live_started = dt.datetime.now()
         db.add_all([
-            LiveSession(id=1, course_id=2, teacher_id=1, status="LIVE", start_time="2026-09-28T08:00:00", started_at_ts=1790582400, live_roster=json.dumps({"1": {"status": "Present", "excused": False}}, ensure_ascii=False)),
+            LiveSession(id=1, course_id=2, teacher_id=1, status="LIVE", start_time=live_started.strftime("%Y-%m-%dT%H:%M:%S"), started_at_ts=live_started.timestamp(), live_roster=json.dumps({"1": {"status": "Present", "excused": False}}, ensure_ascii=False)),
             LiveSession(id=2, course_id=1, teacher_id=1, status="ENDED", start_time="2026-09-27T08:00:00", end_time="2026-09-27T09:00:00", ended_automatically=True),
         ])
 

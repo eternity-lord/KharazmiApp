@@ -48,7 +48,7 @@
 
 ## تست‌های این نوبت
 
-- `tests/route_audit/test_audit_admin.py:60-81` dashboard، debt، transaction list، search دانش‌آموز/معلم را با مقدار seed بررسی می‌کند؛ خطای dashboard در تست strict xfail خط 83 ثبت شده است.
+- `tests/route_audit/test_audit_admin.py:60-81` dashboard، debt، transaction list، search دانش‌آموز/معلم را با مقدار seed بررسی می‌کند؛ RA-admin-01 در خط 83 با fallback مستقیم `student_id` سبز شده است.
 - `tests/route_audit/test_audit_admin.py:88-118` settings، share، pricing، session history، export، pending و parent contacts را بررسی می‌کند.
 - `tests/route_audit/test_audit_admin.py:121-142` profile، deleted classes، today summary و credentials را بررسی می‌کند.
 - `tests/route_audit/test_audit_admin.py:145-183` SMS محلی، mask عددی، share/pricing update و restoration را بررسی می‌کند.

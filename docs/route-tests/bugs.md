@@ -17,9 +17,9 @@
 
 ## نتیجهٔ finance/attendance/classes در این نوبت
 
-در ۲۹ route دارای assertion مقداری finance/attendance/classes، failure جدید سمت سرور ثبت نشد. deep audit admin یک باگ مستقل (`RA-admin-01`) در dashboard پیدا کرد و هر ۴۱ route admin حداقل assertion/guard دارند؛ `RA-admin-01` strict xfail است و fix خارج از scope این turn باقی می‌ماند.
+در ۲۹ route دارای assertion مقداری finance/attendance/classes، failure جدید سمت سرور ثبت نشد. deep audit admin و sliceهای پرریسک نیز سبز هستند؛ RA-admin-01، RA-parent-01 و RA-sweep-01..04 بسته شده‌اند و فقط O-02/O-12/O-19 عمداً xfail باقی مانده‌اند.
 
 ## نتیجهٔ sweep
 
 - route sweep: ۲۲۱/۲۲۱، status 500 برابر صفر، invalid-input status 500 برابر صفر.
-- contract sweep: ۱۵۱ call یکتا، ۴ entry دارای issue؛ شناسه‌ها `RA-sweep-01` تا `RA-sweep-04` هستند و testهای strict xfail دارند.
+- contract sweep post-fix: ۱۵۱ call یکتا، ۰ entry دارای issue؛ `RA-sweep-01` تا `RA-sweep-04` assertion عادی هستند.

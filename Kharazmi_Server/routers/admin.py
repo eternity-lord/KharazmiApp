@@ -484,14 +484,26 @@ def get_student_full_profile(id: int, authorization: Optional[str] = Header(None
             "debt_institute": int(debt_inst_course)
         })
 
-    # مجموع کل پرداخت دانش‌آموز به آموزشگاه (همه کلاس‌ها) - فیلتر استاندارد
-    total_paid_institute_overall = db.query(func.sum(Transaction.amount)).filter(
+    # مجموع کل پرداخت دانش‌آموز به آموزشگاه (همه کلاس‌ها). سهم institute از
+    # رسیدهای both نیز باید در این جمع کلی دیده شود؛ breakdown هر کلاس بالاتر
+    # همین تفکیک را با scope enrollment انجام می‌دهد.
+    overall_payments = db.query(Transaction).filter(
         Transaction.student_id == id,
-        Transaction.target_wallet == "institute",
         Transaction.amount > 0,
         Transaction.is_deleted == False,
-        Transaction.is_reversed == False
-    ).scalar() or 0
+        Transaction.is_reversed == False,
+    ).all()
+    total_paid_institute_overall = 0
+    for payment in overall_payments:
+        if payment.target_wallet == "institute":
+            total_paid_institute_overall += int(payment.amount or 0)
+        elif payment.target_wallet == "both":
+            amount = int(payment.amount or 0)
+            share_teacher = int(payment.share_teacher or 0)
+            share_institute = int(payment.share_institute or 0)
+            if share_teacher + share_institute != amount:
+                share_institute = amount - amount // 2
+            total_paid_institute_overall += share_institute
 
     return {
         "info": {

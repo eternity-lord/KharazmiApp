@@ -237,6 +237,7 @@ class TestPerClassDebtIsolation(unittest.TestCase):
         self.assertEqual(financial["کلاس A"]["paid_institute"], 0)
         self.assertEqual(financial["کلاس B"]["paid_teacher"], 40)
         self.assertEqual(financial["کلاس B"]["paid_institute"], 60)
+        self.assertEqual(profile["total_paid_institute"], 60)
 
     def test_class_debt_plus_unallocated_legacy_debt_equals_student_total(self):
         total = calculate_student_debt(self.db, self.student)

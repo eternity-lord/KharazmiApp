@@ -2349,21 +2349,14 @@ def _debtor_age_bucket(last_payment_day, today: datetime.date):
 
 
 def _debtor_teacher_rows(db: Session, student_id: int, wallet_teacher_debt: int = 0):
-    """(teacher_id, teacher_name, course_title, بدهیِ همان کلاس) برای ثبت‌نام‌های فعال.
+    """(teacher_id, teacher_name, course_title, بدهیِ همان enrollment).
 
-    منبع عدد: `calculate_enrollment_debt` — یعنی دقیقاً همان فرمولِ هر ثبت‌نام که
-    `calculate_student_debt` روی‌شان جمع می‌زند ⇒ جمع «بدهی به تفکیک معلم» با
-    «کل بدهی» دانش‌آموز هم‌خوان می‌ماند و عدد سومِ واگرا ساخته نمی‌شود.
-    (بدهیِ جلساتِ شارژشدهٔ معلم جداگانه در `debt_teacher` کیف پول گزارش می‌شود.)
-
-    حالت legacy (ثبت‌نام بی‌قیمت + کیف معلم منفی): `calculate_enrollment_debt` صفر
-    می‌دهد ولی `calculate_student_debt` از fallback کیف پول بدهی گزارش می‌کند ⇒ اگر
-    دانش‌آموز **دقیقاً یک کلاس فعال** داشته باشد، همان بدهیِ کیف معلم به آن یک معلم
-    نسبت داده می‌شود (بدون حدسِ تقسیم بین چند معلم)؛ در غیر این صورت مبلغ
-    تخصیص‌نیافته می‌ماند و در نمای گروه‌بندی به‌صورت `unassigned_debt` گزارش می‌شود تا
-    `sum(by_teacher.debt) + unassigned_debt == total_debt` همیشه برقرار بماند.
+    این نمای per-class فقط بدهیِ enrollment را نشان می‌دهد. بدهی legacy که
+    `calculate_student_debt` از wallet کلی دانش‌آموز می‌گیرد، در `unassigned_debt`
+    باقی می‌ماند؛ حتی اگر دانش‌آموز فقط یک کلاس فعال داشته باشد. نسبت‌دادن wallet
+    کلی به تنها کلاس هم همچنان نسبت‌دادن نادرست بین کلاس‌هاست.
     """
-    from financial_calculations import calculate_enrollment_debt  # lazy، الگوی پروژه
+    from financial_calculations import calculate_enrollment_debt_breakdown  # lazy، الگوی پروژه
     enrollments = (
         db.query(Enrollment)
         .filter(Enrollment.student_id == student_id, Enrollment.is_deleted == False)
@@ -2375,16 +2368,14 @@ def _debtor_teacher_rows(db: Session, student_id: int, wallet_teacher_debt: int 
         if course is None:
             continue
         teacher = db.query(Teacher).filter(Teacher.id == course.teacher_id).first()
+        breakdown = calculate_enrollment_debt_breakdown(db, en)
         rows.append({
             "teacher_id": course.teacher_id,
             "teacher_name": display_name(teacher, "نامشخص") if teacher else "بدون معلم",
             "course_id": course.id,
             "course_title": course.title or "کلاس بدون نام",
-            "debt": calculate_enrollment_debt(en),
+            "debt": breakdown["debt"],
         })
-    if rows and wallet_teacher_debt > 0 and sum(int(r["debt"] or 0) for r in rows) == 0:
-        if len(rows) == 1:
-            rows[0]["debt"] = int(wallet_teacher_debt)
     return rows
 
 

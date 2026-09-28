@@ -180,3 +180,28 @@ def test_installment_payment_is_atomic_and_updates_expected_rows(client, auth_he
     student.wallet_institute = 5_000
     student.sync_wallet_balance()
     db.commit()
+
+
+def test_invoice_ignores_archived_payment_rows_in_debt_oracle(client, auth_headers, db):
+    """Independent oracle: an archived 123,456 receipt cannot change enrollment 1's 300,000 paid total."""
+    import models
+
+    archived = models.Transaction(
+        student_id=1, enrollment_id=1, course_id=1, branch_id=1,
+        amount=123_456, payment_method="نقدی", tracking_code="AUD-ARCHIVED",
+        date="1405/06/08", receiver="آموزشگاه", description="رسید آرشیوی ممیزی",
+        type="deposit", target_wallet="institute", share_teacher=0,
+        share_institute=123_456, is_deleted=True, is_reversed=False,
+    )
+    db.add(archived)
+    db.commit()
+    try:
+        response = client.get("/finance/invoice/1", headers=_h(auth_headers))
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["total_paid"] == 300_000
+        assert body["balance_due"] == 700_000
+        assert body["credit_balance"] == 0
+    finally:
+        db.delete(archived)
+        db.commit()

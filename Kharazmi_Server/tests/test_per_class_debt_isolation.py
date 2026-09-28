@@ -235,6 +235,23 @@ class TestPerClassDebtIsolation(unittest.TestCase):
         self.assertEqual(b["debt_teacher"], 0)
         self.assertEqual(b["debt_institute"], 0)
 
+    def test_session_charge_is_isolated_by_session_not_a_mistyped_course_id(self):
+        self.enrollment_b.total_tuition = 1000
+        legacy_charge = self.db.query(Transaction).filter(Transaction.id == 1).one()
+        # Even if a legacy charge carries B's course_id, session_id=1 identifies
+        # course A and must keep the charge out of B.
+        legacy_charge.course_id = self.course_b.id
+        self.db.commit()
+
+        a = calculate_enrollment_debt_breakdown(
+            self.db, self.enrollment_a, session_scoped=True
+        )
+        b = calculate_enrollment_debt_breakdown(
+            self.db, self.enrollment_b, session_scoped=True
+        )
+        self.assertEqual((a["debt_teacher"], a["debt_institute"]), (300, 200))
+        self.assertEqual((b["debt_teacher"], b["debt_institute"]), (0, 0))
+
     def test_session_scoped_financial_views_show_only_the_attended_class(self):
         """Two classes for one student: only the class with attendance/charge owes shares."""
         # Make the second registration priced too. Its lack of a session must still
@@ -538,10 +555,12 @@ class TestPerClassDebtIsolation(unittest.TestCase):
         self.assertNotIn("R.id.tvTotalDebt", invoice)
         self.assertIn("debtTeacher", invoice)
         self.assertIn("debtInstitute", invoice)
+        self.assertIn("getStudentClassStatus(studentId, enrollment.course_id, null)", invoice)
+        self.assertIn("row.debt_teacher", profile)
+        self.assertIn("row.debt_institute", profile)
         self.assertIn("sumOf { it.paid_teacher }", attendance)
         self.assertIn("val debtTeacher = student.debt_teacher", attendance)
         self.assertIn("s.paid_teacher, s.paid_institute", attendance)
-        self.assertIn("val debt = row.debt", profile)
         self.assertNotIn("student.wallet_teacher", attendance)
         self.assertNotIn("student.wallet_institute", attendance)
 

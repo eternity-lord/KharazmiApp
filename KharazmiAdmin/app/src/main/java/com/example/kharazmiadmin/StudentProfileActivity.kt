@@ -369,17 +369,12 @@ class StudentProfileActivity : BaseActivity() {
                     // 🔥 لاجیک جدید نمایش مالی (هوشمند)
                     // ===========================================
 
-                    // 1. وضعیت کلی کیف پول و بدهی
-                    tvTotalDebt.text = buildTotalStatus(data.walletTotal, data.totalDebt)
-                    tvTotalDebt.setTextColor(colorForBalance(data.walletTotal))
-
-                    // 2. کیف پول معلم
-                    tvDebtTeacher.text = buildWalletStatus(getString(R.string.profile_wallet_teacher), data.walletTeacher, data.debtTeacher)
-                    tvDebtTeacher.setTextColor(colorForBalance(data.walletTeacher))
-
-                    // 3. کیف پول آموزشگاه
-                    tvDebtInstitute.text = buildWalletStatus(getString(R.string.profile_wallet_institute), data.walletInstitute, data.debtInstitute)
-                    tvDebtInstitute.setTextColor(colorForBalance(data.walletInstitute))
+                    // بدهی کلی/کیف کلی به‌عنوان بدهی کلاس نمایش داده نمی‌شود؛
+                    // اعداد دقیق فقط در تب مالی و بر اساس enrollment دیده می‌شوند.
+                    tvTotalDebt.text = "بدهی هر کلاس در تب مالی به‌صورت تفکیک‌شده نمایش داده می‌شود"
+                    tvTotalDebt.setTextColor(android.graphics.Color.DKGRAY)
+                    tvDebtTeacher.visibility = View.GONE
+                    tvDebtInstitute.visibility = View.GONE
                     // ===========================================
 
                     if (tabLayout.selectedTabPosition == 0) showInfo()
@@ -462,7 +457,10 @@ class StudentProfileActivity : BaseActivity() {
             code.isNotEmpty() -> code
             else -> getString(R.string.common_unknown_class)
         }
-        return if (teacher.isNotEmpty()) "$classLabel — معلم $teacher" else classLabel
+        val debtTeacher = String.format("%,d", en.debt_teacher ?: 0L)
+        val debtInstitute = String.format("%,d", en.debt_institute ?: 0L)
+        val ownerLabel = if (teacher.isNotEmpty()) "$classLabel — معلم $teacher" else classLabel
+        return "$ownerLabel | بدهی به معلم: $debtTeacher | بدهی به آموزشگاه: $debtInstitute"
     }
 
     private fun showInfo() {
@@ -492,24 +490,20 @@ class StudentProfileActivity : BaseActivity() {
             if (data.transactions.isEmpty()) sb.append(getString(R.string.profile_no_txn))
             else data.transactions.forEach { sb.append(getString(R.string.profile_bullet_row, it)) }
 
-            sb.append(getString(R.string.profile_wallet_title))
-            sb.append(getString(R.string.profile_bullet_row, buildTotalStatus(data.walletTotal, data.totalDebt)))
-            sb.append(getString(R.string.profile_wallet_row, buildWalletStatus(getString(R.string.profile_wallet_teacher), data.walletTeacher, data.debtTeacher)))
-            sb.append(getString(R.string.profile_wallet_row_plain, buildWalletStatus(getString(R.string.profile_wallet_institute), data.walletInstitute, data.debtInstitute)))
-
-            // بدهی هر enrollment جداگانه؛ بدهی legacy بدون کلاس هم ردیف مستقل دارد.
+            // بدهی فقط در سطح enrollment نمایش داده می‌شود؛ کیف کلی دانش‌آموز
+            // به هیچ‌کدام از کلاس‌ها نسبت داده نمی‌شود.
             data.teachers_financial?.let { rows ->
                 if (rows.isNotEmpty()) {
-                    sb.append("\nبدهی کلاس‌ها:\n")
+                    sb.append("\nبدهی تفکیک‌شده کلاس‌ها:\n")
                     rows.forEach { row ->
-                        val debt = row.debt
                         if (row.is_unassigned) {
-                            sb.append("بدهی بدون کلاس: ${formatCurrency(debt)}\n")
+                            sb.append("بدهی بدون کلاس — آموزشگاه: ${formatCurrency(row.debt_institute)}\n")
                         } else {
-                            sb.append("بدهی کلاس ${row.course_title ?: "کلاس نامشخص"} — معلم ${row.teacher_name ?: "بدون معلم"}: ${formatCurrency(debt)}\n")
+                            sb.append("کلاس ${row.course_title ?: "کلاس نامشخص"} — معلم ${row.teacher_name ?: "بدون معلم"}\n")
+                            sb.append("  بدهی به معلم: ${formatCurrency(row.debt_teacher)}\n")
+                            sb.append("  بدهی به آموزشگاه: ${formatCurrency(row.debt_institute)}\n")
                         }
                     }
-                    sb.append("جمع کل بدهی: ${formatCurrency(data.totalDebt)}\n")
                 }
             }
 

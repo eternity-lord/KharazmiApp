@@ -401,9 +401,38 @@ def calculate_enrollment_debt_breakdown(
         if recorded_paid > ledger_paid:
             paid_institute += recorded_paid - ledger_paid
 
+    # Session charges created by older attendance flows may have no course_id,
+    # while their session_id still points unambiguously to the class. Resolve
+    # those rows through SessionLog as well; otherwise a real charge is silently
+    # reported as zero in the class card and the quick-remittance picker.
+    class_session_ids = db.query(models.SessionLog.id).filter(
+        models.SessionLog.course_id == enrollment.course_id,
+        models.SessionLog.is_deleted == False,
+    )
+    charge_scope = or_(
+        # For a real session charge, session_id is the authoritative class key.
+        # This prevents a stale/mistyped course_id from leaking class B's charge
+        # into class A when both classes share the same teacher/student.
+        and_(
+            models.Transaction.session_id.is_not(None),
+            models.Transaction.session_id.in_(class_session_ids),
+        ),
+        # Legacy rows without a session_id can only use their explicit enrollment
+        # or course key; an unassigned charge is never guessed into a class.
+        and_(
+            models.Transaction.session_id.is_(None),
+            or_(
+                models.Transaction.enrollment_id == enrollment.id,
+                and_(
+                    models.Transaction.enrollment_id.is_(None),
+                    models.Transaction.course_id == enrollment.course_id,
+                ),
+            ),
+        ),
+    )
     charges = db.query(models.Transaction).filter(
         models.Transaction.student_id == enrollment.student_id,
-        models.Transaction.course_id == enrollment.course_id,
+        charge_scope,
         models.Transaction.type == "session_charge",
         models.Transaction.is_deleted == False,
         models.Transaction.is_reversed == False,

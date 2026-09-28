@@ -246,8 +246,30 @@ class InvoiceActivity : BaseActivity() {
         lifecycleScope.launch(Dispatchers.IO) {
             try {
                 val fullProfile = api.getFullStudentProfile(studentId)
+                // The profile is the picker source, but the authoritative amount is
+                // the class-status endpoint. Refresh each active enrollment by its
+                // own course before rendering the popup so another class' wallet
+                // can never be copied into this row (and a stale/legacy profile
+                // cannot turn every row into zero).
+                val enrollments = fullProfile.enrollments.map { enrollment ->
+                    try {
+                        val status = api.getStudentClassStatus(studentId, enrollment.course_id, null)
+                        enrollment.copy(
+                            debt = status.remaining_tuition
+                                ?: (status.due_to_teacher + status.due_to_institute),
+                            total_debt = status.remaining_tuition
+                                ?: (status.due_to_teacher + status.due_to_institute),
+                            debt_teacher = status.due_to_teacher,
+                            debt_institute = status.due_to_institute,
+                        )
+                    } catch (error: Exception) {
+                        if (error is kotlinx.coroutines.CancellationException) throw error
+                        // Keep the profile row as a fail-soft fallback; the exact
+                        // status is loaded again after the user picks the class.
+                        enrollment
+                    }
+                }
                 withContext(Dispatchers.Main) {
-                    val enrollments = fullProfile.enrollments
                     when {
                         // FIX(invoice): انتخاب از داده‌ی واقعی (enrollment_id/course_id) — دیگر متن نمایشی parse نمی‌شود
                         enrollments.size == 1 -> {

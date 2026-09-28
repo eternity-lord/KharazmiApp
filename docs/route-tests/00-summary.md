@@ -12,7 +12,7 @@
 | route از همین سه router بدون assertion مستقل | 33 | فهرست کامل و دلیل هر مورد در `blockers.md` آمده است؛ sweep جای assertion کسب‌وکار را نگرفته است |
 | route functional باقی‌ماندهٔ سایر routerها | 192 | سه router اول بستهٔ صادقانه دارند؛ routerهای بعدی هنوز در انتظارند |
 | router پردازش‌شده | 3 | finance، attendance و classes، ممیزی اولیه |
-| تست‌های pass | 48 | آخرین اجرای `pytest tests/route_audit -q` |
+| تست‌های pass | 50 | آخرین اجرای `pytest tests/route_audit -q` |
 | تست‌های strict xfail | 8 | 4 مورد قبلی O-02/O-12/O-14/O-19 + 4 مورد `RA-sweep-01..04` |
 | باگ‌های sweep contract | 4 entry | `RA-sweep-01` تا `RA-sweep-04`؛ 6 NPE issue instance و 1 missing-list instance |
 | باگ‌های status 500 در sweep | 0 | در 221 اجرای معتبر و 220 payload نامعتبر، status 500 مشاهده نشد |
@@ -23,7 +23,7 @@
 - جزئیات session، history حضور، live start/status/cancel، roster و اثر صفر مالی بررسی شد.
 - کلاس‌ها: list/detail/full report/students، pending/deletion، suspend و Excel با openpyxl بررسی شد.
 - oracle مستقل برای tuition/discount/payment/due و wallet سهم‌ها استفاده شد.
-- atomic update و retry برای پرداخت قسط بررسی شد.
+- atomic update و retry برای پرداخت مستقیم، پرداخت قسط و شارژ جلسه بررسی شد؛ retry تسویه در این سه router route ندارد.
 - invalid amount بررسی شد و عدم ایجاد transaction assert شد.
 - پاسخ خالی installments به‌صورت `[]` بررسی شد.
 - dynamic URL، امنیت token و نفوذ خارج از scope باقی ماندند.
@@ -33,8 +33,8 @@
 | آزمون/موضوع | نتیجهٔ عددی | تفسیر |
 |---|---:|---|
 | payload نامعتبر تولیدشده از OpenAPI | 220 route دارای body/parameter؛ 0 status 500 | sweep در `report.json` ثبت شده؛ assertion معنایی هر route هنوز فقط در 29 route است |
-| retry پرداخت/قسط | 1 سناریوی صریح، `/finance/installments/{id}/pay` | retry دوم 400 و transaction دوم ساخته نشد؛ retry `/finance/pay` هنوز blocker است |
-| retry شارژ جلسه | 0 سناریوی صریح | `submit_session` در blockers است؛ sweep فقط status/shape را اجرا کرد |
+| retry پرداخت مستقیم/قسط | 2 سناریوی صریح، `/finance/pay` و `/finance/installments/{id}/pay` | پرداخت مستقیم دوباره همان `transaction_id` را می‌دهد و فقط 1 transaction ساخته می‌شود؛ retry قسط 400 و receipt دوم ندارد |
+| retry شارژ جلسه | 1 سناریوی صریح، `/attendance/submit_session` | retry همان تاریخ 409؛ فقط یک SessionLog/Attendance/ledger جدید و wallet به‌صورت snapshot بازگردانده شد؛ این guard جای value audit کامل route نیست |
 | retry تسویهٔ معلم | 0 سناریوی صریح | route settlement در این سه router assertion مستقل ندارد |
 | تعارض شروع جلسهٔ زنده | 1 | شروع دوبارهٔ live، 409 و بدون جلسهٔ دوم |
 | تعارض پایان/لغو جلسه | 1 replay cancel | cancel دوباره idempotent است؛ پایان دوباره در blockers است |
@@ -71,4 +71,4 @@
 - ۳۳ route سه router اول در `blockers.md` assertion مستقل ندارند.
 - exports هنوز به openpyxl/PDF value audit عمیق نشده است؛ sweep فقط response/shape را ثبت کرده است.
 - device checklist عددهای screenهای مهم را دارد، اما اجرای گوشی/compile انجام نشده است.
-- CI remote در این turn هنوز اجرا نشده؛ اجرای محلی route-audit و sweep ثبت شده است.
+- CI remote برای commit sweep سبز است: [run 36407511527](https://github.com/eternity-lord/KharazmiApp/actions/runs/36407511527). Android compile اجرا نشده است.

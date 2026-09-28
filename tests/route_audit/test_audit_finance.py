@@ -125,6 +125,34 @@ def test_finance_schema_rejects_invalid_amounts_without_writing(client, auth_hea
     assert db.query(__import__("models").Transaction).count() == before
 
 
+def test_direct_payment_retry_is_idempotent_without_duplicate_transaction(client, auth_headers, db):
+    import models
+    payload = {"student_id": 1, "amount": 12_345, "target_wallet": "institute", "description": "audit retry", "payment_method": "نقدی", "date": "1403/08/02", "enrollment_id": 1, "idempotency_key": "audit-direct-retry-01"}
+    before_ids = {row.id for row in db.query(models.Transaction).all()}
+    enrollment = db.get(models.Enrollment, 1)
+    student = db.get(models.Student, 1)
+    installment = db.get(models.Installment, 1)
+    before_paid, before_wi = enrollment.total_paid, student.wallet_institute
+    before_installment = (installment.is_paid, installment.paid_at, installment.paid_amount)
+    first = client.post("/finance/pay", json=payload, headers=_h(auth_headers))
+    second = client.post("/finance/pay", json=payload, headers=_h(auth_headers))
+    assert first.status_code == second.status_code == 200, (first.text, second.text)
+    assert first.json().get("transaction_id") == second.json().get("transaction_id")
+    db.expire_all()
+    created = db.query(models.Transaction).filter(~models.Transaction.id.in_(before_ids)).all()
+    assert len(created) == 1
+    assert created[0].amount == 12_345
+    # Restore the seed event ledger for later tests.
+    tx_id = created[0].id
+    db.query(models.TransactionInstallmentAllocation).filter(models.TransactionInstallmentAllocation.transaction_id == tx_id).delete(synchronize_session=False)
+    db.delete(created[0])
+    enrollment = db.get(models.Enrollment, 1); student = db.get(models.Student, 1); installment = db.get(models.Installment, 1)
+    enrollment.total_paid, student.wallet_institute = before_paid, before_wi
+    installment.is_paid, installment.paid_at, installment.paid_amount = before_installment
+    student.sync_wallet_balance()
+    db.commit()
+
+
 def test_installment_payment_is_atomic_and_updates_expected_rows(client, auth_headers, db):
     import models
     response = client.post("/finance/installments/1/pay", params={"payment_method": "نقدی"}, headers=_h(auth_headers))

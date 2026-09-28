@@ -14,7 +14,7 @@
 | `GET /attendance/session/{session_code}` | handler `routers.attendance.get_session_details`؛ منبع `Kharazmi_Server/routers/attendance.py:1003` | 1 | inventory/fixture | success,value,DB,state,role | سبزِ اولیه |
 | `PUT /attendance/session/{session_code}` | handler `routers.attendance.edit_past_session`؛ منبع `Kharazmi_Server/routers/attendance.py:1051` | 0 | inventory/fixture | مسدود: تست رفتاری این route در نوبت router آن نوشته می‌شود | — |
 | `POST /attendance/student_history` | handler `routers.attendance.get_student_attendance_history`؛ منبع `Kharazmi_Server/routers/attendance.py:926` | 1 | inventory/fixture | success,value,DB,state,role | سبزِ اولیه |
-| `POST /attendance/submit_session` | handler `routers.attendance.submit_session_and_calculate`؛ منبع `Kharazmi_Server/routers/attendance.py:631` | 0 | inventory/fixture | مسدود: تست رفتاری این route در نوبت router آن نوشته می‌شود | — |
+| `POST /attendance/submit_session` | handler `routers.attendance.submit_session_and_calculate`؛ منبع `Kharazmi_Server/routers/attendance.py:631` | 1 retry-only | conflict,DB | guard تکرار تاریخ سبز؛ value audit کامل همچنان مسدود | — |
 | `POST /attendance/{course_id}/start_live` | handler `routers.attendance.start_live_session`؛ منبع `Kharazmi_Server/routers/attendance.py:313` | 1 | inventory/fixture | success,value,DB,state,role | سبزِ اولیه |
 | `POST /attendance/{session_id}/cancel_live` | handler `routers.attendance.cancel_live_session`؛ منبع `Kharazmi_Server/routers/attendance.py:449` | 1 | inventory/fixture | success,value,DB,state,role | سبزِ اولیه |
 | `POST /attendance/{session_id}/end_live` | handler `routers.attendance.end_live_session`؛ منبع `Kharazmi_Server/routers/attendance.py:369` | 0 | inventory/fixture | مسدود: تست رفتاری این route در نوبت router آن نوشته می‌شود | — |
@@ -22,7 +22,7 @@
 
 ## تست‌های این نوبت
 
-- `tests/route_audit/test_audit_attendance.py:29-45` خواندن مقداری session/class/student history را بررسی می‌کند.
-- `tests/route_audit/test_audit_attendance.py:48-78` چرخهٔ start/status/cancel و بدون اثر مالی را بررسی می‌کند.
-- `tests/route_audit/test_audit_attendance.py:81-92` live read/roster و دسترسی نقش‌ها را بررسی می‌کند.
-- `tests/route_audit/test_audit_attendance.py:95-103` کلاس معلق را بررسی می‌کند.
+- `tests/route_audit/test_audit_attendance.py:29-48` خواندن مقداری session/class/student history را بررسی می‌کند.
+- `tests/route_audit/test_audit_attendance.py:51-74` چرخهٔ start/status/cancel و بدون اثر مالی را بررسی می‌کند.
+- `tests/route_audit/test_audit_attendance.py:77-121` retry شارژ جلسه را با 409، یکتایی ledger و restore fixture بررسی می‌کند؛ این تست route را از blocker کامل خارج نمی‌کند.
+- `tests/route_audit/test_audit_attendance.py:124-134` live read/roster و `tests/route_audit/test_audit_attendance.py:137-143` کلاس معلق را بررسی می‌کنند.

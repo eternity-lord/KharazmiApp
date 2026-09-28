@@ -30,3 +30,8 @@
 | `GET /finance/student/{student_id}/transactions` | handler `routers.finance.get_student_physical_transactions`؛ منبع `Kharazmi_Server/routers/finance.py:2047` | 1 | success,value,oracle | سبزِ اولیه | — |
 | `GET /finance/student_class_status` | handler `routers.finance.get_student_class_status`؛ منبع `Kharazmi_Server/routers/finance.py:656` | 1 | success,value,oracle | سبزِ اولیه | — |
 | `POST /finance/transaction/{transaction_id}/refund` | handler `routers.finance.refund_transaction`؛ منبع `Kharazmi_Server/routers/finance.py:1394` | 0 | inventory/fixture | مسدود: تست رفتاری این route در نوبت router آن نوشته می‌شود | — |
+
+## تست‌های این نوبت
+
+- `tests/route_audit/test_audit_finance.py:128-153` retry مستقیم `/finance/pay` را بررسی می‌کند: دو پاسخ با `transaction_id` یکسان، فقط یک ledger row و restore installment/enrollment/wallet.
+- `tests/route_audit/test_audit_finance.py:156-182` پرداخت قسط، مبلغ/receiver/DB و retry بدون receipt دوم را بررسی می‌کند.

@@ -74,6 +74,53 @@ def test_live_start_status_cancel_is_idempotent_without_financial_effect(client,
     assert db.query(models.Transaction).count() == tx_before
 
 
+def test_session_charge_retry_is_atomic_and_rejects_duplicate_date(client, auth_headers, db):
+    import models
+    headers = auth_headers["admin"]
+    payload = {
+        "course_id": 1,
+        "date": "1403/08/03",
+        "items": [{"student_id": 1, "status": "Present", "excused": False}],
+    }
+    before_sessions = {row.id for row in db.query(models.SessionLog).all()}
+    before_attendance = {row.id for row in db.query(models.Attendance).all()}
+    before_transactions = {row.id for row in db.query(models.Transaction).all()}
+    student = db.get(models.Student, 1)
+    enrollment = db.get(models.Enrollment, 1)
+    before_wallets = (student.wallet_teacher, student.wallet_institute, student.wallet_balance)
+    before_paid = enrollment.total_paid
+
+    first = client.post("/attendance/submit_session", json=payload, headers=headers)
+    retry = client.post("/attendance/submit_session", json=payload, headers=headers)
+    assert first.status_code == 200, first.text
+    assert retry.status_code == 409, retry.text
+
+    db.expire_all()
+    new_sessions = db.query(models.SessionLog).filter(~models.SessionLog.id.in_(before_sessions)).all()
+    new_attendance = db.query(models.Attendance).filter(~models.Attendance.id.in_(before_attendance)).all()
+    new_transactions = db.query(models.Transaction).filter(~models.Transaction.id.in_(before_transactions)).all()
+    assert len(new_sessions) == 1
+    assert len(new_attendance) == 1
+    assert len(new_transactions) >= 1
+    session_id = new_sessions[0].id
+    assert all(row.session_id == session_id for row in new_transactions)
+
+    # Remove only this test's ledger rows and restore the seeded wallet snapshot.
+    tx_ids = {row.id for row in new_transactions}
+    for allocation in db.query(models.TransactionInstallmentAllocation).filter(models.TransactionInstallmentAllocation.transaction_id.in_(tx_ids)).all():
+        db.delete(allocation)
+    for row in new_attendance:
+        db.delete(row)
+    for row in new_transactions:
+        db.delete(row)
+    for row in new_sessions:
+        db.delete(row)
+    student = db.get(models.Student, 1)
+    student.wallet_teacher, student.wallet_institute, student.wallet_balance = before_wallets
+    db.get(models.Enrollment, 1).total_paid = before_paid
+    db.commit()
+
+
 def test_live_state_and_role_specific_reads(client, auth_headers):
     teacher_live = client.get("/attendance/live/current", headers=auth_headers["teacher"])
     admin_live = client.get("/attendance/live/current", headers=auth_headers["admin"])

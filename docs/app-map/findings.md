@@ -4,4 +4,4 @@
 
 | شدت | فایل:خط | شرح | وضعیت |
 |---|---|---|---|
-| — | — | تا پایان فاز A مورد منطقیِ تأییدشده‌ای ثبت نشده است؛ `نامشخص`های استخراج CSV صرفاً محدودیت scan هستند، نه finding. | باز |
+| متوسط | `Kharazmi_Server/routers/admin.py:524-566`؛ `Kharazmi_Server/routers/reports.py:756-764` | دو خروجی با نام/معنای نزدیک `total_paid_institute` یک تعریف ندارند: full profile سهم institute از رسیدهای `both` را با `share_institute` جمع می‌کند، اما statement فقط ردیف‌های `target_wallet == "institute"` را sum می‌کند و سهم split/both را کنار می‌گذارد. اثر دقیق برای دادهٔ دارای رسید both وابسته به مصرف endpoint است؛ تصمیم/اصلاح محصول در این فاز انجام نشد. | باز؛ فقط مستند شد |

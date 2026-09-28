@@ -84,4 +84,4 @@
 - ۳۳ route سه router اول در `blockers.md` assertion مستقل ندارند.
 - exports هنوز به openpyxl/PDF value audit عمیق نشده است؛ sweep فقط response/shape را ثبت کرده است.
 - device checklist عددهای screenهای مهم را دارد، اما اجرای گوشی/compile انجام نشده است.
-- CI commit پایه سبز است: [run 36411727281](https://github.com/eternity-lord/KharazmiApp/actions/runs/36411727281). CI mutation commits پس از push دوباره بررسی می‌شود؛ Android compile عمداً اجرا نشده است.
+- CI mutation branch سبز است: [run 36413712720](https://github.com/eternity-lord/KharazmiApp/actions/runs/36413712720)؛ Android compile عمداً اجرا نشده است.

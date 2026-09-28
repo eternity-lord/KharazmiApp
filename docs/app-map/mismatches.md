@@ -4,7 +4,7 @@
 
 ## 1. تماس اپ بدون route سرور
 
-مقایسه بر اساس method و path نرمال‌شدهٔ `{id}`/`{student_id}` انجام شد. نتیجه: **0 تماس Retrofit با route مفقود**. دو موردی که ابتدا در مقایسهٔ خام ظاهر می‌شدند، پس از اعمال prefix ثبت‌شده در `main.py:710` و `main.py:713` با route واقعی جفت شدند:
+مقایسه بر اساس method و path نرمال‌شدهٔ `{id}`/`{student_id}` انجام شد؛ declaration پویا `GET dynamic (@Url/نامشخص)` در `ReportExporter.kt:27` route ثابت نیست و پیش از تفاضل به‌عنوان مورد runtime کنار گذاشته شد. نتیجه: **0 تماس Retrofit با route مفقود**. دو موردی که ابتدا در مقایسهٔ خام ظاهر می‌شدند، پس از اعمال prefix ثبت‌شده در `Kharazmi_Server/main.py:710` و `Kharazmi_Server/main.py:713` با route واقعی جفت شدند:
 
 - `AuditApi.getSuspiciousPatterns`: `ApiInterfaces.kt:126` ↔ `/audit/suspicious_patterns` در `routers/audit.py:87` و prefix در `main.py:710`.
 - `AdminCommandCenterApi.getKpis`: `ApiInterfaces.kt:153` ↔ `/dashboard/kpis` در `routers/dashboard.py:56` و prefix در `main.py:713`.

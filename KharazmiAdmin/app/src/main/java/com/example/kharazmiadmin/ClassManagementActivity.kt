@@ -225,7 +225,6 @@ class ClassManagementActivity : BaseActivity() {
             val tvGender: Chip = view.findViewById(R.id.chipGender)
             val tvSessionCount: Chip = view.findViewById(R.id.chipSessionCount)
             val llStudentPreview: LinearLayout = view.findViewById(R.id.ll_student_preview)
-            val tvTotalDebt: TextView = view.findViewById(R.id.tvTotalDebt)
             val tvTeacherDebt: TextView = view.findViewById(R.id.tvTeacherDebt)
             val tvInstituteDebt: TextView = view.findViewById(R.id.tvInstituteDebt)
             val btnRegisterInvoice: Button = view.findViewById(R.id.btnRegisterInvoice)
@@ -327,7 +326,6 @@ class ClassManagementActivity : BaseActivity() {
                 holder.llTopStudents.visibility = View.GONE
             }
 
-            holder.tvTotalDebt.text = String.format("%,d", item.total_debt)
             holder.tvTeacherDebt.text = String.format("%,d", item.debt_to_teacher)
             holder.tvInstituteDebt.text = String.format("%,d", item.debt_to_institute)
 

@@ -397,7 +397,8 @@
     <string name="invoice_due_teacher">سهم معلم (قابل پرداخت): %1$s %2$s تومان</string>
     <string name="invoice_due_institute">سهم آموزشگاه (قابل پرداخت): %1$s %2$s تومان</string>
     <string name="invoice_class_empty">این کلاس دانش‌آموزی ندارد</string>
-    <string name="invoice_student_row">%1$s (بدهی کل: %2$s, معلم: %3$s, آموزشگاه: %4$s)</string>
+    <string name="invoice_student_row">%1$s (بدهی به معلم: %2$s، بدهی به آموزشگاه: %3$s)</string>
+    <string name="invoice_selected_class">کلاس انتخاب‌شده: %1$s</string>
     <string name="invoice_pick_student">انتخاب دانش‌آموز از %1$s</string>
     <string name="invoice_debt_total">بدهی باقی‌مانده: %1$s تومان</string>
     <string name="invoice_debt_teacher">بدهی سهم معلم: %1$s تومان</string>
@@ -714,7 +715,8 @@
     <string name="cdetail_info_sessions">"📅 تعداد جلسات برگزار شده: %1$s\n"</string>
     <string name="cdetail_info_students">"👥 تعداد کل دانش‌آموزان: %1$s\n\n"</string>
     <string name="cdetail_info_revenue">"💰 درآمد وصول شده: %1$s تومان\n"</string>
-    <string name="cdetail_info_debt">"⚠️ مطالبات (بدهی‌ها): %1$s تومان\n"</string>
+    <string name="cdetail_info_debt_teacher">"⚠️ بدهی به معلم: %1$s تومان\n"</string>
+    <string name="cdetail_info_debt_institute">"⚠️ بدهی به آموزشگاه: %1$s تومان\n"</string>
     <string name="cdetail_fin_teacher_title">"💳 تفکیک مالی سهم مربی:\n"</string>
     <string name="cdetail_fin_teacher_debt">"   • مطالبات (بدهی به معلم): %1$s تومان\n"</string>
     <string name="cdetail_fin_teacher_paid">"   • دریافتی (واریزی به معلم): %1$s تومان\n\n"</string>
@@ -746,8 +748,7 @@
     <string name="cdetail_code_row">" (کد: %1$s)"</string>
     <string name="cdetail_student_row">%1$s%2$s (🎁 تخفیف: %3$s)</string>
     <string name="cdetail_att_pct">📊 حضور: %1$s%%</string>
-    <string name="cdetail_debt_break">معلم: %1$s | آموزشگاه: %2$s</string>
-    <string name="cdetail_debt_total">🔴 بدهی کل: %1$s تومان\n(%2$s)</string>
+    <string name="cdetail_debt_split">بدهی به معلم: %1$s تومان\nبدهی به آموزشگاه: %2$s تومان</string>
     <string name="cdetail_unsettled">تسویه نشده</string>
     <string name="cdetail_no_debt">🟢 بدون بدهی</string>
     <string name="cdetail_settled">تسویه شده</string>

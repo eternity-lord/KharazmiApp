@@ -93,7 +93,7 @@ class InvoiceActivity : BaseActivity() {
     private lateinit var tvStName: TextView
     private lateinit var tvStClass: TextView
     private lateinit var tvUnpaid: TextView
-    private lateinit var tvDebt: TextView
+    private lateinit var tvSelectedClass: TextView
     private lateinit var tvDebtTeacher: TextView
     private lateinit var tvDebtInstitute: TextView
     private lateinit var etAmount: TextInputEditText
@@ -144,7 +144,7 @@ class InvoiceActivity : BaseActivity() {
         tvStName = findViewById(R.id.tvStName)
         tvStClass = findViewById(R.id.tvStClass)
         tvUnpaid = findViewById(R.id.tvUnpaidSessions)
-        tvDebt = findViewById(R.id.tvTotalDebt)
+        tvSelectedClass = findViewById(R.id.tvSelectedClass)
         tvDebtTeacher = findViewById(R.id.tvDebtTeacher)
         tvDebtInstitute = findViewById(R.id.tvDebtInstitute)
         etAmount = findViewById(R.id.etAmount)
@@ -307,25 +307,15 @@ class InvoiceActivity : BaseActivity() {
                 selectedEnrollmentId = status.enrollment_id
 
                 withContext(Dispatchers.Main) {
-                    val formattedTotal = String.format("%,d", status.total_amount)
                     val formattedPaidTeacher = String.format("%,d", status.paid_to_teacher)
-                    val formattedPaidInstitute = String.format("%,d", status.paid_to_institute)
-
                     val signTeacher = if (status.due_to_teacher >= 0) "+" else "-"
                     val signInstitute = if (status.due_to_institute >= 0) "+" else "-"
 
                     val formattedDueTeacher = String.format("%,d", abs(status.due_to_teacher))
                     val formattedDueInstitute = String.format("%,d", abs(status.due_to_institute))
-                    // O-09: اعتبار (مازاد پرداخت) صریح نمایش داده می‌شود تا «بدهی منفی» گمراه‌کننده نباشد.
-                    val credit = status.credit_balance ?: 0L
-
-                    tvDebt.text = if (credit > 0)
-                        getString(R.string.invoice_total_and_credit, formattedTotal,
-                                  String.format("%,d", credit))
-                    else
-                        getString(R.string.invoice_total, formattedTotal)
+                    tvSelectedClass.text = getString(R.string.invoice_selected_class, className)
                     tvUnpaid.text = getString(R.string.invoice_paid_teacher, formattedPaidTeacher)
-                    tvStClass.text = getString(R.string.invoice_paid_institute, className, formattedPaidInstitute)
+                    tvStClass.text = className
 
                     tvDebtTeacher.text = getString(R.string.invoice_due_teacher, signTeacher, formattedDueTeacher)
                     tvDebtInstitute.text = getString(R.string.invoice_due_institute, signInstitute, formattedDueInstitute)
@@ -374,10 +364,9 @@ class InvoiceActivity : BaseActivity() {
         }
 
         val names = students.map { student ->
-            val total = student.totalDebt
             val teacherDebt = student.debtTeacher
             val instituteDebt = student.debtInstitute
-            getString(R.string.invoice_student_row, student.name, String.format("%,d", total), String.format("%,d", teacherDebt), String.format("%,d", instituteDebt))
+            getString(R.string.invoice_student_row, student.name, String.format("%,d", teacherDebt), String.format("%,d", instituteDebt))
         }.toTypedArray()
 
         AlertDialog.Builder(this)
@@ -388,7 +377,6 @@ class InvoiceActivity : BaseActivity() {
                     selected.id,
                     selected.name,
                     className,
-                    selected.totalDebt,
                     0,
                     selected.debtTeacher,
                     selected.debtInstitute,
@@ -398,7 +386,7 @@ class InvoiceActivity : BaseActivity() {
             .show()
     }
 
-    private fun fillStudentData(id: Int, name: String, className: String, debt: Long, unpaid: Int, debtTeacherVal: Long = 0, debtInstituteVal: Long = 0, courseId: Int = -1) {
+    private fun fillStudentData(id: Int, name: String, className: String, unpaid: Int, debtTeacherVal: Long = 0, debtInstituteVal: Long = 0, courseId: Int = -1) {
         selectedEnrollmentId = null // تا resolve جدید، پرداخت عمومی است
         selectedStudentId = id
         cardInfo.visibility = View.VISIBLE
@@ -406,14 +394,16 @@ class InvoiceActivity : BaseActivity() {
 
         tvStName.text = name
         tvStClass.text = className
-        tvDebt.text = getString(R.string.invoice_debt_total, String.format("%,d", debt))
+        // در ثبت سریع هم بدهی کل نمایش داده نمی‌شود؛ فقط دو سهم همین کلاس نمایش داده می‌شوند.
+        tvSelectedClass.text = getString(R.string.invoice_selected_class, className)
         tvDebtTeacher.visibility = View.VISIBLE
         tvDebtTeacher.text = getString(R.string.invoice_debt_teacher, String.format("%,d", debtTeacherVal))
         tvDebtInstitute.visibility = View.VISIBLE
         tvDebtInstitute.text = getString(R.string.invoice_debt_institute, String.format("%,d", debtInstituteVal))
         tvUnpaid.text = getString(R.string.invoice_unpaid, unpaid)
 
-        etAmount.setText(if (debt > 0) debt.toString() else "")
+        val classDue = debtTeacherVal + debtInstituteVal
+        etAmount.setText(if (classDue > 0) classDue.toString() else "")
         val defaultDesc = if (unpaid > 0) getString(R.string.invoice_desc_settle, unpaid) else getString(R.string.invoice_desc_tuition)
         etDesc.setText(defaultDesc)
         // اگر کلاس مشخص است، enrollment دقیق را برای لینک پرداخت resolve می‌کنیم (fail-soft)
@@ -425,13 +415,12 @@ class InvoiceActivity : BaseActivity() {
         if (prefillStudentId != -1) {
             val name = intent.getStringExtra(EXTRA_PREFILL_STUDENT_NAME) ?: ""
             val className = intent.getStringExtra(EXTRA_PREFILL_CLASS_NAME) ?: getString(R.string.common_unknown_class)
-            val debt = intent.getLongExtra(EXTRA_PREFILL_DEBT, 0L)
             val debtTeacherVal = intent.getLongExtra(EXTRA_PREFILL_DEBT_TEACHER, 0L)
             val debtInstituteVal = intent.getLongExtra(EXTRA_PREFILL_DEBT_INSTITUTE, 0L)
             val unpaid = intent.getIntExtra(EXTRA_PREFILL_UNPAID_SESSIONS, 0)
             val prefillEnrollmentId = intent.getIntExtra(EXTRA_PREFILL_ENROLLMENT_ID, -1)
             val prefillCourseId = intent.getIntExtra(EXTRA_PREFILL_COURSE_ID, -1)
-            fillStudentData(prefillStudentId, name, className, debt, unpaid, debtTeacherVal, debtInstituteVal)
+            fillStudentData(prefillStudentId, name, className, unpaid, debtTeacherVal, debtInstituteVal)
             // FIX(invoice): پروفایل شناسه‌ی واقعی enrollment را می‌فرستد (تک‌کلاسه) یا نتیجه‌ی
             // پیکر انتخاب کلاس را (چندکلاسه) — فیش به همین enrollment وصل می‌شود.
             if (prefillEnrollmentId > 0) {
@@ -622,7 +611,10 @@ class InvoiceActivity : BaseActivity() {
             code.isNotEmpty() -> code
             else -> getString(R.string.common_unknown_class)
         }
-        return if (teacher.isNotEmpty()) "$classLabel — معلم $teacher" else classLabel
+        val debtTeacher = String.format("%,d", en.debt_teacher ?: 0L)
+        val debtInstitute = String.format("%,d", en.debt_institute ?: 0L)
+        val ownerLabel = if (teacher.isNotEmpty()) "$classLabel — معلم $teacher" else classLabel
+        return "$ownerLabel | بدهی به معلم: $debtTeacher | بدهی به آموزشگاه: $debtInstitute"
     }
 
     // FIX(invoice): «detail» کنترل‌شده‌ی سرور از بدنه‌ی خطا (پیام فارسی قابل فهم)؛ بدنه‌ی غیرJSON → null
@@ -1015,13 +1007,9 @@ class SearchAdapter(
         val icon = if (item.type == "class") holder.itemView.context.getString(R.string.invoice_icon_class) else holder.itemView.context.getString(R.string.invoice_icon_person)
         holder.title.text = "$icon ${item.title}"
 
-        // نمایش اطلاعات اضافی
-        val extraInfo = if (item.total_debt != null && item.total_debt > 0)
-            holder.itemView.context.getString(R.string.invoice_extra_debt, String.format("%,d", item.total_debt))
-        else
-            item.info
-
-        holder.subtitle.text = "${item.subtitle} | $extraInfo"
+        // جستجوی دانش‌آموز هنوز enrollment مشخص ندارد؛ بدهی کل/کیف کلی اینجا نمایش داده نمی‌شود.
+        // بدهی فقط بعد از انتخاب کلاس در picker و student_class_status می‌آید.
+        holder.subtitle.text = "${item.subtitle} | ${item.info}"
         holder.itemView.setOnClickListener { onClick(item) }
     }
 

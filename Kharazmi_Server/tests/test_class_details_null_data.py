@@ -86,7 +86,7 @@ class TestClassDetailsNullData(unittest.TestCase):
         self.assertEqual(row["student_name"], "علی دانش‌آموز")
         self.assertEqual(row["total_tuition"], 1000000)
         self.assertEqual(row["paid"], 500000)
-        self.assertEqual(row["debt"], 500000)
+        self.assertEqual(row["debt"], 0)
 
     # ------------------------------------------------------------------
     # 2. class_id برابر -1 یا 0 → پاسخ کنترل‌شده (404 JSON، نه 500)
@@ -161,7 +161,8 @@ class TestClassDetailsNullData(unittest.TestCase):
         result = get_class_details(course_id=self.course.id, db=self.db, authorization="Bearer admin-token", sub_role="admin")
         row = result["students"][0]
         self.assertEqual(row["paid"], 0)
-        self.assertEqual(row["debt"], 1000000)
+        # Class-scoped views have no debt before a session charge exists.
+        self.assertEqual(row["debt"], 0)
 
     def test_both_money_fields_null_no_500(self):
         enrollment = self._add_enrollment(total_tuition=None, total_paid=None)

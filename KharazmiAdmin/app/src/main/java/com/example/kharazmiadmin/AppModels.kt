@@ -84,6 +84,8 @@ data class StudentItem(
     val student_name: String,
     val debt: Long,
     val enrollment_id: Int,
+    val debt_teacher: Long = 0,
+    val debt_institute: Long = 0,
     val course_id: Int? = null,
     val course_title: String? = null,
     val teacher_id: Int? = null,

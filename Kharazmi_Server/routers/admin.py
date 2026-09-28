@@ -436,7 +436,7 @@ def get_student_full_profile(id: int, authorization: Optional[str] = Header(None
         course = en.course
         teacher = db.query(Teacher).filter(Teacher.id == course.teacher_id).first()
         teacher_name = f"{teacher.first_name} {teacher.last_name}" if teacher else "بدون معلم"
-        breakdown = calculate_enrollment_debt_breakdown(db, en)
+        breakdown = calculate_enrollment_debt_breakdown(db, en, session_scoped=True)
         enrollments_list.append({
             "enrollment_id": en.id,
             "course_id": en.course_id,
@@ -489,7 +489,7 @@ def get_student_full_profile(id: int, authorization: Optional[str] = Header(None
         # breakdown به enrollment متصل است؛ کیف کلی دانش‌آموز و پرداخت عمومی
         # در بدهی این کلاس وارد نمی‌شوند. سهم پرداخت‌های target_wallet=both نیز
         # داخل helper با share_teacher/share_institute تفکیک می‌شود.
-        breakdown = calculate_enrollment_debt_breakdown(db, en)
+        breakdown = calculate_enrollment_debt_breakdown(db, en, session_scoped=True)
         paid_teacher = breakdown["paid_teacher"]
         paid_inst = breakdown["paid_institute"]
         debt_teacher_course = breakdown["debt_teacher"]

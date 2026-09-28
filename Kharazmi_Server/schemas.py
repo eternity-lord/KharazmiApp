@@ -274,13 +274,17 @@ class ClassReportInfo(BaseModel):
     session_count: int  # تعداد جلسات برگزار شده
     total_students: int
     total_revenue: int  # کل درآمد وصول شده
-    total_debt: int  # کل مطالبات (بدهی‌ها)
+    total_debt: int  # کل مطالبات (سازگاری پاسخ قدیمی؛ UI دیگر نمایش نمی‌دهد)
+    debt_to_teacher: int = 0
+    debt_to_institute: int = 0
 
 class ClassStudentData(BaseModel):
     name: str
     mobile: str
     paid: int
-    debt: int
+    debt: int  # سازگاری پاسخ قدیمی؛ UI از دو سهم پایین استفاده می‌کند.
+    debt_to_teacher: int = 0
+    debt_to_institute: int = 0
     # Per-enrollment identity; optional defaults keep old clients/responses compatible.
     enrollment_id: Optional[int] = None
     course_id: Optional[int] = None

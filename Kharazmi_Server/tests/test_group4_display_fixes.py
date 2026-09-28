@@ -122,8 +122,10 @@ class TestItems18To21TeacherAndAdminBanners(unittest.TestCase):
         self.assertIn("calculate_enrollment_debt", route)
 
         body = function_body(kt("TeacherDashboardActivity.kt"), "onBindViewHolder")
-        for view_id, field in (("tvTotalDebt", "total_debt"),
-                               ("tvTeacherDebt", "debt_to_teacher"),
+        # بنر فقط دو بدهی قابل انتساب به همین کلاس را نشان می‌دهد؛ بدهی کل حذف شده است.
+        self.assertNotIn("tvTotalDebt", kt("TeacherDashboardActivity.kt"))
+        self.assertNotIn("tvTotalDebt", kt("ClassManagementActivity.kt"))
+        for view_id, field in (("tvTeacherDebt", "debt_to_teacher"),
                                ("tvInstituteDebt", "debt_to_institute")):
             self.assertIn(f"R.id.{view_id}", kt("TeacherDashboardActivity.kt"))
             self.assertRegex(body, rf"holder\.{view_id}\.text.*item\.{field}")

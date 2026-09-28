@@ -231,7 +231,7 @@ def get_all_classes(
             if st:
                 # کیف‌های Student سراسری‌اند؛ برای بنر کلاس فقط breakdown همین enrollment
                 # مجاز است. کیف کل فقط در لاگ تشخیصی حفظ می‌شود و در اعداد کلاس وارد نمی‌شود.
-                breakdown = calculate_enrollment_debt_breakdown(db, en)
+                breakdown = calculate_enrollment_debt_breakdown(db, en, session_scoped=True)
                 student_debt_teacher = breakdown["debt_teacher"]
                 student_debt_institute = breakdown["debt_institute"]
                 student_paid_teacher = breakdown["paid_teacher"]
@@ -322,7 +322,7 @@ def get_class_details(course_id: int, db: Session = Depends(get_db), authorizati
         if not st:
             continue
         final_tuition, discount_amt = get_enrollment_tuition_and_discount(enroll)
-        breakdown = calculate_enrollment_debt_breakdown(db, enroll)
+        breakdown = calculate_enrollment_debt_breakdown(db, enroll, session_scoped=True)
         students_list.append(
             {
                 # FIX(null-data): نام‌های legacy NULL → فال‌بک نمایشی امن (نه «None None»).
@@ -611,6 +611,8 @@ def get_class_full_report(id: int, db: Session = Depends(get_db), authorization:
     student_list = []
     total_rev = 0
     total_deb = 0
+    debt_to_teacher = 0
+    debt_to_institute = 0
 
     for en in enrollments:
         st = db.query(Student).filter(Student.id == en.student_id, Student.is_deleted == False).first()
@@ -618,9 +620,11 @@ def get_class_full_report(id: int, db: Session = Depends(get_db), authorization:
             continue
         # بدهی گزارش کلاس باید متعلق به همین enrollment باشد؛ بدهی کل دانش‌آموز
         # عمداً برای نمای کلاس استفاده نمی‌شود.
-        breakdown = calculate_enrollment_debt_breakdown(db, en)
+        breakdown = calculate_enrollment_debt_breakdown(db, en, session_scoped=True)
         paid = breakdown["paid_teacher"] + breakdown["paid_institute"]
         debt = breakdown["debt"]
+        debt_to_teacher += breakdown["debt_teacher"]
+        debt_to_institute += breakdown["debt_institute"]
 
         total_rev += paid
         total_deb += debt
@@ -631,6 +635,8 @@ def get_class_full_report(id: int, db: Session = Depends(get_db), authorization:
                 mobile=st.student_mobile,
                 paid=paid,
                 debt=debt,
+                debt_to_teacher=breakdown["debt_teacher"],
+                debt_to_institute=breakdown["debt_institute"],
                 enrollment_id=en.id,
                 course_id=course.id,
                 course_title=course.title,
@@ -677,6 +683,8 @@ def get_class_full_report(id: int, db: Session = Depends(get_db), authorization:
             total_students=len(enrollments),
             total_revenue=total_rev,
             total_debt=total_deb,
+            debt_to_teacher=debt_to_teacher,
+            debt_to_institute=debt_to_institute,
         ),
         students=student_list,
         sessions=session_history,
@@ -743,7 +751,7 @@ def get_class_students_excel(class_id: int, db: Session = Depends(get_db), _: st
         st = db.query(Student).filter(Student.id == enroll.student_id, Student.is_deleted == False).first()
         if st:
             final_tuition, discount_amt = get_enrollment_tuition_and_discount(enroll)
-            breakdown = calculate_enrollment_debt_breakdown(db, enroll)
+            breakdown = calculate_enrollment_debt_breakdown(db, enroll, session_scoped=True)
             debt_teacher = breakdown["debt_teacher"]
             debt_institute = breakdown["debt_institute"]
             total_debt = breakdown["debt"]
@@ -842,7 +850,7 @@ def get_class_students_full(id: int, db: Session = Depends(get_db), authorizatio
         if st:
             final_tuition, discount_amt = get_enrollment_tuition_and_discount(enroll)
             # کیف‌های Student سراسری‌اند؛ اعداد این ردیف فقط برای همین enrollment هستند.
-            breakdown = calculate_enrollment_debt_breakdown(db, enroll)
+            breakdown = calculate_enrollment_debt_breakdown(db, enroll, session_scoped=True)
             debt_teacher = breakdown["debt_teacher"]
             debt_institute = breakdown["debt_institute"]
             total_debt = breakdown["debt"]

@@ -2,7 +2,7 @@
 <!-- ====================================================================================
      PHASE 2 — activity_invoice (صدور فیش و ثبت حواله)
      شناسه‌های حفظ‌شده (InvoiceActivity.kt): etSearch / rvSearchResults / cardStudentInfo /
-       cardPaymentForm / tvStName / tvStClass / tvUnpaidSessions / tvTotalDebt / tvDebtTeacher /
+       cardPaymentForm / tvStName / tvStClass / tvUnpaidSessions / tvSelectedClass / tvDebtTeacher /
        tvDebtInstitute / etAmount / etAmountInstitute / tilAmount1 / tilAmount2 / etDesc /
        rgPaymentMethod / rbCard / rbCash / rbCheque / layoutWalletSelector / rgTargetWallet /
        rbWalletTeacher / rbWalletInstitute / rbWalletBoth / btnSubmit / tvDate
@@ -198,9 +198,9 @@
                         android:textAppearance="@style/TextAppearance.Kharazmi.DS.Body"
                         android:fontFeatureSettings="tnum"/>
 
-                    <!-- خلاصه مالی: مبلغ کل/بدهی کل -->
+                    <!-- کلاس انتخاب‌شده؛ بدهی فقط در دو ردیف سهم معلم و آموزشگاه پایین نمایش داده می‌شود -->
                     <TextView
-                        android:id="@+id/tvTotalDebt"
+                        android:id="@+id/tvSelectedClass"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:minHeight="@dimen/min_touch_target"

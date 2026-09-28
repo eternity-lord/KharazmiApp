@@ -524,7 +524,6 @@ class TeacherClassAdapter(
         val code: TextView = v.findViewById(R.id.tvClassCode)
         val sub: TextView = v.findViewById(R.id.tvTeacherName)
         val status: TextView = v.findViewById(R.id.tvStatus)
-        val tvTotalDebt: TextView = v.findViewById(R.id.tvTotalDebt)
         val tvTeacherDebt: TextView = v.findViewById(R.id.tvTeacherDebt)
         val tvInstituteDebt: TextView = v.findViewById(R.id.tvInstituteDebt)
         val llStudentPreview: LinearLayout = v.findViewById(R.id.ll_student_preview) // Added View Binding
@@ -582,7 +581,6 @@ class TeacherClassAdapter(
         holder.sub.visibility = if (holder.sub.text.isNullOrEmpty()) android.view.View.GONE else android.view.View.VISIBLE
 
         // اعداد مالی از همان endpoint کلاس‌ها می‌آیند و در بنر معلم هم صریح bind می‌شوند.
-        holder.tvTotalDebt.text = String.format("%,d", item.total_debt)
         holder.tvTeacherDebt.text = String.format("%,d", item.debt_to_teacher)
         holder.tvInstituteDebt.text = String.format("%,d", item.debt_to_institute)
 

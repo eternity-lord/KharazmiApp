@@ -305,7 +305,7 @@ def get_my_classes(
             # FIX(class-debt): کیف کل دانش‌آموز را برای هر کلاس تکرار نکن؛
             # در دانش‌آموز چندکلاسه این کار بدهی را چندبرابر نشان می‌داد. breakdown
             # فقط خواندنی است و بر اساس paymentهای لینک‌شده و charge همان کلاس است.
-            breakdown = calculate_enrollment_debt_breakdown(db, en)
+            breakdown = calculate_enrollment_debt_breakdown(db, en, session_scoped=True)
             debt_to_teacher += breakdown["debt_teacher"]
             debt_to_institute += breakdown["debt_institute"]
             total_debt += breakdown["debt"]

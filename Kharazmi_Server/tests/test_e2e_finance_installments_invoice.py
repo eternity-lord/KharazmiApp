@@ -281,10 +281,9 @@ class TestDashboardsAndReceipts(FinanceWorld):
         body = resp.json()
         self.assertEqual(body["total_amount"], 1000000, "کل شهریهٔ ثبت‌نام")
         self.assertEqual(body["paid_to_institute"], 500000, "پیش‌پرداخت ۴۰۰٬۰۰۰ + پرداخت ۱۰۰٬۰۰۰")
-        # قرارداد جدید کلاس‌محور: due از breakdown همین enrollment می‌آید؛
-        # کیف کلی دانش‌آموز دیگر بدهی کلاس را منفی نمی‌کند.
-        self.assertEqual(body["due_to_institute"], 500000,
-                         "ماندهٔ کلاس باید شهریهٔ نهایی منهای پرداخت همین enrollment باشد")
+        # قرارداد جدید کلاس‌محور: تا session_charge وجود نداشته باشد،
+        # پرداخت قراردادی/کیف کلی به بدهی سهم کلاس تبدیل نمی‌شود.
+        self.assertEqual(body["due_to_institute"], 0)
         self.assertEqual(body["due_to_teacher"], 0)
         self.assertEqual(body["enrollment_id"], 1)
 
@@ -299,11 +298,11 @@ class TestDashboardsAndReceipts(FinanceWorld):
         self.client.post("/finance/pay", json=pay_payload(100000, "institute"), headers=hdr("tok-admin"))
         body = self.client.get("/finance/student_class_status?student_id=41&course_id=71",
                                headers=hdr("tok-admin")).json()
-        # ۵۰۰٬۰۰۰ از ۱٬۰۰۰٬۰۰۰ پرداخت شده ⇒ ۵۰۰٬۰۰۰ باقی‌مانده، صفر اعتبار
-        self.assertEqual(body["remaining_tuition"], 500000)
+        # بدون session_charge، هر دو سهم و مبلغ پیشنهادی ثبت سریع صفر هستند؛
+        # شهریهٔ قراردادی فقط در total_amount برای سازگاری پاسخ می‌ماند.
+        self.assertEqual(body["remaining_tuition"], 0)
         self.assertEqual(body["credit_balance"], 0)
-        # نام کلیدها حفظ شده، اما مقدار بدهی متعلق به همین enrollment است.
-        self.assertEqual(body["due_to_institute"], 500000)
+        self.assertEqual(body["due_to_institute"], 0)
         self.assertEqual(body["due_to_teacher"], 0)
         self.assertEqual(body["total_amount"], 1000000)
 

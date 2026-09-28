@@ -37,9 +37,24 @@ data class FullClassReport(
 data class ClassReportInfo(
     val title: String, val code: String, val teacher_name: String,
     val session_count: Int, val total_students: Int,
-    val total_revenue: Long, val total_debt: Long
+    val total_revenue: Long, val total_debt: Long,
+    val debt_to_teacher: Long = 0,
+    val debt_to_institute: Long = 0
 )
-data class ClassStudentData(val name: String, val mobile: String, val paid: Long, val debt: Long)
+data class ClassStudentData(
+    val name: String,
+    val mobile: String,
+    val paid: Long,
+    val debt: Long,
+    val debt_to_teacher: Long = 0,
+    val debt_to_institute: Long = 0,
+    val enrollment_id: Int? = null,
+    val course_id: Int? = null,
+    val course_title: String? = null,
+    val teacher_id: Int? = null,
+    val teacher_name: String? = null,
+    val is_unassigned: Boolean = false
+)
 data class ClassSessionHistory(val date: String, val present_count: Int, val absent_count: Int)
 
 // مدل‌های جدید برای تاریخچه حضور و غیاب دانش‌آموز
@@ -499,24 +514,19 @@ class ClassDetailActivity : BaseActivity() {
                 sb.append(getString(R.string.cdetail_info_sessions, data.info.session_count))
                 sb.append(getString(R.string.cdetail_info_students, data.info.total_students))
                 sb.append(getString(R.string.cdetail_info_revenue, String.format("%,d", data.info.total_revenue)))
-                sb.append(getString(R.string.cdetail_info_debt, String.format("%,d", data.info.total_debt)))
+                sb.append(getString(R.string.cdetail_info_debt_teacher, String.format("%,d", data.info.debt_to_teacher)))
+                sb.append(getString(R.string.cdetail_info_debt_institute, String.format("%,d", data.info.debt_to_institute)))
 
-                // پایش محاسباتی تفکیک مالی سهم مربی و آموزشگاه (به درخواست کارفرما)
+                // پرداخت‌ها نیز از همان enrollmentهای کلاس جمع می‌شوند؛ کیف کلی دانش‌آموز
+                // عمداً در گزارش کلاس وارد نمی‌شود.
                 studentsFullData?.let { fullData ->
-                    val totalDebtTeacher = fullData.students.sumOf { it.debt_teacher }
-                    val totalDebtInstitute = fullData.students.sumOf { it.debt_institute }
-                    
-                    // wallet_teacher/wallet_institute کل دانش‌آموز هستند؛ برای جمع کلاس
-                    // فقط فیلدهای پرداخت per-enrollment را مصرف کن.
                     val totalPaidTeacher = fullData.students.sumOf { it.paid_teacher }
                     val totalPaidInstitute = fullData.students.sumOf { it.paid_institute }
                     
                     sb.append("\n===========================\n")
                     sb.append(getString(R.string.cdetail_fin_teacher_title))
-                    sb.append(getString(R.string.cdetail_fin_teacher_debt, String.format("%,d", totalDebtTeacher)))
                     sb.append(getString(R.string.cdetail_fin_teacher_paid, String.format("%,d", totalPaidTeacher)))
                     sb.append(getString(R.string.cdetail_fin_inst_title))
-                    sb.append(getString(R.string.cdetail_fin_inst_debt, String.format("%,d", totalDebtInstitute)))
                     sb.append(getString(R.string.cdetail_fin_inst_paid, String.format("%,d", totalPaidInstitute)))
                 }
 
@@ -638,7 +648,9 @@ class ClassDetailActivity : BaseActivity() {
                     student_id = student.student_id,
                     student_name = student.student_name,
                     debt = student.debt,
-                    enrollment_id = student.enrollment_id
+                    enrollment_id = student.enrollment_id,
+                    debt_teacher = student.debt_teacher,
+                    debt_institute = student.debt_institute
                 )
             }
             if (studentItems.isEmpty()) {
@@ -764,15 +776,20 @@ class ClassStudentAdapter(
             holder.tvStudentPaid.text = holder.itemView.context.getString(R.string.cdetail_att_pct, String.format("%.1f", fullStudent.attendance_rate))
             holder.tvStudentPaid.visibility = View.VISIBLE
 
-            // Show detailed debt information
-            val totalDebt = fullStudent.debt
-            if (totalDebt > 0) {
-                val breakdown = holder.itemView.context.getString(R.string.cdetail_debt_break, String.format("%,d", fullStudent.debt_teacher), String.format("%,d", fullStudent.debt_institute))
-                holder.tvStudentDebt.text = holder.itemView.context.getString(R.string.cdetail_debt_total, String.format("%,d", totalDebt), breakdown)
+            // فقط دو سهم همین enrollment را نشان بده؛ «بدهی کل» عمداً حذف شده است.
+            val hasDebt = fullStudent.debt_teacher > 0 || fullStudent.debt_institute > 0
+            if (hasDebt) {
+                holder.tvStudentDebt.text = holder.itemView.context.getString(
+                    R.string.cdetail_debt_split,
+                    String.format("%,d", fullStudent.debt_teacher),
+                    String.format("%,d", fullStudent.debt_institute)
+                )
                 holder.tvStudentStatus.text = holder.itemView.context.getString(R.string.cdetail_unsettled)
                 holder.tvStudentStatus.setTextColor(android.graphics.Color.parseColor("#D32F2F")) // Red
             } else {
-                holder.tvStudentDebt.text = holder.itemView.context.getString(R.string.cdetail_no_debt)
+                holder.tvStudentDebt.text = holder.itemView.context.getString(
+                    R.string.cdetail_debt_split, "0", "0"
+                )
                 holder.tvStudentStatus.text = holder.itemView.context.getString(R.string.cdetail_settled)
                 holder.tvStudentStatus.setTextColor(android.graphics.Color.parseColor("#388E3C")) // Green
             }
@@ -786,16 +803,19 @@ class ClassStudentAdapter(
             // Fallback to basic info
             holder.tvStudentMobile.text = holder.itemView.context.getString(R.string.cdetail_sid_row, student.student_id)
 
-            // Show debt information
-            if (student.debt > 0) {
-                holder.tvStudentDebt.text = holder.itemView.context.getString(R.string.cdetail_debt_row, String.format("%,d", student.debt))
-                holder.tvStudentStatus.text = holder.itemView.context.getString(R.string.cdetail_unsettled)
-                holder.tvStudentStatus.setTextColor(android.graphics.Color.parseColor("#D32F2F")) // Red
-            } else {
-                holder.tvStudentDebt.text = holder.itemView.context.getString(R.string.cdetail_no_debt)
-                holder.tvStudentStatus.text = holder.itemView.context.getString(R.string.cdetail_settled)
-                holder.tvStudentStatus.setTextColor(android.graphics.Color.parseColor("#388E3C")) // Green
-            }
+            // Fallback هم باید همان دو سهم را نشان دهد، نه بدهی کل.
+            val hasDebt = student.debt_teacher > 0 || student.debt_institute > 0
+            holder.tvStudentDebt.text = holder.itemView.context.getString(
+                R.string.cdetail_debt_split,
+                String.format("%,d", student.debt_teacher),
+                String.format("%,d", student.debt_institute)
+            )
+            holder.tvStudentStatus.text = holder.itemView.context.getString(
+                if (hasDebt) R.string.cdetail_unsettled else R.string.cdetail_settled
+            )
+            holder.tvStudentStatus.setTextColor(android.graphics.Color.parseColor(
+                if (hasDebt) "#D32F2F" else "#388E3C"
+            ))
 
             // Hide paid info
             holder.tvStudentPaid.visibility = View.GONE

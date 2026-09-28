@@ -88,7 +88,7 @@ def search_finance_advanced(
             if st:
                 # این ردیف نمای یک enrollment داخل کلاس است؛ walletهای Student
                 # سراسری‌اند و نباید بدهی کلاس دیگری را به این ردیف کپی کنند.
-                breakdown = calculate_enrollment_debt_breakdown(db, en)
+                breakdown = calculate_enrollment_debt_breakdown(db, en, session_scoped=True)
                 class_students.append(
                     {
                         "id": st.id,
@@ -132,45 +132,27 @@ def search_finance_advanced(
     students = students_q.all()
 
     for s in students:
-        # 1. خواندن دقیق کیف پول‌ها (هندل کردن Null)
-        w_teacher = s.wallet_teacher if s.wallet_teacher is not None else 0
-        w_institute = s.wallet_institute if s.wallet_institute is not None else 0
-
-        # 2. محاسبه بدهی (فقط منفی‌ها را جمع میکنیم)
-        debt_teacher = abs(w_teacher) if w_teacher < 0 else 0
-        debt_institute = abs(w_institute) if w_institute < 0 else 0
-        # FIX: Bug 16 - contractual tuition, not wallet sign, determines total debt.
-        total_debt_val = calculate_student_debt(db, s)
-
-        # 3. محاسبه تعداد جلسات بدهکار (تخمینی)
-        unpaid_count = 0
-        # FIX: Bug 13 - exclude archived Enrollment rows from this active view.
-        enrollments = db.query(Enrollment).filter(Enrollment.is_deleted == False).filter(Enrollment.student_id == s.id).all()
-        if enrollments:
-            last_en = enrollments[-1]
-            if last_en.course and last_en.course.teacher_session_price > 0:
-                # بدهی معلم تقسیم بر قیمت هر جلسه
-                unpaid_count = int(debt_teacher / last_en.course.teacher_session_price)
-
-        last_course_name = (
-            enrollments[-1].course.title
-            if enrollments and enrollments[-1].course
-            else "---"
-        )
-
+        # نتیجهٔ دانش‌آموز چندکلاسه هنوز به یک کلاس مشخص وصل نیست؛ پس بدهی
+        # wallet کل نباید در ردیف جستجو به‌عنوان بدهی کلاس نمایش داده شود.
+        # نمایش بدهی فقط بعد از انتخاب enrollment واقعی انجام می‌شود؛ اینجا دیگر
+        # wallet کل یا «بدهی کل» به‌عنوان بدهی کلاس نمایش داده نمی‌شود.
+        enrollments = db.query(Enrollment).filter(
+            Enrollment.is_deleted == False,
+            Enrollment.student_id == s.id,
+        ).all()
+        class_count = len([en for en in enrollments if en.course is not None])
         results.append(
             AdvancedSearchItem(
                 type="student",
                 id=s.id,
                 title=display_name(s, "نامشخص"),
-                subtitle=f"کلاس: {last_course_name}",
-                info=f"بدهی کل: {total_debt_val:,} تومان",  # نمایش متنی
+                subtitle=f"{class_count} کلاس ثبت‌نام‌شده — برای مشاهده بدهی، کلاس را انتخاب کنید",
+                info="بدهی پس از انتخاب کلاس نمایش داده می‌شود",
                 student_id=s.id,
-                # ✅ ارسال مقادیر دقیق به اندروید
-                debt_teacher=debt_teacher,
-                debt_institute=debt_institute,
-                total_debt=total_debt_val,
-                unpaid_sessions=unpaid_count,
+                debt_teacher=0,
+                debt_institute=0,
+                total_debt=None,
+                unpaid_sessions=0,
             )
         )
 
@@ -675,7 +657,7 @@ def get_student_class_status(student_id: int, course_id: Optional[int] = None, c
         
     # وضعیت صورت‌حساب باید فقط از همین enrollment بیاید؛ wallet کلی دانش‌آموز
     # در این endpoint کلاس‌محور منبع due نیست.
-    breakdown = calculate_enrollment_debt_breakdown(db, enroll)
+    breakdown = calculate_enrollment_debt_breakdown(db, enroll, session_scoped=True)
     final_tuition = breakdown["tuition"]
     paid_to_teacher = breakdown["paid_teacher"]
     paid_to_institute = breakdown["paid_institute"]
@@ -688,7 +670,10 @@ def get_student_class_status(student_id: int, course_id: Optional[int] = None, c
         "paid_to_institute": paid_to_institute,
         "due_to_teacher": due_to_teacher,
         "due_to_institute": due_to_institute,
-        "remaining_tuition": breakdown["debt"],
+        # For the class-scoped quick-remittance form, the payable default is the
+        # sum of the two actual shares, never the student's aggregate/contractual
+        # balance from another class.
+        "remaining_tuition": due_to_teacher + due_to_institute,
         "credit_balance": max(0, paid_total - final_tuition),
         "course_id": course_id,
         "course_title": enroll.course.title if enroll.course else None,
@@ -2102,7 +2087,7 @@ def get_student_financial_dashboard(
     total_paid_all = 0
     for en in enrollments:
         final_tuition, discount = get_enrollment_tuition_and_discount(en)
-        breakdown = calculate_enrollment_debt_breakdown(db, en)
+        breakdown = calculate_enrollment_debt_breakdown(db, en, session_scoped=True)
         c_title = en.course.title if en.course else "کلاس حذف شده"
         class_teacher = en.course.teacher if en.course else None
         class_teacher_name = display_name(class_teacher, "نامشخص") if class_teacher else None
@@ -2281,7 +2266,7 @@ def get_invoice_details(
     course = db.query(Course).filter(Course.id == enroll.course_id).first()
     
     final_tuition, discount = get_enrollment_tuition_and_discount(enroll)
-    breakdown = calculate_enrollment_debt_breakdown(db, enroll)
+    breakdown = calculate_enrollment_debt_breakdown(db, enroll, session_scoped=True)
     total_paid = breakdown["paid_teacher"] + breakdown["paid_institute"]
     balance_due = breakdown["debt"]
     

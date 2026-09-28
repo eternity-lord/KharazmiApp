@@ -20,6 +20,7 @@ from models import (
     Branch,
     Course,
     Enrollment,
+    Attendance,
     SessionLog,
     Student,
     Teacher,
@@ -234,6 +235,99 @@ class TestPerClassDebtIsolation(unittest.TestCase):
         self.assertEqual(b["debt_teacher"], 0)
         self.assertEqual(b["debt_institute"], 0)
 
+    def test_session_scoped_financial_views_show_only_the_attended_class(self):
+        """Two classes for one student: only the class with attendance/charge owes shares."""
+        # Make the second registration priced too. Its lack of a session must still
+        # keep both class-scoped debts at zero; this is the case that a copied
+        # aggregate wallet or contractual tuition used to get wrong.
+        self.enrollment_b.total_tuition = 1000
+        self.student.branch_id = 1
+        self.db.add(Attendance(
+            session_id=1,
+            student_id=self.student.id,
+            status="Present",
+            is_billed=False,
+            is_deleted=False,
+        ))
+        self.db.commit()
+
+        legacy_a = calculate_enrollment_debt_breakdown(self.db, self.enrollment_a)
+        legacy_b = calculate_enrollment_debt_breakdown(self.db, self.enrollment_b)
+        scoped_a = calculate_enrollment_debt_breakdown(
+            self.db, self.enrollment_a, session_scoped=True
+        )
+        scoped_b = calculate_enrollment_debt_breakdown(
+            self.db, self.enrollment_b, session_scoped=True
+        )
+        self.assertEqual((scoped_a["debt_teacher"], scoped_a["debt_institute"]), (300, 200))
+        self.assertEqual((scoped_b["debt_teacher"], scoped_b["debt_institute"]), (0, 0))
+        self.assertEqual(scoped_b["debt"], 0)
+        # Default/legacy calculation remains available for non-class-scoped reports.
+        self.assertEqual(legacy_b["debt"], 1000)
+        self.assertEqual(legacy_a["debt"], 1000)
+
+        class_rows = {row["id"]: row for row in get_all_classes(db=self.db, _="admin")}
+        self.assertEqual(
+            (class_rows[self.course_a.id]["debt_to_teacher"], class_rows[self.course_a.id]["debt_to_institute"]),
+            (300, 200),
+        )
+        self.assertEqual(
+            (class_rows[self.course_b.id]["debt_to_teacher"], class_rows[self.course_b.id]["debt_to_institute"]),
+            (0, 0),
+        )
+
+        detail_a = get_class_students_full(
+            id=self.course_a.id, db=self.db,
+            authorization=self._admin(), sub_role="admin",
+        )["students"][0]
+        detail_b = get_class_students_full(
+            id=self.course_b.id, db=self.db,
+            authorization=self._admin(), sub_role="admin",
+        )["students"][0]
+        self.assertEqual((detail_a["debt_teacher"], detail_a["debt_institute"]), (300, 200))
+        self.assertEqual((detail_b["debt_teacher"], detail_b["debt_institute"]), (0, 0))
+        self.assertEqual(detail_b["debt"], 0)
+
+        status_a = get_student_class_status(
+            student_id=self.student.id, course_id=self.course_a.id,
+            db=self.db, authorization=self._admin(), sub_role="admin",
+        )
+        status_b = get_student_class_status(
+            student_id=self.student.id, course_id=self.course_b.id,
+            db=self.db, authorization=self._admin(), sub_role="admin",
+        )
+        self.assertEqual((status_a["due_to_teacher"], status_a["due_to_institute"]), (300, 200))
+        self.assertEqual(status_a["remaining_tuition"], 500)
+        self.assertEqual((status_b["due_to_teacher"], status_b["due_to_institute"]), (0, 0))
+        self.assertEqual(status_b["remaining_tuition"], 0)
+        self.assertEqual(status_b["enrollment_id"], self.enrollment_b.id)
+
+        # The quick-remittance picker source is the student's active enrollment
+        # list. It must carry the same per-class values before a class is picked.
+        profile = get_student_full_profile(
+            id=self.student.id, authorization=self._admin(), db=self.db, role="admin",
+        )
+        profile_rows = {row["enrollment_id"]: row for row in profile["enrollments"]}
+        self.assertEqual((profile_rows[self.enrollment_a.id]["debt_teacher"], profile_rows[self.enrollment_a.id]["debt_institute"]), (300, 200))
+        self.assertEqual((profile_rows[self.enrollment_b.id]["debt_teacher"], profile_rows[self.enrollment_b.id]["debt_institute"]), (0, 0))
+
+        advanced = search_finance_advanced(
+            query="0012345680", branch_id=None, authorization=self._admin(),
+            db=self.db, sub_role="admin",
+        )
+        student_result = next(row for row in advanced if row.type == "student")
+        self.assertIsNone(student_result.total_debt)
+        self.assertNotIn("بدهی کل", student_result.info)
+
+        class_search = search_finance_advanced(
+            query="کلاس B", branch_id=None, authorization=self._admin(),
+            db=self.db, sub_role="admin",
+        )
+        class_result = next(row for row in class_search if row.type == "class")
+        class_student = class_result.students_in_class[0]
+        self.assertEqual((class_student["debt_teacher"], class_student["debt_institute"]), (0, 0))
+        self.assertEqual(class_student["enrollment_id"], self.enrollment_b.id)
+
     def test_payment_with_enrollment_id_isolated_and_ambiguous_payment_rejected(self):
         before_a = calculate_enrollment_debt_breakdown(self.db, self.enrollment_a)
         before_b = calculate_enrollment_debt_breakdown(self.db, self.enrollment_b)
@@ -433,11 +527,17 @@ class TestPerClassDebtIsolation(unittest.TestCase):
 
         source_root = __import__("pathlib").Path(__file__).parents[2]
         class_detail = (source_root / "KharazmiAdmin/app/src/main/java/com/example/kharazmiadmin/ClassDetailActivity.kt").read_text()
+        invoice = (source_root / "KharazmiAdmin/app/src/main/java/com/example/kharazmiadmin/InvoiceActivity.kt").read_text()
         attendance = (source_root / "KharazmiAdmin/app/src/main/java/com/example/kharazmiadmin/AttendanceActivity.kt").read_text()
         profile = (source_root / "KharazmiAdmin/app/src/main/java/com/example/kharazmiadmin/StudentProfileActivity.kt").read_text()
         self.assertIn("String.format(\"%,d\", student.debt)", class_detail)
-        self.assertIn("val totalDebt = fullStudent.debt", class_detail)
+        self.assertIn("R.string.cdetail_debt_split", class_detail)
+        self.assertNotIn("val totalDebt = fullStudent.debt", class_detail)
         self.assertIn("it.enrollment_id == student.enrollment_id", class_detail)
+        self.assertIn("tvSelectedClass", invoice)
+        self.assertNotIn("R.id.tvTotalDebt", invoice)
+        self.assertIn("debtTeacher", invoice)
+        self.assertIn("debtInstitute", invoice)
         self.assertIn("sumOf { it.paid_teacher }", attendance)
         self.assertIn("val debtTeacher = student.debt_teacher", attendance)
         self.assertIn("s.paid_teacher, s.paid_institute", attendance)

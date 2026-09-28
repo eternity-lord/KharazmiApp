@@ -329,12 +329,23 @@ def calculate_student_debt(db: Session, student) -> int:
     return max(0, -(student.wallet_teacher or 0)) + max(0, -(student.wallet_institute or 0))
 
 
-def calculate_enrollment_debt_breakdown(db: Session, enrollment) -> dict:
+def calculate_enrollment_debt_breakdown(
+    db: Session,
+    enrollment,
+    *,
+    session_scoped: bool = False,
+) -> dict:
     """بدهی یک ثبت‌نام را بدون کپی‌کردن کیف کل دانش‌آموز بین چند کلاس گزارش می‌کند.
 
     مبنا همان ledger موجود است: پرداخت‌های لینک‌شده به enrollment و سهم‌های واقعی
     session_charge. برای دادهٔ legacy که هنوز charge تفکیکی ندارد، ماندهٔ قراردادی
     فقط به سهم آموزشگاه نسبت داده می‌شود؛ به کلاس‌های دیگر سرایت نمی‌کند.
+
+    ``session_scoped=True`` برای نماهای «بدهی همین کلاس» است. در این نما، ثبت‌نامی
+    که هنوز هیچ ``session_charge`` برایش ثبت نشده بدهی جلسه‌ای ندارد و هر دو سهم
+    صفر هستند؛ شهریهٔ قراردادیِ ثبت‌نام نباید به کلاس دیگری یا به بنر این کلاس
+    نشت کند. رفتار پیش‌فرض برای گزارش‌ها و داده‌های legacy حفظ شده است.
+
     این helper فقط خواندنی است و هیچ wallet/ledger را تغییر نمی‌دهد.
     """
     if enrollment is None:
@@ -403,6 +414,13 @@ def calculate_enrollment_debt_breakdown(db: Session, enrollment) -> dict:
     if charges:
         debt_teacher = max(0, billed_teacher - paid_teacher)
         debt_institute = max(0, billed_institute - paid_institute)
+    elif session_scoped:
+        # No session charge means no class-scoped teacher/institute debt yet.
+        # Do not turn the enrollment's contractual tuition into a debt for this
+        # class banner/list row before a session exists.
+        debt = 0
+        debt_teacher = 0
+        debt_institute = 0
     else:
         debt_teacher = 0
         debt_institute = debt

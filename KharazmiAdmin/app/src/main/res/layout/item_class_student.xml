@@ -88,10 +88,10 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                tools:text="🔴 بدهی: 500,000 تومان"
+                tools:text="بدهی به معلم: 300,000 تومان\nبدهی به آموزشگاه: 200,000 تومان"
                 android:textColor="?android:attr/textColorSecondary"
                 android:textSize="14sp"
-                android:maxLines="1"
+                android:maxLines="2"
                 android:ellipsize="end"
                 android:gravity="end"/>
         </LinearLayout>

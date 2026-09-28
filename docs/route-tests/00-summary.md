@@ -8,13 +8,13 @@
 |---|---:|---|
 | کل routeهای inventory | 221 | از `docs/app-map/server-routes.csv` |
 | route دارای registry تست | 221 | meta-test اجباری است و missing route را fail می‌کند |
-| route با functional assertion مقداری در این نوبت | 29 | finance: 11؛ attendance: 10؛ classes: 8 route با read، state و Excel |
+| route با functional assertion مقداری در این نوبت | 70 | finance: 11؛ attendance: 10؛ classes: 8؛ admin: 41 route با read، state، ledger، export، conflict و guard |
 | route از همین سه router بدون assertion مستقل | 33 | فهرست کامل و دلیل هر مورد در `blockers.md` آمده است؛ sweep جای assertion کسب‌وکار را نگرفته است |
-| route functional باقی‌ماندهٔ سایر routerها | 192 | سه router اول بستهٔ صادقانه دارند؛ routerهای بعدی هنوز در انتظارند |
-| router پردازش‌شده | 3 | finance، attendance و classes، ممیزی اولیه |
-| تست‌های pass | 50 | آخرین اجرای `pytest tests/route_audit -q` |
-| تست‌های strict xfail | 8 | 4 مورد قبلی O-02/O-12/O-14/O-19 + 4 مورد `RA-sweep-01..04` |
-| باگ‌های sweep contract | 4 entry | `RA-sweep-01` تا `RA-sweep-04`؛ 6 NPE issue instance و 1 missing-list instance |
+| route functional باقی‌ماندهٔ سایر routerها | 151 | admin هر 41 route را حداقل با assertion/guard پوشش داد؛ routerهای بعدی هنوز در انتظارند |
+| router پردازش‌شده | 4 | finance، attendance، classes؛ و deep audit admin (41/41 با 0 route بدون assertion) |
+| تست‌های pass | 63 | آخرین اجرای `pytest tests/route_audit -q` |
+| تست‌های strict xfail | 9 | 4 مورد قبلی O-02/O-12/O-14/O-19 + 4 مورد `RA-sweep-01..04` + `RA-admin-01` |
+| باگ‌های contract/deep audit | 5 entry | 4 مورد `RA-sweep-01..04` + `RA-admin-01`؛ 6 NPE issue instance و 1 missing-list instance در sweep |
 | باگ‌های status 500 در sweep | 0 | در 221 اجرای معتبر و 220 payload نامعتبر، status 500 مشاهده نشد |
 
 ## پوشش این نوبت
@@ -43,6 +43,12 @@
 | باگ جدید server/financial در 29 route | 0 | تست‌های مقداری finance/attendance/classes و oracle مستقل سبز بودند |
 | باگ contract در همین scope sweep | 1 entry مستقیم classes (`RA-sweep-01`) | response bulk approve کلید `message` مورد انتظار Android را ندارد؛ در `bugs.md` ثبت و xfail شده است |
 
+## نتیجهٔ deep audit اولیهٔ admin
+
+- **41/41 route** admin حداقل یک assertion مقداری، state، conflict، export یا negative guard دارند؛ route بدون assertion باقی نمانده است.
+- `/dashboard/stats` یک issue واقعی دارد: برای transaction دارای `student_id` ولی بدون `enrollment_id` نام `ناشناس` می‌دهد؛ `RA-admin-01` با strict xfail ثبت شده است.
+- settings/share/pricing، transaction delta، metadata-only restore، session reopen، bulk state، SMS log محلی، role redaction، credentials و XLSX بررسی شدند؛ SMS/network واقعی ارسال نشد.
+
 ## جاروب ۲۲۱ route و ۱۵۱ تماس Retrofit
 
 جزئیات کامل در [`sweep-report.md`](sweep-report.md) و artifactهای `tests/route_audit/sweep/` است:
@@ -67,7 +73,7 @@
 
 ## موارد ناتمام
 
-- ۱۵۹ route functional باقی مانده است: ۸ route admin در blocker و ۱۵۱ route سایر routerها باید طبق ترتیب `progress.md` تکمیل شوند.
+- ۱۵۱ route functional سایر routerها باید طبق ترتیب `progress.md` تکمیل شوند؛ admin اکنون assertion پایه برای هر 41 route دارد.
 - ۳۳ route سه router اول در `blockers.md` assertion مستقل ندارند.
 - exports هنوز به openpyxl/PDF value audit عمیق نشده است؛ sweep فقط response/shape را ثبت کرده است.
 - device checklist عددهای screenهای مهم را دارد، اما اجرای گوشی/compile انجام نشده است.

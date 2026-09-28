@@ -55,4 +55,4 @@
 - `tests/route_audit/test_audit_admin.py:184-218` XLSX، upload validation، credential update و conflict approval را بدون شبکه/فایل valid production بررسی می‌کند.
 - `tests/route_audit/test_audit_admin.py:220-311` transaction delta، bulk state، session reopen، metadata-only restore و toggleهای دانش‌آموز/معلم را بررسی می‌کند.
 
-۸ route هنوز assertion رفتاری کامل ندارند: approve/reject teacher/class، delete teacher/student/transaction، full transaction logic، reset password، و read/writeهای باقی‌ماندهٔ gateway/مدیریت.
+هر ۴۱ route admin حداقل یک assertion دارد. چند route با guard منفی یا round-trip پوشش داده شده‌اند (نه همهٔ شاخه‌های happy-path): حذف‌های hard-delete، approval/rejection با دادهٔ pending واقعی، و gateway/مدیریت چندحالته هنوز می‌توانند در ممیزی عمقی بعدی گسترش یابند.

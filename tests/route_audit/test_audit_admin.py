@@ -217,6 +217,44 @@ def test_admin_single_class_approval_rejects_schedule_conflict_without_write(cli
     assert (course.is_admin_approved, course.rejection_reason, course.pending_since) == original
 
 
+def test_admin_remaining_delete_approval_and_logic_guards_roundtrip(client, auth_headers, db):
+    import models
+    headers = auth_headers["admin"]
+    assert client.post("/teachers/approve/3", headers=headers).status_code == 404
+    assert client.delete("/teachers/reject/3", headers=headers).status_code == 404
+    assert client.delete("/admin/teachers/1", headers=headers).status_code == 400
+    assert client.delete("/admin/students/999", headers=headers).status_code == 404
+
+    course = db.get(models.Course, 6)
+    original_course = (course.is_deleted, course.rejection_reason)
+    before_requests = {row.id for row in db.query(models.ClassDeletionRequest).filter(models.ClassDeletionRequest.course_id == 6).all()}
+    rejected = client.delete("/admin/reject_class/6", params={"reason": "عدم تایید ممیزی"}, headers=headers)
+    assert rejected.status_code == 200
+    db.expire_all()
+    assert db.get(models.Course, 6).is_deleted is True
+    db.get(models.Course, 6).is_deleted, db.get(models.Course, 6).rejection_reason = original_course
+    db.query(models.ClassDeletionRequest).filter(models.ClassDeletionRequest.course_id == 6, ~models.ClassDeletionRequest.id.in_(before_requests)).delete(synchronize_session=False)
+    db.commit()
+
+    transaction = db.get(models.Transaction, 4)
+    student = db.get(models.Student, 6)
+    snapshot = {column.name: getattr(transaction, column.name) for column in models.Transaction.__table__.columns}
+    original_wallets = (student.wallet_institute, student.wallet_balance)
+    deleted = client.delete("/admin/transactions/4", headers=headers)
+    assert deleted.status_code == 200
+    db.expire_all()
+    assert db.get(models.Transaction, 4) is None
+    assert db.get(models.Student, 6).wallet_institute == original_wallets[0] - 75_000
+    db.add(models.Transaction(**snapshot))
+    restored_student = db.get(models.Student, 6)
+    restored_student.wallet_institute, restored_student.wallet_balance = original_wallets
+    db.commit()
+
+    roundtrip = client.post("/test/transaction_logic", json={"student_id": 6, "amount": 12_345, "target_wallet": "teacher", "description": "audit roundtrip", "payment_method": "نقدی", "date": "1405/06/08"}, headers=headers)
+    assert roundtrip.status_code == 200
+    assert roundtrip.json()["test_passed"] is True
+
+
 def test_admin_transaction_update_preserves_ledger_and_wallet_invariant(client, auth_headers, db):
     import models
     headers = auth_headers["admin"]
@@ -233,6 +271,30 @@ def test_admin_transaction_update_preserves_ledger_and_wallet_invariant(client, 
     transaction = db.get(models.Transaction, 4); student = db.get(models.Student, 6)
     transaction.amount, transaction.description, transaction.date = original[:3]
     student.wallet_institute, student.wallet_balance = original[3:]
+    db.commit()
+
+
+def test_admin_reset_teacher_password_rotates_shadow_and_restores_seed(client, auth_headers, db):
+    import models
+    headers = auth_headers["admin"]
+    teacher = db.get(models.Teacher, 1)
+    shadow_session = db.query(models.UserSession).filter(models.UserSession.teacher_id == 1).first()
+    shadow = db.get(models.User, shadow_session.user_id)
+    sequence = db.query(models.SequenceCounter).filter(models.SequenceCounter.name == "teacher").first()
+    original = (teacher.teacher_code, teacher.password, shadow.password, sequence.current_value if sequence else None)
+    response = client.post("/admin/teachers/1/credentials/reset_password", headers=headers)
+    assert response.status_code == 200
+    assert len(response.json()["new_password"]) == 8
+    db.expire_all()
+    teacher = db.get(models.Teacher, 1); shadow = db.get(models.User, shadow.id)
+    assert teacher.teacher_code != original[0]
+    assert teacher.password == shadow.password
+    assert teacher.password != original[1]
+    teacher.teacher_code, teacher.password = original[:2]
+    shadow.password = original[2]
+    if sequence:
+        sequence.current_value = original[3]
+    db.query(models.ActivityLog).filter(models.ActivityLog.action == "reset_teacher_password", models.ActivityLog.target_id == 1).delete(synchronize_session=False)
     db.commit()
 
 

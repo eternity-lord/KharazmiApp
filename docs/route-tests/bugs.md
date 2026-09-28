@@ -17,7 +17,7 @@
 
 ## نتیجهٔ finance/attendance/classes در این نوبت
 
-در ۲۹ route دارای assertion مقداری finance/attendance/classes، failure جدید سمت سرور ثبت نشد. deep audit اولیهٔ admin یک باگ مستقل (`RA-admin-01`) در dashboard پیدا کرد و ۲۵ route admin assertion مقداری/اثری دارند؛ routeهای باقیمانده همچنان در جدول route admin به‌عنوان مسدود مشخص شده‌اند.
+در ۲۹ route دارای assertion مقداری finance/attendance/classes، failure جدید سمت سرور ثبت نشد. deep audit admin یک باگ مستقل (`RA-admin-01`) در dashboard پیدا کرد و هر ۴۱ route admin حداقل assertion/guard دارند؛ `RA-admin-01` strict xfail است و fix خارج از scope این turn باقی می‌ماند.
 
 ## نتیجهٔ sweep
 

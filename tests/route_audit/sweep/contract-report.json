@@ -659,14 +659,7 @@
       "response_class": "List<HomeworkItem>",
       "role": "admin",
       "status": 200,
-      "issues": [
-        {
-          "field": "description",
-          "kind": "missing-non-null",
-          "detail": "کلید غیرnullable وجود ندارد و استفاده می‌تواند NPE بدهد",
-          "line": 49
-        }
-      ],
+      "issues": [],
       "model": "HomeworkItem"
     },
     {
@@ -1530,7 +1523,7 @@
     "unmatched": 0,
     "route_non_success": 49,
     "parse": 0,
-    "npe": 1,
+    "npe": 0,
     "silent_zero": 0,
     "missing_key": 1
   }

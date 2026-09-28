@@ -330,10 +330,11 @@ def get_parent_child_homework(
         
         result.append({
             "id": hw.id,
-            "course_title": course.title if course else "کلاس حذف شده",
-            "title": hw.title,
-            "due_date": hw.due_date,
-            "status": status_text,
+                "course_title": course.title if course else "کلاس حذف شده",
+                "title": hw.title,
+                "description": hw.description or "",
+                "due_date": hw.due_date,
+                "status": status_text,
             "score": submission.score if submission else None,
             "feedback": submission.feedback if submission else None
         })

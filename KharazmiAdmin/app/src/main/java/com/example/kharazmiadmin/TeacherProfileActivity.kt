@@ -439,7 +439,7 @@ class TeacherProfileActivity : BaseActivity() {
                 lifecycleScope.launch(Dispatchers.IO) {
                     try {
                         RetrofitClient.getInstance(this@TeacherProfileActivity).create(SettlementSafetyApi::class.java)
-                            .reverseSettlement(teacherId, item.id, "اصلاح مالی توسط ادمین")
+                            .reverseSettlement(teacherId, item.operationId, "اصلاح مالی توسط ادمین")
                         withContext(Dispatchers.Main) {
                             CacheManager.clear(this@TeacherProfileActivity, "teacher_settlement_history_v2_$teacherId")
                             CacheManager.clear(this@TeacherProfileActivity, "teacher_settlement_history_$teacherId")
@@ -465,7 +465,7 @@ class TeacherProfileActivity : BaseActivity() {
                 lifecycleScope.launch(Dispatchers.IO) {
                     try {
                         RetrofitClient.getInstance(this@TeacherProfileActivity).create(SettlementSafetyApi::class.java)
-                            .editSettlement(teacherId, item.id, SettlementEditRequest(amount, "تعدیل مالی توسط ادمین"))
+                            .editSettlement(teacherId, item.operationId, SettlementEditRequest(amount, "تعدیل مالی توسط ادمین"))
                         withContext(Dispatchers.Main) {
                             CacheManager.clear(this@TeacherProfileActivity, "teacher_settlement_history_v2_$teacherId")
                             CacheManager.clear(this@TeacherProfileActivity, "teacher_settlement_history_$teacherId")
@@ -786,7 +786,7 @@ class SettlementHistoryAdapter(
         try {
             val amt = item.total_amount ?: 0L
             holder.tvSettledAmount.text = holder.itemView.context.getString(R.string.portal_money, String.format(java.util.Locale.US, "%,d", amt))
-            holder.tvSettlementDocument.text = "سند تسویه #${item.id} | ${if (item.is_reversed) "برگشت‌خورده" else "فعال"}" +
+            holder.tvSettlementDocument.text = "سند تسویه #${item.operationId} | ${if (item.is_reversed) "برگشت‌خورده" else "فعال"}" +
                 (item.reversal_reason?.let { " | علت: $it" } ?: "")
             holder.tvSettledDate.text = holder.itemView.context.getString(R.string.tprof_settled_date, item.settled_at ?: "")
             holder.tvSessionCount.text = holder.itemView.context.getString(R.string.tprof_sessions, item.session_count)

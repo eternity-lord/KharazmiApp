@@ -45,6 +45,8 @@ class TestGroup6SettlementSafety(unittest.TestCase):
         xml = layout("item_settlement_history.xml")
         self.assertIn("reverseSettlement", src)
         self.assertIn("editSettlement", src)
+        self.assertIn("operationId", src)
+        self.assertIn("settlement_id", src)
         self.assertIn("btnReverseSettlement", xml)
         self.assertIn("btnEditSettlement", xml)
 

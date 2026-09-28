@@ -1073,7 +1073,12 @@ def get_settlement_history(
     result = []
     for h in history:
         result.append({
+            # `id` is retained for older clients; `settlement_id` is the canonical
+            # operation key used by the reverse/edit endpoints.  Both values come
+            # from the same Settlement row, so a history row cannot expose a
+            # display-only or payout-transaction id by mistake.
             "id": h.id,
+            "settlement_id": h.id,
             "total_amount": h.total_amount,
             "session_count": h.session_count,
             "settled_at": h.settled_at.strftime("%Y/%m/%d %H:%M") if h.settled_at else "---",
@@ -1161,17 +1166,27 @@ def _write_settlement_reversal(db: Session, settlement: Settlement, reason: str,
     return session_ids, reversal
 
 
+def _get_settlement_for_teacher(db: Session, teacher_id: int, settlement_id: int) -> Settlement:
+    """Resolve the exact history document, never a payout or another teacher's row."""
+    settlement = db.query(Settlement).filter(
+        Settlement.id == settlement_id,
+        Settlement.teacher_id == teacher_id,
+    ).first()
+    if not settlement:
+        # Keep the not-found contract deliberately distinct from route-not-found:
+        # clients can show a useful error while still getting a 404 for an invalid
+        # teacher/settlement pair (without leaking another teacher's data).
+        raise HTTPException(status_code=404, detail="تسویه یافت نشد")
+    return settlement
+
+
 @router.post("/teachers/{teacher_id}/settlements/{settlement_id}/reverse")
 def reverse_teacher_settlement(
     teacher_id: int, settlement_id: int, reason: str,
     db: Session = Depends(get_db), authorization: Optional[str] = Header(None),
     _: str = Depends(check_admin_access)
 ):
-    settlement = db.query(Settlement).filter(
-        Settlement.id == settlement_id, Settlement.teacher_id == teacher_id
-    ).first()
-    if not settlement:
-        raise HTTPException(status_code=404, detail="تسویه یافت نشد")
+    settlement = _get_settlement_for_teacher(db, teacher_id, settlement_id)
     session_ids, reversal = _write_settlement_reversal(
         db, settlement, reason, _settlement_actor_id(db, authorization)
     )
@@ -1186,11 +1201,7 @@ def edit_teacher_settlement(
     db: Session = Depends(get_db), authorization: Optional[str] = Header(None),
     _: str = Depends(check_admin_access)
 ):
-    settlement = db.query(Settlement).filter(
-        Settlement.id == settlement_id, Settlement.teacher_id == teacher_id
-    ).first()
-    if not settlement:
-        raise HTTPException(status_code=404, detail="تسویه یافت نشد")
+    settlement = _get_settlement_for_teacher(db, teacher_id, settlement_id)
     if req.total_amount is not None and req.total_amount < 0:
         raise HTTPException(status_code=400, detail="مبلغ تسویه نمی‌تواند منفی باشد")
     actor_id = _settlement_actor_id(db, authorization)

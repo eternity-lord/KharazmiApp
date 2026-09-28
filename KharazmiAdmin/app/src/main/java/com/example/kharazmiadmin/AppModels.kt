@@ -666,7 +666,9 @@ data class TeacherSettlementResponse(
 )
 
 data class SettlementHistoryItem(
+    // Legacy responses expose `id`; new responses also expose the canonical operation key.
     val id: Int,
+    val settlement_id: Int? = null,
     // FIX(null-data): مبالغ/تاریخ legacy ممکن است null باشند — null‌پذیر + فال‌بک امن در نمایش.
     val total_amount: Long? = null,
     val session_count: Int = 0,
@@ -674,7 +676,12 @@ data class SettlementHistoryItem(
     val is_reversed: Boolean = false,
     val reversal_reason: String? = null,
     val session_ids: List<Int>? = null
-)
+) {
+    // Old cached history remains usable while current responses make the operation
+    // identifier explicit. Reverse/edit must never invent a different identifier.
+    val operationId: Int
+        get() = settlement_id ?: id
+}
 
 data class BulkSmsRequest(val student_ids: List<Int>)
 data class BulkSuspendRequest(val course_ids: List<Int>)

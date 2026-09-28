@@ -8,10 +8,10 @@
 |---|---:|---|
 | کل routeهای inventory | 221 | از `docs/app-map/server-routes.csv` |
 | route دارای registry تست | 221 | meta-test اجباری است و missing route را fail می‌کند |
-| route با functional assertion مقداری در این نوبت | 21 | finance: 11 route؛ attendance: 10 route با read، live state، نقش و invariant مالی |
-| route functional باقی‌مانده | 200 | finance و attendance از inventory عبور کرده‌اند؛ routerهای بعدی هنوز در انتظارند |
-| router پردازش‌شده | 2 | finance و attendance، ممیزی اولیه |
-| تست‌های pass | 41 | آخرین اجرای routerهای زیرساخت + finance + attendance |
+| route با functional assertion مقداری در این نوبت | 29 | finance: 11؛ attendance: 10؛ classes: 8 route با read، state و Excel |
+| route functional باقی‌مانده | 192 | finance، attendance و classes از inventory عبور کرده‌اند؛ routerهای بعدی هنوز در انتظارند |
+| router پردازش‌شده | 3 | finance، attendance و classes، ممیزی اولیه |
+| تست‌های pass | 46 | آخرین اجرای routerهای زیرساخت + finance + attendance + classes |
 | تست‌های strict xfail | 4 | O-02، O-12، O-14، O-19 |
 | باگ‌های ثبت‌شده | 4 | همان چهار مورد شناخته‌شده؛ باگ جدید finance ثبت نشد |
 
@@ -19,6 +19,7 @@
 
 - مقدار response و متن فارسی در مسیرهای read finance بررسی شد.
 - جزئیات session، history حضور، live start/status/cancel، roster و اثر صفر مالی بررسی شد.
+- کلاس‌ها: list/detail/full report/students، pending/deletion، suspend و Excel با openpyxl بررسی شد.
 - oracle مستقل برای tuition/discount/payment/due و wallet سهم‌ها استفاده شد.
 - atomic update و retry برای پرداخت قسط بررسی شد.
 - invalid amount بررسی شد و عدم ایجاد transaction assert شد.

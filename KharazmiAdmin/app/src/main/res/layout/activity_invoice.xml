@@ -334,7 +334,7 @@
                             <RadioButton
                                 android:id="@+id/rbWalletTeacher"
                                 android:layout_width="0dp"
-                                android:layout_height="@dimen/min_touch_target"
+                                android:layout_height="wrap_content"
                                 android:layout_weight="1"
                                 android:minHeight="@dimen/min_touch_target"
                                 android:text="@string/invoice_wallet_teacher"
@@ -343,7 +343,7 @@
                             <RadioButton
                                 android:id="@+id/rbWalletInstitute"
                                 android:layout_width="0dp"
-                                android:layout_height="@dimen/min_touch_target"
+                                android:layout_height="wrap_content"
                                 android:layout_weight="1"
                                 android:minHeight="@dimen/min_touch_target"
                                 android:text="@string/invoice_wallet_institute"
@@ -352,7 +352,7 @@
                             <RadioButton
                                 android:id="@+id/rbWalletBoth"
                                 android:layout_width="0dp"
-                                android:layout_height="@dimen/min_touch_target"
+                                android:layout_height="wrap_content"
                                 android:layout_weight="1"
                                 android:minHeight="@dimen/min_touch_target"
                                 android:text="@string/ds_inv_wallet_both"
@@ -421,7 +421,7 @@
                         <RadioButton
                             android:id="@+id/rbCard"
                             android:layout_width="0dp"
-                            android:layout_height="@dimen/min_touch_target"
+                            android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:minHeight="@dimen/min_touch_target"
                             android:checked="true"
@@ -431,7 +431,7 @@
                         <RadioButton
                             android:id="@+id/rbCash"
                             android:layout_width="0dp"
-                            android:layout_height="@dimen/min_touch_target"
+                            android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:minHeight="@dimen/min_touch_target"
                             android:text="@string/ds_inv_pay_cash"
@@ -440,7 +440,7 @@
                         <RadioButton
                             android:id="@+id/rbCheque"
                             android:layout_width="0dp"
-                            android:layout_height="@dimen/min_touch_target"
+                            android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:minHeight="@dimen/min_touch_target"
                             android:text="@string/ds_inv_pay_transfer"
@@ -473,7 +473,7 @@
                         android:id="@+id/btnSubmit"
                         style="@style/Widget.Kharazmi.DS.Button.Primary"
                         android:layout_width="match_parent"
-                        android:layout_height="@dimen/spacing_xxlarge"
+                        android:layout_height="wrap_content"
                         android:layout_marginTop="@dimen/spacing_small"
                         android:minHeight="@dimen/spacing_xxlarge"
                         android:text="@string/ds_inv_submit"

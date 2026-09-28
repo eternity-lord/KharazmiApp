@@ -95,7 +95,7 @@
                         <RadioButton
                             android:id="@+id/rbScopeInstitute"
                             android:layout_width="0dp"
-                            android:layout_height="@dimen/min_touch_target"
+                            android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:minHeight="@dimen/min_touch_target"
                             android:text="@string/ds_rpt_scope_institute"
@@ -105,7 +105,7 @@
                         <RadioButton
                             android:id="@+id/rbScopeTeacher"
                             android:layout_width="0dp"
-                            android:layout_height="@dimen/min_touch_target"
+                            android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:minHeight="@dimen/min_touch_target"
                             android:text="@string/ds_rpt_scope_teacher"

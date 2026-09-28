@@ -22,7 +22,7 @@ from dependencies import get_db, check_admin_access, check_admin_or_secretary_ac
 
 # FIX: Bug 16 - share the tuition-minus-payment debt calculation across financial views.
 from dependencies import limiter  # FIX F-B1: ریت‌لیمیت کال‌بک پرداخت (endpoint پول بدون احراز).
-from financial_calculations import calculate_student_debt
+from financial_calculations import calculate_student_debt, calculate_enrollment_debt_breakdown
 # FIX (F-T2): اعتبارسنجی مرکزی تاریخ/مبلغ قسط — یک منبع حقیقت برای هر دو مسیر ساخت قسط.
 from validation import validate_installment_amount, validate_jalali_due_date
 # FIX: Bug 11 - the existing refund audit write needs its model imported at runtime.
@@ -86,22 +86,17 @@ def search_finance_advanced(
         for en in enrollments:
             st = db.query(Student).filter(Student.id == en.student_id, Student.is_deleted == False).first()
             if st:
-                # محاسبه بدهی دانش‌آموز داخل لیست کلاس
-                w_t = st.wallet_teacher if st.wallet_teacher else 0
-                w_i = st.wallet_institute if st.wallet_institute else 0
-                debt_teacher = abs(w_t) if w_t < 0 else 0
-                debt_institute = abs(w_i) if w_i < 0 else 0
-                # FIX: Bug 16 - show unpaid tuition even when wallet balances are nonnegative.
-                total_debt = calculate_student_debt(db, st)
-
+                # این ردیف نمای یک enrollment داخل کلاس است؛ walletهای Student
+                # سراسری‌اند و نباید بدهی کلاس دیگری را به این ردیف کپی کنند.
+                breakdown = calculate_enrollment_debt_breakdown(db, en)
                 class_students.append(
                     {
                         "id": st.id,
                         "name": display_name(st, "نامشخص"),
-                        "debt": total_debt,
-                        "total_debt": total_debt,
-                        "debt_teacher": debt_teacher,
-                        "debt_institute": debt_institute,
+                        "debt": breakdown["debt"],
+                        "total_debt": breakdown["debt"],
+                        "debt_teacher": breakdown["debt_teacher"],
+                        "debt_institute": breakdown["debt_institute"],
                     }
                 )
 
@@ -672,49 +667,22 @@ def get_student_class_status(student_id: int, course_id: Optional[int] = None, c
     if not enroll:
         raise HTTPException(status_code=404, detail="ثبت‌نام یافت نشد")
         
-    final_tuition, _ = get_enrollment_tuition_and_discount(enroll)
-    
-    w_t = student.wallet_teacher if student.wallet_teacher is not None else 0
-    w_i = student.wallet_institute if student.wallet_institute is not None else 0
-    
-    due_to_teacher = -w_t
-    due_to_institute = -w_i
-    
-    # محاسبه مبالغ پرداخت‌شده واقعی از تراکنش‌های لینک‌شده به همین ثبت‌نام (منبع حقیقت واحد)
-    # FIX: Bug 12 - exclude archived Transaction rows from this active view.
-    linked_payments = db.query(Transaction).filter(Transaction.is_deleted == False, Transaction.is_reversed == False).filter(
-        Transaction.enrollment_id == enroll.id,
-        Transaction.type.in_(["deposit", "enrollment_payment", "tuition"]),
-        Transaction.amount > 0
-    ).all()
-    paid_to_teacher = 0
-    paid_to_institute = 0
-    for t in linked_payments:
-        if t.target_wallet == "teacher":
-            paid_to_teacher += t.amount
-        elif t.target_wallet == "institute":
-            paid_to_institute += t.amount
-        elif t.target_wallet == "both":
-            # رسید تجمیعی قدیمی: تقسیم بر اساس سهم ثبت‌شده، وگرنه نصف دقیق
-            share_t = t.share_teacher or 0
-            share_i = t.share_institute or 0
-            if share_t + share_i != t.amount:
-                share_t = t.amount // 2
-                share_i = t.amount - share_t
-            paid_to_teacher += share_t
-            paid_to_institute += share_i
-    
-    # FIX O-09: دو فیلد صریح و نامنفی برای «بدهی» و «اعتبار» در اپ.
-    # چرا: `due_to_*` قرارداد کیف‌پولی دارد (due = منهای کیف) و بعد از پیش‌پرداخت جزئی
-    # منفی می‌شود ⇒ اپراتور «بدهی: -۵۰۰٬۰۰۰» می‌دید. فیلدهای قبلی دست‌نخورده ماندند.
+    # وضعیت صورت‌حساب باید فقط از همین enrollment بیاید؛ wallet کلی دانش‌آموز
+    # در این endpoint کلاس‌محور منبع due نیست.
+    breakdown = calculate_enrollment_debt_breakdown(db, enroll)
+    final_tuition = breakdown["tuition"]
+    paid_to_teacher = breakdown["paid_teacher"]
+    paid_to_institute = breakdown["paid_institute"]
     paid_total = paid_to_teacher + paid_to_institute
+    due_to_teacher = breakdown["debt_teacher"]
+    due_to_institute = breakdown["debt_institute"]
     return {
         "total_amount": final_tuition,
         "paid_to_teacher": paid_to_teacher,
         "paid_to_institute": paid_to_institute,
         "due_to_teacher": due_to_teacher,
         "due_to_institute": due_to_institute,
-        "remaining_tuition": max(0, final_tuition - paid_total),
+        "remaining_tuition": breakdown["debt"],
         "credit_balance": max(0, paid_total - final_tuition),
         "course_id": course_id,
         # لینک دقیق ثبت‌نام فعال (همان سطری که شهریه از آن خوانده شد) برای اتصال پرداخت بعدی
@@ -2118,15 +2086,16 @@ def get_student_financial_dashboard(
     # دریافت سوابق ثبت‌نام‌ها و مبالغ شهریه
     # FIX: Bug 13 - exclude archived Enrollment rows from this active view.
     enrollments = db.query(Enrollment).filter(Enrollment.is_deleted == False).filter(Enrollment.student_id == student_id).all()
-    # کیف پول واحد شاگرد: جمع کل پرداختی ثبت‌نام‌های فعال (در کنار موجودی و بدهی)
-    total_paid_all = sum((en.total_paid or 0) for en in enrollments)
+    # کیف پول واحد شاگرد: جمع پرداخت‌های enrollmentهای فعال؛ هر ردیف
+    # پایین‌تر با breakdown همان enrollment ساخته می‌شود.
     enroll_list = []
+    total_paid_all = 0
     for en in enrollments:
         final_tuition, discount = get_enrollment_tuition_and_discount(en)
+        breakdown = calculate_enrollment_debt_breakdown(db, en)
         c_title = en.course.title if en.course else "کلاس حذف شده"
-        
-        # مجموع پرداخت‌شده واقعی برای این کلاس (منبع حقیقت واحد: total_paid روی ثبت‌نام)
-        paid_for_class = en.total_paid or 0
+        paid_for_class = breakdown["paid_teacher"] + breakdown["paid_institute"]
+        total_paid_all += paid_for_class
         
         enroll_list.append({
             "enrollment_id": en.id,
@@ -2135,7 +2104,7 @@ def get_student_financial_dashboard(
             "discount": discount,
             "final_tuition": final_tuition,
             "total_paid": paid_for_class,
-            "outstanding": max(0, final_tuition - paid_for_class)
+            "outstanding": breakdown["debt"]
         })
         
     # لیست اقساط
@@ -2296,9 +2265,9 @@ def get_invoice_details(
     course = db.query(Course).filter(Course.id == enroll.course_id).first()
     
     final_tuition, discount = get_enrollment_tuition_and_discount(enroll)
-    
-    # دریافت پرداخت‌های واقعی کلاس (منبع حقیقت واحد: total_paid روی ثبت‌نام، همگام با تراکنش‌های لینک‌شده)
-    total_paid = enroll.total_paid or 0
+    breakdown = calculate_enrollment_debt_breakdown(db, enroll)
+    total_paid = breakdown["paid_teacher"] + breakdown["paid_institute"]
+    balance_due = breakdown["debt"]
     
     # دریافت اقساط این کلاس
     # FIX: Bug 13 - exclude archived Installment rows from this active view.
@@ -2314,9 +2283,9 @@ def get_invoice_details(
         "discount_amount": discount,
         "final_tuition": final_tuition,
         "total_paid": total_paid,
-        "balance_due": max(0, final_tuition - total_paid),
+        "balance_due": balance_due,
         # FIX O-09: همان معنا با نام صریح + اعتبار مازاد پرداخت (افزودنی؛ فیلدهای قبلی دست‌نخورده)
-        "remaining_tuition": max(0, final_tuition - total_paid),
+        "remaining_tuition": balance_due,
         "credit_balance": max(0, total_paid - final_tuition),
         "installments": [
             {

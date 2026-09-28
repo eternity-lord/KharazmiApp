@@ -34,6 +34,13 @@ from routers.classes import (
     get_class_students_full,
 )
 from routers.admin import get_student_full_profile
+from routers.finance import (
+    get_invoice_details,
+    get_student_class_status,
+    get_student_financial_dashboard,
+    search_finance_advanced,
+)
+from routers.teachers import get_my_classes
 
 
 class TestPerClassDebtIsolation(unittest.TestCase):
@@ -171,6 +178,41 @@ class TestPerClassDebtIsolation(unittest.TestCase):
         self.assertEqual(excel_b[8], 0)
         self.assertEqual(excel_b[9], 0)
         self.assertEqual(excel_b[10], 0)
+
+        # finance.py invoice/status/search paths must use the same enrollment scope.
+        status_b = get_student_class_status(
+            student_id=self.student.id, course_id=self.course_b.id,
+            db=self.db, authorization=self._admin(), sub_role="admin",
+        )
+        self.assertEqual(status_b["due_to_teacher"], 0)
+        self.assertEqual(status_b["due_to_institute"], 0)
+        invoice_b = get_invoice_details(
+            enrollment_id=self.enrollment_b.id, db=self.db,
+            authorization=self._admin(), _role="admin",
+        )
+        self.assertEqual(invoice_b["balance_due"], 0)
+        dashboard = get_student_financial_dashboard(
+            student_id=self.student.id, db=self.db,
+            authorization=self._admin(), _role="admin",
+        )
+        dashboard_rows = {row["enrollment_id"]: row for row in dashboard["enrollments"]}
+        self.assertEqual(dashboard_rows[self.enrollment_b.id]["outstanding"], 0)
+        advanced = search_finance_advanced(
+            query="کلاس B", branch_id=None, authorization=self._admin(),
+            db=self.db, sub_role="admin",
+        )
+        class_result = next(row for row in advanced if row.type == "class")
+        self.assertEqual(class_result.students_in_class[0]["total_debt"], 0)
+
+        teacher_classes = get_my_classes(
+            teacher_id=self.teacher.id, db=self.db,
+            authorization=self._admin(), sub_role="admin",
+        )
+        teacher_rows = {row["id"]: row for row in teacher_classes}
+        self.assertEqual(teacher_rows[self.course_a.id]["total_debt"], 1000)
+        self.assertEqual(teacher_rows[self.course_b.id]["total_debt"], 0)
+        self.assertEqual(teacher_rows[self.course_b.id]["debt_to_teacher"], 0)
+        self.assertEqual(teacher_rows[self.course_b.id]["debt_to_institute"], 0)
 
     def test_payment_for_b_does_not_change_a_and_legacy_course_payment_is_scoped(self):
         before_a = calculate_enrollment_debt_breakdown(self.db, self.enrollment_a)

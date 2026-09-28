@@ -287,8 +287,8 @@ def get_my_classes(
                 student_names.append(f"{st.first_name} {st.last_name}")
 
         # 3. همان منبع بدهیِ endpoint لیست کلاس‌های ادمین، برای بنر پنل معلم.
-        # بدهی تفکیکی از کیف‌ها می‌آید؛ بدهی کل از ماندهٔ همین enrollment می‌آید
-        # (برای enrollment بدون شهریه، fallback کیف‌ها مثل ClassManagementActivity است).
+        # همهٔ اعداد از breakdown همان enrollment می‌آیند؛ wallet کلی دانش‌آموز
+        # برای کلاس‌های دیگر این دانش‌آموز هرگز در بنر تکرار نمی‌شود.
         total_debt = 0
         debt_to_teacher = 0
         debt_to_institute = 0

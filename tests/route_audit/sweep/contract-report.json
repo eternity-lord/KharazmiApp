@@ -1,0 +1,1569 @@
+{
+  "declarations": 162,
+  "unique_calls": 151,
+  "entries": [
+    {
+      "method": "GET",
+      "path": "teachers/list",
+      "server_path": "/teachers/list",
+      "response_class": "List<TeacherSimple>",
+      "role": "teacher",
+      "status": 200,
+      "issues": [],
+      "model": "TeacherSimple"
+    },
+    {
+      "method": "POST",
+      "path": "classes/create",
+      "server_path": "/classes/create",
+      "response_class": "ClassResponse",
+      "role": "admin",
+      "status": 400,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "GET",
+      "path": "admin/session_history",
+      "server_path": "/admin/session_history",
+      "response_class": "AdminSessionHistoryResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "AdminSessionHistoryResponse"
+    },
+    {
+      "method": "POST",
+      "path": "admin/session_history/{session_id}/reopen",
+      "server_path": "/admin/session_history/{session_id}/reopen",
+      "response_class": "SimpleResponse",
+      "role": "admin",
+      "status": 409,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "POST",
+      "path": "finance/installments",
+      "server_path": "/finance/installments",
+      "response_class": "CreateInstallmentResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "CreateInstallmentResponse"
+    },
+    {
+      "method": "POST",
+      "path": "finance/installments/{id}/pay",
+      "server_path": "/finance/installments/{installment_id}/pay",
+      "response_class": "PayInstallmentResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "PayInstallmentResponse"
+    },
+    {
+      "method": "POST",
+      "path": "finance/installments/{id}/remind",
+      "server_path": "/finance/installments/{installment_id}/remind",
+      "response_class": "RemindInstallmentResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "RemindInstallmentResponse"
+    },
+    {
+      "method": "GET",
+      "path": "finance/student/{student_id}/dashboard",
+      "server_path": "/finance/student/{student_id}/dashboard",
+      "response_class": "FinancialDashboardResponse",
+      "role": "student",
+      "status": 200,
+      "issues": [],
+      "model": "FinancialDashboardResponse"
+    },
+    {
+      "method": "GET",
+      "path": "audit/suspicious_patterns",
+      "server_path": "/audit/suspicious_patterns",
+      "response_class": "List<AuditAlert>",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "AuditAlert"
+    },
+    {
+      "method": "GET",
+      "path": "students/{id}/timeline",
+      "server_path": "/students/{student_id}/timeline",
+      "response_class": "List<TimelineEvent>",
+      "role": "student",
+      "status": 200,
+      "issues": [],
+      "model": "TimelineEvent"
+    },
+    {
+      "method": "GET",
+      "path": "dunning/drafts",
+      "server_path": "/dunning/drafts",
+      "response_class": "List<DunningDraft>",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "DunningDraft"
+    },
+    {
+      "method": "POST",
+      "path": "dunning/send_batch",
+      "server_path": "/dunning/send_batch",
+      "response_class": "DunningSendResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "DunningSendResponse"
+    },
+    {
+      "method": "GET",
+      "path": "dashboard/kpis",
+      "server_path": "/dashboard/kpis",
+      "response_class": "DashboardKPIs",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "DashboardKPIs"
+    },
+    {
+      "method": "GET",
+      "path": "exports/debtors",
+      "server_path": "/exports/debtors",
+      "response_class": "Response<ResponseBody>",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "GET",
+      "path": "exports/overdue_installments",
+      "server_path": "/exports/overdue_installments",
+      "response_class": "Response<ResponseBody>",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "GET",
+      "path": "exports/audit_alerts",
+      "server_path": "/exports/audit_alerts",
+      "response_class": "Response<ResponseBody>",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "GET",
+      "path": "audit-trail/logs",
+      "server_path": "/audit-trail/logs",
+      "response_class": "AuditTrailResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "AuditTrailResponse"
+    },
+    {
+      "method": "GET",
+      "path": "classes/{id}/details",
+      "server_path": "/classes/{course_id}/details",
+      "response_class": "ClassDetailsResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "ClassDetailsResponse"
+    },
+    {
+      "method": "DELETE",
+      "path": "enrollments/{enrollment_id}",
+      "server_path": "/enrollments/{enrollment_id}",
+      "response_class": "SimpleResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "SimpleResponse"
+    },
+    {
+      "method": "GET",
+      "path": "finance/search_advanced",
+      "server_path": "/finance/search_advanced",
+      "response_class": "List<AdvancedSearchItem>",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "AdvancedSearchItem"
+    },
+    {
+      "method": "POST",
+      "path": "finance/pay",
+      "server_path": "/finance/pay",
+      "response_class": "FinanceResponse",
+      "role": "admin",
+      "status": 400,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "GET",
+      "path": "admin/students/{id}/full_profile",
+      "server_path": "/admin/students/{id}/full_profile",
+      "response_class": "FullStudentProfile",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "FullStudentProfile"
+    },
+    {
+      "method": "GET",
+      "path": "finance/student_class_status",
+      "server_path": "/finance/student_class_status",
+      "response_class": "StudentClassStatus",
+      "role": "admin",
+      "status": 404,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "GET",
+      "path": "classes/list",
+      "server_path": "/classes/list",
+      "response_class": "List<ClassListItem>",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "ClassListItem"
+    },
+    {
+      "method": "POST",
+      "path": "classes/{id}/suspend",
+      "server_path": "/classes/{course_id}/suspend",
+      "response_class": "SuspendResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "SuspendResponse"
+    },
+    {
+      "method": "POST",
+      "path": "admin/classes/{id}/suspend_s",
+      "server_path": "/admin/classes/{course_id}/suspend_s",
+      "response_class": "SuspendResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "SuspendResponse"
+    },
+    {
+      "method": "POST",
+      "path": "admin/classes/suspend_bulk",
+      "server_path": "/admin/classes/suspend_bulk",
+      "response_class": "SimpleResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "SimpleResponse"
+    },
+    {
+      "method": "PUT",
+      "path": "classes/update",
+      "server_path": "/classes/update",
+      "response_class": "SimpleResponse",
+      "role": "admin",
+      "status": 409,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "POST",
+      "path": "classes/pending_approval/bulk_approve",
+      "server_path": "/classes/pending_approval/bulk_approve",
+      "response_class": "SimpleResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [
+        {
+          "field": "message",
+          "kind": "missing-non-null",
+          "detail": "کلید غیرnullable وجود ندارد و استفاده می‌تواند NPE بدهد",
+          "line": 8
+        }
+      ],
+      "model": "SimpleResponse"
+    },
+    {
+      "method": "POST",
+      "path": "classes/pending_approval/bulk_reject",
+      "server_path": "/classes/pending_approval/bulk_reject",
+      "response_class": "SimpleResponse",
+      "role": "admin",
+      "status": 400,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "POST",
+      "path": "attendance/submit_session",
+      "server_path": "/attendance/submit_session",
+      "response_class": "SessionResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "SessionResponse"
+    },
+    {
+      "method": "GET",
+      "path": "attendance/session/{session_code}",
+      "server_path": "/attendance/session/{session_code}",
+      "response_class": "SessionDetailsResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "SessionDetailsResponse"
+    },
+    {
+      "method": "PUT",
+      "path": "attendance/session/{session_code}",
+      "server_path": "/attendance/session/{session_code}",
+      "response_class": "SessionResponse",
+      "role": "admin",
+      "status": 409,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "POST",
+      "path": "rooms/create",
+      "server_path": "/rooms/create",
+      "response_class": "RoomItem",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "RoomItem"
+    },
+    {
+      "method": "GET",
+      "path": "rooms/list",
+      "server_path": "/rooms/list",
+      "response_class": "List<RoomItem>",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "RoomItem"
+    },
+    {
+      "method": "POST",
+      "path": "calendar/check_conflicts",
+      "server_path": "/calendar/check_conflicts",
+      "response_class": "ConflictCheckResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "ConflictCheckResponse"
+    },
+    {
+      "method": "GET",
+      "path": "calendar/events",
+      "server_path": "/calendar/events",
+      "response_class": "List<CalendarEventItem>",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "CalendarEventItem"
+    },
+    {
+      "method": "GET",
+      "path": "reports/chart-data",
+      "server_path": "/reports/chart-data",
+      "response_class": "ChartDataResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "ChartDataResponse"
+    },
+    {
+      "method": "GET",
+      "path": "analytics/enrollment_funnel",
+      "server_path": "/analytics/enrollment_funnel",
+      "response_class": "EnrollmentFunnelResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "EnrollmentFunnelResponse"
+    },
+    {
+      "method": "GET",
+      "path": "classes/{id}/full_report",
+      "server_path": "/classes/{id}/full_report",
+      "response_class": "FullClassReport",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "FullClassReport"
+    },
+    {
+      "method": "GET",
+      "path": "classes/{id}/students_full",
+      "server_path": "/classes/{id}/students_full",
+      "response_class": "ClassStudentsFullResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "ClassStudentsFullResponse"
+    },
+    {
+      "method": "POST",
+      "path": "attendance/student_history",
+      "server_path": "/attendance/student_history",
+      "response_class": "StudentAttendanceHistoryResponse",
+      "role": "student",
+      "status": 200,
+      "issues": [],
+      "model": "StudentAttendanceHistoryResponse"
+    },
+    {
+      "method": "DELETE",
+      "path": "classes/{course_id}",
+      "server_path": "/classes/{course_id}",
+      "response_class": "SimpleResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "SimpleResponse"
+    },
+    {
+      "method": "POST",
+      "path": "classes/{course_id}/request_delete",
+      "server_path": "/classes/{course_id}/request_delete",
+      "response_class": "SimpleResponse",
+      "role": "admin",
+      "status": 403,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "POST",
+      "path": "classes/{course_id}/suspend",
+      "server_path": "/classes/{course_id}/suspend",
+      "response_class": "SuspendResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "SuspendResponse"
+    },
+    {
+      "method": "PUT",
+      "path": "classes/update_info/{course_id}",
+      "server_path": "/classes/update_info/{course_id}",
+      "response_class": "SimpleResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "SimpleResponse"
+    },
+    {
+      "method": "GET",
+      "path": "students/search_simple",
+      "server_path": "/students/search_simple",
+      "response_class": "List<StudentSearchItem>",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "StudentSearchItem"
+    },
+    {
+      "method": "POST",
+      "path": "enrollments/add",
+      "server_path": "/enrollments/add",
+      "response_class": "AddStudentResponse",
+      "role": "admin",
+      "status": 400,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "POST",
+      "path": "enrollments/add_bulk",
+      "server_path": "/enrollments/add_bulk",
+      "response_class": "BulkEnrollmentResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "BulkEnrollmentResponse"
+    },
+    {
+      "method": "POST",
+      "path": "crm/leads/create",
+      "server_path": "/crm/leads/create",
+      "response_class": "LeadResponseModel",
+      "role": "admin",
+      "status": 400,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "GET",
+      "path": "crm/leads/list",
+      "server_path": "/crm/leads/list",
+      "response_class": "List<LeadResponseModel>",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "LeadResponseModel"
+    },
+    {
+      "method": "POST",
+      "path": "crm/leads/{id}/notes",
+      "server_path": "/crm/leads/{id}/notes",
+      "response_class": "SimpleResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "SimpleResponse"
+    },
+    {
+      "method": "POST",
+      "path": "crm/leads/{id}/convert",
+      "server_path": "/crm/leads/{id}/convert",
+      "response_class": "SimpleResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "SimpleResponse"
+    },
+    {
+      "method": "GET",
+      "path": "finance/reports/debtors_grouped",
+      "server_path": "/finance/reports/debtors_grouped",
+      "response_class": "DebtorsGroupedResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "DebtorsGroupedResponse"
+    },
+    {
+      "method": "GET",
+      "path": "classes/deletion_requests",
+      "server_path": "/classes/deletion_requests",
+      "response_class": "List<DeletionRequestItem>",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "DeletionRequestItem"
+    },
+    {
+      "method": "POST",
+      "path": "classes/deletion_requests/{id}/approve",
+      "server_path": "/classes/deletion_requests/{request_id}/approve",
+      "response_class": "SimpleResponse",
+      "role": "admin",
+      "status": 404,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "POST",
+      "path": "classes/deletion_requests/{id}/reject",
+      "server_path": "/classes/deletion_requests/{request_id}/reject",
+      "response_class": "SimpleResponse",
+      "role": "admin",
+      "status": 404,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "GET",
+      "path": "exams/student/list",
+      "server_path": "/exams/student/list",
+      "response_class": "List<HomeworkItem>",
+      "role": "student",
+      "status": 200,
+      "issues": [
+        {
+          "field": "description",
+          "kind": "missing-non-null",
+          "detail": "کلید غیرnullable وجود ندارد و استفاده می‌تواند NPE بدهد",
+          "line": 49
+        },
+        {
+          "field": "due_date",
+          "kind": "missing-non-null",
+          "detail": "کلید غیرnullable وجود ندارد و استفاده می‌تواند NPE بدهد",
+          "line": 50
+        },
+        {
+          "field": "description",
+          "kind": "missing-non-null",
+          "detail": "کلید غیرnullable وجود ندارد و استفاده می‌تواند NPE بدهد",
+          "line": 49
+        },
+        {
+          "field": "due_date",
+          "kind": "missing-non-null",
+          "detail": "کلید غیرnullable وجود ندارد و استفاده می‌تواند NPE بدهد",
+          "line": 50
+        }
+      ],
+      "model": "HomeworkItem"
+    },
+    {
+      "method": "POST",
+      "path": "exams/attempts/{exam_id}/start",
+      "server_path": "/exams/attempts/{exam_id}/start",
+      "response_class": "AttemptStartResponse",
+      "role": "student",
+      "status": 400,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "POST",
+      "path": "exams/attempts/{attempt_id}/submit",
+      "server_path": "/exams/attempts/{attempt_id}/submit",
+      "response_class": "AttemptSubmitResponse",
+      "role": "student",
+      "status": 400,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "GET",
+      "path": "students/{id}/report_card",
+      "server_path": "/students/{student_id}/report_card",
+      "response_class": "ReportCardResponse",
+      "role": "student",
+      "status": 200,
+      "issues": [],
+      "model": "ReportCardResponse"
+    },
+    {
+      "method": "POST",
+      "path": "homework/create",
+      "server_path": "/homework/create",
+      "response_class": "HomeworkResponseModel",
+      "role": "admin",
+      "status": 403,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "DELETE",
+      "path": "homework/{id}",
+      "server_path": "/homework/{id}",
+      "response_class": "SimpleResponse",
+      "role": "admin",
+      "status": 403,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "GET",
+      "path": "homework/student/list",
+      "server_path": "/homework/student/list",
+      "response_class": "List<HomeworkItem>",
+      "role": "student",
+      "status": 200,
+      "issues": [],
+      "model": "HomeworkItem"
+    },
+    {
+      "method": "POST",
+      "path": "homework/submissions/{id}/grade",
+      "server_path": "/homework/submissions/{sub_id}/grade",
+      "response_class": "SimpleResponse",
+      "role": "admin",
+      "status": 403,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "GET",
+      "path": "homework/parent/child/{student_id}",
+      "server_path": "/homework/parent/child/{student_id}",
+      "response_class": "List<HomeworkItem>",
+      "role": "admin",
+      "status": 200,
+      "issues": [
+        {
+          "field": "description",
+          "kind": "missing-non-null",
+          "detail": "کلید غیرnullable وجود ندارد و استفاده می‌تواند NPE بدهد",
+          "line": 49
+        }
+      ],
+      "model": "HomeworkItem"
+    },
+    {
+      "method": "GET",
+      "path": "admin/institute_settings",
+      "server_path": "/admin/institute_settings",
+      "response_class": "InstituteSettings",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "InstituteSettings"
+    },
+    {
+      "method": "PUT",
+      "path": "admin/institute_settings",
+      "server_path": "/admin/institute_settings",
+      "response_class": "SimpleResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "SimpleResponse"
+    },
+    {
+      "method": "POST",
+      "path": "admin/institute_settings/upload_logo",
+      "server_path": "/admin/institute_settings/upload_logo",
+      "response_class": "SimpleResponse",
+      "role": "admin",
+      "status": 422,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "POST",
+      "path": "/finance/receipt/print",
+      "server_path": "/finance/receipt/print",
+      "response_class": "PrintReceiptResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "PrintReceiptResponse"
+    },
+    {
+      "method": "POST",
+      "path": "/finance/receipt/pdf",
+      "server_path": "/finance/receipt/pdf",
+      "response_class": "PdfReceiptResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "PdfReceiptResponse"
+    },
+    {
+      "method": "GET",
+      "path": "/finance/receipt/{transaction_id}",
+      "server_path": "/finance/receipt/{transaction_id}",
+      "response_class": "ReceiptDetailsResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "ReceiptDetailsResponse"
+    },
+    {
+      "method": "POST",
+      "path": "auth/login",
+      "server_path": "/auth/login",
+      "response_class": "LoginResponse",
+      "role": "admin",
+      "status": 400,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "POST",
+      "path": "auth/logout",
+      "server_path": "/auth/logout",
+      "response_class": "BaseActivity()",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": null
+    },
+    {
+      "method": "GET",
+      "path": "admin/deleted_classes",
+      "server_path": "/admin/deleted_classes",
+      "response_class": "List<ArchivedClassItem>",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "ArchivedClassItem"
+    },
+    {
+      "method": "GET",
+      "path": "admin/deleted_classes/{id}",
+      "server_path": "/admin/deleted_classes/{course_id}",
+      "response_class": "ArchivedClassDetail",
+      "role": "admin",
+      "status": 404,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "POST",
+      "path": "admin/deleted_classes/{id}/restore",
+      "server_path": "/admin/deleted_classes/{course_id}/restore",
+      "response_class": "ClassRestoreResponse",
+      "role": "admin",
+      "status": 409,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "GET",
+      "path": "auth/me",
+      "server_path": "/auth/me",
+      "response_class": "MeResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "MeResponse"
+    },
+    {
+      "method": "GET",
+      "path": "messages/conversations",
+      "server_path": "/messages/conversations",
+      "response_class": "List<ConversationItem>",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "ConversationItem"
+    },
+    {
+      "method": "POST",
+      "path": "messages/conversations/create",
+      "server_path": "/messages/conversations/create",
+      "response_class": "SimpleResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "SimpleResponse"
+    },
+    {
+      "method": "GET",
+      "path": "messages/conversations/{id}/history",
+      "server_path": "/messages/conversations/{id}/history",
+      "response_class": "List<MessageHistoryItem>",
+      "role": "admin",
+      "status": 403,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "POST",
+      "path": "messages/conversations/{id}/send",
+      "server_path": "/messages/conversations/{id}/send",
+      "response_class": "SimpleResponse",
+      "role": "admin",
+      "status": 403,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "POST",
+      "path": "messages/broadcast",
+      "server_path": "/messages/broadcast",
+      "response_class": "SimpleResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "SimpleResponse"
+    },
+    {
+      "method": "POST",
+      "path": "messages/conversations/{id}/pin",
+      "server_path": "/messages/conversations/{id}/pin",
+      "response_class": "PinToggleResponse",
+      "role": "admin",
+      "status": 404,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "GET",
+      "path": "notifications",
+      "server_path": "/notifications",
+      "response_class": "List<NotificationItem>",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "NotificationItem"
+    },
+    {
+      "method": "GET",
+      "path": "notifications/unread_count",
+      "server_path": "/notifications/unread_count",
+      "response_class": "UnreadCountResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "UnreadCountResponse"
+    },
+    {
+      "method": "POST",
+      "path": "notifications/{id}/read",
+      "server_path": "/notifications/{id}/read",
+      "response_class": "SimpleResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "SimpleResponse"
+    },
+    {
+      "method": "POST",
+      "path": "notifications/read_all",
+      "server_path": "/notifications/read_all",
+      "response_class": "SimpleResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "SimpleResponse"
+    },
+    {
+      "method": "GET",
+      "path": "admin/parent_contacts",
+      "server_path": "/admin/parent_contacts",
+      "response_class": "List<ParentContactItem>",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "ParentContactItem"
+    },
+    {
+      "method": "POST",
+      "path": "parent/request_otp",
+      "server_path": "/parent/request_otp",
+      "response_class": "SimpleResponse",
+      "role": "parent",
+      "status": 404,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "POST",
+      "path": "parent/login",
+      "server_path": "/parent/login",
+      "response_class": "ParentLoginResponse",
+      "role": "parent",
+      "status": 400,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "POST",
+      "path": "parent/select_child",
+      "server_path": "/parent/select_child",
+      "response_class": "ParentLoginResponse",
+      "role": "parent",
+      "status": 401,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "GET",
+      "path": "parent/child_profile",
+      "server_path": "/parent/child_profile",
+      "response_class": "ParentProfileResponse",
+      "role": "parent",
+      "status": 200,
+      "issues": [],
+      "model": "ParentProfileResponse"
+    },
+    {
+      "method": "GET",
+      "path": "admin/pending_classes",
+      "server_path": "/admin/pending_classes",
+      "response_class": "List<PendingClassItem>",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "PendingClassItem"
+    },
+    {
+      "method": "POST",
+      "path": "admin/approve_class/{id}",
+      "server_path": "/admin/approve_class/{course_id}",
+      "response_class": "SimpleResponse",
+      "role": "admin",
+      "status": 409,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "DELETE",
+      "path": "admin/reject_class/{id}",
+      "server_path": "/admin/reject_class/{course_id}",
+      "response_class": "SimpleResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "SimpleResponse"
+    },
+    {
+      "method": "GET",
+      "path": "teachers/pending",
+      "server_path": "/teachers/pending",
+      "response_class": "List<TeacherPending>",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "TeacherPending"
+    },
+    {
+      "method": "POST",
+      "path": "teachers/approve/{id}",
+      "server_path": "/teachers/approve/{teacher_id}",
+      "response_class": "ApproveResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "ApproveResponse"
+    },
+    {
+      "method": "DELETE",
+      "path": "teachers/reject/{id}",
+      "server_path": "/teachers/reject/{teacher_id}",
+      "response_class": "ApproveResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "ApproveResponse"
+    },
+    {
+      "method": "GET",
+      "path": "admin/students/search",
+      "server_path": "/admin/students/search",
+      "response_class": "List<PersonListItem>",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "PersonListItem"
+    },
+    {
+      "method": "GET",
+      "path": "admin/teachers/search",
+      "server_path": "/admin/teachers/search",
+      "response_class": "List<PersonListItem>",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "PersonListItem"
+    },
+    {
+      "method": "GET",
+      "path": "reports/financial/excel",
+      "server_path": "/reports/financial/excel",
+      "response_class": "Response<ResponseBody>",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "GET",
+      "path": "reports/financial_summary",
+      "server_path": "/reports/financial_summary",
+      "response_class": "FinancialSummaryResponse",
+      "role": "admin",
+      "status": 400,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "GET",
+      "path": "reports/student_statement",
+      "server_path": "/reports/student_statement",
+      "response_class": "StudentStatementResponse",
+      "role": "student",
+      "status": 200,
+      "issues": [],
+      "model": "StudentStatementResponse"
+    },
+    {
+      "method": "GET",
+      "path": "dynamic (@Url/نامشخص)",
+      "response_class": "ResponseBody",
+      "status": null,
+      "dynamic": true,
+      "issues": []
+    },
+    {
+      "method": "POST",
+      "path": "attendance/get_history",
+      "server_path": "/attendance/get_history",
+      "response_class": "List<SessionHistoryItem>",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "SessionHistoryItem"
+    },
+    {
+      "method": "POST",
+      "path": "auth/change-password",
+      "server_path": "/auth/change-password",
+      "response_class": "SimpleResponse",
+      "role": "admin",
+      "status": 403,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "POST",
+      "path": "auth/change-mobile",
+      "server_path": "/auth/change-mobile",
+      "response_class": "SimpleResponse",
+      "role": "admin",
+      "status": 400,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "GET",
+      "path": "config/share",
+      "server_path": "/config/share",
+      "response_class": "ShareConfigData",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "ShareConfigData"
+    },
+    {
+      "method": "POST",
+      "path": "config/share/update",
+      "server_path": "/config/share/update",
+      "response_class": "SimpleResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "SimpleResponse"
+    },
+    {
+      "method": "POST",
+      "path": "sms/send",
+      "server_path": "/sms/send",
+      "response_class": "SmsResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "SmsResponse"
+    },
+    {
+      "method": "GET",
+      "path": "sms/history",
+      "server_path": "/sms/history",
+      "response_class": "List<SmsLogItem>",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "SmsLogItem"
+    },
+    {
+      "method": "POST",
+      "path": "auth/student/request_otp",
+      "server_path": "/auth/student/request_otp",
+      "response_class": "SimpleResponse",
+      "role": "admin",
+      "status": 404,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "POST",
+      "path": "auth/student/login",
+      "server_path": "/auth/student/login",
+      "response_class": "StudentLoginResponse",
+      "role": "admin",
+      "status": 400,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "GET",
+      "path": "students/my_profile",
+      "server_path": "/students/my_profile",
+      "response_class": "ParentProfileResponse",
+      "role": "student",
+      "status": 200,
+      "issues": [],
+      "model": "ParentProfileResponse"
+    },
+    {
+      "method": "GET",
+      "path": "teachers/{id}/communication_history",
+      "server_path": "/teachers/{teacher_id}/communication_history",
+      "response_class": "List<CommunicationHistoryItem>",
+      "role": "teacher",
+      "status": 200,
+      "issues": [],
+      "model": "CommunicationHistoryItem"
+    },
+    {
+      "method": "POST",
+      "path": "admin/students/{id}/send_portal_link",
+      "server_path": "/admin/students/{id}/send_portal_link",
+      "response_class": "SimpleResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "SimpleResponse"
+    },
+    {
+      "method": "GET",
+      "path": "teachers/{id}/collaboration_summary",
+      "server_path": "/teachers/{teacher_id}/collaboration_summary",
+      "response_class": "TeacherCollaborationSummary",
+      "role": "teacher",
+      "status": 403,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "GET",
+      "path": "students/{id}/grades",
+      "server_path": "/students/{student_id}/grades",
+      "response_class": "StudentGradesResponse",
+      "role": "student",
+      "status": 200,
+      "issues": [],
+      "model": "StudentGradesResponse"
+    },
+    {
+      "method": "GET",
+      "path": "students/{id}",
+      "server_path": "/students/{student_id}",
+      "response_class": "StudentRawProfile",
+      "role": "student",
+      "status": 200,
+      "issues": [],
+      "model": "StudentRawProfile"
+    },
+    {
+      "method": "PUT",
+      "path": "students/update/{id}",
+      "server_path": "/students/update/{student_id}",
+      "response_class": "SimpleResponse",
+      "role": "admin",
+      "status": 400,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "DELETE",
+      "path": "admin/students/{id}",
+      "server_path": "/admin/students/{id}",
+      "response_class": "SimpleResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "SimpleResponse"
+    },
+    {
+      "method": "POST",
+      "path": "admin/students/{id}/toggle_suspend",
+      "server_path": "/admin/students/{id}/toggle_suspend",
+      "response_class": "SuspendResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "SuspendResponse"
+    },
+    {
+      "method": "GET",
+      "path": "teachers/{id}/full_profile",
+      "server_path": "/teachers/{id}/full_profile",
+      "response_class": "FullTeacherProfile",
+      "role": "teacher",
+      "status": 200,
+      "issues": [],
+      "model": "FullTeacherProfile"
+    },
+    {
+      "method": "GET",
+      "path": "teachers/{id}",
+      "server_path": "/teachers/{teacher_id}",
+      "response_class": "TeacherRawProfile",
+      "role": "teacher",
+      "status": 200,
+      "issues": [],
+      "model": "TeacherRawProfile"
+    },
+    {
+      "method": "PUT",
+      "path": "teachers/update/{id}",
+      "server_path": "/teachers/update/{teacher_id}",
+      "response_class": "SimpleResponse",
+      "role": "teacher",
+      "status": 403,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "POST",
+      "path": "students/{id}/upload_photo",
+      "server_path": "/students/{id}/upload_photo",
+      "response_class": "SimpleResponse",
+      "role": "student",
+      "status": 422,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "POST",
+      "path": "teachers/{id}/upload_photo",
+      "server_path": "/teachers/{id}/upload_photo",
+      "response_class": "SimpleResponse",
+      "role": "teacher",
+      "status": 422,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "GET",
+      "path": "teachers/{id}/pending_settlement",
+      "server_path": "/teachers/{teacher_id}/pending_settlement",
+      "response_class": "TeacherPendingSettlementResponse",
+      "role": "teacher",
+      "status": 200,
+      "issues": [],
+      "model": "TeacherPendingSettlementResponse"
+    },
+    {
+      "method": "POST",
+      "path": "teachers/{id}/settle",
+      "server_path": "/teachers/{teacher_id}/settle",
+      "response_class": "TeacherSettlementResponse",
+      "role": "teacher",
+      "status": 403,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "GET",
+      "path": "teachers/{id}/settlement_history",
+      "server_path": "/teachers/{teacher_id}/settlement_history",
+      "response_class": "List<SettlementHistoryItem>",
+      "role": "teacher",
+      "status": 200,
+      "issues": [],
+      "model": "SettlementHistoryItem"
+    },
+    {
+      "method": "GET",
+      "path": "students/{id}/installments",
+      "server_path": "/students/{student_id}/installments",
+      "response_class": "List<StudentInstallmentItem>",
+      "role": "student",
+      "status": 200,
+      "issues": [],
+      "model": "StudentInstallmentItem"
+    },
+    {
+      "method": "GET",
+      "path": "students/{id}/communication_history",
+      "server_path": "/students/{student_id}/communication_history",
+      "response_class": "List<CommunicationHistoryItem>",
+      "role": "student",
+      "status": 403,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "POST",
+      "path": "students/register_and_enroll",
+      "server_path": "/students/register_and_enroll",
+      "response_class": "RegisterResponse",
+      "role": "admin",
+      "status": 422,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "POST",
+      "path": "grades/submit",
+      "server_path": "/grades/submit",
+      "response_class": "SimpleResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "SimpleResponse"
+    },
+    {
+      "method": "GET",
+      "path": "admin/teachers/{id}/credentials",
+      "server_path": "/admin/teachers/{id}/credentials",
+      "response_class": "TeacherCredentialsResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "TeacherCredentialsResponse"
+    },
+    {
+      "method": "POST",
+      "path": "admin/teachers/{id}/credentials/reset_password",
+      "server_path": "/admin/teachers/{id}/credentials/reset_password",
+      "response_class": "ResetPasswordResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "ResetPasswordResponse"
+    },
+    {
+      "method": "PUT",
+      "path": "admin/teachers/{id}/credentials",
+      "server_path": "/admin/teachers/{id}/credentials",
+      "response_class": "SimpleResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "SimpleResponse"
+    },
+    {
+      "method": "GET",
+      "path": "teachers/{id}/classes",
+      "server_path": "/teachers/{teacher_id}/classes",
+      "response_class": "List<TeacherClassItem>",
+      "role": "teacher",
+      "status": 200,
+      "issues": [],
+      "model": "TeacherClassItem"
+    },
+    {
+      "method": "GET",
+      "path": "teachers/{id}/incomplete_classes",
+      "server_path": "/teachers/{teacher_id}/incomplete_classes",
+      "response_class": "List<TeacherClassItem>",
+      "role": "teacher",
+      "status": 200,
+      "issues": [
+        {
+          "field": "students_preview",
+          "kind": "missing-list",
+          "detail": "کلید لیست در پاسخ نیست؛ UI آن را خالی می‌بیند",
+          "line": 30
+        }
+      ],
+      "model": "TeacherClassItem"
+    },
+    {
+      "method": "GET",
+      "path": "teachers/{teacher_id}/pending_classes",
+      "server_path": "/teachers/{teacher_id}/pending_classes",
+      "response_class": "List<TeacherPendingClassItem>",
+      "role": "teacher",
+      "status": 200,
+      "issues": [],
+      "model": "TeacherPendingClassItem"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/teachers/{teacher_id}/suspend",
+      "server_path": "/admin/teachers/{teacher_id}/suspend",
+      "response_class": "SuspendResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "SuspendResponse"
+    },
+    {
+      "method": "DELETE",
+      "path": "/admin/teachers/{teacher_id}",
+      "server_path": "/admin/teachers/{teacher_id}",
+      "response_class": "SimpleResponse",
+      "role": "admin",
+      "status": 400,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "POST",
+      "path": "teachers/{teacher_id}/settlements/{settlement_id}/reverse",
+      "server_path": "/teachers/{teacher_id}/settlements/{settlement_id}/reverse",
+      "response_class": "SimpleResponse",
+      "role": "teacher",
+      "status": 403,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "PUT",
+      "path": "teachers/{teacher_id}/settlements/{settlement_id}/edit",
+      "server_path": "/teachers/{teacher_id}/settlements/{settlement_id}/edit",
+      "response_class": "SimpleResponse",
+      "role": "teacher",
+      "status": 403,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "POST",
+      "path": "teachers/register",
+      "server_path": "/teachers/register",
+      "response_class": "RegisterResponse",
+      "role": "teacher",
+      "status": 422,
+      "issues": [],
+      "route_non_success": true
+    },
+    {
+      "method": "GET",
+      "path": "teachers/{id}/today_summary",
+      "server_path": "/teachers/{id}/today_summary",
+      "response_class": "TeacherTodaySummary",
+      "role": "teacher",
+      "status": 200,
+      "issues": [],
+      "model": "TeacherTodaySummary"
+    },
+    {
+      "method": "GET",
+      "path": "admin/today_summary",
+      "server_path": "/admin/today_summary",
+      "response_class": "AdminTodaySummary",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "AdminTodaySummary"
+    },
+    {
+      "method": "GET",
+      "path": "admin/transactions/list",
+      "server_path": "/admin/transactions/list",
+      "response_class": "List<TransactionFullItem>",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "TransactionFullItem"
+    },
+    {
+      "method": "DELETE",
+      "path": "admin/transactions/{id}",
+      "server_path": "/admin/transactions/{id}",
+      "response_class": "SimpleResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "SimpleResponse"
+    },
+    {
+      "method": "PUT",
+      "path": "admin/transactions/{id}",
+      "server_path": "/admin/transactions/{id}",
+      "response_class": "SimpleResponse",
+      "role": "admin",
+      "status": 200,
+      "issues": [],
+      "model": "SimpleResponse"
+    }
+  ],
+  "counts": {
+    "dynamic": 1,
+    "unmatched": 0,
+    "route_non_success": 49,
+    "parse": 0,
+    "npe": 6,
+    "silent_zero": 0,
+    "missing_key": 1
+  }
+}

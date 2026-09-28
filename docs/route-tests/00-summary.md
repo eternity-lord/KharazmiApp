@@ -9,11 +9,13 @@
 | کل routeهای inventory | 221 | از `docs/app-map/server-routes.csv` |
 | route دارای registry تست | 221 | meta-test اجباری است و missing route را fail می‌کند |
 | route با functional assertion مقداری در این نوبت | 29 | finance: 11؛ attendance: 10؛ classes: 8 route با read، state و Excel |
-| route functional باقی‌مانده | 192 | finance، attendance و classes از inventory عبور کرده‌اند؛ routerهای بعدی هنوز در انتظارند |
+| route از همین سه router بدون assertion مستقل | 33 | فهرست کامل و دلیل هر مورد در `blockers.md` آمده است؛ sweep جای assertion کسب‌وکار را نگرفته است |
+| route functional باقی‌ماندهٔ سایر routerها | 192 | سه router اول بستهٔ صادقانه دارند؛ routerهای بعدی هنوز در انتظارند |
 | router پردازش‌شده | 3 | finance، attendance و classes، ممیزی اولیه |
-| تست‌های pass | 44 | آخرین اجرای `pytest tests/route_audit -q`؛ ۴۸ تست جمعاً، ۴ مورد strict xfail |
-| تست‌های strict xfail | 4 | O-02، O-12، O-14، O-19 |
-| باگ‌های ثبت‌شده | 4 | همان چهار مورد شناخته‌شده؛ باگ جدید finance ثبت نشد |
+| تست‌های pass | 48 | آخرین اجرای `pytest tests/route_audit -q` |
+| تست‌های strict xfail | 8 | 4 مورد قبلی O-02/O-12/O-14/O-19 + 4 مورد `RA-sweep-01..04` |
+| باگ‌های sweep contract | 4 entry | `RA-sweep-01` تا `RA-sweep-04`؛ 6 NPE issue instance و 1 missing-list instance |
+| باگ‌های status 500 در sweep | 0 | در 221 اجرای معتبر و 220 payload نامعتبر، status 500 مشاهده نشد |
 
 ## پوشش این نوبت
 
@@ -26,10 +28,47 @@
 - پاسخ خالی installments به‌صورت `[]` بررسی شد.
 - dynamic URL، امنیت token و نفوذ خارج از scope باقی ماندند.
 
+## نتیجهٔ صریح برای ۶۲ route سه router اول
+
+| آزمون/موضوع | نتیجهٔ عددی | تفسیر |
+|---|---:|---|
+| payload نامعتبر تولیدشده از OpenAPI | 220 route دارای body/parameter؛ 0 status 500 | sweep در `report.json` ثبت شده؛ assertion معنایی هر route هنوز فقط در 29 route است |
+| retry پرداخت/قسط | 1 سناریوی صریح، `/finance/installments/{id}/pay` | retry دوم 400 و transaction دوم ساخته نشد؛ retry `/finance/pay` هنوز blocker است |
+| retry شارژ جلسه | 0 سناریوی صریح | `submit_session` در blockers است؛ sweep فقط status/shape را اجرا کرد |
+| retry تسویهٔ معلم | 0 سناریوی صریح | route settlement در این سه router assertion مستقل ندارد |
+| تعارض شروع جلسهٔ زنده | 1 | شروع دوبارهٔ live، 409 و بدون جلسهٔ دوم |
+| تعارض پایان/لغو جلسه | 1 replay cancel | cancel دوباره idempotent است؛ پایان دوباره در blockers است |
+| truncation/limit لیست | 0 assertion عمیق | seed حجیم ساخته می‌شود اما حد/ترتیب لیست‌ها هنوز تست نشده است |
+| تومان/ریال | 0 assertion قطعی | Q-003 باز است؛ فقط متن source/مبلغ عددی بررسی شده و تبدیل حدس زده نشده است |
+| باگ جدید server/financial در 29 route | 0 | تست‌های مقداری finance/attendance/classes و oracle مستقل سبز بودند |
+| باگ contract در همین scope sweep | 1 entry مستقیم classes (`RA-sweep-01`) | response bulk approve کلید `message` مورد انتظار Android را ندارد؛ در `bugs.md` ثبت و xfail شده است |
+
+## جاروب ۲۲۱ route و ۱۵۱ تماس Retrofit
+
+جزئیات کامل در [`sweep-report.md`](sweep-report.md) و artifactهای `tests/route_audit/sweep/` است:
+
+- route smoke: **221/221**؛ status 500 برابر **0**؛ پاسخ‌های non-JSON مورد انتظار **13**.
+- invalid OpenAPI probes: **220/220 target**؛ status 500 برابر **0**.
+- empty probes: **11**؛ list=`null` برابر **0**.
+- Retrofit contract: **151 unique call**، dynamic=`1`، unmatched=`0`.
+- contract issueها: parse/overflow=`0`، NPE بالقوه=`6` issue instance، missing-list=`1`، silent-zero=`0`؛ چهار entry به `RA-sweep-01..04` تبدیل شدند.
+
+## سؤال‌های باز
+
+تعداد سؤال‌ها: **5**. متن کوتاه هرکدام:
+
+1. **Q-001:** «درآمد» وصول نقدی است، تعهد شهریه است، یا هر دو با نام جدا؟
+2. **Q-002:** برای `target_wallet=both` کل receipt در statement بیاید یا سهم‌های explicit؟
+3. **Q-003:** واحد مبلغ تومان است، ریال است، یا ذخیره بدون تبدیل با label مستقل؟
+4. **Q-004:** پرداخت بی‌تاریخ خارج از بازه باشد، سبد بی‌تاریخ داشته باشد، یا رد شود؟
+5. **Q-005:** restore کلاس metadata-only، full ledger، یا فقط با snapshot ledger باشد؟
+
+جزئیات گزینه‌ها در `questions.md` است.
+
 ## موارد ناتمام
 
-- ۲۱۰ route functional هنوز باید طبق ترتیب `progress.md` تکمیل شوند.
-- exports هنوز به openpyxl/PDF value audit نشده است.
+- ۱۹۲ route functional سایر routerها هنوز باید طبق ترتیب `progress.md` تکمیل شوند.
+- ۳۳ route سه router اول در `blockers.md` assertion مستقل ندارند.
+- exports هنوز به openpyxl/PDF value audit عمیق نشده است؛ sweep فقط response/shape را ثبت کرده است.
 - device checklist عددهای screenهای مهم را دارد، اما اجرای گوشی/compile انجام نشده است.
-- تصمیم‌های Q-001 تا Q-005 باید از صاحب محصول گرفته شوند.
-- CI remote در این turn اجرا نشده؛ اجرای محلی route-audit ثبت‌شده است.
+- CI remote در این turn هنوز اجرا نشده؛ اجرای محلی route-audit و sweep ثبت شده است.

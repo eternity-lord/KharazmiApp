@@ -6,7 +6,7 @@
 |---|---|---:|---|---|---|
 | `POST /finance/debtors/remind` | handler `routers.finance.remind_debtors`؛ منبع `Kharazmi_Server/routers/finance.py:2576` | 0 | inventory/fixture | مسدود: تست رفتاری این route در نوبت router آن نوشته می‌شود | — |
 | `GET /finance/installments` | handler `routers.finance.get_all_installments`؛ منبع `Kharazmi_Server/routers/finance.py:1588` | 1 | success,value,oracle | سبزِ اولیه | — |
-| `POST /finance/installments` | handler `routers.finance.create_installment`؛ منبع `Kharazmi_Server/routers/finance.py:1646` | 1 | success,value,oracle | سبزِ اولیه | — |
+| `POST /finance/installments` | handler `routers.finance.create_installment`؛ منبع `Kharazmi_Server/routers/finance.py:1646` | 0 | inventory/fixture | مسدود: تست رفتاری این route در نوبت تکمیل finance نوشته می‌شود | — |
 | `DELETE /finance/installments/{installment_id}` | handler `routers.finance.delete_installment`؛ منبع `Kharazmi_Server/routers/finance.py:1764` | 0 | inventory/fixture | مسدود: تست رفتاری این route در نوبت router آن نوشته می‌شود | — |
 | `PUT /finance/installments/{installment_id}` | handler `routers.finance.update_installment`؛ منبع `Kharazmi_Server/routers/finance.py:1698` | 0 | inventory/fixture | مسدود: تست رفتاری این route در نوبت router آن نوشته می‌شود | — |
 | `POST /finance/installments/{installment_id}/pay` | handler `routers.finance.pay_installment_manually`؛ منبع `Kharazmi_Server/routers/finance.py:1809` | 1 | success,value,DB,oracle,idempotency | سبزِ اولیه | — |

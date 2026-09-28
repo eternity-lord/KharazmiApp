@@ -34,8 +34,8 @@
 ## آخرین اجرای ثبت‌شده
 
 ```text
-command: /tmp/route-audit-venv/bin/python -m pytest tests/route_audit -q
-result: 36 passed, 4 xfailed
+route sweep: 221 route؛ status 500=0؛ invalid-target=220؛ invalid status 500=0
+Retrofit contract: 151 unique؛ dynamic=1؛ unmatched=0؛ RA-sweep=4 entry
 ```
 
-این عدد به معنی ممیزی کامل رفتاری ۲۲۱ route نیست: registry همهٔ routeها را اجباری کرده، اما routeهای غیر finance/attendance/classes در docs به‌صورت «مسدود/در انتظار نوبت router» ثبت شده‌اند.
+این sweep جای ممیزی عمیق را نمی‌گیرد: registry همهٔ routeها را اجباری کرده، اما ۳۳ route از finance/attendance/classes در blockers با دلیل صریح بسته شده‌اند و ۱۹۲ route سایر routerها در انتظار نوبت هستند.

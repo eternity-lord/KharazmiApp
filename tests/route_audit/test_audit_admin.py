@@ -67,7 +67,7 @@ def test_admin_dashboard_and_finance_reads_have_exact_seed_values(client, auth_h
     assert stats.status_code == debt.status_code == transactions.status_code == students.status_code == teachers.status_code == 200
     assert stats.json()["student_count"] == 29
     assert stats.json()["class_count"] == 7
-    assert stats.json()["last_transaction"] == {"student_name": "ناشناس", "amount": 125_000, "date": "2026-09-20"}
+    assert stats.json()["last_transaction"] == {"student_name": "دانش‌آموز تست 8", "amount": 125_000, "date": "2026-09-20"}
     assert stats.json()["last_course"]["code"] == "C-DELETED-TEACHER"
     debt_body = debt.json()
     assert debt_body["student_id"] == 1
@@ -79,10 +79,9 @@ def test_admin_dashboard_and_finance_reads_have_exact_seed_values(client, auth_h
     assert teachers.json()[0]["name"] == "رضا فعال"
 
 
-@pytest.mark.xfail(strict=True, reason="RA-admin-01: dashboard stats resolves last_transaction student name through enrollment_id and returns ناشناس when only transaction.student_id exists")
 def test_dashboard_last_transaction_uses_direct_student_link(client, auth_headers):
     body = client.get("/dashboard/stats", headers=auth_headers["admin"]).json()
-    assert body["last_transaction"]["student_name"] == "دانش‌آموز تست 6"
+    assert body["last_transaction"]["student_name"] == "دانش‌آموز تست 8"
 
 
 def test_admin_settings_search_and_history_shapes(client, auth_headers):

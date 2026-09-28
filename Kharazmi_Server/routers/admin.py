@@ -62,11 +62,18 @@ def get_dashboard_stats(db: Session = Depends(get_db), _: str = Depends(check_ad
             .filter(Enrollment.id == last_trans.enrollment_id)
             .first()
         )
-        student_name = "ناشناس"
+        student = None
         if enrollment:
-            st = db.query(Student).filter(Student.id == enrollment.student_id).first()
-            if st:
-                student_name = f"{st.first_name} {st.last_name}"
+            student = db.query(Student).filter(
+                Student.id == enrollment.student_id, Student.is_deleted == False
+            ).first()
+        # Legacy receipts can retain student_id without an enrollment_id; the
+        # direct link is authoritative for the dashboard in that case.
+        if student is None and last_trans.student_id is not None:
+            student = db.query(Student).filter(
+                Student.id == last_trans.student_id, Student.is_deleted == False
+            ).first()
+        student_name = f"{student.first_name} {student.last_name}" if student else "ناشناس"
         last_trans_data = {
             "student_name": student_name,
             "amount": last_trans.amount,

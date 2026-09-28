@@ -194,3 +194,20 @@ def test_session_charge_uses_the_declared_teacher_share_value(client, auth_heade
         student = db.get(models.Student, 1)
         student.wallet_teacher, student.wallet_institute, student.wallet_balance = before_wallet
         db.commit()
+
+
+
+def test_deleting_a_settled_session_is_a_conflict_without_side_effects(client, auth_headers, db):
+    """Independent oracle: billed session 5001 must remain active and return HTTP 409."""
+    import models
+
+    before_attendance = db.query(models.Attendance).filter(models.Attendance.session_id == 1).count()
+    before_session_transactions = {row.id for row in db.query(models.Transaction).filter(models.Transaction.session_id == 1).all()}
+    response = client.delete("/attendance/session/5001", headers=auth_headers["admin"])
+    assert response.status_code == 409, response.text
+    db.expire_all()
+    session = db.query(models.SessionLog).filter(models.SessionLog.session_code == 5001).one()
+    assert session.is_deleted is False
+    assert db.query(models.Attendance).filter(models.Attendance.session_id == session.id).count() == before_attendance
+    assert {row.id for row in db.query(models.Transaction).filter(models.Transaction.session_id == session.id).all()} == before_session_transactions
+    assert db.query(models.Attendance).filter(models.Attendance.session_id == session.id, models.Attendance.is_billed == True).count() == 2

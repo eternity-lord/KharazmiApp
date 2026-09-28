@@ -209,21 +209,4 @@
     <color name="ds_ripple_neutral">#22FFFFFF</color>
     <color name="ds_scrim">#99000000</color>
 
-    <!-- Shared semantic component tokens. Keeping these in the palette prevents missing
-         references and gives legacy and DS widgets the same day/night contrast rules. -->
-    <color name="gold_button_text">@color/text_on_gold</color>
-    <color name="ds_button_danger_bg">@color/ds_danger_deep</color>
-    <color name="ds_button_danger_text">@color/white</color>
-    <color name="ds_card_stroke">@color/ds_border</color>
-    <color name="ds_card_stroke_success">@color/ds_success</color>
-    <color name="ds_card_stroke_warning">@color/ds_warning</color>
-    <color name="ds_card_stroke_danger">@color/ds_danger</color>
-    <color name="ds_card_stroke_info">@color/ds_info</color>
-    <color name="ds_chip_bg">@color/ds_bg_surface_3</color>
-    <color name="ds_chip_stroke">@color/ds_border_strong</color>
-    <color name="ds_chip_text">@color/ds_text_primary</color>
-    <color name="ds_input_stroke">@color/ds_border_strong</color>
-    <color name="ds_switch_track">@color/ds_border_strong</color>
-    <color name="ds_switch_thumb">@color/ds_accent</color>
-
 </resources>

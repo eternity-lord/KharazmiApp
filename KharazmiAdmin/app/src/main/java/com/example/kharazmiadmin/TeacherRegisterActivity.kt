@@ -72,7 +72,11 @@ class TeacherRegisterActivity : BaseActivity() {
                 .setMinYear(1300)
                 .setMaxYear(PersianCalendar().persianYear)
                 .setInitDate(1365, 1, 1)
-                .setActionTextColor(Color.GRAY)
+                .setActionTextColor(UiColors.resolve(this@TeacherRegisterActivity, R.color.ds_accent))
+                // The library is light by default; these tokens keep Jalali numbers readable in dark mode.
+                .setBackgroundColor(UiColors.resolve(this@TeacherRegisterActivity, R.color.ds_bg_surface))
+                .setPickerBackgroundColor(UiColors.resolve(this@TeacherRegisterActivity, R.color.ds_bg_surface_2))
+                .setTitleColor(UiColors.resolve(this@TeacherRegisterActivity, R.color.ds_text_primary))
                 .setTitleType(PersianDatePickerDialog.WEEKDAY_DAY_MONTH_YEAR)
                 .setShowInBottomSheet(true)
                 .setListener(object : ir.hamsaa.persiandatepicker.Listener {

@@ -24,7 +24,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import android.widget.Button
-import android.graphics.Color
 import android.content.res.ColorStateList
 
 class ClassManagementActivity : BaseActivity() {
@@ -126,6 +125,37 @@ class ClassManagementActivity : BaseActivity() {
         }
     }
 
+    // صف تأیید ادمین: تصمیم گروهی با علت رد قابل audit است.
+    private fun bulkApprove(courseIds: List<Int>) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            RetrofitClient.getInstance(this@ClassManagementActivity).create(ClassApi::class.java)
+                .bulkApprove(BulkClassDecisionRequest(courseIds))
+            withContext(Dispatchers.Main) { fetchClasses() }
+        }
+    }
+
+    private fun bulkReject(courseIds: List<Int>, rejectionReason: String) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            RetrofitClient.getInstance(this@ClassManagementActivity).create(ClassApi::class.java)
+                .bulkReject(BulkClassDecisionRequest(courseIds, rejectionReason))
+            withContext(Dispatchers.Main) { fetchClasses() }
+        }
+    }
+
+    // ویرایش زمان‌بندی/ظرفیت/انتقال معلم فقط از endpoint ادمین و با guardهای سرور.
+    private fun updateClass(courseId: Int, request: AdminClassUpdateRequest) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                RetrofitClient.getInstance(this@ClassManagementActivity).create(ClassApi::class.java)
+                    .updateClass(courseId, request)
+                withContext(Dispatchers.Main) { fetchClasses() }
+            } catch (error: Exception) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                withContext(Dispatchers.Main) { Toast.makeText(this@ClassManagementActivity, "ویرایش کلاس انجام نشد", Toast.LENGTH_SHORT).show() }
+            }
+        }
+    }
+
     private fun filterList(query: String) {
         if (!::adapter.isInitialized) return
 
@@ -194,7 +224,6 @@ class ClassManagementActivity : BaseActivity() {
             val tvGender: Chip = view.findViewById(R.id.chipGender)
             val tvSessionCount: Chip = view.findViewById(R.id.chipSessionCount)
             val llStudentPreview: LinearLayout = view.findViewById(R.id.ll_student_preview)
-            val tvTotalDebt: TextView = view.findViewById(R.id.tvTotalDebt)
             val tvTeacherDebt: TextView = view.findViewById(R.id.tvTeacherDebt)
             val tvInstituteDebt: TextView = view.findViewById(R.id.tvInstituteDebt)
             val btnRegisterInvoice: Button = view.findViewById(R.id.btnRegisterInvoice)
@@ -221,7 +250,10 @@ class ClassManagementActivity : BaseActivity() {
             holder.tvTitle.text = item.title
             holder.tvCode.text = getString(R.string.cmgmt_code_row, item.code)
             holder.tvGradeLevel.text = item.grade_level
-            holder.tvGender.text = item.gender
+            // سیستم برای کلاس جنسیت ثبت نمی‌کند؛ فقط چیپ همین بنر ادمین مخفی می‌شود.
+            // مدل/endpoint مشترک دست‌نخورده می‌ماند تا پنل معلم رفتار ناخواسته نگیرد.
+            holder.tvGender.text = ""
+            holder.tvGender.visibility = View.GONE
             holder.tvSessionCount.text = getString(R.string.cmgmt_sessions_row, item.session_count)
 
             // اعمال رنگ پس‌زمینه کارت کلاس بر اساس bg_color ثبت شده
@@ -264,7 +296,7 @@ class ClassManagementActivity : BaseActivity() {
                     val tv = TextView(holder.itemView.context)
                     tv.text = getString(R.string.common_bullet_row, name)
                     tv.textSize = 12f
-                    tv.setTextColor(android.graphics.Color.parseColor("#424242"))
+                    tv.setTextColor(UiColors.resolve(holder.itemView.context, R.color.text_primary))
                     tv.setPadding(0, 4, 0, 4)
                     tv.isClickable = true
                     tv.setOnClickListener {
@@ -276,7 +308,7 @@ class ClassManagementActivity : BaseActivity() {
                 val tv = TextView(holder.itemView.context)
                 tv.text = getString(R.string.cmgmt_no_students)
                 tv.textSize = 10f
-                tv.setTextColor(android.graphics.Color.GRAY)
+                tv.setTextColor(UiColors.resolve(holder.itemView.context, R.color.text_secondary))
                 holder.llStudentPreview.addView(tv)
             }
 
@@ -293,7 +325,6 @@ class ClassManagementActivity : BaseActivity() {
                 holder.llTopStudents.visibility = View.GONE
             }
 
-            holder.tvTotalDebt.text = String.format("%,d", item.total_debt)
             holder.tvTeacherDebt.text = String.format("%,d", item.debt_to_teacher)
             holder.tvInstituteDebt.text = String.format("%,d", item.debt_to_institute)
 
@@ -302,11 +333,11 @@ class ClassManagementActivity : BaseActivity() {
                 holder.btnSuspend.visibility = View.VISIBLE
                 if (item.is_suspended) {
                     holder.itemView.alpha = 0.5f
-                    holder.btnSuspend.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#4CAF50"))
+                    holder.btnSuspend.backgroundTintList = ColorStateList.valueOf(UiColors.resolve(holder.itemView.context, R.color.status_success))
                     holder.btnSuspend.text = getString(R.string.cmgmt_activate)
                 } else {
                     holder.itemView.alpha = 1.0f
-                    holder.btnSuspend.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#FF9800"))
+                    holder.btnSuspend.backgroundTintList = ColorStateList.valueOf(UiColors.resolve(holder.itemView.context, R.color.status_warning))
                     holder.btnSuspend.text = getString(R.string.cmgmt_suspend)
                 }
 

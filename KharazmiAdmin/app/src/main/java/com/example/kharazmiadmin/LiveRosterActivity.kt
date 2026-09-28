@@ -134,15 +134,15 @@ class LiveRosterAdapter(
         when (item.status) {
             "Present", "Late" -> {
                 holder.status.text = if (item.status == "Late") holder.itemView.context.getString(R.string.lrost_late) else holder.itemView.context.getString(R.string.lrost_present)
-                holder.status.setTextColor(android.graphics.Color.parseColor("#2E7D32"))
+                holder.status.setTextColor(UiColors.resolve(holder.itemView.context, R.color.status_success))
             }
             "Absent" -> {
                 holder.status.text = if (item.excused) holder.itemView.context.getString(R.string.lrost_excused) else holder.itemView.context.getString(R.string.lrost_absent)
-                holder.status.setTextColor(android.graphics.Color.parseColor("#C62828"))
+                holder.status.setTextColor(UiColors.resolve(holder.itemView.context, R.color.status_danger))
             }
             else -> {
                 holder.status.text = holder.itemView.context.getString(R.string.lrost_unknown)
-                holder.status.setTextColor(android.graphics.Color.parseColor("#F57F17"))
+                holder.status.setTextColor(UiColors.resolve(holder.itemView.context, R.color.status_warning))
             }
         }
 

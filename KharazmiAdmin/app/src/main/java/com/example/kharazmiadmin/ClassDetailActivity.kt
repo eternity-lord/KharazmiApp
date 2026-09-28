@@ -37,9 +37,24 @@ data class FullClassReport(
 data class ClassReportInfo(
     val title: String, val code: String, val teacher_name: String,
     val session_count: Int, val total_students: Int,
-    val total_revenue: Long, val total_debt: Long
+    val total_revenue: Long, val total_debt: Long,
+    val debt_to_teacher: Long = 0,
+    val debt_to_institute: Long = 0
 )
-data class ClassStudentData(val name: String, val mobile: String, val paid: Long, val debt: Long)
+data class ClassStudentData(
+    val name: String,
+    val mobile: String,
+    val paid: Long,
+    val debt: Long,
+    val debt_to_teacher: Long = 0,
+    val debt_to_institute: Long = 0,
+    val enrollment_id: Int? = null,
+    val course_id: Int? = null,
+    val course_title: String? = null,
+    val teacher_id: Int? = null,
+    val teacher_name: String? = null,
+    val is_unassigned: Boolean = false
+)
 data class ClassSessionHistory(val date: String, val present_count: Int, val absent_count: Int)
 
 // مدل‌های جدید برای تاریخچه حضور و غیاب دانش‌آموز
@@ -84,6 +99,8 @@ data class StudentFullItem(
     val debt: Long,
     val debt_teacher: Long,
     val debt_institute: Long,
+    val paid_teacher: Long = 0,
+    val paid_institute: Long = 0,
     val wallet_teacher: Long? = 0,
     val wallet_institute: Long? = 0,
     val student_code: Int? = null,
@@ -130,11 +147,28 @@ interface ClassDetailActionsApi {
 
     @PUT("classes/update_info/{course_id}")
     suspend fun updateClassInfo(@Path("course_id") courseId: Int, @Body data: ClassUpdateInfo): SimpleResponse
+
+    @PUT("classes/update")
+    suspend fun updateClass(@Query("course_id") courseId: Int, @Body data: AdminClassUpdateRequest): SimpleResponse
 }
 
 data class ClassUpdateInfo(val title: String, val grade_level: String? = null)
 
 class ClassDetailActivity : BaseActivity() {
+
+    // تغییرات حساس کلاس از یک مسیر ادمین‌محور و قابل audit عبور می‌کند.
+    private fun updateClass(request: AdminClassUpdateRequest) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                RetrofitClient.getInstance(this@ClassDetailActivity).create(ClassDetailActionsApi::class.java)
+                    .updateClass(classId, request)
+                withContext(Dispatchers.Main) { Toast.makeText(this@ClassDetailActivity, "کلاس به‌روزرسانی شد", Toast.LENGTH_SHORT).show() }
+            } catch (error: Exception) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                withContext(Dispatchers.Main) { Toast.makeText(this@ClassDetailActivity, "ویرایش کلاس انجام نشد", Toast.LENGTH_SHORT).show() }
+            }
+        }
+    }
 
     private var classId: Int = -1
     private var reportData: FullClassReport? = null
@@ -255,7 +289,7 @@ class ClassDetailActivity : BaseActivity() {
                     student.student_name,
                     String.format("%,d", student.total_tuition),
                     String.format("%,d", student.paid),
-                    String.format("%,d", student.debt_teacher + student.debt_institute),
+                    String.format("%,d", student.debt),
                     "${String.format("%.1f", student.attendance_rate)}%"
                 )
             }
@@ -370,8 +404,8 @@ class ClassDetailActivity : BaseActivity() {
             .create()
 
         dialog.show()
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(android.graphics.Color.parseColor("#4CAF50"))
-        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(android.graphics.Color.parseColor("#F44336"))
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(UiColors.resolve(this@ClassDetailActivity, R.color.status_success))
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(UiColors.resolve(this@ClassDetailActivity, R.color.status_danger))
     }
 
     private fun performDeleteClass(subRole: String, forgive: Boolean) {
@@ -480,22 +514,19 @@ class ClassDetailActivity : BaseActivity() {
                 sb.append(getString(R.string.cdetail_info_sessions, data.info.session_count))
                 sb.append(getString(R.string.cdetail_info_students, data.info.total_students))
                 sb.append(getString(R.string.cdetail_info_revenue, String.format("%,d", data.info.total_revenue)))
-                sb.append(getString(R.string.cdetail_info_debt, String.format("%,d", data.info.total_debt)))
+                sb.append(getString(R.string.cdetail_info_debt_teacher, String.format("%,d", data.info.debt_to_teacher)))
+                sb.append(getString(R.string.cdetail_info_debt_institute, String.format("%,d", data.info.debt_to_institute)))
 
-                // پایش محاسباتی تفکیک مالی سهم مربی و آموزشگاه (به درخواست کارفرما)
+                // پرداخت‌ها نیز از همان enrollmentهای کلاس جمع می‌شوند؛ کیف کلی دانش‌آموز
+                // عمداً در گزارش کلاس وارد نمی‌شود.
                 studentsFullData?.let { fullData ->
-                    val totalDebtTeacher = fullData.students.sumOf { it.debt_teacher }
-                    val totalDebtInstitute = fullData.students.sumOf { it.debt_institute }
-                    
-                    val totalPaidTeacher = fullData.students.sumOf { if ((it.wallet_teacher ?: 0L) > 0) it.wallet_teacher ?: 0L else 0L }
-                    val totalPaidInstitute = fullData.students.sumOf { if ((it.wallet_institute ?: 0L) > 0) it.wallet_institute ?: 0L else 0L }
+                    val totalPaidTeacher = fullData.students.sumOf { it.paid_teacher }
+                    val totalPaidInstitute = fullData.students.sumOf { it.paid_institute }
                     
                     sb.append("\n===========================\n")
                     sb.append(getString(R.string.cdetail_fin_teacher_title))
-                    sb.append(getString(R.string.cdetail_fin_teacher_debt, String.format("%,d", totalDebtTeacher)))
                     sb.append(getString(R.string.cdetail_fin_teacher_paid, String.format("%,d", totalPaidTeacher)))
                     sb.append(getString(R.string.cdetail_fin_inst_title))
-                    sb.append(getString(R.string.cdetail_fin_inst_debt, String.format("%,d", totalDebtInstitute)))
                     sb.append(getString(R.string.cdetail_fin_inst_paid, String.format("%,d", totalPaidInstitute)))
                 }
 
@@ -511,6 +542,7 @@ class ClassDetailActivity : BaseActivity() {
             1 -> { // لیست دانش‌آموزان
                 scrollView.visibility = View.GONE
                 tabContainer.visibility = View.VISIBLE
+                rvStudents.visibility = View.VISIBLE
 
                 // Update students list with full data including attendance
                 if (studentsFullData != null) {
@@ -616,7 +648,9 @@ class ClassDetailActivity : BaseActivity() {
                     student_id = student.student_id,
                     student_name = student.student_name,
                     debt = student.debt,
-                    enrollment_id = student.enrollment_id
+                    enrollment_id = student.enrollment_id,
+                    debt_teacher = student.debt_teacher,
+                    debt_institute = student.debt_institute
                 )
             }
             if (studentItems.isEmpty()) {
@@ -721,7 +755,7 @@ class ClassStudentAdapter(
 
         // Try to get full student data if available
         val activity = holder.itemView.context as? ClassDetailActivity
-        val fullStudent = activity?.studentsFullData?.students?.find { it.student_id == student.student_id }
+        val fullStudent = activity?.studentsFullData?.students?.find { it.enrollment_id == student.enrollment_id }
 
         if (fullStudent != null) {
             val dType = fullStudent.discount_type ?: "none"
@@ -742,38 +776,49 @@ class ClassStudentAdapter(
             holder.tvStudentPaid.text = holder.itemView.context.getString(R.string.cdetail_att_pct, String.format("%.1f", fullStudent.attendance_rate))
             holder.tvStudentPaid.visibility = View.VISIBLE
 
-            // Show detailed debt information
-            val totalDebt = fullStudent.debt_teacher + fullStudent.debt_institute
-            if (totalDebt > 0) {
-                val breakdown = holder.itemView.context.getString(R.string.cdetail_debt_break, String.format("%,d", fullStudent.debt_teacher), String.format("%,d", fullStudent.debt_institute))
-                holder.tvStudentDebt.text = holder.itemView.context.getString(R.string.cdetail_debt_total, String.format("%,d", totalDebt), breakdown)
+            // فقط دو سهم همین enrollment را نشان بده؛ «بدهی کل» عمداً حذف شده است.
+            val hasDebt = fullStudent.debt_teacher > 0 || fullStudent.debt_institute > 0
+            if (hasDebt) {
+                holder.tvStudentDebt.text = holder.itemView.context.getString(
+                    R.string.cdetail_debt_split,
+                    String.format("%,d", fullStudent.debt_teacher),
+                    String.format("%,d", fullStudent.debt_institute)
+                )
                 holder.tvStudentStatus.text = holder.itemView.context.getString(R.string.cdetail_unsettled)
-                holder.tvStudentStatus.setTextColor(android.graphics.Color.parseColor("#D32F2F")) // Red
+                holder.tvStudentStatus.setTextColor(UiColors.resolve(holder.itemView.context, R.color.status_danger)) // Red
             } else {
-                holder.tvStudentDebt.text = holder.itemView.context.getString(R.string.cdetail_no_debt)
+                holder.tvStudentDebt.text = holder.itemView.context.getString(
+                    R.string.cdetail_debt_split, "0", "0"
+                )
                 holder.tvStudentStatus.text = holder.itemView.context.getString(R.string.cdetail_settled)
-                holder.tvStudentStatus.setTextColor(android.graphics.Color.parseColor("#388E3C")) // Green
+                holder.tvStudentStatus.setTextColor(UiColors.resolve(holder.itemView.context, R.color.status_success)) // Green
             }
 
             // Show suspension status if applicable
             if (fullStudent.is_suspended) {
                 holder.tvStudentStatus.text = holder.itemView.context.getString(R.string.cdetail_susp)
-                holder.tvStudentStatus.setTextColor(android.graphics.Color.parseColor("#FF9800")) // Orange
+                holder.tvStudentStatus.setTextColor(UiColors.resolve(holder.itemView.context, R.color.status_warning)) // Orange
             }
         } else {
             // Fallback to basic info
             holder.tvStudentMobile.text = holder.itemView.context.getString(R.string.cdetail_sid_row, student.student_id)
 
-            // Show debt information
-            if (student.debt > 0) {
-                holder.tvStudentDebt.text = holder.itemView.context.getString(R.string.cdetail_debt_row, String.format("%,d", student.debt))
-                holder.tvStudentStatus.text = holder.itemView.context.getString(R.string.cdetail_unsettled)
-                holder.tvStudentStatus.setTextColor(android.graphics.Color.parseColor("#D32F2F")) // Red
-            } else {
-                holder.tvStudentDebt.text = holder.itemView.context.getString(R.string.cdetail_no_debt)
-                holder.tvStudentStatus.text = holder.itemView.context.getString(R.string.cdetail_settled)
-                holder.tvStudentStatus.setTextColor(android.graphics.Color.parseColor("#388E3C")) // Green
-            }
+            // Fallback هم باید همان دو سهم را نشان دهد، نه بدهی کل.
+            val hasDebt = student.debt_teacher > 0 || student.debt_institute > 0
+            holder.tvStudentDebt.text = holder.itemView.context.getString(
+                R.string.cdetail_debt_split,
+                String.format("%,d", student.debt_teacher),
+                String.format("%,d", student.debt_institute)
+            )
+            holder.tvStudentStatus.text = holder.itemView.context.getString(
+                if (hasDebt) R.string.cdetail_unsettled else R.string.cdetail_settled
+            )
+            holder.tvStudentStatus.setTextColor(
+                UiColors.resolve(
+                    holder.itemView.context,
+                    if (hasDebt) R.color.status_danger else R.color.status_success
+                )
+            )
 
             // Hide paid info
             holder.tvStudentPaid.visibility = View.GONE

@@ -517,11 +517,11 @@ class TestDebtorsReportEnriched(Group2World):
         self.assertEqual(body["debtors_count"], 2)
         # گروه‌بندی بر اساس معلم
         teachers = {g["teacher_id"]: g for g in body["by_teacher"]}
-        self.assertEqual(teachers[51]["debt"], 600000, body["by_teacher"])
+        self.assertEqual(teachers[51]["debt"], 200000, body["by_teacher"])
         self.assertEqual(teachers[52]["debt"], 500000, body["by_teacher"])
         self.assertTrue(teachers[51]["teacher_name"].strip())
         self.assertEqual(teachers[51]["students_count"], 1)
-        # دسته‌بندی قدمت
+        # دسته‌بندی قدمت — total_debt student-level است و تغییر نمی‌کند.
         buckets = {b["bucket"]: b for b in body["by_age"]}
         self.assertEqual(buckets["over_30"]["debt"], 600000)
         self.assertEqual(buckets["no_payment"]["debt"], 500000)
@@ -576,11 +576,9 @@ class TestDebtorsReportEnriched(Group2World):
     def test_9h_legacy_wallet_only_debtor_reconciles_in_the_grouped_view(self):
         """دادهٔ legacy: بدهی فقط از کیف پول منفی (ثبت‌نام بدون شهریهٔ قیمت‌گذاری‌شده).
 
-        در این حالت `total_debt` از fallback کیف پول می‌آید ولی تفکیک «بدهی به کدام معلم»
-        از `calculate_enrollment_debt` (که برای ثبت‌نام بی‌قیمت صفر است) ⇒ جمع ستون معلم‌ها
-        با کل بدهی نمی‌خواند. قرارداد فیکس: اگر یک کلاس فعال/یک معلم باشد، بدهیِ کیف معلم
-        به همان معلم نسبت داده می‌شود؛ در غیر این صورت در `unassigned_debt` گزارش می‌شود تا
-        همیشه `sum(by_teacher.debt) + unassigned_debt == total_debt` برقرار بماند.
+        در این حالت `total_debt` از fallback کیف پول می‌آید، اما wallet کلی منبع بدهی
+        یک کلاس نیست. بنابراین مبلغ در `unassigned_debt` باقی می‌ماند، حتی با یک کلاس فعال؛
+        همیشه `sum(by_teacher.debt) + unassigned_debt == total_debt` برقرار می‌ماند.
         """
         cid = self.create_class(teacher_id=51, title="ریاضی")
         self.assertEqual(self.enroll(cid, 41, tuition=0, paid=0).status_code, 200,
@@ -590,8 +588,10 @@ class TestDebtorsReportEnriched(Group2World):
 
         body = self.client.get("/finance/reports/debtors_grouped", headers=hdr("tok-admin")).json()
         self.assertEqual(body["total_debt"], 100000, body)
-        self.assertEqual(sum(g["debt"] for g in body["by_teacher"]), 100000, body["by_teacher"])
-        self.assertEqual(body["unassigned_debt"], 0, body)
+        # wallet کلی دانش‌آموز بدهی کلاس نیست؛ حتی با یک کلاس فعال هم
+        # مبلغ بدون اتصال enrollment باید تخصیص‌نیافته بماند.
+        self.assertEqual(sum(g["debt"] for g in body["by_teacher"]), 0, body["by_teacher"])
+        self.assertEqual(body["unassigned_debt"], 100000, body)
         self.assertEqual(body["by_teacher"][0]["teacher_id"], 51, body["by_teacher"])
 
         # دو کلاس فعال با دو معلم ⇒ نسبت‌دادن قطعی ممکن نیست ⇒ unassigned

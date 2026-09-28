@@ -25,6 +25,7 @@ import kotlinx.coroutines.withContext
 import retrofit2.http.Body
 import retrofit2.http.POST
 import retrofit2.http.GET
+import retrofit2.HttpException
 import java.util.Locale
 
 // ==========================================
@@ -217,7 +218,11 @@ class StudentRegisterActivity : BaseActivity() {
                 .setMinYear(1300)
                 .setMaxYear(PersianCalendar().persianYear)
                 .setInitDate(1385, 1, 1)
-                .setActionTextColor(Color.GRAY)
+                .setActionTextColor(UiColors.resolve(this@StudentRegisterActivity, R.color.ds_accent))
+                // Keep the picker surface and NumberPicker columns on the active day/night palette.
+                .setBackgroundColor(UiColors.resolve(this@StudentRegisterActivity, R.color.ds_bg_surface))
+                .setPickerBackgroundColor(UiColors.resolve(this@StudentRegisterActivity, R.color.ds_bg_surface_2))
+                .setTitleColor(UiColors.resolve(this@StudentRegisterActivity, R.color.ds_text_primary))
                 .setTitleType(PersianDatePickerDialog.WEEKDAY_DAY_MONTH_YEAR)
                 .setShowInBottomSheet(true)
                 .setListener(object : ir.hamsaa.persiandatepicker.Listener {
@@ -375,6 +380,23 @@ class StudentRegisterActivity : BaseActivity() {
     }
 
     // فرستادن اطلاعات ثبت‌نام ترکیبی به سرور به صورت تراکنشی
+    private fun registrationError(error: Exception): String {
+        if (error is HttpException) {
+            val body = error.response()?.errorBody()?.string().orEmpty()
+            val detail = try {
+                val value = org.json.JSONObject(body).opt("detail")
+                when (value) {
+                    is String -> value
+                    null -> ""
+                    else -> value.toString()
+                }
+            } catch (_: Exception) { "" }
+            return if (detail.isNotBlank()) "ثبت نام ناموفق (HTTP ${error.code()}): $detail"
+            else "ثبت نام ناموفق (HTTP ${error.code()})"
+        }
+        return "ثبت نام ناموفق: ${error.message ?: "خطای شبکه"}"
+    }
+
     private fun registerStudentAndEnrollDirectly() {
         val baseTuition = etRegBaseTuition.text.toString().toIntOrNull() ?: 0
         val dType = when (acRegDiscountType.text.toString()) {
@@ -394,18 +416,23 @@ class StudentRegisterActivity : BaseActivity() {
                 else -> 0
             }
             val finalTuition = Math.max(0, baseTuition - discountAmt)
-            val half1 = finalTuition / 2
-            val half2 = finalTuition - half1
-            // FIX H3-B2: due_date column is Jalali — send real Jalali dates (was: Gregorian today + year-621 approx).
-            val todayDate = JalaliUtils.todayJalaliString()
-
-            // تولید تاریخ سررسید قسط دوم (۳۰ روز بعد)
-            val futureDate = JalaliUtils.jalaliStringDaysFromNow(30)
-
-            installmentList = listOf(
-                InstallmentCreate(half1, todayDate),
-                InstallmentCreate(half2, futureDate)
-            )
+            // شهریهٔ صفر قسط ندارد؛ ارسال دو قسط صفر از سمت Gson باعث 422
+            // در InstallmentCreate (مبلغ باید مثبت باشد) و خطای ظاهراً مربوط به شهریه می‌شد.
+            if (finalTuition > 0) {
+                // FIX: برای مبلغ ۱ هم هیچ قسط صفر ارسال نشود.
+                val todayDate = JalaliUtils.todayJalaliString()
+                val futureDate = JalaliUtils.jalaliStringDaysFromNow(30)
+                installmentList = if (finalTuition == 1) {
+                    listOf(InstallmentCreate(1, todayDate))
+                } else {
+                    val half1 = finalTuition / 2
+                    val half2 = finalTuition - half1
+                    listOf(
+                        InstallmentCreate(half1, todayDate),
+                        InstallmentCreate(half2, futureDate)
+                    )
+                }
+            }
         }
 
         val data = StudentRegisterAndEnrollRequest(
@@ -468,7 +495,7 @@ class StudentRegisterActivity : BaseActivity() {
                 withContext(Dispatchers.Main) {
                     // FIX: Restore the button on both success and failure.
                     (btnNext as? GoldButton)?.setLoading(false)
-                    Toast.makeText(this@StudentRegisterActivity, getString(R.string.common_submit_dup), Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@StudentRegisterActivity, registrationError(e), Toast.LENGTH_LONG).show()
                     android.util.Log.e("StudentRegisterActivity", "registerStudentAndEnrollDirectly failed", e)
                     btnNext.isEnabled = true
                     btnNext.text = getString(R.string.btn_retry)

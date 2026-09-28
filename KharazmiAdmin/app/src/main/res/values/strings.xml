@@ -397,7 +397,8 @@
     <string name="invoice_due_teacher">سهم معلم (قابل پرداخت): %1$s %2$s تومان</string>
     <string name="invoice_due_institute">سهم آموزشگاه (قابل پرداخت): %1$s %2$s تومان</string>
     <string name="invoice_class_empty">این کلاس دانش‌آموزی ندارد</string>
-    <string name="invoice_student_row">%1$s (بدهی کل: %2$s, معلم: %3$s, آموزشگاه: %4$s)</string>
+    <string name="invoice_student_row">%1$s (بدهی به معلم: %2$s، بدهی به آموزشگاه: %3$s)</string>
+    <string name="invoice_selected_class">کلاس انتخاب‌شده: %1$s</string>
     <string name="invoice_pick_student">انتخاب دانش‌آموز از %1$s</string>
     <string name="invoice_debt_total">بدهی باقی‌مانده: %1$s تومان</string>
     <string name="invoice_debt_teacher">بدهی سهم معلم: %1$s تومان</string>
@@ -714,7 +715,8 @@
     <string name="cdetail_info_sessions">"📅 تعداد جلسات برگزار شده: %1$s\n"</string>
     <string name="cdetail_info_students">"👥 تعداد کل دانش‌آموزان: %1$s\n\n"</string>
     <string name="cdetail_info_revenue">"💰 درآمد وصول شده: %1$s تومان\n"</string>
-    <string name="cdetail_info_debt">"⚠️ مطالبات (بدهی‌ها): %1$s تومان\n"</string>
+    <string name="cdetail_info_debt_teacher">"⚠️ بدهی به معلم: %1$s تومان\n"</string>
+    <string name="cdetail_info_debt_institute">"⚠️ بدهی به آموزشگاه: %1$s تومان\n"</string>
     <string name="cdetail_fin_teacher_title">"💳 تفکیک مالی سهم مربی:\n"</string>
     <string name="cdetail_fin_teacher_debt">"   • مطالبات (بدهی به معلم): %1$s تومان\n"</string>
     <string name="cdetail_fin_teacher_paid">"   • دریافتی (واریزی به معلم): %1$s تومان\n\n"</string>
@@ -746,8 +748,7 @@
     <string name="cdetail_code_row">" (کد: %1$s)"</string>
     <string name="cdetail_student_row">%1$s%2$s (🎁 تخفیف: %3$s)</string>
     <string name="cdetail_att_pct">📊 حضور: %1$s%%</string>
-    <string name="cdetail_debt_break">معلم: %1$s | آموزشگاه: %2$s</string>
-    <string name="cdetail_debt_total">🔴 بدهی کل: %1$s تومان\n(%2$s)</string>
+    <string name="cdetail_debt_split">بدهی به معلم: %1$s تومان\nبدهی به آموزشگاه: %2$s تومان</string>
     <string name="cdetail_unsettled">تسویه نشده</string>
     <string name="cdetail_no_debt">🟢 بدون بدهی</string>
     <string name="cdetail_settled">تسویه شده</string>
@@ -782,6 +783,9 @@
     <string name="csetup_disc_range">درصد تخفیف باید بین ۰ و ۱۰۰ باشد</string>
     <string name="csetup_disc_over">مبلغ تخفیف ثابت نمی‌تواند بیشتر از شهریه پایه باشد</string>
     <string name="csetup_no_pick">دانش‌آموزی انتخاب نشد</string>
+    <string name="csetup_bulk_selected">تعداد انتخاب‌شده: %1$d نفر</string>
+    <string name="csetup_bulk_summary">%1$d نفر اضافه شد، %2$d نفر رد شد</string>
+    <string name="csetup_bulk_error">خطا در افزودن گروهی دانش‌آموزان</string>
     <string name="csetup_add_error">خطا در افزودن دانش‌آموز</string>
     <string name="csetup_del_title">حذف دانش‌آموز</string>
     <string name="csetup_del_msg">آیا مطمئن هستید %1$s حذف شود؟</string>
@@ -928,6 +932,7 @@
     <string name="chart_att_empty">دیتای حضور و غیاب کافی برای این بازه یافت نشد</string>
     <string name="chart_money_empty">دیتای مالی کافی برای تفکیک سهم‌ها در این بازه یافت نشد</string>
     <string name="chart_stats_error">خطا در دریافت اطلاعات آمار</string>
+    <string name="chart_no_data">داده‌ای برای نمایش در این بازه وجود ندارد</string>
     <string name="chart_ds_income">وصولی نقدی بازه (تومان)</string>
     <string name="chart_pie_all">کل دانش‌آموزان</string>
     <string name="chart_line_att">درصد حضور در کلاس</string>
@@ -1018,6 +1023,7 @@
     <string name="rpt_stmt_error">خطا در دریافت جزئیات صورت‌حساب</string>
     <string name="rpt_rendering">در حال رندر و آماده‌سازی پنجره چاپ...</string>
     <string name="rpt_job_name">صورت‌حساب خوارزمی</string>
+    <string name="rpt_payment_link_fallback">https://kharazmi.local/payments/initiate</string>
     <string name="set_about_title">درباره ما</string>
     <string name="set_about_msg">سیستم مدیریت آموزشگاه خوارزمی\nطراحی و توسعه:توسط Aspect \n ایدی اینستاگرام: ma_mad.eros</string>
     <string name="set_logout_title">خروج</string>
@@ -1096,10 +1102,18 @@
     <string name="lcls_list_error">خطا در دریافت لیست کلاس</string>
     <string name="lcls_live_row">🔴 در حال برگزاری — %1$s دقیقه گذشته</string>
     <string name="lcls_started">شروع: %1$s</string>
+    <string name="lcls_not_started">کلاس هنوز شروع نشده است</string>
+    <string name="lcls_not_started_hint">برای شروع، دکمهٔ «شروع کلاس» را بزنید</string>
+    <string name="lcls_start_error">شروع کلاس انجام نشد: %1$s</string>
     <string name="lcls_end_title">پایان کلاس</string>
     <string name="lcls_end_msg">آیا از پایان این کلاس زنده و ثبت نهایی حضور و غیاب (با محاسبه‌ی شهریه) اطمینان دارید؟</string>
     <string name="lcls_done_msg">✅ جلسه ثبت شد. سهم معلم: %1$s | سهم آموزشگاه: %2$s</string>
     <string name="lcls_end_error">خطا در پایان کلاس: %1$s</string>
+    <string name="lcls_cancel_title">لغو کلاس زنده</string>
+    <string name="lcls_cancel_msg">کلاس زنده بدون ثبت شهریه، حضور و غیاب یا تراکنش مالی لغو می‌شود. ادامه می‌دهید؟</string>
+    <string name="lcls_cancel_button">لغو بدون ثبت</string>
+    <string name="lcls_cancel_done">کلاس زنده لغو شد و هیچ محاسبه‌ای ثبت نشد.</string>
+    <string name="lcls_cancel_error">خطا در لغو کلاس: %1$s</string>
     <!-- FIX (گروه۱/آیتم۱): وقتی جلسهٔ این تاریخ قبلاً ثبت شده، پایان کلاس زنده خطا نیست؛
          سرور پیام گویا می‌فرستد و همین‌جا نمایش داده می‌شود (بدون هاردکد متن در Activity). -->
     <string name="lcls_duplicate_msg">⚠️ %1$s</string>
@@ -1346,7 +1360,11 @@
     <string name="audit_trail_field_date">تاریخ</string>
     <string name="audit_trail_field_target_wallet">کیف پول مقصد</string>
     <string name="audit_trail_field_student">شناسه دانش‌آموز</string>
-    <string name="audit_trail_field_enrollment">شناسه ثبت‌نام</string>
+    <string name="audit_trail_field_enrollment">ثبت‌نام</string>
+    <string name="audit_trail_field_course">کلاس</string>
+    <string name="audit_trail_field_branch">شعبه</string>
+    <string name="audit_trail_field_teacher">معلم</string>
+    <string name="audit_trail_field_session">جلسه</string>
 
     <!-- FIX (گروه۲/آیتم۸): جست‌وجوی نام + نمایش نام‌ها به‌جای شناسه‌ی خام + لینک صورت‌حساب -->
     <string name="audit_trail_search_hint">جست‌وجوی نام دانش‌آموز / معلم / کلاس / شعبه</string>
@@ -1568,7 +1586,7 @@
     <string name="ds_rpt_statement_title">۳. صورت‌حساب دانش‌آموز</string>
     <string name="ds_rpt_statement_desc">جست‌وجو با نام یا کد ملی و صدور صورت‌حساب رسمی</string>
     <string name="ds_rpt_stmt_paid">کل واریزی به آموزشگاه</string>
-    <string name="ds_rpt_stmt_debt">مانده بدهی به آموزشگاه</string>
+    <string name="ds_rpt_stmt_debt">بدهی آموزشگاه در کلاس‌ها</string>
     <string name="ds_rpt_print_statement">چاپ صورت‌حساب</string>
     <string name="ds_rpt_search_btn">بررسی</string>
     <string name="ds_rpt_scope_institute">آموزشگاه</string>

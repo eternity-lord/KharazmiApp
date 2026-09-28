@@ -145,9 +145,11 @@
                             style="@style/Widget.Kharazmi.Button.Gold"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
+                            android:textColor="@color/text_on_gold"
                             android:text="ارسال پیامک"
                             app:backgroundTint="@color/gold_primary"
                             app:icon="@drawable/ic_arrow_forward_24"
+                            app:iconTint="@color/text_on_gold"
                             app:iconGravity="textStart"
                             app:elevation="@dimen/elevation_button"
                         />

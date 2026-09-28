@@ -72,6 +72,7 @@ class CourseCreate(BaseModel):
     days_of_week: str = "نامشخص"
     class_time: str = "نامشخص"
     teacher_session_price: int = Field(ge=0)  # FIX: Bug 22 - a session price cannot be negative.
+    capacity: Optional[int] = Field(default=None, gt=0)
     rule_prepay_institute: bool = False
     rule_prepay_teacher: bool = False
     rule_calc_absent: bool = True
@@ -124,6 +125,21 @@ class EnrollmentCreate(BaseModel):
         if value < 0:
             raise ValueError("شهریهٔ ثبت‌نام نمی‌تواند منفی باشد؛ برای دانش‌آموز رایگان یا معاف عدد ۰ را وارد کنید")
         return value
+
+
+class BulkEnrollmentCreate(BaseModel):
+    """ورودی مشترک شهریه برای افزودن چند دانش‌آموز به یک کلاس."""
+    student_ids: List[int] = Field(min_length=1)
+    course_id: int
+    register_date: str
+    shift: str
+    total_tuition: int
+    paid_amount: int = Field(ge=0)
+    payment_method: str
+    receiver: str
+    discount_type: Optional[str] = "none"
+    discount_value: Optional[int] = 0
+    installments: Optional[List[InstallmentCreate]] = None
 
 
 # مدل‌های مربوط به نمره
@@ -198,6 +214,14 @@ class StudentActiveEnrollment(BaseModel):
     title: str = ""
     code: str = ""
     branch_id: Optional[int] = None
+    course_title: Optional[str] = None
+    teacher_id: Optional[int] = None
+    teacher_name: Optional[str] = None
+    debt: Optional[int] = None
+    debt_teacher: Optional[int] = None
+    debt_institute: Optional[int] = None
+    total_debt: Optional[int] = None
+    is_unassigned: bool = False
 
 class FullStudentProfile(BaseModel):
     info: StudentProfileInfo
@@ -205,6 +229,13 @@ class FullStudentProfile(BaseModel):
     enrollments: List[StudentActiveEnrollment] = []
     transactions: List[str]
     total_debt: int
+    wallet_total: int = 0
+    wallet_teacher: int = 0
+    wallet_institute: int = 0
+    debt_teacher: int = 0
+    debt_institute: int = 0
+    unassigned_debt: int = 0
+    teachers_financial: Optional[List[dict]] = None
 
 class TeacherProfileInfo(BaseModel):
     name: str
@@ -243,13 +274,24 @@ class ClassReportInfo(BaseModel):
     session_count: int  # تعداد جلسات برگزار شده
     total_students: int
     total_revenue: int  # کل درآمد وصول شده
-    total_debt: int  # کل مطالبات (بدهی‌ها)
+    total_debt: int  # کل مطالبات (سازگاری پاسخ قدیمی؛ UI دیگر نمایش نمی‌دهد)
+    debt_to_teacher: int = 0
+    debt_to_institute: int = 0
 
 class ClassStudentData(BaseModel):
     name: str
     mobile: str
     paid: int
-    debt: int
+    debt: int  # سازگاری پاسخ قدیمی؛ UI از دو سهم پایین استفاده می‌کند.
+    debt_to_teacher: int = 0
+    debt_to_institute: int = 0
+    # Per-enrollment identity; optional defaults keep old clients/responses compatible.
+    enrollment_id: Optional[int] = None
+    course_id: Optional[int] = None
+    course_title: Optional[str] = None
+    teacher_id: Optional[int] = None
+    teacher_name: Optional[str] = None
+    is_unassigned: bool = False
 
 class ClassSessionHistory(BaseModel):
     date: str

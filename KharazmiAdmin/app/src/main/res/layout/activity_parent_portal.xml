@@ -106,6 +106,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="@dimen/spacing_normal"
+                            android:textColor="@color/text_on_gold"
                             android:text="ارسال کد تایید پیامکی"
                             app:backgroundTint="@color/gold_primary" />
 
@@ -147,7 +148,7 @@
                                 android:layout_marginTop="@dimen/spacing_normal"
                                 android:text="تایید و ورود به پورتال"
                                 app:backgroundTint="@color/gold_primary"
-                                android:textColor="@color/white" />
+                                android:textColor="@color/text_on_gold" />
                         </LinearLayout>
 
                     </LinearLayout>
@@ -310,7 +311,7 @@
                             android:layout_height="wrap_content"
                             android:paddingVertical="4dp">
                             <TextView android:text="مانده تراز مالی:" android:textAppearance="@style/TextAppearance.Kharazmi.Body" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"/>
-                            <TextView android:id="@+id/tvParentWalletBalance" android:text="---" android:textAppearance="@style/TextAppearance.Kharazmi.Body" android:textStyle="bold" android:textColor="#388E3C" android:fontFeatureSettings="tnum" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                            <TextView android:id="@+id/tvParentWalletBalance" android:text="---" android:textAppearance="@style/TextAppearance.Kharazmi.Body" android:textStyle="bold" android:textColor="@color/status_success" android:fontFeatureSettings="tnum" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
                         </LinearLayout>
 
                         <LinearLayout

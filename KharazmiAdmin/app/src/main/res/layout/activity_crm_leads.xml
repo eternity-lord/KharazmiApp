@@ -108,6 +108,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="@dimen/spacing_normal"
+                        android:textColor="@color/text_on_gold"
                         android:text="ثبت سرنخ جدید در سیستم"
                         app:backgroundTint="@color/gold_primary" />
 
@@ -205,7 +206,7 @@
                             android:text="وضعیت جاری: NEW"
                             android:textAppearance="@style/TextAppearance.Kharazmi.Body"
                             android:textStyle="bold"
-                            android:textColor="#388E3C"
+                            android:textColor="@color/status_success"
                             android:layout_marginTop="4dp"/>
 
                     </LinearLayout>
@@ -267,6 +268,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="@dimen/spacing_normal"
+                            android:textColor="@color/text_on_gold"
                             android:text="ثبت و بروزرسانی پیگیری"
                             app:backgroundTint="@color/gold_primary" />
 
@@ -312,7 +314,7 @@
                             android:layout_height="wrap_content"
                             android:text="تبدیل به شاگرد رسمی آموزشگاه"
                             app:backgroundTint="@color/gold_primary"
-                            android:textColor="@color/white" />
+                            android:textColor="@color/text_on_gold" />
 
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>

@@ -20,7 +20,7 @@
     <!-- Text Colors in Dark Mode -->
     <color name="gaj_text_primary">#E0E0E0</color>
     <color name="gaj_text_secondary">#9E9E9E</color>
-    <color name="gaj_text_hint">#757575</color>
+    <color name="gaj_text_hint">#A6AFBC</color>
     <color name="gaj_text_on_primary">#FFFFFF</color>
     <color name="gaj_text_on_accent">#121212</color>
 
@@ -71,9 +71,13 @@
     <color name="text_disabled">#9BA4B3</color>
     <color name="text_on_gold">#0D0F13</color>
     <color name="status_success">#4CAF7D</color>
+    <color name="status_success_deep">#2F8F60</color>
     <color name="status_danger">#E0615A</color>
     <color name="status_info">#5B8DEF</color>
     <color name="status_warning">#D4A94C</color>
+    <color name="status_info_deep">#355EA8</color>
+    <color name="status_warning_deep">#916B1E</color>
+    <color name="status_neutral_deep">#3A4150</color>
     <color name="gold_button_disabled_bg">#2A2F3A</color>
     <color name="gold_button_disabled_text">@color/text_disabled</color>
     <color name="gold_input_focused">#D4A94C</color>
@@ -90,5 +94,14 @@
 
     <!-- FIX: Opaque muted-gold fill keeps sent messages distinct without washing out light text. -->
     <color name="gold_chat_sent_bg">#453821</color>
+
+    <!-- Night overrides for shared design-system surfaces and on-container text. -->
+    <color name="ds_bg_surface_3">#262B35</color>
+    <color name="ds_border_strong">#3A4150</color>
+    <color name="ds_success_on_container">#8FE0B4</color>
+    <color name="ds_warning_on_container">#F0C572</color>
+    <color name="ds_danger_on_container">#F2A9A4</color>
+    <color name="ds_info_on_container">#A8C4F5</color>
+    <color name="ds_ripple_neutral">#22FFFFFF</color>
 
 </resources>

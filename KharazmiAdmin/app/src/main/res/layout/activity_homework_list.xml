@@ -111,6 +111,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="@dimen/spacing_normal"
+                        android:textColor="@color/text_on_gold"
                         android:text="ثبت و ابلاغ تکلیف کلاسی"
                         app:backgroundTint="@color/gold_primary" />
 
@@ -282,6 +283,7 @@
                     style="@style/Widget.Kharazmi.Button.Gold"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:textColor="@color/text_on_gold"
                     android:text="بازگشت به لیست تکالیف"
                     app:backgroundTint="@color/gold_primary" />
 

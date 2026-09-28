@@ -9,8 +9,8 @@
        btnSearchStudentStatement / llStatementResult / tvStatementStudentName /
        tvStatementStudentCode / tvStatementPaid / tvStatementDebt / btnPrintStatement /
        cardReportTypeSelector / cardFilters / cardMonthlySummary / cardStudentStatement / tvHeaderTitle
-     نکته: وضعیت loading/empty/error این صفحه در کد فعلی با Toast مدیریت می‌شود و هیچ Viewای
-     برای آن bind نشده؛ بنابراین ویوی مرده اضافه نشد (نیازمند تغییر Kotlin است).
+     وضعیت دریافت/خطای گزارش در tvReportStatus نمایش داده می‌شود تا کارت‌های عددی در
+     حالت خطا به‌صورت خاموش و خالی باقی نمانند.
      ==================================================================================== -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -197,13 +197,32 @@
                         android:id="@+id/btnFetchFinancialSummary"
                         style="@style/Widget.Kharazmi.DS.Button.Primary"
                         android:layout_width="match_parent"
-                        android:layout_height="@dimen/min_touch_target"
+                        android:layout_height="wrap_content"
                         android:layout_marginTop="@dimen/spacing_normal"
                         android:minHeight="@dimen/min_touch_target"
                         android:text="@string/ds_rpt_get"
                         app:icon="@drawable/ic_ds_wallet_24"
                         app:iconSize="@dimen/icon_medium"
                         app:iconGravity="textStart"/>
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnExportFinancial"
+                        style="@style/Widget.Kharazmi.DS.Button.Secondary"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_small"
+                        android:text="خروجی Excel همین بازه" />
+
+                    <TextView
+                        android:id="@+id/tvReportStatus"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_small"
+                        android:paddingHorizontal="@dimen/spacing_small"
+                        android:paddingVertical="@dimen/spacing_xs"
+                        android:textColor="@color/ds_text_secondary"
+                        android:textAppearance="@style/TextAppearance.Kharazmi.DS.Caption"
+                        android:visibility="gone" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -259,8 +278,7 @@
                             android:layout_height="wrap_content"
                             android:text="@string/ds_value_placeholder"
                             android:textAppearance="@style/TextAppearance.Kharazmi.DS.Money"
-                            android:fontFeatureSettings="tnum"
-                            android:maxLines="1"/>
+                            android:fontFeatureSettings="tnum"/>
                     </LinearLayout>
 
                     <View
@@ -302,8 +320,7 @@
                             android:text="@string/ds_value_placeholder"
                             android:textAppearance="@style/TextAppearance.Kharazmi.DS.Money"
                             android:textColor="@color/ds_success"
-                            android:fontFeatureSettings="tnum"
-                            android:maxLines="1"/>
+                            android:fontFeatureSettings="tnum"/>
                     </LinearLayout>
 
                     <View
@@ -345,8 +362,7 @@
                             android:text="@string/ds_value_placeholder"
                             android:textAppearance="@style/TextAppearance.Kharazmi.DS.Money"
                             android:textColor="@color/ds_danger"
-                            android:fontFeatureSettings="tnum"
-                            android:maxLines="1"/>
+                            android:fontFeatureSettings="tnum"/>
                     </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
@@ -413,8 +429,7 @@
                             android:layout_height="wrap_content"
                             android:text="@string/ds_value_placeholder"
                             android:textAppearance="@style/TextAppearance.Kharazmi.DS.Money"
-                            android:fontFeatureSettings="tnum"
-                            android:maxLines="1"/>
+                            android:fontFeatureSettings="tnum"/>
                     </LinearLayout>
 
                     <View
@@ -455,8 +470,7 @@
                             android:text="@string/ds_value_placeholder"
                             android:textAppearance="@style/TextAppearance.Kharazmi.DS.Money"
                             android:textColor="@color/ds_success"
-                            android:fontFeatureSettings="tnum"
-                            android:maxLines="1"/>
+                            android:fontFeatureSettings="tnum"/>
                     </LinearLayout>
 
                     <View
@@ -497,8 +511,7 @@
                             android:text="@string/ds_value_placeholder"
                             android:textAppearance="@style/TextAppearance.Kharazmi.DS.Money"
                             android:textColor="@color/ds_danger"
-                            android:fontFeatureSettings="tnum"
-                            android:maxLines="1"/>
+                            android:fontFeatureSettings="tnum"/>
                     </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
@@ -555,7 +568,7 @@
                             android:id="@+id/btnSearchStudentStatement"
                             style="@style/Widget.Kharazmi.DS.Button.Primary"
                             android:layout_width="wrap_content"
-                            android:layout_height="@dimen/min_touch_target"
+                            android:layout_height="wrap_content"
                             android:layout_marginStart="@dimen/spacing_small"
                             android:minHeight="@dimen/min_touch_target"
                             android:text="@string/ds_rpt_search_btn"/>
@@ -581,9 +594,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:text="@string/ds_value_placeholder"
-                            android:textAppearance="@style/TextAppearance.Kharazmi.DS.SectionTitle"
-                            android:maxLines="2"
-                            android:ellipsize="end"/>
+                            android:textAppearance="@style/TextAppearance.Kharazmi.DS.SectionTitle"/>
 
                         <TextView
                             android:id="@+id/tvStatementStudentCode"
@@ -626,8 +637,7 @@
                                 android:text="@string/ds_value_placeholder"
                                 android:textAppearance="@style/TextAppearance.Kharazmi.DS.Money"
                                 android:textColor="@color/ds_success"
-                                android:fontFeatureSettings="tnum"
-                                android:maxLines="1"/>
+                                android:fontFeatureSettings="tnum"/>
                         </LinearLayout>
 
                         <View
@@ -668,16 +678,47 @@
                                 android:text="@string/ds_value_placeholder"
                                 android:textAppearance="@style/TextAppearance.Kharazmi.DS.Money"
                                 android:textColor="@color/ds_danger"
-                                android:fontFeatureSettings="tnum"
-                                android:maxLines="1"/>
+                                android:fontFeatureSettings="tnum"/>
                         </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/tvStatementTeacher"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/spacing_small"
+                            android:text="معلم بدهکار: —"
+                            android:textAppearance="@style/TextAppearance.Kharazmi.DS.Body" />
+
+                        <TextView
+                            android:id="@+id/tvStatementNextDue"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/spacing_xs"
+                            android:text="قسط بعدی: —"
+                            android:textAppearance="@style/TextAppearance.Kharazmi.DS.Body" />
+
+                        <TextView
+                            android:id="@+id/rvPaymentTimeline"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/spacing_small"
+                            android:text="تاریخچه پرداخت"
+                            android:textAppearance="@style/TextAppearance.Kharazmi.DS.Caption" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnStatementPay"
+                            style="@style/Widget.Kharazmi.DS.Button.Primary"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/spacing_small"
+                            android:text="پرداخت قسط بعدی" />
 
                         <!-- اکشن ثانویه: چاپ رسمی -->
                         <com.google.android.material.button.MaterialButton
                             android:id="@+id/btnPrintStatement"
                             style="@style/Widget.Kharazmi.DS.Button.Secondary"
                             android:layout_width="match_parent"
-                            android:layout_height="@dimen/min_touch_target"
+                            android:layout_height="wrap_content"
                             android:layout_marginTop="@dimen/spacing_normal"
                             android:minHeight="@dimen/min_touch_target"
                             android:text="@string/ds_rpt_print_statement"

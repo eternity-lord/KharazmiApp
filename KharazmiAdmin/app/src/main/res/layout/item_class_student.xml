@@ -36,8 +36,6 @@
                 android:textColor="@color/text_primary"
                 android:textStyle="bold"
                 android:textSize="16sp"
-                android:maxLines="1"
-                android:ellipsize="end"
                 android:clickable="true"
                 android:focusable="true"/>
 
@@ -60,7 +58,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             tools:text="شناسه: 123"
-            android:textColor="?android:attr/textColorSecondary"
+            android:textColor="@color/text_secondary"
             android:textSize="14sp"
             android:layout_marginBottom="4dp"/>
 
@@ -77,10 +75,8 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 tools:text="✅ پرداخت: 1,500,000 تومان"
-                android:textColor="?android:attr/textColorSecondary"
-                android:textSize="14sp"
-                android:maxLines="1"
-                android:ellipsize="end"/>
+                android:textColor="@color/text_secondary"
+                android:textSize="14sp"/>
 
             <TextView
                 android:fontFeatureSettings="tnum"
@@ -88,11 +84,9 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                tools:text="🔴 بدهی: 500,000 تومان"
-                android:textColor="?android:attr/textColorSecondary"
+                tools:text="بدهی به معلم: 300,000 تومان\nبدهی به آموزشگاه: 200,000 تومان"
+                android:textColor="@color/text_secondary"
                 android:textSize="14sp"
-                android:maxLines="1"
-                android:ellipsize="end"
                 android:gravity="end"/>
         </LinearLayout>
 

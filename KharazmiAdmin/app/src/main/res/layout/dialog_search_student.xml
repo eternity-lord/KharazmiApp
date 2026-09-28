@@ -20,7 +20,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="نام یا کدملی دانش‌آموز را جستجو کنید:"
-        android:textColor="#757575"
+        android:textColor="@color/text_secondary"
         android:textSize="14sp"
         android:layout_marginBottom="@dimen/spacing_small"/>
 
@@ -48,6 +48,23 @@
         android:textColor="@color/status_success"
         android:textStyle="bold"
         android:layout_marginTop="10dp"/>
+
+    <TextView
+        android:id="@+id/tvBulkSelectionSummary"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="برای افزودن چند نفر، چک‌باکس دانش‌آموزان نتیجه را تیک بزنید"
+        android:textColor="@color/gold_primary"
+        android:textStyle="bold"
+        android:layout_marginTop="8dp"/>
+
+    <LinearLayout
+        android:id="@+id/llStudentMultiSelect"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone"
+        android:layout_marginTop="4dp" />
 
     <!-- شهریه پایه کلاسی -->
     <com.google.android.material.textfield.TextInputLayout
@@ -119,7 +136,7 @@
         android:layout_marginTop="10dp"
         android:text="تقسیم به ۲ قسط مساوی (۵۰٪ نقدی و ۵۰٪ سررسید یک ماه بعد)"
         android:textSize="13sp"
-        android:textColor="#555"
+        android:textColor="@color/text_secondary"
         android:checked="false"/>
 
 </LinearLayout>

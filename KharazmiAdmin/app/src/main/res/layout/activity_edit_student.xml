@@ -126,7 +126,7 @@
                         android:layout_marginBottom="@dimen/spacing_normal"
                         android:hint="کد ملی (ادمین ارشد فقط)"
                         app:endIconDrawable="@android:drawable/ic_lock_lock"
-                        app:endIconTint="#999999"
+                        app:endIconTint="@color/text_secondary"
                         app:helperText="تغییر کد ملی منوط به دسترسی ادمین ارشد است."
                         app:helperTextTextColor="@color/gold_primary">
                         <com.google.android.material.textfield.TextInputEditText
@@ -297,7 +297,7 @@
                             android:layout_height="wrap_content"
                             android:text="مجموع کل واریزی به آموزشگاه:"
                             android:textAppearance="@style/TextAppearance.Kharazmi.Body"
-                            android:textColor="#555"/>
+                            android:textColor="@color/text_secondary"/>
                         <View android:layout_width="0dp" android:layout_weight="1" android:layout_height="1dp"/>
                         <TextView
                             android:id="@+id/tvOverallPaidInstitute"
@@ -306,7 +306,7 @@
                             android:text="0 تومان"
                             android:textAppearance="@style/TextAppearance.Kharazmi.Body"
                             android:textStyle="bold"
-                            android:textColor="#388E3C"
+                            android:textColor="@color/status_success"
                             android:fontFeatureSettings="tnum"/>
                     </LinearLayout>
 
@@ -322,7 +322,7 @@
                             android:layout_height="wrap_content"
                             android:text="مجموع کل بدهی به آموزشگاه:"
                             android:textAppearance="@style/TextAppearance.Kharazmi.Body"
-                            android:textColor="#555"/>
+                            android:textColor="@color/text_secondary"/>
                         <View android:layout_width="0dp" android:layout_weight="1" android:layout_height="1dp"/>
                         <TextView
                             android:id="@+id/tvOverallDebtInstitute"
@@ -373,7 +373,7 @@
                             android:layout_height="wrap_content"
                             android:text="کلاس فعالی یافت نشد"
                             android:gravity="center"
-                            android:textColor="#999"
+                            android:textColor="@color/text_disabled"
                             android:textAppearance="@style/TextAppearance.Kharazmi.Caption"
                             android:padding="@dimen/spacing_small"/>
                     </LinearLayout>
@@ -412,10 +412,12 @@
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content"
+            android:textColor="@color/text_on_gold"
             android:text="ذخیره تغییرات"
             app:backgroundTint="@color/gold_primary"
             android:layout_marginStart="6dp"
             app:icon="@drawable/ic_save_24"
+            app:iconTint="@color/text_on_gold"
             app:iconGravity="textStart" />
     </LinearLayout>
 

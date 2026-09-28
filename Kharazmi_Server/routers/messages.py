@@ -149,6 +149,8 @@ def get_conversation_history(
     db: Session = Depends(get_db),
     role: str = Depends(require_permission("messages.read"))
 ):
+    if not authorization or len(authorization.split()) != 2:
+        raise HTTPException(status_code=401, detail="نشست معتبر نیست؛ لطفاً دوباره وارد شوید")
     session = db.query(models.UserSession).filter(models.UserSession.token == authorization.split()[1]).first()
     keys = resolve_participant_keys(db, session, role)
     if not keys:
@@ -181,6 +183,10 @@ def send_message(
     db: Session = Depends(get_db),
     role: str = Depends(require_permission("messages.send"))
 ):
+    if not req.body or not req.body.strip():
+        raise HTTPException(status_code=400, detail="متن پیام نمی‌تواند خالی باشد")
+    if not authorization or len(authorization.split()) != 2:
+        raise HTTPException(status_code=401, detail="نشست معتبر نیست؛ لطفاً دوباره وارد شوید")
     session = db.query(models.UserSession).filter(models.UserSession.token == authorization.split()[1]).first()
     keys = resolve_participant_keys(db, session, role)
     if not keys:
@@ -247,6 +253,10 @@ def send_broadcast_message(
     # FIX (L14/Y2-F1): پرمیژن جدا — شاگرد/ولی (و نقش ناشناخته) 403؛ DMهای شاگرد روی messages.send دست‌نخورده
     role: str = Depends(require_permission("messages.broadcast"))
 ):
+    if not req.body or not req.body.strip():
+        raise HTTPException(status_code=400, detail="متن پیام نمی‌تواند خالی باشد")
+    if not authorization or len(authorization.split()) != 2:
+        raise HTTPException(status_code=401, detail="نشست معتبر نیست؛ لطفاً دوباره وارد شوید")
     session = db.query(models.UserSession).filter(models.UserSession.token == authorization.split()[1]).first()
     keys = resolve_participant_keys(db, session, role)
     if not keys:
@@ -271,19 +281,52 @@ def send_broadcast_message(
             recipients.append((s.id, "student"))
         for t in teachers:
             recipients.append((t.id, "teacher"))
-    elif req.target_type == "class" and req.target_id:
-        # Check course ownership if teacher
-        course = db.query(Course).filter(Course.id == req.target_id).first()
+    elif req.target_type == "class":
+        # The Android broadcast card has no class selector yet. For a teacher,
+        # a missing target_id therefore means "my active classes"; the old code
+        # silently created a successful-looking broadcast with zero recipients.
+        from routers.reports import get_logged_in_teacher
+        course_ids = []
         if role == "teacher":
-            from routers.reports import get_logged_in_teacher
             logged_teacher = get_logged_in_teacher(db, authorization)
-            if not logged_teacher or course.teacher_id != logged_teacher.id:
-                raise HTTPException(status_code=403, detail="شما مجاز به ارسال پیام گروهی به شاگردان کلاس دیگران نیستید (IDOR)")
-                
-        enrolls = db.query(Enrollment).filter(Enrollment.course_id == req.target_id).all()
-        for en in enrolls:
-            recipients.append((en.student_id, "student"))
-            
+            if not logged_teacher:
+                raise HTTPException(status_code=403, detail="معلم جاری یافت نشد")
+            if req.target_id is not None:
+                course = db.query(Course).filter(
+                    Course.id == req.target_id,
+                    Course.is_deleted == False,
+                ).first()
+                if not course:
+                    raise HTTPException(status_code=404, detail="کلاس مورد نظر یافت نشد")
+                if course.teacher_id != logged_teacher.id:
+                    raise HTTPException(status_code=403, detail="شما مجاز به ارسال پیام گروهی به شاگردان کلاس دیگران نیستید (IDOR)")
+                course_ids = [course.id]
+            else:
+                course_ids = [course_id for course_id, in db.query(Course.id).filter(
+                    Course.teacher_id == logged_teacher.id,
+                    Course.is_deleted == False,
+                ).all()]
+        else:
+            if req.target_id is None:
+                raise HTTPException(status_code=400, detail="شناسه کلاس برای اطلاعیه آموزشگاه الزامی است")
+            course = db.query(Course).filter(
+                Course.id == req.target_id,
+                Course.is_deleted == False,
+            ).first()
+            if not course:
+                raise HTTPException(status_code=404, detail="کلاس مورد نظر یافت نشد")
+            course_ids = [course.id]
+
+        if not course_ids:
+            raise HTTPException(status_code=400, detail="برای این اطلاعیه هیچ کلاس فعالی وجود ندارد")
+        enrolls = db.query(Enrollment).filter(
+            Enrollment.course_id.in_(course_ids),
+            Enrollment.is_deleted == False,
+        ).all()
+        # A student enrolled in two of the teacher's classes must receive one
+        # broadcast, not duplicate participants/notifications.
+        recipients = list({(en.student_id, "student") for en in enrolls})
+
     # Add recipients
     for pid, prole in recipients:
         part = ConversationParticipant(conversation_id=conv.id, user_id=pid, role=prole)

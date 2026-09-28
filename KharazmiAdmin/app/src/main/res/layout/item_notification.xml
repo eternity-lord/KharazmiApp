@@ -53,12 +53,10 @@
             android:id="@+id/tvNotifBody"
             android:text="متن بدنه اعلان به صورت خلاصه در ردیف..."
             android:textAppearance="@style/TextAppearance.Kharazmi.Body"
-            android:textColor="?android:attr/textColorSecondary"
+            android:textColor="@color/text_secondary"
             android:layout_marginTop="@dimen/spacing_small"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:maxLines="1"
-            android:ellipsize="end"/>
+            android:layout_height="wrap_content"/>
 
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

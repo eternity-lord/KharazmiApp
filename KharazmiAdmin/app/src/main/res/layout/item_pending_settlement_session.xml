@@ -37,7 +37,7 @@
                 android:layout_height="wrap_content"
                 android:text="📅 تاریخ: 1402/10/01"
                 android:textSize="12sp"
-                android:textColor="?android:attr/textColorSecondary"
+                android:textColor="@color/text_secondary"
                 android:layout_marginTop="2dp" />
         </LinearLayout>
 

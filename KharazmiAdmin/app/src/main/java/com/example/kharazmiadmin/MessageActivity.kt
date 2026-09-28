@@ -18,6 +18,7 @@ import com.google.android.material.textfield.TextInputEditText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import retrofit2.HttpException
 import retrofit2.http.*
 
 // API Models for Messenger
@@ -239,23 +240,36 @@ class MessageActivity : BaseActivity() {
         }
     }
 
+    private fun messageError(error: Exception, fallback: String): String {
+        if (error is HttpException) {
+            val raw = error.response()?.errorBody()?.string()
+            val detail = try {
+                org.json.JSONObject(raw ?: "").optString("detail")
+            } catch (_: Exception) { "" }
+            return detail.ifBlank { "$fallback (${error.code()})" }
+        }
+        return error.message?.takeIf { it.isNotBlank() } ?: fallback
+    }
+
     private fun sendMessageToServer(body: String) {
         btnSend.isEnabled = false  // FIX L9: ضد دابل‌کلیک.
         val req = MessageSendRequest(body)
         // FIX: Bug 19 - cancel screen work when this Activity is destroyed.
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                api.sendMessage(activeConversationId, req)
+                val response = api.sendMessage(activeConversationId, req)
                 withContext(Dispatchers.Main) {
                     etCompose.text = null
                     btnSend.isEnabled = true
+                    Toast.makeText(this@MessageActivity, response.message, Toast.LENGTH_SHORT).show()
                     loadChatHistory() // Reload
                 }
             } catch (e: Exception) {
                 // FIX: Bug 19 - cancellation is not a network/UI error.
                 if (e is kotlinx.coroutines.CancellationException) throw e;
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(this@MessageActivity, getString(R.string.msg_send_error), Toast.LENGTH_SHORT).show()
+                    val detail = messageError(e, getString(R.string.msg_send_error))
+                    Toast.makeText(this@MessageActivity, detail, Toast.LENGTH_LONG).show()
                     btnSend.isEnabled = true
                 }
             }
@@ -269,9 +283,9 @@ class MessageActivity : BaseActivity() {
         // FIX: Bug 19 - cancel screen work when this Activity is destroyed.
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                api.sendBroadcast(req)
+                val response = api.sendBroadcast(req)
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(this@MessageActivity, getString(R.string.msg_group_ok), Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@MessageActivity, response.message, Toast.LENGTH_LONG).show()
                     etBroadcast.text = null
                     btnBroadcast.isEnabled = true
                     loadConversations() // Reload list
@@ -280,7 +294,8 @@ class MessageActivity : BaseActivity() {
                 // FIX: Bug 19 - cancellation is not a network/UI error.
                 if (e is kotlinx.coroutines.CancellationException) throw e;
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(this@MessageActivity, getString(R.string.msg_group_error), Toast.LENGTH_SHORT).show()
+                    val detail = messageError(e, getString(R.string.msg_group_error))
+                    Toast.makeText(this@MessageActivity, detail, Toast.LENGTH_LONG).show()
                     btnBroadcast.isEnabled = true
                 }
             }

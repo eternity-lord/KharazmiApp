@@ -85,6 +85,10 @@
             android:exported="false"
             android:label="تاریخچه جلسات" />
         <activity
+            android:name=".AdminSessionHistoryActivity"
+            android:exported="false"
+            android:label="تاریخچه جلسات ادمین" />
+        <activity
             android:name=".InvoiceActivity"
             android:exported="false" />
         <activity
@@ -200,6 +204,10 @@
             android:name=".AdminDashboardActivity"
             android:exported="false"
             android:label="داشبورد مدیریت" />
+        <activity
+            android:name=".DebtorsActivity"
+            android:exported="false"
+            android:label="داشبورد بدهکاران" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

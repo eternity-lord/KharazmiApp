@@ -51,6 +51,9 @@
     <style name="TextAppearance.Kharazmi.DS.Money" parent="TextAppearance.MaterialComponents.Body1">
         <item name="android:textSize">@dimen/font_size_money</item>
         <item name="android:textStyle">bold</item>
+        <item name="android:maxLines">2</item>
+        <item name="android:gravity">center</item>
+        <item name="android:lineSpacingMultiplier">1.0</item>
         <item name="android:textColor">@color/ds_accent</item>
         <item name="android:fontFamily">@font/app_font</item>
         <item name="android:fontFeatureSettings">tnum</item>
@@ -83,6 +86,9 @@
     <style name="TextAppearance.Kharazmi.DS.KpiValue" parent="TextAppearance.MaterialComponents.Headline5">
         <item name="android:textSize">@dimen/font_size_kpi_value</item>
         <item name="android:textStyle">bold</item>
+        <item name="android:maxLines">2</item>
+        <item name="android:gravity">center</item>
+        <item name="android:lineSpacingMultiplier">1.0</item>
         <item name="android:textColor">@color/ds_accent</item>
         <item name="android:fontFamily">@font/app_font</item>
         <item name="android:fontFeatureSettings">tnum</item>
@@ -122,6 +128,9 @@
         <item name="android:minHeight">@dimen/min_touch_target</item>
         <item name="android:textSize">@dimen/font_size_body</item>
         <item name="android:textStyle">bold</item>
+        <item name="android:maxLines">2</item>
+        <item name="android:gravity">center</item>
+        <item name="android:lineSpacingMultiplier">1.0</item>
         <item name="android:textColor">@color/ds_accent</item>
         <item name="rippleColor">@color/ds_ripple</item>
         <item name="android:insetTop">0dp</item>
@@ -133,6 +142,9 @@
         <item name="android:minHeight">@dimen/min_touch_target</item>
         <item name="android:textSize">@dimen/font_size_body</item>
         <item name="android:textStyle">bold</item>
+        <item name="android:maxLines">2</item>
+        <item name="android:gravity">center</item>
+        <item name="android:lineSpacingMultiplier">1.0</item>
         <item name="android:textColor">@color/ds_button_danger_text</item>
         <item name="backgroundTint">@color/ds_button_danger_bg</item>
         <item name="cornerRadius">@dimen/corner_radius_button</item>
@@ -232,7 +244,10 @@
         <item name="cornerRadius">@dimen/corner_radius_pill</item>
         <item name="android:textColor">@color/ds_chip_text</item>
         <item name="android:textSize">@dimen/font_size_caption</item>
-        <item name="chipMinHeight">36dp</item>
+        <item name="chipMinHeight">@dimen/min_touch_target</item>
+        <item name="android:singleLine">false</item>
+        <item name="android:maxLines">2</item>
+        <item name="android:paddingVertical">6dp</item>
         <item name="ensureMinTouchTargetSize">true</item>
         <item name="checkedIconVisible">false</item>
         <item name="chipIconVisible">false</item>
@@ -245,7 +260,10 @@
         <item name="cornerRadius">@dimen/corner_radius_pill</item>
         <item name="android:textColor">@color/ds_chip_text</item>
         <item name="android:textSize">@dimen/font_size_caption</item>
-        <item name="chipMinHeight">32dp</item>
+        <item name="chipMinHeight">@dimen/min_touch_target</item>
+        <item name="android:singleLine">false</item>
+        <item name="android:maxLines">2</item>
+        <item name="android:paddingVertical">6dp</item>
         <item name="ensureMinTouchTargetSize">true</item>
         <item name="checkedIconVisible">false</item>
         <item name="chipIconVisible">false</item>

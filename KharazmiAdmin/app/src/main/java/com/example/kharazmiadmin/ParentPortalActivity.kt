@@ -63,7 +63,7 @@ data class ParentGradeItem(val course_name: String, val exam_title: String, val 
 data class ParentAttendanceItem(val date: String, val course_title: String, val status: String)
 data class ParentInstallmentItem(val course_title: String, val amount: Long, val due_date: String, val is_paid: Boolean, val status: String, val paid_at: String)
 data class ParentHomeworkItem(val course_title: String, val title: String, val due_date: String, val status: String)
-data class ParentExamItem(val course_title: String, val title: String, val date: String, val max_score: Int)
+data class ParentExamItem(val course_title: String, val title: String, val date: String, val max_score: Float)
 data class ParentUpcomingSessionItem(val course_title: String, val date: String, val time: String)
 data class ParentNotificationItem(val title: String, val body: String, val date: String)
 
@@ -417,7 +417,7 @@ class ChildrenAdapter(
         val subtitle: TextView = v.findViewById(android.R.id.text2)
         init {
             subtitle.textSize = 12f
-            subtitle.setTextColor(android.graphics.Color.GRAY)
+            subtitle.setTextColor(UiColors.resolve(v.context, R.color.text_secondary))
         }
     }
 

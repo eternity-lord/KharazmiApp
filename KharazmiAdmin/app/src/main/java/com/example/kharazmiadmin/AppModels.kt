@@ -79,7 +79,19 @@ data class RegisterResponse(val message: String, val id: Int, val teacher_code: 
 data class StudentSearchItem(val id: Int, val name: String)
 data class SearchItem(val id: Int, val name: String)
 
-data class StudentItem(val student_id: Int, val student_name: String, val debt: Long, val enrollment_id: Int)
+data class StudentItem(
+    val student_id: Int,
+    val student_name: String,
+    val debt: Long,
+    val enrollment_id: Int,
+    val debt_teacher: Long = 0,
+    val debt_institute: Long = 0,
+    val course_id: Int? = null,
+    val course_title: String? = null,
+    val teacher_id: Int? = null,
+    val teacher_name: String? = null,
+    val is_unassigned: Boolean = false
+)
 
 // ==========================================
 // 5. کلاس‌ها (Classes)
@@ -109,13 +121,22 @@ data class ClassItemFull(
 
 data class PendingClassItem(
     val id: Int,
-    val title: String,
-    val teacher_name: String,
-    val teacher_price: Long,
-    val days: String,
-    val time: String,
-    val base_institute_share: Long,
-    val code: String? = null
+    val title: String? = null,
+    val teacher_name: String? = null,
+    val teacher_price: Long? = null,
+    val days: String? = null,
+    val time: String? = null,
+    val base_institute_share: Long? = null,
+    val code: String? = null,
+    val teacher_id: Int? = null,
+    val capacity: Int? = null,
+    val branch_id: Int? = null,
+    val rejection_reason: String? = null,
+    val pending_since: String? = null,
+    // Gson can legally materialize a JSON null even when the Kotlin default is a list;
+    // keep the wire model nullable and normalize at the adapter boundary.
+    val conflict_course_ids: List<Int>? = null,
+    val has_schedule_conflict: Boolean = false
 )
 
 data class ClassDetailsResponse(val students: List<StudentItem>)
@@ -225,6 +246,33 @@ data class AddStudentToClassData(
 )
 
 data class AddStudentResponse(val message: String, val enrollment_id: Int)
+
+data class BulkEnrollmentData(
+    val student_ids: List<Int>,
+    val course_id: Int,
+    val register_date: String,
+    val shift: String,
+    val total_tuition: Int,
+    val paid_amount: Int,
+    val payment_method: String,
+    val receiver: String,
+    val discount_type: String = "none",
+    val discount_value: Int = 0,
+    val installments: List<InstallmentCreate>? = null
+)
+
+data class BulkEnrollmentRejected(
+    val student_id: Int,
+    val reason: String
+)
+
+data class BulkEnrollmentResponse(
+    val message: String,
+    val added_count: Int,
+    val rejected_count: Int,
+    val added_student_ids: List<Int> = emptyList(),
+    val rejected: List<BulkEnrollmentRejected> = emptyList()
+)
 
 // ==========================================
 // 7. حضور و غیاب (Attendance)
@@ -365,7 +413,12 @@ data class AdvancedSearchItem(
     val debt_institute: Long? = 0,
     val total_debt: Long? = 0,
     val unpaid_sessions: Int? = 0,
-    val students_in_class: List<SimpleStudentItem>? = null
+    val students_in_class: List<SimpleStudentItem>? = null,
+    val enrollment_id: Int? = null,
+    val course_title: String? = null,
+    val teacher_id: Int? = null,
+    val teacher_name: String? = null,
+    val is_unassigned: Boolean = false
 )
 
 data class SimpleStudentItem(
@@ -374,7 +427,13 @@ data class SimpleStudentItem(
     val debt: Long,
     @SerializedName("debt_teacher") val debtTeacher: Long = 0,
     @SerializedName("debt_institute") val debtInstitute: Long = 0,
-    @SerializedName("total_debt") val totalDebt: Long = 0
+    @SerializedName("total_debt") val totalDebt: Long = 0,
+    val enrollment_id: Int? = null,
+    val course_id: Int? = null,
+    val course_title: String? = null,
+    val teacher_id: Int? = null,
+    val teacher_name: String? = null,
+    val is_unassigned: Boolean = false
 )
 
 // ==========================================
@@ -419,6 +478,7 @@ data class FullStudentProfile(
     @SerializedName("debt_teacher") val debtTeacher: Long = 0,
     @SerializedName("debt_institute") val debtInstitute: Long = 0,
     val total_paid_institute: Long = 0,
+    val unassigned_debt: Long = 0,
     val teachers_financial: List<TeacherFinancialItem>? = null
 )
 
@@ -428,16 +488,29 @@ data class ActiveStudentEnrollment(
     val course_id: Int,
     val title: String? = null,
     val code: String? = null,
-    val branch_id: Int? = null
+    val branch_id: Int? = null,
+    val course_title: String? = null,
+    val teacher_id: Int? = null,
+    val teacher_name: String? = null,
+    val debt: Long? = null,
+    val debt_teacher: Long? = null,
+    val debt_institute: Long? = null,
+    val total_debt: Long? = null,
+    val is_unassigned: Boolean = false
 )
 
 data class TeacherFinancialItem(
-    val course_title: String,
-    val teacher_name: String,
+    val course_title: String? = null,
+    val teacher_name: String? = null,
     val paid_teacher: Long,
     val debt_teacher: Long,
     val paid_institute: Long,
-    val debt_institute: Long
+    val debt_institute: Long,
+    val debt: Long = 0,
+    val enrollment_id: Int? = null,
+    val course_id: Int? = null,
+    val teacher_id: Int? = null,
+    val is_unassigned: Boolean = false
 )
 
 data class StudentInfo(
@@ -468,7 +541,11 @@ data class ClassListItem(
     val debt_to_teacher: Long,
     val debt_to_institute: Long,
     val is_suspended: Boolean = false,
-    val bg_color: String? = null
+    val bg_color: String? = null,
+    val enrollment_id: Int? = null,
+    val course_id: Int? = null,
+    val course_title: String? = null,
+    val is_unassigned: Boolean = false
 )
 
 // ==========================================
@@ -591,12 +668,22 @@ data class TeacherSettlementResponse(
 )
 
 data class SettlementHistoryItem(
+    // Legacy responses expose `id`; new responses also expose the canonical operation key.
     val id: Int,
+    val settlement_id: Int? = null,
     // FIX(null-data): مبالغ/تاریخ legacy ممکن است null باشند — null‌پذیر + فال‌بک امن در نمایش.
     val total_amount: Long? = null,
     val session_count: Int = 0,
-    val settled_at: String? = null
-)
+    val settled_at: String? = null,
+    val is_reversed: Boolean = false,
+    val reversal_reason: String? = null,
+    val session_ids: List<Int>? = null
+) {
+    // Old cached history remains usable while current responses make the operation
+    // identifier explicit. Reverse/edit must never invent a different identifier.
+    val operationId: Int
+        get() = settlement_id ?: id
+}
 
 data class BulkSmsRequest(val student_ids: List<Int>)
 data class BulkSuspendRequest(val course_ids: List<Int>)
@@ -643,10 +730,14 @@ data class WalletInfo(
 
 data class DashboardEnrollment(
     @SerializedName("enrollment_id") val enrollmentId: Int,
+    @SerializedName("course_id") val courseId: Int? = null,
     @SerializedName("course_title") val courseTitle: String,
+    @SerializedName("teacher_id") val teacherId: Int? = null,
+    @SerializedName("teacher_name") val teacherName: String? = null,
     @SerializedName("total_tuition") val totalTuition: Long? = null,
     @SerializedName("total_paid") val totalPaid: Long? = null,
-    @SerializedName("outstanding") val outstanding: Long? = null
+    @SerializedName("outstanding") val outstanding: Long? = null,
+    @SerializedName("is_unassigned") val isUnassigned: Boolean = false
 )
 
 data class FinancialDashboardResponse(
@@ -699,6 +790,13 @@ data class LiveEndResponse(
     @SerializedName("existing_session_id") val existingSessionId: Int? = null,
     @SerializedName("existing_session_code") val existingSessionCode: Int? = null,
     @SerializedName("duplicate_date_str") val duplicateDateStr: String? = null
+)
+
+// پاسخ لغو کلاس زنده؛ لغو هیچ SessionLog یا اثر مالی ایجاد نمی‌کند.
+data class LiveCancelResponse(
+    val message: String,
+    @SerializedName("live_session_id") val liveSessionId: Int,
+    val status: String
 )
 
 // وضعیت جلسه‌ی زنده‌ی فعلی معلم (برای رزومه و تایمر داشبورد معلم)

@@ -1,0 +1,4288 @@
+{
+  "seed": {
+    "users": 5,
+    "teachers": 3,
+    "students": 30,
+    "courses": 7,
+    "enrollments": 7,
+    "transactions": 6,
+    "session_logs": 3,
+    "attendances": 4,
+    "installments": 4,
+    "grades": 2,
+    "homeworks": 1,
+    "exams": 2,
+    "crm_leads": 1
+  },
+  "route_count": 221,
+  "routes": [
+    {
+      "method": "POST",
+      "path": "/admin/approve_class/{course_id}",
+      "handler": "routers.admin.approve_class",
+      "role": "admin",
+      "status": 409,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/admin/classes/suspend_bulk",
+      "handler": "routers.admin.suspend_bulk_classes",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/admin/classes/{course_id}/suspend_s",
+      "handler": "routers.classes.suspend_class_admin",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/admin/deleted_classes",
+      "handler": "routers.admin.get_deleted_classes",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "list",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/admin/deleted_classes/{course_id}",
+      "handler": "routers.admin.get_deleted_class_detail",
+      "role": "admin",
+      "status": 404,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/admin/deleted_classes/{course_id}/restore",
+      "handler": "routers.admin.restore_deleted_class",
+      "role": "admin",
+      "status": 409,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/admin/institute_settings",
+      "handler": "routers.admin.get_institute_settings",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/admin/institute_settings",
+      "handler": "routers.admin.update_institute_settings",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/admin/institute_settings/upload_logo",
+      "handler": "routers.admin.upload_institute_logo",
+      "role": "admin",
+      "status": 422,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/admin/live_sessions",
+      "handler": "routers.attendance.get_admin_live_sessions",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "list",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/admin/live_sessions/{session_id}/roster",
+      "handler": "routers.attendance.get_admin_live_session_roster",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/admin/parent_contacts",
+      "handler": "routers.admin.get_parent_contacts",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "list",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/admin/pending_classes",
+      "handler": "routers.admin.get_pending_classes",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "list",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/admin/pricing_table",
+      "handler": "routers.admin.get_pricing_table",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "list",
+        "status_500": false
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/admin/pricing_table",
+      "handler": "routers.admin.update_pricing_table",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/admin/reject_class/{course_id}",
+      "handler": "routers.admin.reject_class",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/admin/session_history",
+      "handler": "routers.admin.admin_session_history",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/admin/session_history/{session_id}/reopen",
+      "handler": "routers.admin.reopen_admin_session",
+      "role": "admin",
+      "status": 409,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/admin/students/search",
+      "handler": "routers.admin.search_admin_students",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "list",
+        "status_500": false
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/admin/students/{id}",
+      "handler": "routers.admin.delete_student",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/admin/students/{id}/full_profile",
+      "handler": "routers.admin.get_student_full_profile",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/admin/students/{id}/send_portal_link",
+      "handler": "routers.students.send_portal_link",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/admin/students/{id}/toggle_suspend",
+      "handler": "routers.admin.toggle_suspend_student",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/admin/teachers/search",
+      "handler": "routers.admin.search_admin_teachers",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "list",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/admin/teachers/{id}/credentials",
+      "handler": "routers.admin.get_teacher_credentials",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/admin/teachers/{id}/credentials",
+      "handler": "routers.admin.update_teacher_credentials",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/admin/teachers/{id}/credentials/reset_password",
+      "handler": "routers.admin.reset_teacher_password",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/admin/teachers/{teacher_id}",
+      "handler": "routers.admin.delete_teacher",
+      "role": "admin",
+      "status": 400,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/admin/teachers/{teacher_id}/suspend",
+      "handler": "routers.admin.suspend_teacher",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/admin/today_summary",
+      "handler": "routers.admin.get_admin_today_summary",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/admin/transactions/list",
+      "handler": "routers.admin.get_all_transactions",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "list",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/admin/transactions/list/excel",
+      "handler": "routers.admin.get_transactions_excel",
+      "role": "admin",
+      "status": 200,
+      "json": false,
+      "shape": "non-json",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": false,
+        "shape": "non-json",
+        "status_500": false
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/admin/transactions/{id}",
+      "handler": "routers.admin.delete_transaction",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/admin/transactions/{id}",
+      "handler": "routers.admin.update_transaction",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/ai/chat",
+      "handler": "routers.ai.chat_with_ai_assistant",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/analytics/classes",
+      "handler": "routers.analytics.get_classes_performance_analytics",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "list",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/analytics/dashboard",
+      "handler": "routers.analytics.get_analytics_dashboard",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/analytics/enrollment_funnel",
+      "handler": "routers.analytics.get_enrollment_funnel",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": {
+        "status": 200,
+        "json": true,
+        "shape": "object",
+        "is_null_list": false,
+        "value": null
+      },
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/analytics/export/excel",
+      "handler": "routers.analytics.export_analytics_excel",
+      "role": "admin",
+      "status": 200,
+      "json": false,
+      "shape": "non-json",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": false,
+        "shape": "non-json",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/analytics/export/pdf",
+      "handler": "routers.analytics.export_analytics_pdf",
+      "role": "admin",
+      "status": 200,
+      "json": false,
+      "shape": "non-json",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": false,
+        "shape": "non-json",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/analytics/teachers",
+      "handler": "routers.analytics.get_teachers_performance_analytics",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "list",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/attendance/get",
+      "handler": "routers.attendance.get_class_attendance",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/attendance/get_history",
+      "handler": "routers.attendance.get_history",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/attendance/live/current",
+      "handler": "routers.attendance.get_current_live_session",
+      "role": "teacher",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/attendance/qr_check-in",
+      "handler": "routers.attendance.qr_student_check_in",
+      "role": "student",
+      "status": 403,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/attendance/session/{session_code}",
+      "handler": "routers.attendance.delete_session_endpoint",
+      "role": "admin",
+      "status": 409,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/attendance/session/{session_code}",
+      "handler": "routers.attendance.get_session_details",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/attendance/session/{session_code}",
+      "handler": "routers.attendance.edit_past_session",
+      "role": "admin",
+      "status": 409,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/attendance/student_history",
+      "handler": "routers.attendance.get_student_attendance_history",
+      "role": "student",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/attendance/submit_session",
+      "handler": "routers.attendance.submit_session_and_calculate",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/attendance/{course_id}/start_live",
+      "handler": "routers.attendance.start_live_session",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/attendance/{session_id}/cancel_live",
+      "handler": "routers.attendance.cancel_live_session",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/attendance/{session_id}/end_live",
+      "handler": "routers.attendance.end_live_session",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/attendance/{session_id}/live_status",
+      "handler": "routers.attendance.save_live_status",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/audit-trail/logs",
+      "handler": "routers.audit_trail.list_audit_logs",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/audit/suspicious_patterns",
+      "handler": "routers.audit.get_suspicious_patterns",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "list",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/auth/change-mobile",
+      "handler": "routers.auth.change_mobile",
+      "role": "admin",
+      "status": 400,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/auth/change-password",
+      "handler": "routers.auth.change_password",
+      "role": "admin",
+      "status": 403,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/auth/device_token",
+      "handler": "routers.auth.register_device_token",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/auth/login",
+      "handler": "routers.auth.login_user",
+      "role": "admin",
+      "status": 400,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/auth/logout",
+      "handler": "routers.auth.logout_user",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/auth/me",
+      "handler": "routers.auth.get_me",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/auth/student/login",
+      "handler": "routers.auth.student_login",
+      "role": "admin",
+      "status": 400,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/auth/student/request_otp",
+      "handler": "routers.auth.request_student_otp",
+      "role": "admin",
+      "status": 404,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/automation/logs",
+      "handler": "routers.automation.get_automation_logs",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "list",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/automation/rules",
+      "handler": "routers.automation.get_automation_rules",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "list",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/automation/rules",
+      "handler": "routers.automation.create_automation_rule",
+      "role": "admin",
+      "status": 400,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/automation/rules/{rule_id}",
+      "handler": "routers.automation.update_automation_rule",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/automation/run_rules",
+      "handler": "routers.automation.run_automation_engine",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/branches",
+      "handler": "routers.branches.list_branches",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "list",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/branches",
+      "handler": "routers.branches.create_branch",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/branches/{branch_id}",
+      "handler": "routers.branches.update_branch",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/branches/{branch_id}/suspend",
+      "handler": "routers.branches.suspend_branch",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/calendar/check_conflicts",
+      "handler": "routers.calendar.check_scheduling_conflicts",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/calendar/events",
+      "handler": "routers.calendar.get_calendar_events",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "list",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/classes/create",
+      "handler": "routers.classes.create_class",
+      "role": "admin",
+      "status": 400,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/classes/deletion_requests",
+      "handler": "routers.classes.list_class_deletion_requests",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "list",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/classes/deletion_requests/{request_id}/approve",
+      "handler": "routers.classes.approve_class_deletion",
+      "role": "admin",
+      "status": 404,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/classes/deletion_requests/{request_id}/reject",
+      "handler": "routers.classes.reject_class_deletion",
+      "role": "admin",
+      "status": 404,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/classes/list",
+      "handler": "routers.classes.get_all_classes",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "list",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/classes/pending_approval",
+      "handler": "routers.classes.pending_classes_for_admin",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "list",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/classes/pending_approval/bulk_approve",
+      "handler": "routers.classes.bulk_approve_classes",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/classes/pending_approval/bulk_reject",
+      "handler": "routers.classes.bulk_reject_classes",
+      "role": "admin",
+      "status": 400,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 400,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/classes/update",
+      "handler": "routers.classes.update_class_by_admin",
+      "role": "admin",
+      "status": 409,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/classes/update_info/{course_id}",
+      "handler": "routers.classes.update_class_info",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/classes/{class_id}/students_full/excel",
+      "handler": "routers.classes.get_class_students_excel",
+      "role": "admin",
+      "status": 200,
+      "json": false,
+      "shape": "non-json",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/classes/{course_id}",
+      "handler": "routers.classes.delete_class_endpoint",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/classes/{course_id}/details",
+      "handler": "routers.classes.get_class_details",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/classes/{course_id}/request_delete",
+      "handler": "routers.classes.request_class_deletion",
+      "role": "admin",
+      "status": 403,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/classes/{course_id}/suspend",
+      "handler": "routers.classes.suspend_class",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/classes/{id}/full_report",
+      "handler": "routers.classes.get_class_full_report",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/classes/{id}/students_full",
+      "handler": "routers.classes.get_class_students_full",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/config/share",
+      "handler": "routers.admin.get_share_config",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/config/share/update",
+      "handler": "routers.admin.update_share_config",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/crm/leads/create",
+      "handler": "routers.crm.create_crm_lead",
+      "role": "admin",
+      "status": 400,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/crm/leads/list",
+      "handler": "routers.crm.get_crm_leads_list",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "list",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/crm/leads/{id}/convert",
+      "handler": "routers.crm.convert_lead_to_student",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/crm/leads/{id}/notes",
+      "handler": "routers.crm.add_lead_notes",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/crm/register_online",
+      "handler": "routers.crm.public_online_registration",
+      "role": "admin",
+      "status": 422,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/dashboard/branch_stats",
+      "handler": "routers.branches.get_branch_stats",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/dashboard/kpis",
+      "handler": "routers.dashboard.get_dashboard_kpis",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/dashboard/push_status",
+      "handler": "routers.dashboard.get_push_status",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/dashboard/stats",
+      "handler": "routers.admin.get_dashboard_stats",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/dunning/drafts",
+      "handler": "routers.dunning.get_dunning_drafts",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "list",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/dunning/send_batch",
+      "handler": "routers.dunning.send_dunning_batch",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 400,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/enrollments/add",
+      "handler": "routers.classes.add_enrollment",
+      "role": "admin",
+      "status": 400,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/enrollments/add_bulk",
+      "handler": "routers.classes.add_enrollments_bulk",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/enrollments/{enrollment_id}",
+      "handler": "routers.classes.delete_enrollment",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/exams/attempts/{attempt_id}/submit",
+      "handler": "routers.exams.submit_exam_attempt",
+      "role": "student",
+      "status": 400,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/exams/attempts/{exam_id}/start",
+      "handler": "routers.exams.start_exam_attempt",
+      "role": "student",
+      "status": 400,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/exams/create",
+      "handler": "routers.exams.create_exam",
+      "role": "admin",
+      "status": 403,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/exams/student/list",
+      "handler": "routers.exams.get_student_exams_list",
+      "role": "student",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "list",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/exams/{id}/questions",
+      "handler": "routers.exams.add_exam_question",
+      "role": "admin",
+      "status": 403,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/exports/audit_alerts",
+      "handler": "routers.exports.export_audit_alerts",
+      "role": "admin",
+      "status": 200,
+      "json": false,
+      "shape": "non-json",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": false,
+        "shape": "non-json",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/exports/debtors",
+      "handler": "routers.exports.export_debtors",
+      "role": "admin",
+      "status": 200,
+      "json": false,
+      "shape": "non-json",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": false,
+        "shape": "non-json",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/exports/overdue_installments",
+      "handler": "routers.exports.export_overdue_installments",
+      "role": "admin",
+      "status": 200,
+      "json": false,
+      "shape": "non-json",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": false,
+        "shape": "non-json",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/finance/debtors/remind",
+      "handler": "routers.finance.remind_debtors",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 400,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/finance/installments",
+      "handler": "routers.finance.get_all_installments",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "list",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/finance/installments",
+      "handler": "routers.finance.create_installment",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/finance/installments/{installment_id}",
+      "handler": "routers.finance.delete_installment",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/finance/installments/{installment_id}",
+      "handler": "routers.finance.update_installment",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/finance/installments/{installment_id}/pay",
+      "handler": "routers.finance.pay_installment_manually",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/finance/installments/{installment_id}/remind",
+      "handler": "routers.finance.send_installment_payment_reminder",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/finance/invoice/{enrollment_id}",
+      "handler": "routers.finance.get_invoice_details",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/finance/mock_payment_page",
+      "handler": "routers.finance.mock_payment_page",
+      "role": "admin",
+      "status": 404,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": {
+        "status": 404,
+        "json": true,
+        "shape": "object",
+        "is_null_list": false,
+        "value": null
+      },
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/finance/parent/dashboard",
+      "handler": "routers.finance.get_parent_financial_dashboard",
+      "role": "parent",
+      "status": 403,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 403,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/finance/pay",
+      "handler": "routers.finance.submit_payment",
+      "role": "admin",
+      "status": 400,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/finance/payment/callback",
+      "handler": "routers.finance.payment_callback",
+      "role": "admin",
+      "status": 404,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": {
+        "status": 404,
+        "json": true,
+        "shape": "object",
+        "is_null_list": false,
+        "value": null
+      },
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/finance/payment/initiate",
+      "handler": "routers.finance.initiate_online_payment",
+      "role": "admin",
+      "status": 400,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/finance/receipt/pdf",
+      "handler": "routers.finance.generate_pdf_receipt",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/finance/receipt/print",
+      "handler": "routers.finance.print_receipt",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/finance/receipt/{transaction_id}",
+      "handler": "routers.finance.get_receipt_details",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/finance/reports/debtors_grouped",
+      "handler": "routers.finance.get_debtors_grouped",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/finance/reports/debtors_list",
+      "handler": "routers.finance.get_debtors_list",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "list",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/finance/reports/revenue_summary",
+      "handler": "routers.finance.get_revenue_summary",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/finance/reports/teacher_settlements_summary",
+      "handler": "routers.finance.get_teacher_settlements_summary",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "list",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/finance/search_advanced",
+      "handler": "routers.finance.search_finance_advanced",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": {
+        "status": 200,
+        "json": true,
+        "shape": "list",
+        "is_null_list": false,
+        "value": []
+      },
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/finance/student/{student_id}/dashboard",
+      "handler": "routers.finance.get_student_financial_dashboard",
+      "role": "student",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/finance/student/{student_id}/payments",
+      "handler": "routers.finance.get_student_online_payments",
+      "role": "student",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/finance/student/{student_id}/transactions",
+      "handler": "routers.finance.get_student_physical_transactions",
+      "role": "student",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/finance/student_class_status",
+      "handler": "routers.finance.get_student_class_status",
+      "role": "admin",
+      "status": 404,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": {
+        "status": 404,
+        "json": true,
+        "shape": "object",
+        "is_null_list": false,
+        "value": null
+      },
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/finance/transaction/{transaction_id}/refund",
+      "handler": "routers.finance.refund_transaction",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/grades/submit",
+      "handler": "routers.students.submit_grade",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/homework/create",
+      "handler": "routers.homework.create_homework",
+      "role": "admin",
+      "status": 403,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/homework/parent/child/{student_id}",
+      "handler": "routers.homework.get_parent_child_homework",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/homework/student/list",
+      "handler": "routers.homework.get_student_homework_list",
+      "role": "student",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "list",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/homework/submissions/{homework_id}/submit",
+      "handler": "routers.homework.submit_homework_file",
+      "role": "admin",
+      "status": 422,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/homework/submissions/{sub_id}/grade",
+      "handler": "routers.homework.grade_homework_submission",
+      "role": "admin",
+      "status": 403,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/homework/{id}",
+      "handler": "routers.homework.delete_homework",
+      "role": "admin",
+      "status": 403,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/messages/broadcast",
+      "handler": "routers.messages.send_broadcast_message",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/messages/conversations",
+      "handler": "routers.messages.get_my_conversations",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "list",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/messages/conversations/create",
+      "handler": "routers.messages.create_conversation",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/messages/conversations/{id}/history",
+      "handler": "routers.messages.get_conversation_history",
+      "role": "admin",
+      "status": 403,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/messages/conversations/{id}/pin",
+      "handler": "routers.messages.toggle_conversation_pin",
+      "role": "admin",
+      "status": 404,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/messages/conversations/{id}/send",
+      "handler": "routers.messages.send_message",
+      "role": "admin",
+      "status": 403,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/messages/{id}",
+      "handler": "routers.messages.delete_own_message",
+      "role": "admin",
+      "status": 404,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/notifications",
+      "handler": "routers.auth.get_notifications",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "list",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/notifications/read_all",
+      "handler": "routers.auth.mark_all_notifications_read",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/notifications/unread_count",
+      "handler": "routers.auth.get_unread_notifications_count",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/notifications/{id}/read",
+      "handler": "routers.auth.mark_notification_read",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/parent/child_profile",
+      "handler": "routers.parent.get_parent_child_profile",
+      "role": "parent",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/parent/login",
+      "handler": "routers.parent.parent_login",
+      "role": "parent",
+      "status": 400,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/parent/portal",
+      "handler": "routers.parent.get_parent_portal_page",
+      "role": "parent",
+      "status": 200,
+      "json": false,
+      "shape": "non-json",
+      "error": null,
+      "invalid_target": false,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": false,
+        "shape": "non-json",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/parent/request_otp",
+      "handler": "routers.parent.request_parent_otp",
+      "role": "parent",
+      "status": 404,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/parent/select_child",
+      "handler": "routers.parent.parent_select_child",
+      "role": "parent",
+      "status": 401,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/reports/chart-data",
+      "handler": "routers.reports.get_chart_data",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/reports/debtors",
+      "handler": "routers.reports.get_debtors_report",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "list",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/reports/debtors/excel",
+      "handler": "routers.reports.get_debtors_excel",
+      "role": "admin",
+      "status": 200,
+      "json": false,
+      "shape": "non-json",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": false,
+        "shape": "non-json",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/reports/financial",
+      "handler": "routers.reports.get_financial_report",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "list",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/reports/financial/excel",
+      "handler": "routers.reports.get_financial_report_excel",
+      "role": "admin",
+      "status": 200,
+      "json": false,
+      "shape": "non-json",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": false,
+        "shape": "non-json",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/reports/financial_summary",
+      "handler": "routers.reports.get_financial_summary",
+      "role": "admin",
+      "status": 400,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": {
+        "status": 400,
+        "json": true,
+        "shape": "object",
+        "is_null_list": false,
+        "value": null
+      },
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/reports/student_profile/print",
+      "handler": "routers.reports.print_student_profile",
+      "role": "admin",
+      "status": 200,
+      "json": false,
+      "shape": "non-json",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": {
+        "status": 200,
+        "json": false,
+        "shape": "non-json",
+        "is_null_list": false,
+        "value": null
+      },
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/reports/student_statement",
+      "handler": "routers.reports.get_student_statement",
+      "role": "student",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": {
+        "status": 403,
+        "json": true,
+        "shape": "object",
+        "is_null_list": false,
+        "value": null
+      },
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/reports/student_statement/print",
+      "handler": "routers.reports.print_student_statement",
+      "role": "student",
+      "status": 200,
+      "json": false,
+      "shape": "non-json",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": {
+        "status": 403,
+        "json": true,
+        "shape": "object",
+        "is_null_list": false,
+        "value": null
+      },
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/resources",
+      "handler": "routers.branches.list_resources",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "list",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/resources",
+      "handler": "routers.branches.create_resource",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/resources/bookings",
+      "handler": "routers.branches.book_resource",
+      "role": "admin",
+      "status": 404,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/resources/{id}",
+      "handler": "routers.branches.update_resource",
+      "role": "admin",
+      "status": 404,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/rooms/create",
+      "handler": "routers.calendar.create_physical_room",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/rooms/list",
+      "handler": "routers.calendar.get_all_rooms",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "list",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/sms/history",
+      "handler": "routers.admin.get_sms_history",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "list",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/sms/send",
+      "handler": "routers.admin.send_sms",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/sms/send_bulk",
+      "handler": "routers.admin.send_bulk_sms",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/students/my_profile",
+      "handler": "routers.students.get_student_my_profile",
+      "role": "student",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/students/register",
+      "handler": "routers.students.register_student",
+      "role": "admin",
+      "status": 422,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/students/register_and_enroll",
+      "handler": "routers.students.register_and_enroll_student",
+      "role": "admin",
+      "status": 422,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/students/search",
+      "handler": "routers.students.search_students",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": {
+        "status": 200,
+        "json": true,
+        "shape": "list",
+        "is_null_list": false,
+        "value": []
+      },
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/students/search_simple",
+      "handler": "routers.students.search_students_simple",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": {
+        "status": 200,
+        "json": true,
+        "shape": "list",
+        "is_null_list": false,
+        "value": []
+      },
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/students/update/{student_id}",
+      "handler": "routers.students.update_student",
+      "role": "admin",
+      "status": 400,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/students/{id}/upload_photo",
+      "handler": "routers.students.upload_student_photo",
+      "role": "student",
+      "status": 422,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/students/{student_id}",
+      "handler": "routers.students.get_student_profile",
+      "role": "student",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/students/{student_id}/communication_history",
+      "handler": "routers.students.get_student_communication_history",
+      "role": "student",
+      "status": 403,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/students/{student_id}/grades",
+      "handler": "routers.students.get_student_grades",
+      "role": "student",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/students/{student_id}/installments",
+      "handler": "routers.students.get_student_installments",
+      "role": "student",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/students/{student_id}/report_card",
+      "handler": "routers.exams.get_student_report_card",
+      "role": "student",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/students/{student_id}/report_card/pdf",
+      "handler": "routers.exams.export_report_card_pdf",
+      "role": "student",
+      "status": 200,
+      "json": false,
+      "shape": "non-json",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/students/{student_id}/timeline",
+      "handler": "routers.timeline.get_student_timeline",
+      "role": "student",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/teachers/approve/{teacher_id}",
+      "handler": "routers.admin.approve_teacher",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/teachers/list",
+      "handler": "routers.teachers.get_all_teachers",
+      "role": "teacher",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "list",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/teachers/list/excel",
+      "handler": "routers.teachers.get_teachers_excel",
+      "role": "teacher",
+      "status": 403,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 403,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/teachers/pending",
+      "handler": "routers.admin.get_pending_teachers",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "list",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/teachers/register",
+      "handler": "routers.teachers.register_teacher",
+      "role": "teacher",
+      "status": 422,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/teachers/reject/{teacher_id}",
+      "handler": "routers.admin.reject_teacher",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/teachers/update/{teacher_id}",
+      "handler": "routers.teachers.update_teacher",
+      "role": "teacher",
+      "status": 403,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 403,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/teachers/{id}/full_profile",
+      "handler": "routers.teachers.get_teacher_full_profile",
+      "role": "teacher",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/teachers/{id}/today_summary",
+      "handler": "routers.teachers.get_teacher_today_summary",
+      "role": "teacher",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/teachers/{id}/upload_photo",
+      "handler": "routers.teachers.upload_teacher_photo",
+      "role": "teacher",
+      "status": 422,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/teachers/{teacher_id}",
+      "handler": "routers.teachers.get_teacher_profile",
+      "role": "teacher",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/teachers/{teacher_id}/classes",
+      "handler": "routers.teachers.get_my_classes",
+      "role": "teacher",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/teachers/{teacher_id}/collaboration_summary",
+      "handler": "routers.teachers.get_teacher_collaboration_summary",
+      "role": "teacher",
+      "status": 403,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 403,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/teachers/{teacher_id}/communication_history",
+      "handler": "routers.teachers.get_teacher_communication_history",
+      "role": "teacher",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/teachers/{teacher_id}/incomplete_classes",
+      "handler": "routers.teachers.get_teacher_incomplete_classes",
+      "role": "teacher",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/teachers/{teacher_id}/pending_classes",
+      "handler": "routers.teachers.get_teacher_pending_classes",
+      "role": "teacher",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/teachers/{teacher_id}/pending_settlement",
+      "handler": "routers.teachers.get_pending_settlement",
+      "role": "teacher",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/teachers/{teacher_id}/settle",
+      "handler": "routers.teachers.settle_teacher_sessions",
+      "role": "teacher",
+      "status": 403,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 403,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/teachers/{teacher_id}/settlement_history",
+      "handler": "routers.teachers.get_settlement_history",
+      "role": "teacher",
+      "status": 200,
+      "json": true,
+      "shape": "list",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/teachers/{teacher_id}/settlements/{settlement_id}/edit",
+      "handler": "routers.teachers.edit_teacher_settlement",
+      "role": "teacher",
+      "status": 403,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 403,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/teachers/{teacher_id}/settlements/{settlement_id}/reverse",
+      "handler": "routers.teachers.reverse_teacher_settlement",
+      "role": "teacher",
+      "status": 403,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 403,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/test/debt_calculation",
+      "handler": "routers.admin.test_debt_calculation",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 200,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/test/transaction_logic",
+      "handler": "routers.admin.test_transaction_logic",
+      "role": "admin",
+      "status": 200,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 422,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/uploads/{filename}",
+      "handler": "main.serve_upload",
+      "role": "admin",
+      "status": 404,
+      "json": true,
+      "shape": "object",
+      "error": null,
+      "invalid_target": true,
+      "status_500": false,
+      "empty": null,
+      "invalid": {
+        "status": 404,
+        "json": true,
+        "shape": "object",
+        "status_500": false
+      }
+    }
+  ],
+  "contract": {},
+  "invalid_target_count": 220,
+  "empty_probe_count": 11
+}

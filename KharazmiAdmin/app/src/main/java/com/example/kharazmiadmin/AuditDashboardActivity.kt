@@ -1,6 +1,5 @@
 package com.example.kharazmiadmin
 
-import android.graphics.Color
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -134,11 +133,28 @@ class AuditDashboardActivity : BaseActivity() {
             holder.tvDetected.text = "شناسایی: ${item.detectedAt}"
 
             // Color-code based on severity
+            val context = holder.itemView.context
             val (bgColor, strokeColor, severityColor) = when (item.severity.lowercase()) {
-                "high" -> Triple(Color.parseColor("#FFEBEE"), Color.parseColor("#D32F2F"), Color.parseColor("#D32F2F"))
-                "medium" -> Triple(Color.parseColor("#FFF3E0"), Color.parseColor("#FF6F00"), Color.parseColor("#E65100"))
-                "low" -> Triple(Color.parseColor("#E8F5E9"), Color.parseColor("#388E3C"), Color.parseColor("#2E7D32"))
-                else -> Triple(Color.parseColor("#F5F5F5"), Color.parseColor("#616161"), Color.parseColor("#616161"))
+                "high" -> Triple(
+                    UiColors.resolve(context, R.color.ds_danger_container),
+                    UiColors.resolve(context, R.color.ds_danger),
+                    UiColors.resolve(context, R.color.ds_danger_on_container)
+                )
+                "medium" -> Triple(
+                    UiColors.resolve(context, R.color.ds_warning_container),
+                    UiColors.resolve(context, R.color.ds_warning),
+                    UiColors.resolve(context, R.color.ds_warning_on_container)
+                )
+                "low" -> Triple(
+                    UiColors.resolve(context, R.color.ds_success_container),
+                    UiColors.resolve(context, R.color.ds_success),
+                    UiColors.resolve(context, R.color.ds_success_on_container)
+                )
+                else -> Triple(
+                    UiColors.resolve(context, R.color.ds_neutral_container),
+                    UiColors.resolve(context, R.color.ds_border_strong),
+                    UiColors.resolve(context, R.color.ds_text_secondary)
+                )
             }
             holder.card.setCardBackgroundColor(bgColor)
             holder.card.strokeColor = strokeColor

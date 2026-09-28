@@ -134,8 +134,10 @@ class TestExportsCSV(unittest.TestCase):
         self.assertEqual(rows[1][1], "سینا مرادی")
         self.assertEqual(rows[1][2], "0000000001")
         self.assertEqual(rows[1][3], "09120000001")
-        self.assertEqual(rows[1][4], "50000")      # کیف معلم منفی → بدهی معلم
-        self.assertEqual(rows[1][5], "0")
+        # CSV debt columns are enrollment-scoped; the negative legacy wallet is
+        # not attributed to this class.
+        self.assertEqual(rows[1][4], "0")
+        self.assertEqual(rows[1][5], "1000000")
         self.assertEqual(rows[1][6], "1000000")    # بدهی شهریه
         self.assertEqual(rows[1][7], "ریاضی کنکور")
         # هیچ تراکنش پرداختی در فیکسچر نیست ⇒ ستون‌های جدید خالی/بی‌مقدار می‌آیند (نه crash)

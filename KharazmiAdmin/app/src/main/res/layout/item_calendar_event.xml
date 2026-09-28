@@ -49,7 +49,7 @@
             android:id="@+id/tvEventDetail"
             android:text="توضیحات و مشخصات تکمیلی رویداد..."
             android:textAppearance="@style/TextAppearance.Kharazmi.Body"
-            android:textColor="?android:attr/textColorSecondary"
+            android:textColor="@color/text_secondary"
             android:layout_marginTop="6dp"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"/>

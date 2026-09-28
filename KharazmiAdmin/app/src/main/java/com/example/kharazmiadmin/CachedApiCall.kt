@@ -80,8 +80,8 @@ object CachedApiCall {
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT
                 )
-                setBackgroundColor(Color.parseColor("#FFF3E0")) // زرد کم‌رنگ
-                setTextColor(Color.parseColor("#E65100")) // نارنجی تیره
+                setBackgroundColor(UiColors.resolve(activity, R.color.status_warning_light)) // زرد کم‌رنگ
+                setTextColor(UiColors.resolve(activity, R.color.status_warning)) // نارنجی تیره
                 setPadding(24, 16, 24, 16)
                 textSize = 13f
                 gravity = Gravity.CENTER

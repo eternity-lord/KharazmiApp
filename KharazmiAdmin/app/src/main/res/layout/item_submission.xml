@@ -49,7 +49,7 @@
             android:id="@+id/tvSubmissionDetails"
             android:text="نمره: --- | بازخورد: ---"
             android:textAppearance="@style/TextAppearance.Kharazmi.Caption"
-            android:textColor="?android:attr/textColorSecondary"
+            android:textColor="@color/text_secondary"
             android:fontFeatureSettings="tnum"
             android:layout_marginTop="6dp"
             android:layout_width="match_parent"

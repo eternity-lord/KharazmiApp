@@ -391,7 +391,7 @@ class ExamActivity : BaseActivity() {
         val cardPdf = dialogView.findViewById<MaterialCardView>(R.id.cardFinancialStatus)
         val tvTotalDebt = dialogView.findViewById<TextView>(R.id.tvTotalDebt)
         tvTotalDebt.text = getString(R.string.exam_pdf_hint)
-        tvTotalDebt.setTextColor(android.graphics.Color.parseColor("#1565C0"))
+        tvTotalDebt.setTextColor(UiColors.resolve(this@ExamActivity, R.color.status_info))
         
         dialogView.findViewById<View>(R.id.tvDebtTeacher).visibility = View.GONE
         dialogView.findViewById<View>(R.id.tvDebtInstitute).visibility = View.GONE

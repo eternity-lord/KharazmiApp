@@ -86,7 +86,7 @@
             <TextView
                 android:text="کسر شده از هر دانش‌آموز:"
                 android:textAppearance="@style/TextAppearance.Kharazmi.Caption"
-                android:textColor="?android:attr/textColorSecondary"
+                android:textColor="@color/text_secondary"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"/>
             <Space android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"/>

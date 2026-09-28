@@ -9,7 +9,7 @@
     app:cardCornerRadius="12dp"
     app:cardElevation="2dp"
     app:strokeWidth="1.5dp"
-    app:strokeColor="#D32F2F"
+    app:strokeColor="@color/status_danger"
     app:cardBackgroundColor="@color/gold_bg_elevated">
 
     <LinearLayout
@@ -62,7 +62,7 @@
                 android:text="🔴 بحرانی >۷ روز"
                 android:textAppearance="@style/TextAppearance.Kharazmi.Caption"
                 android:textColor="@android:color/white"
-                android:background="#F44336"
+                android:background="@color/ds_danger_deep"
                 android:paddingHorizontal="8dp"
                 android:paddingVertical="4dp" />
 

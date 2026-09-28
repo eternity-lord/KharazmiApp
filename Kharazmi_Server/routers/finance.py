@@ -22,7 +22,7 @@ from dependencies import get_db, check_admin_access, check_admin_or_secretary_ac
 
 # FIX: Bug 16 - share the tuition-minus-payment debt calculation across financial views.
 from dependencies import limiter  # FIX F-B1: ریت‌لیمیت کال‌بک پرداخت (endpoint پول بدون احراز).
-from financial_calculations import calculate_student_debt
+from financial_calculations import calculate_student_debt, calculate_enrollment_debt_breakdown
 # FIX (F-T2): اعتبارسنجی مرکزی تاریخ/مبلغ قسط — یک منبع حقیقت برای هر دو مسیر ساخت قسط.
 from validation import validate_installment_amount, validate_jalali_due_date
 # FIX: Bug 11 - the existing refund audit write needs its model imported at runtime.
@@ -86,22 +86,23 @@ def search_finance_advanced(
         for en in enrollments:
             st = db.query(Student).filter(Student.id == en.student_id, Student.is_deleted == False).first()
             if st:
-                # محاسبه بدهی دانش‌آموز داخل لیست کلاس
-                w_t = st.wallet_teacher if st.wallet_teacher else 0
-                w_i = st.wallet_institute if st.wallet_institute else 0
-                debt_teacher = abs(w_t) if w_t < 0 else 0
-                debt_institute = abs(w_i) if w_i < 0 else 0
-                # FIX: Bug 16 - show unpaid tuition even when wallet balances are nonnegative.
-                total_debt = calculate_student_debt(db, st)
-
+                # این ردیف نمای یک enrollment داخل کلاس است؛ walletهای Student
+                # سراسری‌اند و نباید بدهی کلاس دیگری را به این ردیف کپی کنند.
+                breakdown = calculate_enrollment_debt_breakdown(db, en)
                 class_students.append(
                     {
                         "id": st.id,
                         "name": display_name(st, "نامشخص"),
-                        "debt": total_debt,
-                        "total_debt": total_debt,
-                        "debt_teacher": debt_teacher,
-                        "debt_institute": debt_institute,
+                        "debt": breakdown["debt"],
+                        "total_debt": breakdown["debt"],
+                        "debt_teacher": breakdown["debt_teacher"],
+                        "debt_institute": breakdown["debt_institute"],
+                        "enrollment_id": en.id,
+                        "course_id": c.id,
+                        "course_title": c.title,
+                        "teacher_id": c.teacher_id,
+                        "teacher_name": t_name,
+                        "is_unassigned": False,
                     }
                 )
 
@@ -131,45 +132,29 @@ def search_finance_advanced(
     students = students_q.all()
 
     for s in students:
-        # 1. خواندن دقیق کیف پول‌ها (هندل کردن Null)
-        w_teacher = s.wallet_teacher if s.wallet_teacher is not None else 0
-        w_institute = s.wallet_institute if s.wallet_institute is not None else 0
-
-        # 2. محاسبه بدهی (فقط منفی‌ها را جمع میکنیم)
-        debt_teacher = abs(w_teacher) if w_teacher < 0 else 0
-        debt_institute = abs(w_institute) if w_institute < 0 else 0
-        # FIX: Bug 16 - contractual tuition, not wallet sign, determines total debt.
-        total_debt_val = calculate_student_debt(db, s)
-
-        # 3. محاسبه تعداد جلسات بدهکار (تخمینی)
-        unpaid_count = 0
-        # FIX: Bug 13 - exclude archived Enrollment rows from this active view.
-        enrollments = db.query(Enrollment).filter(Enrollment.is_deleted == False).filter(Enrollment.student_id == s.id).all()
-        if enrollments:
-            last_en = enrollments[-1]
-            if last_en.course and last_en.course.teacher_session_price > 0:
-                # بدهی معلم تقسیم بر قیمت هر جلسه
-                unpaid_count = int(debt_teacher / last_en.course.teacher_session_price)
-
-        last_course_name = (
-            enrollments[-1].course.title
-            if enrollments and enrollments[-1].course
-            else "---"
-        )
-
+        # نتیجهٔ دانش‌آموز چندکلاسه هنوز به یک کلاس مشخص وصل نیست؛ پس بدهی
+        # wallet کل نباید در ردیف جستجو به‌عنوان بدهی کلاس نمایش داده شود.
+        # نمایش بدهی فقط بعد از انتخاب enrollment واقعی انجام می‌شود؛ اینجا دیگر
+        # wallet کل یا «بدهی کل» به‌عنوان بدهی کلاس نمایش داده نمی‌شود.
+        enrollments = db.query(Enrollment).filter(
+            Enrollment.is_deleted == False,
+            Enrollment.student_id == s.id,
+        ).all()
+        class_count = len([en for en in enrollments if en.course is not None])
         results.append(
             AdvancedSearchItem(
                 type="student",
                 id=s.id,
                 title=display_name(s, "نامشخص"),
-                subtitle=f"کلاس: {last_course_name}",
-                info=f"بدهی کل: {total_debt_val:,} تومان",  # نمایش متنی
+                subtitle=f"{class_count} کلاس ثبت‌نام‌شده — برای مشاهده بدهی، کلاس را انتخاب کنید",
+                info="بدهی پس از انتخاب کلاس نمایش داده می‌شود",
                 student_id=s.id,
-                # ✅ ارسال مقادیر دقیق به اندروید
-                debt_teacher=debt_teacher,
-                debt_institute=debt_institute,
-                total_debt=total_debt_val,
-                unpaid_sessions=unpaid_count,
+                debt_teacher=0,
+                debt_institute=0,
+                # This is an aggregate search hint only; the client must not
+                # attribute it to a class until it selects an enrollment.
+                total_debt=calculate_student_debt(db, s),
+                unpaid_sessions=0,
             )
         )
 
@@ -672,51 +657,31 @@ def get_student_class_status(student_id: int, course_id: Optional[int] = None, c
     if not enroll:
         raise HTTPException(status_code=404, detail="ثبت‌نام یافت نشد")
         
-    final_tuition, _ = get_enrollment_tuition_and_discount(enroll)
-    
-    w_t = student.wallet_teacher if student.wallet_teacher is not None else 0
-    w_i = student.wallet_institute if student.wallet_institute is not None else 0
-    
-    due_to_teacher = -w_t
-    due_to_institute = -w_i
-    
-    # محاسبه مبالغ پرداخت‌شده واقعی از تراکنش‌های لینک‌شده به همین ثبت‌نام (منبع حقیقت واحد)
-    # FIX: Bug 12 - exclude archived Transaction rows from this active view.
-    linked_payments = db.query(Transaction).filter(Transaction.is_deleted == False, Transaction.is_reversed == False).filter(
-        Transaction.enrollment_id == enroll.id,
-        Transaction.type.in_(["deposit", "enrollment_payment", "tuition"]),
-        Transaction.amount > 0
-    ).all()
-    paid_to_teacher = 0
-    paid_to_institute = 0
-    for t in linked_payments:
-        if t.target_wallet == "teacher":
-            paid_to_teacher += t.amount
-        elif t.target_wallet == "institute":
-            paid_to_institute += t.amount
-        elif t.target_wallet == "both":
-            # رسید تجمیعی قدیمی: تقسیم بر اساس سهم ثبت‌شده، وگرنه نصف دقیق
-            share_t = t.share_teacher or 0
-            share_i = t.share_institute or 0
-            if share_t + share_i != t.amount:
-                share_t = t.amount // 2
-                share_i = t.amount - share_t
-            paid_to_teacher += share_t
-            paid_to_institute += share_i
-    
-    # FIX O-09: دو فیلد صریح و نامنفی برای «بدهی» و «اعتبار» در اپ.
-    # چرا: `due_to_*` قرارداد کیف‌پولی دارد (due = منهای کیف) و بعد از پیش‌پرداخت جزئی
-    # منفی می‌شود ⇒ اپراتور «بدهی: -۵۰۰٬۰۰۰» می‌دید. فیلدهای قبلی دست‌نخورده ماندند.
+    # وضعیت صورت‌حساب باید فقط از همین enrollment بیاید؛ wallet کلی دانش‌آموز
+    # در این endpoint کلاس‌محور منبع due نیست.
+    breakdown = calculate_enrollment_debt_breakdown(db, enroll)
+    final_tuition = breakdown["tuition"]
+    paid_to_teacher = breakdown["paid_teacher"]
+    paid_to_institute = breakdown["paid_institute"]
     paid_total = paid_to_teacher + paid_to_institute
+    due_to_teacher = breakdown["debt_teacher"]
+    due_to_institute = breakdown["debt_institute"]
     return {
         "total_amount": final_tuition,
         "paid_to_teacher": paid_to_teacher,
         "paid_to_institute": paid_to_institute,
         "due_to_teacher": due_to_teacher,
         "due_to_institute": due_to_institute,
-        "remaining_tuition": max(0, final_tuition - paid_total),
+        # For the class-scoped quick-remittance form, the payable default is the
+        # sum of the two actual shares, never the student's aggregate/contractual
+        # balance from another class.
+        "remaining_tuition": due_to_teacher + due_to_institute,
         "credit_balance": max(0, paid_total - final_tuition),
         "course_id": course_id,
+        "course_title": enroll.course.title if enroll.course else None,
+        "teacher_id": enroll.course.teacher_id if enroll.course else None,
+        "teacher_name": display_name(enroll.course.teacher, "نامشخص") if enroll.course and enroll.course.teacher else None,
+        "is_unassigned": False,
         # لینک دقیق ثبت‌نام فعال (همان سطری که شهریه از آن خوانده شد) برای اتصال پرداخت بعدی
         "enrollment_id": enroll.id
     }
@@ -2118,24 +2083,31 @@ def get_student_financial_dashboard(
     # دریافت سوابق ثبت‌نام‌ها و مبالغ شهریه
     # FIX: Bug 13 - exclude archived Enrollment rows from this active view.
     enrollments = db.query(Enrollment).filter(Enrollment.is_deleted == False).filter(Enrollment.student_id == student_id).all()
-    # کیف پول واحد شاگرد: جمع کل پرداختی ثبت‌نام‌های فعال (در کنار موجودی و بدهی)
-    total_paid_all = sum((en.total_paid or 0) for en in enrollments)
+    # کیف پول واحد شاگرد: جمع پرداخت‌های enrollmentهای فعال؛ هر ردیف
+    # پایین‌تر با breakdown همان enrollment ساخته می‌شود.
     enroll_list = []
+    total_paid_all = 0
     for en in enrollments:
         final_tuition, discount = get_enrollment_tuition_and_discount(en)
+        breakdown = calculate_enrollment_debt_breakdown(db, en)
         c_title = en.course.title if en.course else "کلاس حذف شده"
-        
-        # مجموع پرداخت‌شده واقعی برای این کلاس (منبع حقیقت واحد: total_paid روی ثبت‌نام)
-        paid_for_class = en.total_paid or 0
+        class_teacher = en.course.teacher if en.course else None
+        class_teacher_name = display_name(class_teacher, "نامشخص") if class_teacher else None
+        paid_for_class = breakdown["paid_teacher"] + breakdown["paid_institute"]
+        total_paid_all += paid_for_class
         
         enroll_list.append({
             "enrollment_id": en.id,
+            "course_id": en.course_id,
             "course_title": c_title,
+            "teacher_id": en.course.teacher_id if en.course else None,
+            "teacher_name": class_teacher_name,
+            "is_unassigned": False,
             "total_tuition": en.total_tuition,
             "discount": discount,
             "final_tuition": final_tuition,
             "total_paid": paid_for_class,
-            "outstanding": max(0, final_tuition - paid_for_class)
+            "outstanding": breakdown["debt"]
         })
         
     # لیست اقساط
@@ -2296,9 +2268,9 @@ def get_invoice_details(
     course = db.query(Course).filter(Course.id == enroll.course_id).first()
     
     final_tuition, discount = get_enrollment_tuition_and_discount(enroll)
-    
-    # دریافت پرداخت‌های واقعی کلاس (منبع حقیقت واحد: total_paid روی ثبت‌نام، همگام با تراکنش‌های لینک‌شده)
-    total_paid = enroll.total_paid or 0
+    breakdown = calculate_enrollment_debt_breakdown(db, enroll)
+    total_paid = breakdown["paid_teacher"] + breakdown["paid_institute"]
+    balance_due = breakdown["debt"]
     
     # دریافت اقساط این کلاس
     # FIX: Bug 13 - exclude archived Installment rows from this active view.
@@ -2306,17 +2278,21 @@ def get_invoice_details(
     
     return {
         "enrollment_id": enroll.id,
+        "course_id": course.id if course else enroll.course_id,
         "student_name": display_name(student, "نامشخص"),
         "course_title": course.title if course else "کلاس حذف شده",
+        "teacher_id": course.teacher_id if course else None,
+        "teacher_name": display_name(course.teacher, "نامشخص") if course and course.teacher else None,
+        "is_unassigned": False,
         "base_tuition": enroll.total_tuition,
         "discount_type": enroll.discount_type,
         "discount_value": enroll.discount_value,
         "discount_amount": discount,
         "final_tuition": final_tuition,
         "total_paid": total_paid,
-        "balance_due": max(0, final_tuition - total_paid),
+        "balance_due": balance_due,
         # FIX O-09: همان معنا با نام صریح + اعتبار مازاد پرداخت (افزودنی؛ فیلدهای قبلی دست‌نخورده)
-        "remaining_tuition": max(0, final_tuition - total_paid),
+        "remaining_tuition": balance_due,
         "credit_balance": max(0, total_paid - final_tuition),
         "installments": [
             {
@@ -2380,21 +2356,14 @@ def _debtor_age_bucket(last_payment_day, today: datetime.date):
 
 
 def _debtor_teacher_rows(db: Session, student_id: int, wallet_teacher_debt: int = 0):
-    """(teacher_id, teacher_name, course_title, بدهیِ همان کلاس) برای ثبت‌نام‌های فعال.
+    """(teacher_id, teacher_name, course_title, بدهیِ همان enrollment).
 
-    منبع عدد: `calculate_enrollment_debt` — یعنی دقیقاً همان فرمولِ هر ثبت‌نام که
-    `calculate_student_debt` روی‌شان جمع می‌زند ⇒ جمع «بدهی به تفکیک معلم» با
-    «کل بدهی» دانش‌آموز هم‌خوان می‌ماند و عدد سومِ واگرا ساخته نمی‌شود.
-    (بدهیِ جلساتِ شارژشدهٔ معلم جداگانه در `debt_teacher` کیف پول گزارش می‌شود.)
-
-    حالت legacy (ثبت‌نام بی‌قیمت + کیف معلم منفی): `calculate_enrollment_debt` صفر
-    می‌دهد ولی `calculate_student_debt` از fallback کیف پول بدهی گزارش می‌کند ⇒ اگر
-    دانش‌آموز **دقیقاً یک کلاس فعال** داشته باشد، همان بدهیِ کیف معلم به آن یک معلم
-    نسبت داده می‌شود (بدون حدسِ تقسیم بین چند معلم)؛ در غیر این صورت مبلغ
-    تخصیص‌نیافته می‌ماند و در نمای گروه‌بندی به‌صورت `unassigned_debt` گزارش می‌شود تا
-    `sum(by_teacher.debt) + unassigned_debt == total_debt` همیشه برقرار بماند.
+    این نمای per-class فقط بدهیِ enrollment را نشان می‌دهد. بدهی legacy که
+    `calculate_student_debt` از wallet کلی دانش‌آموز می‌گیرد، در `unassigned_debt`
+    باقی می‌ماند؛ حتی اگر دانش‌آموز فقط یک کلاس فعال داشته باشد. نسبت‌دادن wallet
+    کلی به تنها کلاس هم همچنان نسبت‌دادن نادرست بین کلاس‌هاست.
     """
-    from financial_calculations import calculate_enrollment_debt  # lazy، الگوی پروژه
+    from financial_calculations import calculate_enrollment_debt_breakdown  # lazy، الگوی پروژه
     enrollments = (
         db.query(Enrollment)
         .filter(Enrollment.student_id == student_id, Enrollment.is_deleted == False)
@@ -2406,16 +2375,40 @@ def _debtor_teacher_rows(db: Session, student_id: int, wallet_teacher_debt: int 
         if course is None:
             continue
         teacher = db.query(Teacher).filter(Teacher.id == course.teacher_id).first()
+        breakdown = calculate_enrollment_debt_breakdown(db, en)
         rows.append({
             "teacher_id": course.teacher_id,
             "teacher_name": display_name(teacher, "نامشخص") if teacher else "بدون معلم",
             "course_id": course.id,
             "course_title": course.title or "کلاس بدون نام",
-            "debt": calculate_enrollment_debt(en),
+            "debt": breakdown["debt"],
+            "debt_teacher": breakdown["debt_teacher"],
+            "debt_institute": breakdown["debt_institute"],
+            "enrollment_id": en.id,
+            "is_unassigned": False,
         })
-    if rows and wallet_teacher_debt > 0 and sum(int(r["debt"] or 0) for r in rows) == 0:
-        if len(rows) == 1:
-            rows[0]["debt"] = int(wallet_teacher_debt)
+    # A legacy wallet balance has no enrollment scope. Keep its remainder as an
+    # explicit row instead of assigning it to an arbitrary active class.
+    student = db.query(Student).filter(Student.id == student_id).first()
+    if student is not None:
+        total_debt = calculate_student_debt(db, student)
+        assigned = sum(int(row["debt"] or 0) for row in rows)
+        unassigned = max(0, int(total_debt) - assigned)
+        # ``unassigned`` is contractual/tuition debt that has no enrollment
+        # owner. Wallet debt is reported in its own top-level fields and must
+        # not be smuggled into this row's teacher/institute class split.
+        if unassigned:
+            rows.append({
+                "teacher_id": None,
+                "teacher_name": None,
+                "course_id": None,
+                "course_title": None,
+                "debt": unassigned,
+                "debt_teacher": 0,
+                "debt_institute": unassigned,
+                "enrollment_id": None,
+                "is_unassigned": True,
+            })
     return rows
 
 
@@ -2454,7 +2447,7 @@ def build_debtor_rows(db: Session, resolved_branch: Optional[int], search: Optio
 
         student_name = display_name(s, "نامشخص")
         teacher_rows = _debtor_teacher_rows(db, s.id, abs(w_t) if w_t < 0 else 0)
-        teacher_names = sorted({r["teacher_name"] for r in teacher_rows})
+        teacher_names = sorted({r["teacher_name"] for r in teacher_rows if r.get("teacher_name")})
         if needle:
             haystack = " ".join([student_name, *teacher_names, *(c or "" for c in courses)]).lower()
             if needle not in haystack:
@@ -2462,6 +2455,10 @@ def build_debtor_rows(db: Session, resolved_branch: Optional[int], search: Optio
 
         last_payment_raw, last_payment_day = _debtor_last_payment(db, s.id)
         bucket, age_days = _debtor_age_bucket(last_payment_day, today)
+        # Category totals are the sum of explicit enrollment rows. The global
+        # wallet is used only for the explicit unassigned row above.
+        class_debt_teacher = sum(int(row.get("debt_teacher") or 0) for row in teacher_rows)
+        class_debt_institute = sum(int(row.get("debt_institute") or 0) for row in teacher_rows)
         result.append({
             "student_id": s.id,
             "student_name": student_name,
@@ -2469,8 +2466,12 @@ def build_debtor_rows(db: Session, resolved_branch: Optional[int], search: Optio
             "parent_mobile": s.parent_mobile,
             "student_mobile": s.student_mobile,
             "contact_mobile": s.parent_mobile or s.student_mobile or "",
-            "debt_teacher": abs(w_t) if w_t < 0 else 0,
-            "debt_institute": abs(w_i) if w_i < 0 else 0,
+            "debt_teacher": class_debt_teacher,
+            "debt_institute": class_debt_institute,
+            # Legacy wallet debt is deliberately exposed under separate names;
+            # it is never merged into a class/enrollment row.
+            "wallet_debt_teacher": max(0, -w_t),
+            "wallet_debt_institute": max(0, -w_i),
             "total_debt": total_debt,
             "active_courses": courses,
             # FIX (گروه۲/آیتم۹): فیلدهای خواسته‌شده — تاریخ آخرین پرداخت، شماره تماس،
@@ -2521,6 +2522,10 @@ def get_debtors_grouped(
             {"teacher_id": None, "teacher_name": "بدون کلاس فعال", "course_title": "", "debt": 0}
         ]
         for entry in teacher_entries:
+            # The explicit unassigned row is reported through the top-level
+            # unassigned_debt field, not as a teacher group.
+            if entry.get("is_unassigned"):
+                continue
             key = entry["teacher_id"]
             group = teacher_groups.setdefault(key, {
                 "teacher_id": key,
@@ -2550,11 +2555,15 @@ def get_debtors_grouped(
         group["student_ids"].append(row["student_id"])
 
     total_debt = sum(int(row["total_debt"]) for row in rows)
+    wallet_debt_teacher = sum(int(row.get("wallet_debt_teacher") or 0) for row in rows)
+    wallet_debt_institute = sum(int(row.get("wallet_debt_institute") or 0) for row in rows)
     by_teacher = sorted(teacher_groups.values(), key=lambda g: (-g["debt"], g["teacher_id"] or 0))
     assigned = sum(int(group["debt"]) for group in by_teacher)
     return {
         "total_debt": total_debt,
         "debtors_count": len(rows),
+        "wallet_debt_teacher": wallet_debt_teacher,
+        "wallet_debt_institute": wallet_debt_institute,
         "by_teacher": by_teacher,
         "by_age": [bucket_groups[name] for name in ("0-7", "8-30", "over_30", "no_payment")],
         # FIX (گروه۲/آیتم۹): بخشی از بدهی که قطعی به معلمِ خاصی نسبت داده نمی‌شود
@@ -2674,9 +2683,10 @@ def get_revenue_summary(
     
     # تعداد تراکنش‌های استرداد شده (Refunds)
     # FIX: Bug 12 - exclude archived Transaction rows from this active view.
-    refund_count = db.query(Transaction).filter(Transaction.is_deleted == False, Transaction.is_reversed == False).filter(Transaction.type == "reversal").count()
+    # برگشت payout معلم ledger است و refund دانش‌آموز نیست؛ با settlement_id تفکیک می‌شود.
+    refund_count = db.query(Transaction).filter(Transaction.is_deleted == False, Transaction.is_reversed == False, Transaction.settlement_id.is_(None)).filter(Transaction.type == "reversal").count()
     # FIX: Bug 12 - exclude archived Transaction rows from this active view.
-    refund_amount = db.query(func.sum(Transaction.amount)).filter(Transaction.is_deleted == False, Transaction.is_reversed == False).filter(Transaction.type == "reversal").scalar() or 0
+    refund_amount = db.query(func.sum(Transaction.amount)).filter(Transaction.is_deleted == False, Transaction.is_reversed == False, Transaction.settlement_id.is_(None)).filter(Transaction.type == "reversal").scalar() or 0
     
     return {
         "revenue_by_wallet": {

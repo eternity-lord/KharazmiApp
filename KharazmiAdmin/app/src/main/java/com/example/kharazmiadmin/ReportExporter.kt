@@ -110,7 +110,8 @@ object ReportExporter {
         fileName: String,
         onStart: () -> Unit,
         onComplete: () -> Unit,
-        onError: (String) -> Unit
+        onError: (String) -> Unit,
+        mimeType: String = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     ) {
         // FIX: Bug 19 - never create an unowned background job from a UI helper.
         val owner = context as? LifecycleOwner
@@ -157,7 +158,7 @@ object ReportExporter {
 
                     // نمایش دیالوگ اشتراک‌گذاری/بازکردن فایل Excel
                     val intent = Intent(Intent.ACTION_SEND).apply {
-                        type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        type = mimeType
                         putExtra(Intent.EXTRA_STREAM, fileUri)
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     }

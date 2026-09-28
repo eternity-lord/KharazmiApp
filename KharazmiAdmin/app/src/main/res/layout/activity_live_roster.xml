@@ -81,7 +81,7 @@
         android:layout_height="wrap_content"
         android:text="دانش‌آموزی ثبت‌نام نشده است."
         android:textAppearance="@style/TextAppearance.Kharazmi.Body"
-        android:textColor="?android:attr/textColorSecondary"
+        android:textColor="@color/text_secondary"
         android:gravity="center"
         android:padding="@dimen/spacing_large"
         android:visibility="gone" />

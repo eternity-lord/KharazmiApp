@@ -1,7 +1,6 @@
 package com.example.kharazmiadmin
 
 import android.content.Context
-import android.graphics.Color
 import android.os.Bundle
 import android.view.View
 import android.widget.Button
@@ -187,19 +186,24 @@ class ChartActivity : BaseActivity() {
         )
         val dataSet = BarDataSet(entries, getString(R.string.chart_ds_count))
         dataSet.colors = listOf(
-            Color.parseColor("#2196F3"),
-            Color.parseColor("#00695C")
+            UiColors.resolve(this@ChartActivity, R.color.status_info),
+            UiColors.resolve(this@ChartActivity, R.color.gaj_green_dark)
         )
         dataSet.valueTextSize = 12f
+        dataSet.valueTextColor = UiColors.resolve(this@ChartActivity, R.color.ds_text_primary)
         dataSet.valueFormatter = object : ValueFormatter() {
             override fun getFormattedValue(value: Float): String = value.toInt().toString()
         }
 
         chart.data = BarData(dataSet).apply { barWidth = 0.55f }
         chart.description.isEnabled = false
+        chart.setNoDataText(getString(R.string.chart_no_data))
+        chart.setNoDataTextColor(UiColors.resolve(this@ChartActivity, R.color.ds_text_secondary))
         chart.legend.isEnabled = false
         chart.axisRight.isEnabled = false
         chart.axisLeft.axisMinimum = 0f
+        chart.axisLeft.textColor = UiColors.resolve(this@ChartActivity, R.color.ds_text_secondary)
+        chart.xAxis.textColor = UiColors.resolve(this@ChartActivity, R.color.ds_text_secondary)
         chart.xAxis.valueFormatter =
             IndexAxisValueFormatter(listOf(getString(R.string.chart_funnel_in), getString(R.string.chart_funnel_done)))
         chart.xAxis.position = XAxis.XAxisPosition.BOTTOM
@@ -270,13 +274,19 @@ class ChartActivity : BaseActivity() {
         }
 
         val dataSet = BarDataSet(entries, getString(R.string.chart_ds_income))
-        dataSet.color = Color.parseColor("#00695C") // رنگ سبز گاج
+        dataSet.color = UiColors.resolve(this@ChartActivity, R.color.gaj_green_dark) // رنگ سبز گاج
         dataSet.valueTextSize = 11f
+        dataSet.valueTextColor = UiColors.resolve(this@ChartActivity, R.color.ds_text_primary)
 
         val barData = BarData(dataSet)
         barChart.data = barData
 
         barChart.description.isEnabled = false
+        barChart.setNoDataText(getString(R.string.chart_no_data))
+        barChart.setNoDataTextColor(UiColors.resolve(this@ChartActivity, R.color.ds_text_secondary))
+        barChart.axisLeft.textColor = UiColors.resolve(this@ChartActivity, R.color.ds_text_secondary)
+        barChart.xAxis.textColor = UiColors.resolve(this@ChartActivity, R.color.ds_text_secondary)
+        barChart.legend.textColor = UiColors.resolve(this@ChartActivity, R.color.ds_text_secondary)
         barChart.xAxis.valueFormatter = IndexAxisValueFormatter(labels)
         barChart.xAxis.position = XAxis.XAxisPosition.BOTTOM
         barChart.xAxis.granularity = 1f
@@ -296,17 +306,22 @@ class ChartActivity : BaseActivity() {
 
         val dataSet = PieDataSet(entries, "")
         dataSet.colors = listOf(
-            Color.parseColor("#00695C"), // سبز تیره گاج
-            Color.parseColor("#FFC107"), // زرد طلایی
-            Color.parseColor("#D32F2F")  // قرمز
+            UiColors.resolve(this@ChartActivity, R.color.gaj_green_dark), // سبز تیره گاج
+            UiColors.resolve(this@ChartActivity, R.color.gaj_accent), // زرد طلایی
+            UiColors.resolve(this@ChartActivity, R.color.status_danger)  // قرمز
         )
         dataSet.valueTextSize = 14f
-        dataSet.valueTextColor = Color.WHITE
+        dataSet.valueTextColor = UiColors.resolve(this@ChartActivity, R.color.white)
 
         val pieData = PieData(dataSet)
         pieChart.data = pieData
 
         pieChart.description.isEnabled = false
+        pieChart.setNoDataText(getString(R.string.chart_no_data))
+        pieChart.setNoDataTextColor(UiColors.resolve(this@ChartActivity, R.color.ds_text_secondary))
+        pieChart.setCenterTextColor(UiColors.resolve(this@ChartActivity, R.color.ds_text_primary))
+        pieChart.setEntryLabelColor(UiColors.resolve(this@ChartActivity, R.color.ds_text_primary))
+        pieChart.legend.textColor = UiColors.resolve(this@ChartActivity, R.color.ds_text_secondary)
         pieChart.centerText = getString(R.string.chart_pie_all)
         pieChart.setCenterTextSize(15f)
         pieChart.animateY(1000)
@@ -329,20 +344,25 @@ class ChartActivity : BaseActivity() {
         }
 
         val dataSet = LineDataSet(entries, getString(R.string.chart_line_att))
-        dataSet.color = Color.parseColor("#00695C") // رنگ سبز اصلی
-        dataSet.setCircleColor(Color.parseColor("#FFC107")) // زرد طلایی
+        dataSet.color = UiColors.resolve(this@ChartActivity, R.color.gaj_green_dark) // رنگ سبز اصلی
+        dataSet.setCircleColor(UiColors.resolve(this@ChartActivity, R.color.gaj_accent)) // زرد طلایی
         dataSet.lineWidth = 3f
         dataSet.circleRadius = 5f
         dataSet.setDrawCircleHole(true)
         dataSet.valueTextSize = 11f
-        dataSet.valueTextColor = Color.parseColor("#212121")
+        dataSet.valueTextColor = UiColors.resolve(this@ChartActivity, R.color.text_primary)
         dataSet.setDrawFilled(true)
-        dataSet.fillColor = Color.parseColor("#E8F5E9") // رنگ سبز ملایم پشت خط
+        dataSet.fillColor = UiColors.resolve(this@ChartActivity, R.color.status_success_light) // رنگ سبز ملایم پشت خط
 
         val lineData = LineData(dataSet)
         lineChart.data = lineData
 
         lineChart.description.isEnabled = false
+        lineChart.setNoDataText(getString(R.string.chart_no_data))
+        lineChart.setNoDataTextColor(UiColors.resolve(this@ChartActivity, R.color.ds_text_secondary))
+        lineChart.axisLeft.textColor = UiColors.resolve(this@ChartActivity, R.color.ds_text_secondary)
+        lineChart.xAxis.textColor = UiColors.resolve(this@ChartActivity, R.color.ds_text_secondary)
+        lineChart.legend.textColor = UiColors.resolve(this@ChartActivity, R.color.ds_text_secondary)
         lineChart.xAxis.valueFormatter = IndexAxisValueFormatter(labels)
         lineChart.xAxis.position = XAxis.XAxisPosition.BOTTOM
         lineChart.xAxis.granularity = 1f
@@ -364,16 +384,21 @@ class ChartActivity : BaseActivity() {
 
         val dataSet = PieDataSet(entries, "")
         dataSet.colors = listOf(
-            Color.parseColor("#00695C"), // سبز تیره گاج
-            Color.parseColor("#FFC107")  // زرد طلایی گاج
+            UiColors.resolve(this@ChartActivity, R.color.gaj_green_dark), // سبز تیره گاج
+            UiColors.resolve(this@ChartActivity, R.color.gaj_accent)  // زرد طلایی گاج
         )
         dataSet.valueTextSize = 13f
-        dataSet.valueTextColor = Color.WHITE
+        dataSet.valueTextColor = UiColors.resolve(this@ChartActivity, R.color.white)
 
         val pieData = PieData(dataSet)
         pieChart.data = pieData
 
         pieChart.description.isEnabled = false
+        pieChart.setNoDataText(getString(R.string.chart_no_data))
+        pieChart.setNoDataTextColor(UiColors.resolve(this@ChartActivity, R.color.ds_text_secondary))
+        pieChart.setCenterTextColor(UiColors.resolve(this@ChartActivity, R.color.ds_text_primary))
+        pieChart.setEntryLabelColor(UiColors.resolve(this@ChartActivity, R.color.ds_text_primary))
+        pieChart.legend.textColor = UiColors.resolve(this@ChartActivity, R.color.ds_text_secondary)
         pieChart.centerText = getString(R.string.chart_pie_collected)
         pieChart.setCenterTextSize(15f)
         pieChart.animateY(1000)

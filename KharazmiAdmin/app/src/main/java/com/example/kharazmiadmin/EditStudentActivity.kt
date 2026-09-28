@@ -80,7 +80,11 @@ class EditStudentActivity : BaseActivity() {
                 .setMinYear(1300)
                 .setMaxYear(PersianCalendar().persianYear)
                 .setInitDate(1385, 1, 1)
-                .setActionTextColor(Color.GRAY)
+                .setActionTextColor(UiColors.resolve(this@EditStudentActivity, R.color.ds_accent))
+                // Persian-Date-Picker-Dialog uses white backgrounds unless explicitly themed.
+                .setBackgroundColor(UiColors.resolve(this@EditStudentActivity, R.color.ds_bg_surface))
+                .setPickerBackgroundColor(UiColors.resolve(this@EditStudentActivity, R.color.ds_bg_surface_2))
+                .setTitleColor(UiColors.resolve(this@EditStudentActivity, R.color.ds_text_primary))
                 .setTitleType(PersianDatePickerDialog.WEEKDAY_DAY_MONTH_YEAR)
                 .setShowInBottomSheet(true)
                 .setListener(object : ir.hamsaa.persiandatepicker.Listener {
@@ -188,7 +192,7 @@ class EditStudentActivity : BaseActivity() {
                         val tv = TextView(this@EditStudentActivity).apply {
                             text = getString(R.string.estudent_no_class)
                             gravity = android.view.Gravity.CENTER
-                            setTextColor(Color.GRAY)
+                            setTextColor(UiColors.resolve(this@EditStudentActivity, R.color.text_secondary))
                             textSize = 12f
                             setPadding(0, 16, 0, 16)
                         }
@@ -202,22 +206,26 @@ class EditStudentActivity : BaseActivity() {
                                     layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1).apply {
                                         setMargins(0, 4, 0, 8)
                                     }
-                                    setBackgroundColor(Color.parseColor("#E0E0E0"))
+                                    setBackgroundColor(UiColors.resolve(this@EditStudentActivity, R.color.ds_border))
                                 }
                                 addView(border)
                                 
                                 val tvTitle = TextView(this@EditStudentActivity).apply {
-                                    text = getString(R.string.estudent_course_row, tf.course_title, tf.teacher_name)
+                                    text = if (tf.is_unassigned) {
+                                        "بدهی بدون کلاس"
+                                    } else {
+                                        "بدهی کلاس ${tf.course_title} — معلم ${tf.teacher_name ?: "بدون معلم"}"
+                                    }
                                     textStyleBold()
-                                    setTextColor(Color.BLACK)
+                                    setTextColor(UiColors.resolve(this@EditStudentActivity, R.color.text_primary))
                                     textSize = 13f
                                 }
                                 addView(tvTitle)
 
                                 val hlPaid = LinearLayout(this@EditStudentActivity).apply {
                                     orientation = LinearLayout.HORIZONTAL
-                                    val l = TextView(this@EditStudentActivity).apply { text = getString(R.string.estudent_paid_label); textSize = 12f; setTextColor(Color.GRAY) }
-                                    val v = TextView(this@EditStudentActivity).apply { text = getString(R.string.common_toman_format, tf.paid_teacher); textSize = 12f; setTextColor(Color.parseColor("#388E3C")); textStyleBold() }
+                                    val l = TextView(this@EditStudentActivity).apply { text = getString(R.string.estudent_paid_label); textSize = 12f; setTextColor(UiColors.resolve(this@EditStudentActivity, R.color.text_secondary)) }
+                                    val v = TextView(this@EditStudentActivity).apply { text = getString(R.string.common_toman_format, tf.paid_teacher); textSize = 12f; setTextColor(UiColors.resolve(this@EditStudentActivity, R.color.status_success)); textStyleBold() }
                                     addView(l)
                                     addView(View(this@EditStudentActivity).apply { layoutParams = LinearLayout.LayoutParams(0, 1, 1f) })
                                     addView(v)
@@ -226,8 +234,8 @@ class EditStudentActivity : BaseActivity() {
 
                                 val hlDebt = LinearLayout(this@EditStudentActivity).apply {
                                     orientation = LinearLayout.HORIZONTAL
-                                    val l = TextView(this@EditStudentActivity).apply { text = getString(R.string.estudent_debt_label); textSize = 12f; setTextColor(Color.GRAY) }
-                                    val v = TextView(this@EditStudentActivity).apply { text = getString(R.string.common_toman_format, tf.debt_teacher); textSize = 12f; setTextColor(Color.parseColor("#D32F2F")); textStyleBold() }
+                                    val l = TextView(this@EditStudentActivity).apply { text = getString(R.string.estudent_debt_label); textSize = 12f; setTextColor(UiColors.resolve(this@EditStudentActivity, R.color.text_secondary)) }
+                                    val v = TextView(this@EditStudentActivity).apply { text = getString(R.string.common_toman_format, tf.debt); textSize = 12f; setTextColor(UiColors.resolve(this@EditStudentActivity, R.color.status_danger)); textStyleBold() }
                                     addView(l)
                                     addView(View(this@EditStudentActivity).apply { layoutParams = LinearLayout.LayoutParams(0, 1, 1f) })
                                     addView(v)

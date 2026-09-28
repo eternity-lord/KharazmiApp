@@ -33,19 +33,26 @@ class TimelineAdapter(
         holder.tvSubtitle.text = ev.subtitle
         holder.tvDate.text = ev.timestamp
 
-        // Icon & color based on type
-        val color = try {
-            Color.parseColor(ev.colorHex)
+        // Icon fills and title text use separate semantic tokens: bright status text remains
+        // readable on the dark/light icon fills in both palettes.
+        val (iconColor, titleColor) = try {
+            val serverColor = Color.parseColor(ev.colorHex)
+            serverColor to serverColor
         } catch (_: Exception) {
             when (ev.type) {
-                "payment" -> Color.parseColor("#4CAF50")
-                "absence" -> Color.parseColor("#F44336")
-                "grade" -> Color.parseColor("#2196F3")
-                "installment" -> Color.parseColor("#FF9800")
-                else -> Color.parseColor("#757575")
+                "payment" -> UiColors.resolve(holder.itemView.context, R.color.status_success_deep) to
+                    UiColors.resolve(holder.itemView.context, R.color.status_success)
+                "absence" -> UiColors.resolve(holder.itemView.context, R.color.ds_danger_deep) to
+                    UiColors.resolve(holder.itemView.context, R.color.status_danger)
+                "grade" -> UiColors.resolve(holder.itemView.context, R.color.status_info_deep) to
+                    UiColors.resolve(holder.itemView.context, R.color.status_info)
+                "installment" -> UiColors.resolve(holder.itemView.context, R.color.status_warning_deep) to
+                    UiColors.resolve(holder.itemView.context, R.color.status_warning)
+                else -> UiColors.resolve(holder.itemView.context, R.color.status_neutral_deep) to
+                    UiColors.resolve(holder.itemView.context, R.color.text_secondary)
             }
         }
-        holder.cardIcon.setCardBackgroundColor(color)
+        holder.cardIcon.setCardBackgroundColor(iconColor)
 
         val iconText = when (ev.type) {
             "payment" -> "💰"
@@ -63,7 +70,7 @@ class TimelineAdapter(
             }
         }
         holder.tvIcon.text = iconText
-        holder.tvTitle.setTextColor(color)
+        holder.tvTitle.setTextColor(titleColor)
     }
 
     fun update(newList: List<TimelineEvent>) {

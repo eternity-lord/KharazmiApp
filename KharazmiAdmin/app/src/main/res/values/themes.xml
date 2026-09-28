@@ -16,6 +16,10 @@
         <item name="android:statusBarColor">@color/gaj_primary_dark</item>
         <item name="colorSurface">@color/gaj_surface</item>
         <item name="colorOnSurface">@color/gaj_text_primary</item>
+        <item name="android:textColorPrimary">@color/gaj_text_primary</item>
+        <item name="android:textColorSecondary">@color/gaj_text_secondary</item>
+        <item name="android:textColorTertiary">@color/gaj_text_hint</item>
+        <item name="android:textColorHint">@color/gaj_text_hint</item>
         <item name="colorBackground">@color/gaj_background</item>
         <item name="colorOnBackground">@color/gaj_text_primary</item>
         <item name="colorError">@color/gaj_error</item>
@@ -38,9 +42,12 @@
         <item name="cornerRadius">28dp</item>
         <item name="android:paddingVertical">12dp</item>
         <item name="android:paddingHorizontal">12dp</item>
-        <item name="android:minHeight">0dp</item>
+        <item name="android:minHeight">@dimen/min_touch_target</item>
         <item name="android:textSize">13sp</item>
         <item name="android:textStyle">bold</item>
+        <item name="android:maxLines">2</item>
+        <item name="android:gravity">center</item>
+        <item name="android:lineSpacingMultiplier">1.0</item>
         <item name="android:insetTop">0dp</item>
         <item name="android:insetBottom">0dp</item>
         <item name="backgroundTint">?attr/colorPrimary</item>
@@ -54,9 +61,12 @@
         <item name="cornerRadius">28dp</item>
         <item name="android:paddingVertical">12dp</item>
         <item name="android:paddingHorizontal">12dp</item>
-        <item name="android:minHeight">0dp</item>
+        <item name="android:minHeight">@dimen/min_touch_target</item>
         <item name="android:textSize">13sp</item>
         <item name="android:textStyle">bold</item>
+        <item name="android:maxLines">2</item>
+        <item name="android:gravity">center</item>
+        <item name="android:lineSpacingMultiplier">1.0</item>
         <item name="android:insetTop">0dp</item>
         <item name="android:insetBottom">0dp</item>
         <item name="strokeColor">?attr/colorPrimary</item>
@@ -176,6 +186,10 @@
         <item name="cornerRadius">16dp</item>
         <item name="android:textColor">?attr/colorOnSurface</item>
         <item name="android:textSize">12sp</item>
+        <item name="android:singleLine">false</item>
+        <item name="android:maxLines">2</item>
+        <item name="android:minHeight">@dimen/min_touch_target</item>
+        <item name="android:paddingVertical">6dp</item>
     </style>
 
     <!-- ==================== GOLD/DARK REDESIGN STYLES (NEW) ==================== -->
@@ -191,6 +205,7 @@
         <item name="android:statusBarColor">@color/gold_bg_base</item>
         <item name="colorSurface">@color/gold_bg_elevated</item>
         <item name="colorOnSurface">@color/text_primary</item>
+        <item name="android:textColorPrimary">@color/text_primary</item>
         <!-- FIX: Gold secondary and hint text must use the readable Gold tokens, not inherited light-theme defaults. -->
         <item name="android:textColorSecondary">@color/text_secondary</item>
         <item name="android:textColorTertiary">@color/text_disabled</item>
@@ -213,9 +228,12 @@
         <item name="cornerRadius">14dp</item>
         <item name="android:paddingVertical">14dp</item>
         <item name="android:paddingHorizontal">16dp</item>
-        <item name="android:minHeight">0dp</item>
+        <item name="android:minHeight">@dimen/min_touch_target</item>
         <item name="android:textSize">15sp</item>
         <item name="android:textStyle">bold</item>
+        <item name="android:maxLines">2</item>
+        <item name="android:gravity">center</item>
+        <item name="android:lineSpacingMultiplier">1.0</item>
         <item name="android:insetTop">0dp</item>
         <item name="android:insetBottom">0dp</item>
         <!-- FIX: Plain MaterialButtons using this style need the same readable disabled text as GoldButton. -->
@@ -232,9 +250,12 @@
         <item name="cornerRadius">14dp</item>
         <item name="android:paddingVertical">12dp</item>
         <item name="android:paddingHorizontal">16dp</item>
-        <item name="android:minHeight">0dp</item>
+        <item name="android:minHeight">@dimen/min_touch_target</item>
         <item name="android:textSize">14sp</item>
         <item name="android:textStyle">bold</item>
+        <item name="android:maxLines">2</item>
+        <item name="android:gravity">center</item>
+        <item name="android:lineSpacingMultiplier">1.0</item>
         <item name="strokeColor">@color/gold_primary</item>
         <item name="strokeWidth">1.5dp</item>
         <item name="android:textColor">@color/gold_primary</item>

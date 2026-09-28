@@ -358,7 +358,8 @@ def test_s08_contractual_and_wallet_debt_stay_separate(world):
     rows = finance.get_debtors_list(db=world.db, authorization=f"Bearer {TOKEN}", _="admin")
     row = next(r for r in rows if r["student_id"] == 101)
     assert row["total_debt"] == 800
-    assert (row["debt_teacher"], row["debt_institute"]) == (30, 20), "بدهی کیف جداگانه گزارش می‌شود"
+    assert (row["debt_teacher"], row["debt_institute"]) == (0, 800), "بدهی کلاس فقط از enrollment می‌آید"
+    assert (row["wallet_debt_teacher"], row["wallet_debt_institute"]) == (30, 20), "بدهی کیف جداگانه گزارش می‌شود"
 
 
 # ==========================================

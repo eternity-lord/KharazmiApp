@@ -51,16 +51,14 @@
                     tools:text="استاد احمدی"
                     android:textColor="@color/text_primary"
                     android:textStyle="bold"
-                    android:textSize="18sp"
-                    android:maxLines="1"
-                    android:ellipsize="end"/>
+                    android:textSize="18sp"/>
 
                 <TextView
                     android:id="@+id/tvTeacherMobile"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     tools:text="📱 09123456789"
-                    android:textColor="?android:attr/textColorSecondary"
+                    android:textColor="@color/text_secondary"
                     android:textSize="14sp"
                     android:layout_marginTop="4dp"/>
 
@@ -85,12 +83,12 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             tools:text="کد ملی: 1234567890"
-            android:textColor="?android:attr/textColorSecondary"
+            android:textColor="@color/text_secondary"
             android:textSize="14sp"
             android:layout_marginBottom="@dimen/spacing_normal"
             android:drawableStart="@android:drawable/ic_lock_idle_lock"
             android:drawablePadding="4dp"
-            android:drawableTint="?android:attr/textColorSecondary"/>
+            android:drawableTint="@color/text_secondary"/>
 
         <!-- Quick actions -->
         <LinearLayout
@@ -105,7 +103,8 @@
                 style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="0dp"
                 android:layout_weight="1"
-                android:layout_height="40dp"
+                android:layout_height="wrap_content"
+                android:minHeight="@dimen/min_touch_target"
                 android:text="تماس"
                 android:textSize="12sp"
                 app:icon="@android:drawable/ic_menu_call"
@@ -119,7 +118,8 @@
                 style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="0dp"
                 android:layout_weight="1"
-                android:layout_height="40dp"
+                android:layout_height="wrap_content"
+                android:minHeight="@dimen/min_touch_target"
                 android:text="پروفایل"
                 android:textSize="12sp"
                 app:icon="@android:drawable/ic_menu_info_details"
@@ -134,7 +134,8 @@
                 style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="0dp"
                 android:layout_weight="1"
-                android:layout_height="40dp"
+                android:layout_height="wrap_content"
+                android:minHeight="@dimen/min_touch_target"
                 android:text="کلاس‌ها"
                 android:textSize="12sp"
                 app:icon="@android:drawable/ic_menu_agenda"

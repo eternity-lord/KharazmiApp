@@ -28,6 +28,12 @@ interface LiveApi {
         @retrofit2.http.Body body: LiveEndPayload
     ): LiveEndResponse
 
+    // لغو کلاس زنده — فقط وضعیت LiveSession را می‌بندد و هیچ جلسه/حضور/تراکنشی نمی‌سازد.
+    @retrofit2.http.POST("attendance/{session_id}/cancel_live")
+    suspend fun cancelLive(
+        @retrofit2.http.Path("session_id") sessionId: Int
+    ): LiveCancelResponse
+
     // جلسه‌ی زنده‌ی فعلیِ معلمِ لاگین‌شده (برای رزومه/تایمر)
     @retrofit2.http.GET("attendance/live/current")
     suspend fun getCurrentLive(): LiveCurrentResponse?

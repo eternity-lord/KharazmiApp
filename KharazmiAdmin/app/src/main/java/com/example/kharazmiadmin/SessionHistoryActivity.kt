@@ -100,27 +100,27 @@ class HistoryAdapter(private val list: List<SessionHistoryItem>) : RecyclerView.
         when (statusVal.lowercase()) {
             "finished" -> {
                 holder.tvStatus.text = holder.itemView.context.getString(R.string.shist_st_done)
-                holder.tvStatus.setTextColor(android.graphics.Color.parseColor("#388E3C"))
+                holder.tvStatus.setTextColor(UiColors.resolve(holder.itemView.context, R.color.status_success))
                 holder.imgStatusIcon.setImageResource(android.R.drawable.checkbox_on_background)
-                holder.imgStatusIcon.imageTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#388E3C"))
+                holder.imgStatusIcon.imageTintList = android.content.res.ColorStateList.valueOf(UiColors.resolve(holder.itemView.context, R.color.status_success))
             }
             "modified" -> {
                 holder.tvStatus.text = holder.itemView.context.getString(R.string.shist_st_modified)
-                holder.tvStatus.setTextColor(android.graphics.Color.parseColor("#F57C00"))
+                holder.tvStatus.setTextColor(UiColors.resolve(holder.itemView.context, R.color.status_warning))
                 holder.imgStatusIcon.setImageResource(android.R.drawable.ic_menu_edit)
-                holder.imgStatusIcon.imageTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#F57C00"))
+                holder.imgStatusIcon.imageTintList = android.content.res.ColorStateList.valueOf(UiColors.resolve(holder.itemView.context, R.color.status_warning))
             }
             "deleted" -> {
                 holder.tvStatus.text = holder.itemView.context.getString(R.string.shist_st_deleted)
-                holder.tvStatus.setTextColor(android.graphics.Color.parseColor("#D32F2F"))
+                holder.tvStatus.setTextColor(UiColors.resolve(holder.itemView.context, R.color.status_danger))
                 holder.imgStatusIcon.setImageResource(android.R.drawable.ic_delete)
-                holder.imgStatusIcon.imageTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#D32F2F"))
+                holder.imgStatusIcon.imageTintList = android.content.res.ColorStateList.valueOf(UiColors.resolve(holder.itemView.context, R.color.status_danger))
             }
             else -> {
                 holder.tvStatus.text = statusVal
-                holder.tvStatus.setTextColor(android.graphics.Color.GRAY)
+                holder.tvStatus.setTextColor(UiColors.resolve(holder.itemView.context, R.color.text_secondary))
                 holder.imgStatusIcon.setImageResource(android.R.drawable.checkbox_off_background)
-                holder.imgStatusIcon.imageTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.GRAY)
+                holder.imgStatusIcon.imageTintList = android.content.res.ColorStateList.valueOf(UiColors.resolve(holder.itemView.context, R.color.text_secondary))
             }
         }
     }

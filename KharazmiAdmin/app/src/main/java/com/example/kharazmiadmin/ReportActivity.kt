@@ -2,6 +2,7 @@ package com.example.kharazmiadmin
 
 import android.app.AlertDialog
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import android.print.PrintAttributes
 import android.print.PrintManager
@@ -15,8 +16,11 @@ import com.google.android.material.textfield.TextInputLayout
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import okhttp3.ResponseBody
+import retrofit2.Response
 import retrofit2.http.GET
 import retrofit2.http.Query
+import retrofit2.http.Streaming
 
 // مدل‌های داده برای رتروفیت جدید گزارش‌گیری متمرکز
 data class FinancialSummaryResponse(
@@ -37,12 +41,52 @@ data class FinancialMetrics(
     val uncollected: Long
 )
 
+data class PaymentTimelineItem(
+    val transaction_id: Int? = null, val date: String? = null,
+    val amount: Long? = null, val target_wallet: String? = null,
+    val payment_link: String? = null
+)
+
+data class NextInstallmentItem(
+    val id: Int? = null, val amount: Long? = null, val due_date: String? = null,
+    val remaining_amount: Long? = null, val payment_link: String? = null
+)
+
+data class StudentStatementTeacher(
+    val enrollment_id: Int? = null,
+    val teacher_id: Int? = null,
+    val teacher_name: String? = null,
+    val course_id: Int? = null,
+    val course_title: String? = null,
+    val course_code: String? = null,
+    val branch_id: Int? = null,
+    val paid_teacher: Long = 0,
+    val paid_institute: Long = 0,
+    val debt_teacher: Long = 0,
+    val debt_institute: Long = 0,
+    val debt: Long = 0,
+    val tuition: Long = 0,
+    val enrollment_status: String? = null,
+    val teacher_profile_path: String? = null,
+    val is_unassigned: Boolean = false
+)
+
 data class StudentStatementResponse(
     val student_id: Int,
     val student_name: String,
     val student_code: String,
     val total_paid_institute: Long,
     val total_debt_institute: Long,
+    // Class-scoped totals are separate from the legacy aggregate wallet fields.
+    val class_paid_institute: Long? = null,
+    val class_debt_institute: Long? = null,
+    val class_debt_total: Long? = null,
+    val unassigned_debt: Long = 0,
+    val teacher_name: String? = null,
+    val teachers: List<StudentStatementTeacher> = emptyList(),
+    val payment_timeline: List<PaymentTimelineItem> = emptyList(),
+    val next_installment: NextInstallmentItem? = null,
+    val payment_link: String? = null,
     val institute_card_number: String,
     val institute_name: String,
     val address: String,
@@ -70,6 +114,15 @@ data class TeacherItem(
 interface ReportNewApi {
     @GET("teachers/list")
     suspend fun getTeachersList(): List<TeacherItem>
+
+    @Streaming
+    @GET("reports/financial/excel")
+    suspend fun exportFinancial(
+        @Query("start_date") startDate: String?,
+        @Query("end_date") endDate: String?,
+        @Query("branch_id") branchId: Int? = null,
+        @Query("teacher_id") teacherId: Int? = null
+    ): Response<ResponseBody>
 
     @GET("reports/financial_summary")
     suspend fun getFinancialSummary(
@@ -103,8 +156,10 @@ class ReportActivity : BaseActivity() {
     private lateinit var acYearFilter: AutoCompleteTextView
     private lateinit var acMonthFilter: AutoCompleteTextView
     private lateinit var btnFetchFinancialSummary: Button
+    private lateinit var btnExportFinancial: Button
     // O-10: خط هشدار پول بی‌تاریخ (nullable: اگر چیدمان قدیمی بود، اپ نباید بشکند)
     private var tvUndatedWarning: TextView? = null
+    private var tvReportStatus: TextView? = null
 
     // مقادیر خروجی آمار مالی
     private lateinit var tvMonthlyTitle: TextView
@@ -126,6 +181,10 @@ class ReportActivity : BaseActivity() {
     private lateinit var tvStatementStudentCode: TextView
     private lateinit var tvStatementPaid: TextView
     private lateinit var tvStatementDebt: TextView
+    private lateinit var tvStatementTeacher: TextView
+    private lateinit var tvStatementNextDue: TextView
+    private lateinit var tvStatementTimeline: TextView
+    private lateinit var btnStatementPay: Button
     private lateinit var btnPrintStatement: Button
 
     // حالت‌ها و متغیرهای کمکی
@@ -147,7 +206,9 @@ class ReportActivity : BaseActivity() {
         acYearFilter = findViewById(R.id.acYearFilter)
         acMonthFilter = findViewById(R.id.acMonthFilter)
         btnFetchFinancialSummary = findViewById(R.id.btnFetchFinancialSummary)
+        btnExportFinancial = findViewById(R.id.btnExportFinancial)
         tvUndatedWarning = findViewById(R.id.tvUndatedWarning)
+        tvReportStatus = findViewById(R.id.tvReportStatus)
 
         tvMonthlyTitle = findViewById(R.id.tvMonthlyTitle)
         tvMonthlyTotal = findViewById(R.id.tvMonthlyTotal)
@@ -167,6 +228,10 @@ class ReportActivity : BaseActivity() {
         tvStatementStudentCode = findViewById(R.id.tvStatementStudentCode)
         tvStatementPaid = findViewById(R.id.tvStatementPaid)
         tvStatementDebt = findViewById(R.id.tvStatementDebt)
+        tvStatementTeacher = findViewById(R.id.tvStatementTeacher)
+        tvStatementNextDue = findViewById(R.id.tvStatementNextDue)
+        tvStatementTimeline = findViewById(R.id.rvPaymentTimeline)
+        btnStatementPay = findViewById(R.id.btnStatementPay)
         btnPrintStatement = findViewById(R.id.btnPrintStatement)
         
         ButtonAnimator.applyPillScaleAnimation(btnFetchFinancialSummary)
@@ -210,6 +275,7 @@ class ReportActivity : BaseActivity() {
             val scope = if (rbScopeTeacher.isChecked) "teacher" else "institute"
             fetchReport(scope)
         }
+        btnExportFinancial.setOnClickListener { exportFinancialReport() }
 
         // ۶. دکمه جستجوی صورت‌حساب دانش‌آموز
         btnSearchStudentStatement.setOnClickListener {
@@ -222,6 +288,8 @@ class ReportActivity : BaseActivity() {
                 printStatementDirect(studentId)
             } ?: Toast.makeText(this, getString(R.string.rpt_no_student), Toast.LENGTH_SHORT).show()
         }
+        // دکمهٔ پرداخت فقط پس از دریافت صورت‌حساب و با شناسهٔ واقعی دانش‌آموز فعال می‌شود.
+        btnStatementPay.visibility = View.GONE
     }
 
     private fun setupDateDropdowns() {
@@ -279,9 +347,18 @@ class ReportActivity : BaseActivity() {
                     }
                     val teacherAdapter = ArrayAdapter(this@ReportActivity, android.R.layout.simple_dropdown_item_1line, teacherNames)
                     acTeacherFilter.setAdapter(teacherAdapter)
+                    acTeacherFilter.threshold = 0
+                    acTeacherFilter.setOnClickListener { acTeacherFilter.showDropDown() }
 
                     acTeacherFilter.setOnItemClickListener { _, _, position, _ ->
-                        selectedTeacherId = list[position].id
+                        // AutoComplete فهرستِ فیلترشدهٔ خودش را دارد؛ استفاده از list[position]
+                        // بعد از تایپ نام، شناسهٔ معلم دیگری را می‌فرستاد.
+                        val selectedText = teacherAdapter.getItem(position).orEmpty()
+                        selectedTeacherId = Regex("\\((\\d+)\\)$").find(selectedText)?.groupValues?.getOrNull(1)?.toIntOrNull()
+                    }
+                    acTeacherFilter.setOnFocusChangeListener { _, hasFocus ->
+                        if (hasFocus) acTeacherFilter.showDropDown()
+                        else if (selectedTeacherId == null) acTeacherFilter.setText("", false)
                     }
                 }
             } catch (e: Exception) {
@@ -294,7 +371,50 @@ class ReportActivity : BaseActivity() {
         }
     }
 
+    private fun exportFinancialReport() {
+        val month = acMonthFilter.text.toString().trim().toIntOrNull() ?: 12
+        val year = acYearFilter.text.toString().trim().toIntOrNull() ?: 1405
+        val start = "$year/${String.format(java.util.Locale.US, "%02d", month)}/01"
+        val lastDay = if (month <= 6) 31 else if (month <= 11) 30 else 29
+        val end = "$year/${String.format(java.util.Locale.US, "%02d", month)}/$lastDay"
+        val teacherId = if (rbScopeTeacher.isChecked && currentUserRole != "teacher") selectedTeacherId else null
+        val teacherQuery = teacherId?.let { "&teacher_id=$it" } ?: ""
+        val baseUrl = RetrofitClient.getInstance(this).baseUrl().toString()
+        val url = "${baseUrl}reports/financial/excel?start_date=$start&end_date=$end$teacherQuery"
+        ReportExporter.exportToExcel(
+            context = this,
+            endpointUrl = url,
+            fileName = "financial_report_${System.currentTimeMillis()}.xlsx",
+            onStart = { Toast.makeText(this, "در حال ساخت خروجی Excel…", Toast.LENGTH_SHORT).show() },
+            onComplete = { Toast.makeText(this, "خروجی Excel آماده و قابل اشتراک‌گذاری شد", Toast.LENGTH_LONG).show() },
+            onError = { error -> Toast.makeText(this, "خروجی Excel ناموفق بود: $error", Toast.LENGTH_LONG).show() }
+        )
+    }
+
+    private fun setReportStatus(message: String?, isError: Boolean = false) {
+        tvReportStatus?.let { status ->
+            if (message.isNullOrBlank()) {
+                status.visibility = View.GONE
+            } else {
+                status.text = message
+                status.setTextColor(
+                    UiColors.resolve(
+                        this,
+                        if (isError) R.color.ds_danger else R.color.ds_text_secondary
+                    )
+                )
+                status.visibility = View.VISIBLE
+            }
+        }
+    }
+
     private fun fetchReport(scope: String) {
+        // اگر کاربر نام را تایپ کرده ولی روی suggestion نزده، شناسهٔ انتهای متن
+        // (`نام معلم (id)`) را هم resolve کن؛ گزارش نباید بی‌دلیل با «معلم انتخاب نشده» متوقف شود.
+        if (scope == "teacher" && currentUserRole != "teacher" && selectedTeacherId == null) {
+            selectedTeacherId = Regex("\\((\\d+)\\)$").find(acTeacherFilter.text.toString().trim())
+                ?.groupValues?.getOrNull(1)?.toIntOrNull()
+        }
         val yearStr = acYearFilter.text.toString().trim()
         val monthStr = acMonthFilter.text.toString().trim()
 
@@ -306,6 +426,9 @@ class ReportActivity : BaseActivity() {
             return
         }
 
+        // Keep a visible state on the page; a Toast alone made failed reports
+        // look like permanently blank number cards.
+        setReportStatus("در حال دریافت ارقام گزارش...", isError = false)
         // FIX: Bug 19 - cancel screen work when this Activity is destroyed.
 
         lifecycleScope.launch(Dispatchers.IO) {
@@ -318,6 +441,7 @@ class ReportActivity : BaseActivity() {
                 )
 
                 withContext(Dispatchers.Main) {
+                    setReportStatus(null)
                     tvMonthlyTitle.text = getString(R.string.rpt_monthly_title, yearStr, monthStr)
                     tvMonthlyTotal.text = getString(R.string.common_toman_format, summary.monthly.total)
                     tvMonthlyCollected.text = getString(R.string.common_toman_format, summary.monthly.collected)
@@ -353,7 +477,9 @@ class ReportActivity : BaseActivity() {
                 // FIX: Bug 19 - cancellation is not a network/UI error.
                 if (e is kotlinx.coroutines.CancellationException) throw e;
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(this@ReportActivity, getString(R.string.rpt_calc_error), Toast.LENGTH_SHORT).show()
+                    val detail = e.message?.takeIf { it.isNotBlank() } ?: getString(R.string.rpt_calc_error)
+                    setReportStatus("گزارش بارگذاری نشد: $detail", isError = true)
+                    Toast.makeText(this@ReportActivity, detail, Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -419,8 +545,91 @@ class ReportActivity : BaseActivity() {
                     llStatementResult.visibility = View.VISIBLE
                     tvStatementStudentName.text = getString(R.string.rpt_stmt_name, stmt.student_name)
                     tvStatementStudentCode.text = getString(R.string.rpt_stmt_code, stmt.student_code)
-                    tvStatementPaid.text = getString(R.string.common_toman_format, stmt.total_paid_institute)
-                    tvStatementDebt.text = getString(R.string.common_toman_format, stmt.total_debt_institute)
+                    tvStatementStudentName.setOnClickListener {
+                        startActivity(Intent(this@ReportActivity, StudentProfileActivity::class.java).apply {
+                            putExtra("STUDENT_ID", studentId)
+                        })
+                    }
+                    // Prefer the new class-scoped totals; old servers fall back to
+                    // the legacy aggregate fields without breaking the screen.
+                    val classPaidInstitute = stmt.class_paid_institute ?: stmt.total_paid_institute
+                    val classDebtInstitute = stmt.class_debt_institute ?: stmt.total_debt_institute
+                    tvStatementPaid.text = getString(R.string.common_toman_format, classPaidInstitute)
+                    tvStatementDebt.text = getString(R.string.common_toman_format, classDebtInstitute)
+                    val teacherLines = stmt.teachers.joinToString("\n") { item ->
+                        val teacher = item.teacher_name ?: "بدون معلم"
+                        val course = item.course_title ?: "بدون کلاس / بدهی عمومی"
+                        val teacherDebt = String.format(java.util.Locale.US, "%,d", item.debt_teacher)
+                        val instituteDebt = String.format(java.util.Locale.US, "%,d", item.debt_institute)
+                        val totalDebt = String.format(java.util.Locale.US, "%,d", item.debt)
+                        "$teacher / $course — بدهی معلم: $teacherDebt، بدهی آموزشگاه: $instituteDebt، کل: $totalDebt تومان"
+                    }
+                    tvStatementTeacher.text = if (teacherLines.isNotBlank()) teacherLines else
+                        "معلم بدهکار: ${stmt.teacher_name ?: "بدون معلم"}"
+                    tvStatementTeacher.setOnClickListener {
+                        val teacherRows = stmt.teachers.filter { it.teacher_id != null }
+                        if (teacherRows.isEmpty()) return@setOnClickListener
+                        val labels = teacherRows.map {
+                            "${it.teacher_name ?: "بدون معلم"} | بدهی معلم: ${it.debt_teacher} | بدهی آموزشگاه: ${it.debt_institute}"
+                        }.toTypedArray()
+                        AlertDialog.Builder(this@ReportActivity)
+                            .setTitle("انتخاب معلم برای مشاهده پروفایل")
+                            .setItems(labels) { _, which ->
+                                teacherRows[which].teacher_id?.let { teacherId ->
+                                    startActivity(Intent(this@ReportActivity, TeacherProfileActivity::class.java).apply {
+                                        putExtra("TEACHER_ID", teacherId)
+                                    })
+                                }
+                            }
+                            .setNegativeButton(getString(R.string.common_cancel), null)
+                            .show()
+                    }
+                    tvStatementNextDue.text = stmt.next_installment?.let {
+                        "قسط بعدی: ${it.due_date ?: "نامشخص"} | ${it.remaining_amount ?: it.amount ?: 0} تومان"
+                    } ?: "قسط بازی ندارد"
+                    tvStatementTimeline.text = stmt.payment_timeline.joinToString("\n") {
+                        "${it.date ?: "تاریخ نامشخص"} — ${it.amount ?: 0} تومان"
+                    }.ifEmpty { "تاریخچه پرداختی وجود ندارد" }
+                    btnStatementPay.visibility = if (stmt.next_installment != null) View.VISIBLE else View.GONE
+                    btnStatementPay.setOnClickListener {
+                        // گزارش می‌تواند چند enrollment داشته باشد؛ ابتدا کلاس را انتخاب می‌کنیم
+                        // تا prefill بدهی و enrollment_id همیشه از همان ردیف بیاید.
+                        val teacherRows = stmt.teachers
+                        if (teacherRows.isEmpty()) {
+                            Toast.makeText(this@ReportActivity, "برای پرداخت، کلاس فعالی وجود ندارد", Toast.LENGTH_LONG).show()
+                            return@setOnClickListener
+                        }
+                        val labels = teacherRows.map { row ->
+                            "${row.course_title ?: "بدون کلاس"} — معلم ${row.teacher_name ?: "بدون معلم"}"
+                        }.toTypedArray()
+                        fun openSelected(row: StudentStatementTeacher) {
+                            val enrollmentId = row.enrollment_id
+                            if (enrollmentId == null || enrollmentId <= 0) {
+                                Toast.makeText(this@ReportActivity, "برای بدهی بدون کلاس امکان ثبت پرداخت کلاس‌محور وجود ندارد", Toast.LENGTH_LONG).show()
+                                return
+                            }
+                            startActivity(Intent(this@ReportActivity, InvoiceActivity::class.java).apply {
+                                putExtra(InvoiceActivity.EXTRA_IS_ADMIN, true)
+                                putExtra(InvoiceActivity.EXTRA_PREFILL_STUDENT_ID, studentId)
+                                putExtra(InvoiceActivity.EXTRA_PREFILL_STUDENT_NAME, stmt.student_name)
+                                putExtra(InvoiceActivity.EXTRA_PREFILL_CLASS_NAME, labels[teacherRows.indexOf(row)])
+                                putExtra(InvoiceActivity.EXTRA_PREFILL_DEBT, row.debt)
+                                putExtra(InvoiceActivity.EXTRA_PREFILL_DEBT_TEACHER, row.debt_teacher)
+                                putExtra(InvoiceActivity.EXTRA_PREFILL_DEBT_INSTITUTE, row.debt_institute)
+                                putExtra(InvoiceActivity.EXTRA_PREFILL_ENROLLMENT_ID, enrollmentId)
+                                putExtra(InvoiceActivity.EXTRA_PREFILL_COURSE_ID, row.course_id ?: -1)
+                            })
+                        }
+                        if (teacherRows.size == 1) {
+                            openSelected(teacherRows[0])
+                        } else {
+                            AlertDialog.Builder(this@ReportActivity)
+                                .setTitle("انتخاب کلاس برای ثبت پرداخت")
+                                .setItems(labels) { _, which -> openSelected(teacherRows[which]) }
+                                .setNegativeButton(getString(R.string.common_cancel), null)
+                                .show()
+                        }
+                    }
                 }
             } catch (e: Exception) {
                 // FIX: Bug 19 - cancellation is not a network/UI error.

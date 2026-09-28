@@ -136,7 +136,9 @@ def calculate_institute_session_revenue(db: Session, start_date: str, end_date: 
         models.Transaction.is_reversed == False
     )
     if branch_id is not None:
-        query = query.filter(models.Transaction.branch_id == branch_id)
+        scope = branch_scope_clause(models.Transaction.branch_id, branch_id)
+        if scope is not None:
+            query = query.filter(scope)
     return sum(int(share or 0) for share, date_value in query.all() if _row_date_in_range(date_value, start, end))
 
 
@@ -165,7 +167,9 @@ def collected_revenue_rows(db: Session, start_date: str, end_date: str,
         models.Transaction.is_reversed == False
     )
     if branch_id is not None:
-        query = query.filter(models.Transaction.branch_id == branch_id)
+        scope = branch_scope_clause(models.Transaction.branch_id, branch_id)
+        if scope is not None:
+            query = query.filter(scope)
     if course_id is not None:
         query = query.filter(models.Transaction.course_id == course_id)
     rows = query.all()
@@ -205,7 +209,9 @@ def count_undated_payments(db: Session, target_wallet: Optional[str] = None,
     if target_wallet is not None:
         query = query.filter(models.Transaction.target_wallet == target_wallet)
     if branch_id is not None:
-        query = query.filter(models.Transaction.branch_id == branch_id)
+        scope = branch_scope_clause(models.Transaction.branch_id, branch_id)
+        if scope is not None:
+            query = query.filter(scope)
     if course_ids is not None:
         # مثل منطق کارکرد معلم: هم پرداخت‌های همان کلاس‌ها، هم پرداخت‌های عمومی (بدون کلاس)
         query = query.filter(or_(models.Transaction.course_id.in_(course_ids),
@@ -231,7 +237,9 @@ def calculate_total_turnover(db: Session, start_date: str, end_date: str, branch
         models.Transaction.is_reversed == False
     )
     if branch_id is not None:
-        query = query.filter(models.Transaction.branch_id == branch_id)
+        scope = branch_scope_clause(models.Transaction.branch_id, branch_id)
+        if scope is not None:
+            query = query.filter(scope)
     return sum(int(amount or 0) for amount, date_value in query.all() if _row_date_in_range(date_value, start, end))
 
 
@@ -319,6 +327,137 @@ def calculate_student_debt(db: Session, student) -> int:
     if enrollments and not active:
         return 0
     return max(0, -(student.wallet_teacher or 0)) + max(0, -(student.wallet_institute or 0))
+
+
+def calculate_enrollment_debt_breakdown(
+    db: Session,
+    enrollment,
+    *,
+    session_scoped: bool = False,
+) -> dict:
+    """بدهی یک ثبت‌نام را بدون کپی‌کردن کیف کل دانش‌آموز بین چند کلاس گزارش می‌کند.
+
+    مبنا همان ledger موجود است: پرداخت‌های لینک‌شده به enrollment و سهم‌های واقعی
+    session_charge. برای دادهٔ legacy که هنوز charge تفکیکی ندارد، ماندهٔ قراردادی
+    فقط به سهم آموزشگاه نسبت داده می‌شود؛ به کلاس‌های دیگر سرایت نمی‌کند.
+
+    ``session_scoped`` برای سازگاری با کلاینت/تست‌های قدیمی پذیرفته می‌شود، اما
+    بدهی enrollment حتی در نمای کلاس‌محور هم صفر نمی‌شود مگر این‌که واقعاً تسویه
+    شده باشد. محاسبه بر اساس همان enrollment انجام می‌شود؛ بدهی ثبت‌نام بدون
+    ``session_charge`` نیز به کلاس دیگری سرایت نمی‌کند و سهم آموزشگاه می‌گیرد.
+
+    این helper فقط خواندنی است و هیچ wallet/ledger را تغییر نمی‌دهد.
+    """
+    if enrollment is None:
+        return {"tuition": 0, "paid_teacher": 0, "paid_institute": 0,
+                "debt_teacher": 0, "debt_institute": 0, "debt": 0}
+    from dependencies import get_enrollment_tuition_and_discount
+    final_tuition, _ = get_enrollment_tuition_and_discount(enrollment)
+    # قرارداد اتصال پرداخت به کلاس: ابتدا enrollment_id واقعی؛ برای legacyهایی که
+    # enrollment_id ندارند اما course_id دارند، تطبیق دقیق student_id + course_id.
+    # پرداخت عمومیِ بدون course/enrollment عمداً به هیچ کلاس نسبت داده نمی‌شود.
+    from sqlalchemy import and_, or_
+    payment_scope = or_(
+        models.Transaction.enrollment_id == enrollment.id,
+        and_(
+            models.Transaction.enrollment_id.is_(None),
+            models.Transaction.student_id == enrollment.student_id,
+            models.Transaction.course_id == enrollment.course_id,
+        ),
+    )
+    payments = db.query(models.Transaction).filter(
+        payment_scope,
+        models.Transaction.is_deleted == False,
+        models.Transaction.is_reversed == False,
+        models.Transaction.amount > 0,
+    ).all()
+    paid_teacher = 0
+    paid_institute = 0
+    for payment in payments:
+        amount = int(payment.amount or 0)
+        if payment.target_wallet == "teacher":
+            paid_teacher += amount
+        elif payment.target_wallet == "institute":
+            paid_institute += amount
+        elif payment.target_wallet == "both":
+            share_teacher = int(payment.share_teacher or 0)
+            share_institute = int(payment.share_institute or 0)
+            if share_teacher + share_institute != amount:
+                share_teacher = amount // 2
+                share_institute = amount - share_teacher
+            paid_teacher += share_teacher
+            paid_institute += share_institute
+
+    # Enrollment.total_paid is the only payment record in older databases, while
+    # some legacy receipts are the reverse (a receipt exists but total_paid was not
+    # backfilled). Reconcile both without counting the smaller source twice; any
+    # unattributed delta stays in the institute side for backward-compatible totals.
+    ledger_paid = paid_teacher + paid_institute
+    recorded_paid = int(enrollment.total_paid or 0)
+    if ledger_paid > 0 and ledger_paid > recorded_paid:
+        effective_paid = ledger_paid
+    else:
+        effective_paid = recorded_paid
+        if recorded_paid > ledger_paid:
+            paid_institute += recorded_paid - ledger_paid
+
+    # Session charges created by older attendance flows may have no course_id,
+    # while their session_id still points unambiguously to the class. Resolve
+    # those rows through SessionLog as well; otherwise a real charge is silently
+    # reported as zero in the class card and the quick-remittance picker.
+    class_session_ids = db.query(models.SessionLog.id).filter(
+        models.SessionLog.course_id == enrollment.course_id,
+        models.SessionLog.is_deleted == False,
+    )
+    charge_scope = or_(
+        # For a real session charge, session_id is the authoritative class key.
+        # This prevents a stale/mistyped course_id from leaking class B's charge
+        # into class A when both classes share the same teacher/student.
+        and_(
+            models.Transaction.session_id.is_not(None),
+            models.Transaction.session_id.in_(class_session_ids),
+        ),
+        # Legacy rows without a session_id can only use their explicit enrollment
+        # or course key; an unassigned charge is never guessed into a class.
+        and_(
+            models.Transaction.session_id.is_(None),
+            or_(
+                models.Transaction.enrollment_id == enrollment.id,
+                and_(
+                    models.Transaction.enrollment_id.is_(None),
+                    models.Transaction.course_id == enrollment.course_id,
+                ),
+            ),
+        ),
+    )
+    charges = db.query(models.Transaction).filter(
+        models.Transaction.student_id == enrollment.student_id,
+        charge_scope,
+        models.Transaction.type == "session_charge",
+        models.Transaction.is_deleted == False,
+        models.Transaction.is_reversed == False,
+    ).all()
+    billed_teacher = sum(int(row.share_teacher or 0) for row in charges)
+    billed_institute = sum(int(row.share_institute or 0) for row in charges)
+    debt = max(0, int(final_tuition or 0) - effective_paid)
+    if charges:
+        debt_teacher = max(0, billed_teacher - paid_teacher)
+        debt_institute = max(0, billed_institute - paid_institute)
+    else:
+        # Contractual enrollment tuition remains owed until paid, including in
+        # class-scoped screens. Without session-level shares, keep the amount on
+        # the institute side of this exact enrollment rather than zeroing it or
+        # copying it to another class.
+        debt_teacher = 0
+        debt_institute = debt
+    return {
+        "tuition": int(final_tuition or 0),
+        "paid_teacher": paid_teacher,
+        "paid_institute": paid_institute,
+        "debt_teacher": debt_teacher,
+        "debt_institute": debt_institute,
+        "debt": debt,
+    }
 
 
 # FIX: H5/H6 - منطق یگانه‌ی تقسیم سهم جلسه؛ استخراج‌شده از submit/edit تا فقط یک‌بار نوشته/تست شود.

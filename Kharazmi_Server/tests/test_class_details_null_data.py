@@ -161,6 +161,7 @@ class TestClassDetailsNullData(unittest.TestCase):
         result = get_class_details(course_id=self.course.id, db=self.db, authorization="Bearer admin-token", sub_role="admin")
         row = result["students"][0]
         self.assertEqual(row["paid"], 0)
+        # Contractual enrollment debt remains visible even without a session charge.
         self.assertEqual(row["debt"], 1000000)
 
     def test_both_money_fields_null_no_500(self):

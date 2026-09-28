@@ -108,10 +108,17 @@ class SmsActivity : BaseActivity() {
                     fetchHistory() // آپدیت لیست
                 }
             } catch (e: Exception) {
-                // FIX: Bug 19 - cancellation is not a network/UI error.
-                if (e is kotlinx.coroutines.CancellationException) throw e;
-                lifecycleScope.launch(Dispatchers.Main) { findViewById<Button>(R.id.btnSendSms).isEnabled = true }
+                // Cancellation is lifecycle control, not a delivery failure.
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 android.util.Log.e("SmsActivity", "sendSms failed", e)
+                withContext(Dispatchers.Main) {
+                    findViewById<Button>(R.id.btnSendSms).isEnabled = true
+                    Toast.makeText(
+                        this@SmsActivity,
+                        "ارسال پیامک انجام نشد: ${e.message ?: "خطای سرور یا شبکه"}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
             }
         }
     }
@@ -125,8 +132,17 @@ class SmsActivity : BaseActivity() {
                     rvHistory.adapter = SmsAdapter(list)
                 }
             } catch (e: Exception) {
-                // FIX: Bug 19 - cancellation is not a network/UI error.
-                if (e is kotlinx.coroutines.CancellationException) throw e; android.util.Log.e("SmsActivity", "fetchHistory failed", e) }
+                // Cancellation is lifecycle control, not a network/UI error.
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                android.util.Log.e("SmsActivity", "fetchHistory failed", e)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        this@SmsActivity,
+                        "تاریخچه پیامک بارگذاری نشد: ${e.message ?: "خطای سرور یا شبکه"}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
         }
     }
 }

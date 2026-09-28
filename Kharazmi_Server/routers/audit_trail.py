@@ -480,9 +480,14 @@ def _entity_refs_batch(db: Session, collected: List[Tuple[int, str, Dict[str, se
     if page_ids.get("course_ids"):
         courses = {row.id: row for row in db.query(Course).filter(
             Course.id.in_(page_ids["course_ids"])).all()}
-    if page_ids.get("branch_ids"):
+    # branch_id در برخی تراکنش‌های legacy خالی است؛ از کلاس/ثبت‌نام به‌عنوان
+    # fallback نمایشی استفاده می‌کنیم، بدون تغییر سند خام ممیزی.
+    derived_branch_ids = set(page_ids.get("branch_ids") or ())
+    derived_branch_ids |= {course.branch_id for course in courses.values() if course.branch_id}
+    derived_branch_ids |= {enrollment.branch_id for enrollment in enrollments.values() if enrollment.branch_id}
+    if derived_branch_ids:
         branches = {row.id: (row.name or "") for row in db.query(Branch).filter(
-            Branch.id.in_(page_ids["branch_ids"])).all()}
+            Branch.id.in_(derived_branch_ids)).all()}
 
     teacher_ids = {course.teacher_id for course in courses.values() if course.teacher_id}
     # معلمِ کلاسِ ثبت‌نام هم لازم است (قسط خودش course_id ندارد)
@@ -511,9 +516,11 @@ def _entity_refs_batch(db: Session, collected: List[Tuple[int, str, Dict[str, se
         if enrollment is not None:
             student_id = student_id if student_id is not None else enrollment.student_id
             course_id = course_id if course_id is not None else enrollment.course_id
+            branch_id = branch_id if branch_id is not None else enrollment.branch_id
         student_by_log[log_id] = student_id
         student = students.get(student_id) if student_id is not None else None
         course = courses.get(course_id) if course_id is not None else None
+        branch_id = branch_id if branch_id is not None else (course.branch_id if course is not None else None)
         teacher = None
         if course is not None and course.teacher_id:
             teacher = teachers.get(course.teacher_id)

@@ -116,9 +116,11 @@
                             style="@style/Widget.Kharazmi.Button.Gold"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
+                            android:textColor="@color/text_on_gold"
                             android:text="۱) ثبت حضور و غیاب"
                             app:backgroundTint="@color/gold_primary"
                             app:icon="@drawable/ic_calendar_24"
+                            app:iconTint="@color/text_on_gold"
                             app:iconGravity="textStart"
                             app:elevation="@dimen/elevation_button"
                             android:layout_marginBottom="@dimen/spacing_normal"/>
@@ -128,9 +130,11 @@
                             style="@style/Widget.Kharazmi.Button.Gold"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
+                            android:textColor="@color/text_on_gold"
                             android:text="۲) ثبت‌نام و ویرایش دانش‌آموزان"
                             app:backgroundTint="@color/gold_primary"
                             app:icon="@android:drawable/ic_input_add"
+                            app:iconTint="@color/text_on_gold"
                             app:iconGravity="textStart"
                             app:elevation="@dimen/elevation_button"/>
 
@@ -161,6 +165,13 @@
                         android:orientation="vertical"
                         android:padding="@dimen/spacing_normal">
 
+                        <TextView
+                            android:id="@+id/tvClassCapacity"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="ظرفیت کلاس"
+                            android:contentDescription="capacity" />
+
                         <com.google.android.material.button.MaterialButton
                             android:id="@+id/btnEditClassInfoAction"
                             style="@style/Widget.Kharazmi.Button.Gold"
@@ -168,8 +179,8 @@
                             android:layout_height="wrap_content"
                             android:text="۳) اصلاح اطلاعات کلاس (پایه / عنوان)"
                             app:backgroundTint="@color/gold_primary"
-                            android:textColor="@color/white"
-                            app:iconTint="@color/white"
+                            android:textColor="@color/text_on_gold"
+                            app:iconTint="@color/text_on_gold"
                             app:icon="@android:drawable/ic_menu_edit"
                             app:iconGravity="textStart"
                             app:elevation="@dimen/elevation_button"
@@ -182,8 +193,8 @@
                             android:layout_height="wrap_content"
                             android:text="۴) تعلیق کلاس"
                             app:backgroundTint="@color/gold_primary"
-                            android:textColor="@color/white"
-                            app:iconTint="@color/white"
+                            android:textColor="@color/text_on_gold"
+                            app:iconTint="@color/text_on_gold"
                             app:icon="@android:drawable/ic_lock_lock"
                             app:iconGravity="textStart"
                             app:elevation="@dimen/elevation_button"

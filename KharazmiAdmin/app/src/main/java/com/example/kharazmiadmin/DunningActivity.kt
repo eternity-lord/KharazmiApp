@@ -1,6 +1,5 @@
 package com.example.kharazmiadmin
 
-import android.graphics.Color
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -230,10 +229,26 @@ class DunningActivity : BaseActivity() {
 
             // Category badge & colors
             val (label, bgColor, strokeColor) = when (item.category) {
-                "upcoming" -> Triple(getString(R.string.dunning_filter_upcoming), Color.parseColor("#2196F3"), Color.parseColor("#1976D2"))
-                "overdue" -> Triple(getString(R.string.dunning_filter_overdue), Color.parseColor("#FF9800"), Color.parseColor("#F57C00"))
-                "critical" -> Triple(getString(R.string.dunning_filter_critical), Color.parseColor("#F44336"), Color.parseColor("#D32F2F"))
-                else -> Triple(item.category, Color.parseColor("#616161"), Color.parseColor("#424242"))
+                "upcoming" -> Triple(
+                    getString(R.string.dunning_filter_upcoming),
+                    UiColors.resolve(holder.itemView.context, R.color.status_info_deep),
+                    UiColors.resolve(holder.itemView.context, R.color.status_info)
+                )
+                "overdue" -> Triple(
+                    getString(R.string.dunning_filter_overdue),
+                    UiColors.resolve(holder.itemView.context, R.color.status_warning_deep),
+                    UiColors.resolve(holder.itemView.context, R.color.status_warning)
+                )
+                "critical" -> Triple(
+                    getString(R.string.dunning_filter_critical),
+                    UiColors.resolve(holder.itemView.context, R.color.ds_danger_deep),
+                    UiColors.resolve(holder.itemView.context, R.color.status_danger)
+                )
+                else -> Triple(
+                    item.category,
+                    UiColors.resolve(holder.itemView.context, R.color.status_neutral_deep),
+                    UiColors.resolve(holder.itemView.context, R.color.text_secondary)
+                )
             }
             // compute days string for overlay? preview already includes, but add status line
             val statusText = when (item.category) {
@@ -244,7 +259,7 @@ class DunningActivity : BaseActivity() {
             }
             holder.tvCategory.text = statusText
             holder.tvCategory.setBackgroundColor(bgColor)
-            holder.tvCategory.setTextColor(Color.WHITE)
+            holder.tvCategory.setTextColor(UiColors.resolve(holder.itemView.context, R.color.white))
             holder.card.strokeColor = strokeColor
 
             // Checkbox state - avoid triggering listener on recycle

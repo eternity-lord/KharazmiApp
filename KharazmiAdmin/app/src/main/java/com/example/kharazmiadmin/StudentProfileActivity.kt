@@ -2,7 +2,6 @@ package com.example.kharazmiadmin
 
 import android.content.Intent
 import android.content.Context
-import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.view.View
@@ -369,17 +368,12 @@ class StudentProfileActivity : BaseActivity() {
                     // 🔥 لاجیک جدید نمایش مالی (هوشمند)
                     // ===========================================
 
-                    // 1. وضعیت کلی کیف پول و بدهی
-                    tvTotalDebt.text = buildTotalStatus(data.walletTotal, data.totalDebt)
-                    tvTotalDebt.setTextColor(colorForBalance(data.walletTotal))
-
-                    // 2. کیف پول معلم
-                    tvDebtTeacher.text = buildWalletStatus(getString(R.string.profile_wallet_teacher), data.walletTeacher, data.debtTeacher)
-                    tvDebtTeacher.setTextColor(colorForBalance(data.walletTeacher))
-
-                    // 3. کیف پول آموزشگاه
-                    tvDebtInstitute.text = buildWalletStatus(getString(R.string.profile_wallet_institute), data.walletInstitute, data.debtInstitute)
-                    tvDebtInstitute.setTextColor(colorForBalance(data.walletInstitute))
+                    // بدهی کلی/کیف کلی به‌عنوان بدهی کلاس نمایش داده نمی‌شود؛
+                    // اعداد دقیق فقط در تب مالی و بر اساس enrollment دیده می‌شوند.
+                    tvTotalDebt.text = "بدهی هر کلاس در تب مالی به‌صورت تفکیک‌شده نمایش داده می‌شود"
+                    tvTotalDebt.setTextColor(UiColors.resolve(this@StudentProfileActivity, R.color.text_primary))
+                    tvDebtTeacher.visibility = View.GONE
+                    tvDebtInstitute.visibility = View.GONE
                     // ===========================================
 
                     if (tabLayout.selectedTabPosition == 0) showInfo()
@@ -407,7 +401,7 @@ class StudentProfileActivity : BaseActivity() {
             enrollments.size == 1 -> {
                 // FIX(invoice): تنها کلاس فعال → شناسه‌ی واقعی همان enrollment می‌رود (نه نام نمایشی)
                 val en = enrollments[0]
-                openInvoice(en.enrollment_id, en.course_id, en.title?.trim()?.takeIf { it.isNotEmpty() } ?: fallbackName)
+                openInvoice(en.enrollment_id, en.course_id, enrollmentLabel(en), en)
             }
             enrollments.size > 1 -> {
                 // FIX(invoice): چند کلاس فعال → اول انتخاب کلاس (با شناسه واقعی)؛ فیش هرگز با نام کلاس حدس‌زده نمی‌شود
@@ -416,27 +410,29 @@ class StudentProfileActivity : BaseActivity() {
                     .setTitle(getString(R.string.invoice_pick_class, profile.info.name))
                     .setItems(labels.toTypedArray()) { _, which ->
                         val en = enrollments[which]
-                        openInvoice(en.enrollment_id, en.course_id, en.title?.trim()?.takeIf { it.isNotEmpty() } ?: fallbackName)
+                        openInvoice(en.enrollment_id, en.course_id, enrollmentLabel(en), en)
                     }
                     .setNegativeButton(R.string.common_cancel, null)
                     .show()
             }
             else -> {
                 // enrollment فعالی نیست (سرور قدیمی یا واقعاً بدون کلاس) → رفتار قبلی: فیش عمومی
-                openInvoice(null, -1, fallbackName)
+                openInvoice(null, -1, fallbackName, null)
             }
         }
     }
 
-    private fun openInvoice(enrollmentId: Int?, courseId: Int, className: String) {
+    private fun openInvoice(enrollmentId: Int?, courseId: Int, className: String, selected: ActiveStudentEnrollment? = null) {
         val profile = cachedProfile ?: return
         val intent = Intent(this, InvoiceActivity::class.java).apply {
             putExtra(InvoiceActivity.EXTRA_PREFILL_STUDENT_ID, studentId)
             putExtra(InvoiceActivity.EXTRA_PREFILL_STUDENT_NAME, profile.info.name)
             putExtra(InvoiceActivity.EXTRA_PREFILL_CLASS_NAME, className)
-            putExtra(InvoiceActivity.EXTRA_PREFILL_DEBT, profile.totalDebt)
-            putExtra(InvoiceActivity.EXTRA_PREFILL_DEBT_TEACHER, profile.debtTeacher)
-            putExtra(InvoiceActivity.EXTRA_PREFILL_DEBT_INSTITUTE, profile.debtInstitute)
+            // Prefill is scoped to the selected enrollment; the profile totals remain
+            // the fallback only for legacy responses that omit enrollment debt fields.
+            putExtra(InvoiceActivity.EXTRA_PREFILL_DEBT, selected?.total_debt ?: profile.totalDebt)
+            putExtra(InvoiceActivity.EXTRA_PREFILL_DEBT_TEACHER, selected?.debt_teacher ?: profile.debtTeacher)
+            putExtra(InvoiceActivity.EXTRA_PREFILL_DEBT_INSTITUTE, selected?.debt_institute ?: profile.debtInstitute)
             putExtra(InvoiceActivity.EXTRA_PREFILL_UNPAID_SESSIONS, 0)
             putExtra(InvoiceActivity.EXTRA_PREFILL_SEARCH_NAME, profile.info.name)
             putExtra(InvoiceActivity.EXTRA_IS_ADMIN, true)
@@ -451,14 +447,19 @@ class StudentProfileActivity : BaseActivity() {
 
     // FIX(invoice): برچسب نمایشی فقط برای UI — هیچ‌جا از روی این متن شناسه استخراج نمی‌شود
     private fun enrollmentLabel(en: ActiveStudentEnrollment): String {
-        val title = en.title?.trim().orEmpty()
+        val title = (en.course_title ?: en.title)?.trim().orEmpty()
         val code = en.code?.trim().orEmpty()
-        return when {
+        val teacher = en.teacher_name?.trim().orEmpty()
+        val classLabel = when {
             title.isNotEmpty() && code.isNotEmpty() -> "$title (کد: $code)"
             title.isNotEmpty() -> title
             code.isNotEmpty() -> code
             else -> getString(R.string.common_unknown_class)
         }
+        val debtTeacher = String.format("%,d", en.debt_teacher ?: 0L)
+        val debtInstitute = String.format("%,d", en.debt_institute ?: 0L)
+        val ownerLabel = if (teacher.isNotEmpty()) "$classLabel — معلم $teacher" else classLabel
+        return "$ownerLabel | بدهی به معلم: $debtTeacher | بدهی به آموزشگاه: $debtInstitute"
     }
 
     private fun showInfo() {
@@ -488,10 +489,22 @@ class StudentProfileActivity : BaseActivity() {
             if (data.transactions.isEmpty()) sb.append(getString(R.string.profile_no_txn))
             else data.transactions.forEach { sb.append(getString(R.string.profile_bullet_row, it)) }
 
-            sb.append(getString(R.string.profile_wallet_title))
-            sb.append(getString(R.string.profile_bullet_row, buildTotalStatus(data.walletTotal, data.totalDebt)))
-            sb.append(getString(R.string.profile_wallet_row, buildWalletStatus(getString(R.string.profile_wallet_teacher), data.walletTeacher, data.debtTeacher)))
-            sb.append(getString(R.string.profile_wallet_row_plain, buildWalletStatus(getString(R.string.profile_wallet_institute), data.walletInstitute, data.debtInstitute)))
+            // بدهی فقط در سطح enrollment نمایش داده می‌شود؛ کیف کلی دانش‌آموز
+            // به هیچ‌کدام از کلاس‌ها نسبت داده نمی‌شود.
+            data.teachers_financial?.let { rows ->
+                if (rows.isNotEmpty()) {
+                    sb.append("\nبدهی تفکیک‌شده کلاس‌ها:\n")
+                    rows.forEach { row ->
+                        if (row.is_unassigned) {
+                            sb.append("بدهی بدون کلاس — آموزشگاه: ${formatCurrency(row.debt_institute)}\n")
+                        } else {
+                            sb.append("کلاس ${row.course_title ?: "کلاس نامشخص"} — معلم ${row.teacher_name ?: "بدون معلم"}\n")
+                            sb.append("  بدهی به معلم: ${formatCurrency(row.debt_teacher)}\n")
+                            sb.append("  بدهی به آموزشگاه: ${formatCurrency(row.debt_institute)}\n")
+                        }
+                    }
+                }
+            }
 
             tvContent.text = sb.toString()
             tvContent.setOnClickListener(null)
@@ -772,9 +785,9 @@ class StudentProfileActivity : BaseActivity() {
     }
 
     private fun colorForBalance(balance: Long): Int = when {
-        balance < 0 -> Color.parseColor("#D32F2F")
-        balance > 0 -> Color.parseColor("#388E3C")
-        else -> Color.parseColor("#616161")
+        balance < 0 -> UiColors.resolve(this, R.color.status_danger)
+        balance > 0 -> UiColors.resolve(this, R.color.status_success)
+        else -> UiColors.resolve(this, R.color.text_secondary)
     }
 
     private fun formatCurrency(value: Long): String =
@@ -1207,14 +1220,14 @@ class StudentProfileActivity : BaseActivity() {
             holder.tvDue.text = holder.itemView.context.getString(R.string.installment_due, item.due_date)
             if (item.is_paid) {
                 holder.tvStatus.text = holder.itemView.context.getString(R.string.installment_paid_label)
-                holder.tvStatus.setTextColor(Color.parseColor("#388E3C"))
+                holder.tvStatus.setTextColor(UiColors.resolve(holder.itemView.context, R.color.status_success))
                 holder.tvPaidAt.visibility = View.VISIBLE
                 holder.tvPaidAt.text = holder.itemView.context.getString(R.string.profile_inst_paidat, item.paid_at)
                 holder.layoutActions.visibility = View.GONE
             } else {
                 val overdue = JalaliUtils.isBeforeToday(item.due_date)
                 holder.tvStatus.text = if (overdue) holder.itemView.context.getString(R.string.profile_inst_overdue) else holder.itemView.context.getString(R.string.profile_inst_pending)
-                holder.tvStatus.setTextColor(if (overdue) Color.parseColor("#D32F2F") else Color.parseColor("#FF8F00"))
+                holder.tvStatus.setTextColor(if (overdue) UiColors.resolve(holder.itemView.context, R.color.status_danger) else UiColors.resolve(holder.itemView.context, R.color.status_warning))
                 holder.tvPaidAt.visibility = View.GONE
                 // FIX (گروه۳/آیتم۱۴): «پرداخت» و «یادآوری» قسط اکشن مالی ادمین/منشی‌اند؛
                 // برای معلم ردیف قسط فقط خواندنی می‌ماند (isTeacherUser از Activity بیرونی).

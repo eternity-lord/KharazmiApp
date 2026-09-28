@@ -70,6 +70,7 @@
                 style="@style/Widget.Kharazmi.Button.Gold"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:textColor="@color/text_on_gold"
                 android:text="📊 مشاهده و دانلود کارنامه رسمی من"
                 app:backgroundTint="@color/gold_primary" />
 
@@ -230,7 +231,7 @@
                         android:layout_height="wrap_content"
                         android:text="ثبت و تحویل نهایی پاسخ‌برگ"
                         app:backgroundTint="@color/gold_primary"
-                        android:textColor="@color/white" />
+                        android:textColor="@color/text_on_gold" />
 
                 </LinearLayout>
 

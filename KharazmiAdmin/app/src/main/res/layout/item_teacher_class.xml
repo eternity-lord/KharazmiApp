@@ -35,9 +35,7 @@
                 tools:text="ریاضی کنکور"
                 android:textColor="@color/text_primary"
                 android:textStyle="bold"
-                android:textSize="16sp"
-                android:maxLines="1"
-                android:ellipsize="end"/>
+                android:textSize="16sp"/>
 
             <TextView
                 android:id="@+id/tvClassStatus"
@@ -58,7 +56,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             tools:text="کد: 3406"
-            android:textColor="?android:attr/textColorSecondary"
+            android:textColor="@color/text_secondary"
             android:textSize="14sp"
             android:layout_marginBottom="4dp"/>
 
@@ -67,11 +65,11 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             tools:text="پایه دهم"
-            android:textColor="?android:attr/textColorSecondary"
+            android:textColor="@color/text_secondary"
             android:textSize="12sp"
             android:drawableStart="@android:drawable/ic_menu_info_details"
             android:drawablePadding="4dp"
-            android:drawableTint="?android:attr/textColorSecondary"/>
+            android:drawableTint="@color/text_secondary"/>
 
     </LinearLayout>
 

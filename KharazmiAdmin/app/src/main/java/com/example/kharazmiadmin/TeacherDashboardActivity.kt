@@ -28,7 +28,17 @@ data class TeacherClassItem(
     val is_admin_approved: Boolean = false,
     val is_suspended: Boolean = false,
     val students_preview: List<String>? = null, // New field added
-    val bg_color: String? = "#FFFFFF"
+    val bg_color: String? = "#FFFFFF",
+    val total_debt: Long = 0,
+    val debt_to_teacher: Long = 0,
+    val debt_to_institute: Long = 0
+)
+
+data class TeacherPendingClassItem(
+    val id: Int, val title: String? = null, val code: String? = null,
+    val days_of_week: String? = null, val class_time: String? = null,
+    val capacity: Int? = null, val status: String? = null,
+    val rejection_reason: String? = null, val pending_since: String? = null
 )
 
 interface TeacherPanelApi {
@@ -37,6 +47,9 @@ interface TeacherPanelApi {
 
     @GET("teachers/{id}/incomplete_classes")
     suspend fun getTeacherIncompleteClasses(@Path("id") id: Int): List<TeacherClassItem>
+
+    @GET("teachers/{teacher_id}/pending_classes")
+    suspend fun getPendingClasses(@Path("teacher_id") teacherId: Int): List<TeacherPendingClassItem>
 }
 
 interface TeacherMeApi {
@@ -50,6 +63,7 @@ class TeacherDashboardActivity : BaseActivity() {
     private lateinit var api: TeacherPanelApi
     private lateinit var rv: RecyclerView
     private var todaySummaryLoading = false
+    private var pendingApprovalItems: List<TeacherPendingClassItem> = emptyList()
     // FIX (گروه۳/آیتم۱۲): پرچم نقش برای آداپتر بنر کلاس‌ها — همان USER_SUB_ROLE موجود.
     private var isAdminUser = false
 
@@ -72,6 +86,7 @@ class TeacherDashboardActivity : BaseActivity() {
         // رفرش دستی
         findViewById<ImageView>(R.id.btnRefresh).setOnClickListener {
             fetchClasses()
+            fetchPendingClasses()
             fetchTeacherTodaySummary(forceRefresh = true)
             Toast.makeText(this, getString(R.string.tdash_updated), Toast.LENGTH_SHORT).show()
         }
@@ -114,9 +129,11 @@ class TeacherDashboardActivity : BaseActivity() {
         // ============================================================
         val credsPrefs = getSharedPreferences("UserCreds", Context.MODE_PRIVATE)
         val subRole = credsPrefs.getString("USER_SUB_ROLE", "admin") ?: "admin"
-        isAdminUser = subRole == "admin"
+        val userRole = credsPrefs.getString("USER_ROLE", "") ?: ""
+        // legacy نصب‌هایی که USER_SUB_ROLE ندارند نباید یک معلم را ادمین فرض کنند.
+        isAdminUser = subRole == "admin" && userRole != "teacher"
         val cardFastInvoice = findViewById<MaterialCardView>(R.id.cardFastInvoice)
-        if (subRole != "admin") {
+        if (!isAdminUser) {
             cardFastInvoice.visibility = android.view.View.GONE
         } else {
             cardFastInvoice.setOnClickListener {
@@ -126,7 +143,13 @@ class TeacherDashboardActivity : BaseActivity() {
         }
         // ============================================================
 
-        // 5. دکمه کلاس‌های ناقص
+        // 5. صف کلاس‌های منتظر تأیید: بنر فقط اطلاع‌رسانی نیست و جزئیات وضعیت را باز می‌کند.
+        findViewById<MaterialCardView>(R.id.cardPendingApproval).setOnClickListener {
+            if (pendingApprovalItems.isEmpty()) fetchPendingClasses()
+            else showPendingApprovalDialog()
+        }
+
+        // 6. دکمه کلاس‌های ناقص
         findViewById<MaterialCardView>(R.id.cardIncompleteClasses).setOnClickListener {
             showIncompleteClassesDialog()
         }
@@ -145,12 +168,48 @@ class TeacherDashboardActivity : BaseActivity() {
         api = retrofit.create(TeacherPanelApi::class.java)
 
         fetchClasses()
+        fetchPendingClasses()
+    }
+
+    private fun showPendingApprovalDialog() {
+        val rows = pendingApprovalItems.map { item ->
+            val status = if (item.status == "rejected") "رد شده" else "در انتظار بررسی آموزشگاه"
+            val reason = item.rejection_reason?.takeIf { it.isNotBlank() }?.let { "\nعلت رد: $it" } ?: ""
+            "${item.title ?: "کلاس بدون عنوان"} | ${item.days_of_week ?: "روز نامشخص"} ${item.class_time ?: "ساعت نامشخص"}\n$status$reason"
+        }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("کلاس‌های منتظر تأیید شما (${rows.size})")
+            .setItems(rows, null)
+            .setPositiveButton(getString(R.string.common_ok), null)
+            .show()
+    }
+
+    private fun fetchPendingClasses() {
+        if (teacherId == -1) return
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val pending_classes = api.getPendingClasses(teacherId)
+                withContext(Dispatchers.Main) {
+                    pendingApprovalItems = pending_classes
+                    val card = findViewById<MaterialCardView>(R.id.cardPendingApproval)
+                    val text = findViewById<TextView>(R.id.tvPendingApproval)
+                    card.visibility = if (pending_classes.isEmpty()) android.view.View.GONE else android.view.View.VISIBLE
+                    text.text = pending_classes.joinToString("\n") {
+                        val reason = it.rejection_reason?.let { value -> " — رد: $value" } ?: " — در انتظار تأیید"
+                        "${it.title ?: "کلاس"}$reason"
+                    }
+                }
+            } catch (error: Exception) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+            }
+        }
     }
 
     override fun onResume() {
         super.onResume()
         if (teacherId != -1) {
             fetchClasses()
+            fetchPendingClasses()
         }
         setupLiveCard()
         fetchTeacherTodaySummary()
@@ -249,35 +308,11 @@ class TeacherDashboardActivity : BaseActivity() {
     }
 
     private fun startUpcomingLiveClass(next: TeacherTodayNextClass) {
-        val liveApi = RetrofitClient.getInstance(this).create(LiveApi::class.java)
-        // FIX: Bug 19 - cancel screen work when this Activity is destroyed.
-        lifecycleScope.launch(Dispatchers.IO) {
-            try {
-                val response = liveApi.startLive(next.courseId)
-                CacheManager.clear(this@TeacherDashboardActivity, "today_summary_teacher_$teacherId")
-                withContext(Dispatchers.Main) {
-                    val intent = Intent(this@TeacherDashboardActivity, LiveClassActivity::class.java)
-                    intent.putExtra("TARGET_COURSE_ID", next.courseId)
-                    intent.putExtra("TARGET_COURSE_NAME", next.className)
-                    intent.putExtra("LIVE_SESSION_ID", response.liveSessionId)
-                    intent.putExtra(
-                        "STARTED_AT_TS",
-                        response.startedAtTs ?: System.currentTimeMillis() / 1000
-                    )
-                    startActivity(intent)
-                }
-            } catch (ignoredError: Exception) {
-                // FIX: Bug 19 - cancellation is not a network/UI error.
-                if (ignoredError is kotlinx.coroutines.CancellationException) throw ignoredError;
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(
-                        this@TeacherDashboardActivity,
-                        getString(R.string.tdash_start_failed),
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-            }
-        }
+        // فقط صفحه‌ی آماده‌سازی باز می‌شود؛ شروع واقعی پشت دکمه‌ی «شروع کلاس» است.
+        val intent = Intent(this, LiveClassActivity::class.java)
+        intent.putExtra("TARGET_COURSE_ID", next.courseId)
+        intent.putExtra("TARGET_COURSE_NAME", next.className)
+        startActivity(intent)
     }
 
     // 🎥 کارت «کلاس زنده» معلم: شروع/رزومه جلسه
@@ -297,7 +332,7 @@ class TeacherDashboardActivity : BaseActivity() {
                     if (cur != null) {
                         openLiveClass(cur)
                     } else {
-                        chooseClassToStart(liveApi)
+                        chooseClassToStart()
                     }
                 }
 
@@ -321,7 +356,7 @@ class TeacherDashboardActivity : BaseActivity() {
         startActivity(intent)
     }
 
-    private fun chooseClassToStart(liveApi: LiveApi) {
+    private fun chooseClassToStart() {
         // FIX: Bug 19 - cancel screen work when this Activity is destroyed.
         lifecycleScope.launch(Dispatchers.IO) {
             try {
@@ -337,7 +372,7 @@ class TeacherDashboardActivity : BaseActivity() {
                         .setTitle(getString(R.string.tdash_pick_live))
                         .setItems(names) { _, which ->
                             val selected = eligible[which]
-                            startLive(liveApi, selected)
+                            startLive(selected)
                         }
                         .show()
                 }
@@ -351,38 +386,12 @@ class TeacherDashboardActivity : BaseActivity() {
         }
     }
 
-    private fun startLive(liveApi: LiveApi, cls: TeacherClassItem) {
-        // FIX: Bug 19 - cancel screen work when this Activity is destroyed.
-        lifecycleScope.launch(Dispatchers.IO) {
-            try {
-                val res = liveApi.startLive(cls.id)
-                CacheManager.clear(this@TeacherDashboardActivity, "today_summary_teacher_$teacherId")
-                withContext(Dispatchers.Main) {
-                    val intent = Intent(this@TeacherDashboardActivity, LiveClassActivity::class.java)
-                    intent.putExtra("TARGET_COURSE_ID", cls.id)
-                    intent.putExtra("TARGET_COURSE_NAME", cls.title ?: "")
-                    intent.putExtra("LIVE_SESSION_ID", res.liveSessionId)
-                    intent.putExtra("STARTED_AT_TS", res.startedAtTs ?: System.currentTimeMillis() / 1000)
-                    startActivity(intent)
-                }
-            } catch (e: Exception) {
-                // FIX: Bug 19 - cancellation is not a network/UI error.
-                if (e is kotlinx.coroutines.CancellationException) throw e;
-                // اگر کلاس از قبل زنده بود، به سمت جلسه‌ی موجود برویم
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(this@TeacherDashboardActivity, getString(R.string.tdash_already_live), Toast.LENGTH_SHORT).show()
-                }
-                try {
-                    val cur = liveApi.getCurrentLive()
-                    if (cur != null) {
-                        CacheManager.clear(this@TeacherDashboardActivity, "today_summary_teacher_$teacherId")
-                        withContext(Dispatchers.Main) { openLiveClass(cur) }
-                    }
-                } catch (e2: Exception) {
-                // FIX: Bug 19 - cancellation is not a network/UI error.
-                if (e2 is kotlinx.coroutines.CancellationException) throw e2; }
-            }
-        }
+    private fun startLive(cls: TeacherClassItem) {
+        // ورود به صفحه نباید side effect داشته باشد؛ endpoint فقط از دکمه‌ی شروع آن صفحه صدا زده می‌شود.
+        val intent = Intent(this, LiveClassActivity::class.java)
+        intent.putExtra("TARGET_COURSE_ID", cls.id)
+        intent.putExtra("TARGET_COURSE_NAME", cls.title ?: "")
+        startActivity(intent)
     }
 
     private fun showIncompleteClassesDialog() {
@@ -514,6 +523,9 @@ class TeacherClassAdapter(
         val title: TextView = v.findViewById(R.id.tvClassTitle)
         val code: TextView = v.findViewById(R.id.tvClassCode)
         val sub: TextView = v.findViewById(R.id.tvTeacherName)
+        val status: TextView = v.findViewById(R.id.tvStatus)
+        val tvTeacherDebt: TextView = v.findViewById(R.id.tvTeacherDebt)
+        val tvInstituteDebt: TextView = v.findViewById(R.id.tvInstituteDebt)
         val llStudentPreview: LinearLayout = v.findViewById(R.id.ll_student_preview) // Added View Binding
         // FIX (گروه۳/آیتم۱۲): این دو در layout پیش‌فرض نمایان‌اند و آداپتر معلم قبلاً
         // هرگز به آن‌ها دست نمی‌زد ⇒ دو دکمهٔ نمایانِ بی‌عملکرد در پنل معلم.
@@ -528,35 +540,49 @@ class TeacherClassAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = list[position]
-        holder.title.text = item.title
-        holder.code.text = holder.itemView.context.getString(R.string.tdash_code_row, item.code)
+        val classTitle = item.title?.trim().orEmpty()
+        val classCode = item.code?.trim().orEmpty()
+        holder.title.text = classTitle.ifEmpty { classCode }
+        holder.title.visibility = android.view.View.VISIBLE
+        holder.code.text = holder.itemView.context.getString(R.string.tdash_code_row, classCode)
+        holder.code.visibility = android.view.View.VISIBLE
 
-        // اعمال رنگ پس‌زمینه کارت کلاس بر اساس bg_color ثبت شده
-        if (!item.bg_color.isNullOrEmpty()) {
-            try {
-                (holder.itemView as? com.google.android.material.card.MaterialCardView)?.setCardBackgroundColor(
-                    android.graphics.Color.parseColor(item.bg_color)
-                )
-            } catch (e: Exception) {
-                // FIX: Bug 19 - cancellation is not a network/UI error.
-                if (e is kotlinx.coroutines.CancellationException) throw e;
-                // رنگ نامعتبر رد می‌شود
-            }
+        // بنر پنل معلم باید تم ثبت‌شدهٔ کلاس را قطعی روی همان کارت بنشاند؛
+        // مقدار خالی/نامعتبر فقط به تم پیش‌فرض برمی‌گردد و اسم کلاس حذف نمی‌شود.
+        val cardColor = item.bg_color?.trim().takeUnless { it.isNullOrEmpty() } ?: "#FFFFFF"
+        try {
+            (holder.itemView as? com.google.android.material.card.MaterialCardView)?.setCardBackgroundColor(
+                android.graphics.Color.parseColor(cardColor)
+            )
+        } catch (e: Exception) {
+            // FIX: Bug 19 - cancellation is not a network/UI error.
+            if (e is kotlinx.coroutines.CancellationException) throw e;
+            (holder.itemView as? com.google.android.material.card.MaterialCardView)?.setCardBackgroundColor(
+                UiColors.resolve(holder.itemView.context, R.color.gold_bg_elevated)
+            )
         }
 
         if (item.is_suspended) {
-            holder.sub.text = holder.itemView.context.getString(R.string.tdash_suspended)
-            holder.sub.setTextColor(android.graphics.Color.parseColor("#D32F2F"))
+            holder.status.text = holder.itemView.context.getString(R.string.tdash_suspended)
+            holder.status.setTextColor(UiColors.resolve(holder.itemView.context, R.color.status_danger))
+            holder.sub.text = item.grade_level?.trim().orEmpty()
             holder.itemView.alpha = 0.5f
         } else if (item.is_admin_approved) {
-            holder.sub.text = holder.itemView.context.getString(R.string.tdash_active)
-            holder.sub.setTextColor(android.graphics.Color.parseColor("#388E3C"))
+            holder.status.text = holder.itemView.context.getString(R.string.tdash_active)
+            holder.status.setTextColor(UiColors.resolve(holder.itemView.context, R.color.status_success))
+            holder.sub.text = item.grade_level?.trim().orEmpty()
             holder.itemView.alpha = 1.0f
         } else {
-            holder.sub.text = holder.itemView.context.getString(R.string.tdash_pending)
-            holder.sub.setTextColor(android.graphics.Color.parseColor("#F57C00"))
+            holder.status.text = holder.itemView.context.getString(R.string.tdash_pending)
+            holder.status.setTextColor(UiColors.resolve(holder.itemView.context, R.color.status_warning))
+            holder.sub.text = item.grade_level?.trim().orEmpty()
             holder.itemView.alpha = 1.0f
         }
+        holder.sub.visibility = if (holder.sub.text.isNullOrEmpty()) android.view.View.GONE else android.view.View.VISIBLE
+
+        // اعداد مالی از همان endpoint کلاس‌ها می‌آیند و در بنر معلم هم صریح bind می‌شوند.
+        holder.tvTeacherDebt.text = String.format("%,d", item.debt_to_teacher)
+        holder.tvInstituteDebt.text = String.format("%,d", item.debt_to_institute)
 
         // FIX (گروه۳/آیتم۱۲): تعلیق و ثبت حواله از اختیارات ادمین/منشی‌اند؛ در پنل معلم
         // پنهان می‌شوند (listener هم سمت ادمینِ ClassManagementActivity می‌ماند).
@@ -573,7 +599,7 @@ class TeacherClassAdapter(
                 val tv = TextView(holder.itemView.context)
                 tv.text = holder.itemView.context.getString(R.string.common_bullet_row, name)
                 tv.textSize = 12f
-                tv.setTextColor(android.graphics.Color.parseColor("#555555")) // Gray color
+                tv.setTextColor(UiColors.resolve(holder.itemView.context, R.color.text_secondary)) // Gray color
                 tv.setPadding(0, 4, 0, 4)
                 holder.llStudentPreview.addView(tv)
             }
@@ -581,7 +607,7 @@ class TeacherClassAdapter(
             val tv = TextView(holder.itemView.context)
             tv.text = holder.itemView.context.getString(R.string.tdash_no_students)
             tv.textSize = 10f
-            tv.setTextColor(android.graphics.Color.GRAY)
+            tv.setTextColor(UiColors.resolve(holder.itemView.context, R.color.text_secondary))
             holder.llStudentPreview.addView(tv)
         }
         // -----------------------------

@@ -281,11 +281,9 @@ class TestDashboardsAndReceipts(FinanceWorld):
         body = resp.json()
         self.assertEqual(body["total_amount"], 1000000, "کل شهریهٔ ثبت‌نام")
         self.assertEqual(body["paid_to_institute"], 500000, "پیش‌پرداخت ۴۰۰٬۰۰۰ + پرداخت ۱۰۰٬۰۰۰")
-        # قرارداد علامت‌دار کیف پول: due = منهای کیف پول. پرداخت‌ها کیف را مثبت می‌کنند
-        # ⇒ برای شاگردی که ۵۰۰٬۰۰۰ از ۱٬۰۰۰٬۰۰۰ را داده، "due" منفی (اعتبار) گزارش می‌شود.
-        # اپ همین را با علامت نشان می‌دهد (InvoiceActivity:314-322): "بدهی: -۵۰۰٬۰۰۰"
-        self.assertEqual(body["due_to_institute"], -500000,
-                         "❗ قرارداد علامت: بعد از پیش‌پرداختِ جزئی، «بدهی» منفی نمایش داده می‌شود")
+        # Contractual debt remains scoped to this enrollment even without a
+        # session_charge; no other class is charged with this amount.
+        self.assertEqual(body["due_to_institute"], 500000)
         self.assertEqual(body["due_to_teacher"], 0)
         self.assertEqual(body["enrollment_id"], 1)
 
@@ -293,18 +291,18 @@ class TestDashboardsAndReceipts(FinanceWorld):
     def test_11b_remaining_tuition_and_credit_are_sign_safe(self):
         """O-09: «باقی‌ماندهٔ شهریه» و «اعتبار» هر دو نامنفی و بی‌ابهام‌اند.
 
-        `due_to_teacher`/`due_to_institute` قرارداد کیف‌پولی دارند و **دست‌نخورده ماندند**
-        (می‌توانند منفی باشند)؛ ولی برای «بدهی» و «مبلغ پیش‌فرض پرداخت» در اپ، دو فیلد صریح
-        اضافه شد تا اپراتور عدد منفی به‌عنوان بدهی نبیند.
+        `due_to_teacher`/`due_to_institute` همچنان با همان نام‌ها برمی‌گردند، اما
+        اکنون از breakdown همین enrollment می‌آیند؛ wallet کلی دانش‌آموز در بدهی کلاس
+        مصرف نمی‌شود.
         """
         self.client.post("/finance/pay", json=pay_payload(100000, "institute"), headers=hdr("tok-admin"))
         body = self.client.get("/finance/student_class_status?student_id=41&course_id=71",
                                headers=hdr("tok-admin")).json()
-        # ۵۰۰٬۰۰۰ از ۱٬۰۰۰٬۰۰۰ پرداخت شده ⇒ ۵۰۰٬۰۰۰ باقی‌مانده، صفر اعتبار
+        # The selected enrollment's contractual remainder is the payable
+        # amount; another enrollment's wallet is not used as a substitute.
         self.assertEqual(body["remaining_tuition"], 500000)
         self.assertEqual(body["credit_balance"], 0)
-        # و فیلدهای قبلی بدون تغییر (قرارداد علامت کیف‌پول)
-        self.assertEqual(body["due_to_institute"], -500000)
+        self.assertEqual(body["due_to_institute"], 500000)
         self.assertEqual(body["due_to_teacher"], 0)
         self.assertEqual(body["total_amount"], 1000000)
 

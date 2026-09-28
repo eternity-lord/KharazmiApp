@@ -82,7 +82,7 @@ git diff --stat -- Kharazmi_Server ':!Kharazmi_Server/scripts/extract_server_rou
 ```
 
 - تغییر مستقل extractor/CSV در [`47973bb`](https://github.com/eternity-lord/KharazmiApp/commit/47973bb7611c361c2da95fa5ca1a43f707cdda3a) commit و push شد.
-- D در [`ec8aa87`](https://github.com/eternity-lord/KharazmiApp/commit/ec8aa8706600e913bb608011044878efa13f1b26) و E در [`3c9f9cb`](https://github.com/eternity-lord/KharazmiApp/commit/3c9f9cb2352b02b3d103a51eb4f1385d441e396) commit و push شدند؛ توضیح exclusion برای URL پویا در [`b9a8183`](https://github.com/eternity-lord/KharazmiApp/commit/b9a8183) تکمیل شد.
+- D در [`ec8aa87`](https://github.com/eternity-lord/KharazmiApp/commit/ec8aa8706600e913bb608011044878efa13f1b26) و E در [`3c9f9cb`](https://github.com/eternity-lord/KharazmiApp/commit/3c9f9cb2352b02b3d103a51eb4f1385d441e396) commit و push شدند؛ توضیح exclusion برای URL پویا در [`b9a8183`](https://github.com/eternity-lord/KharazmiApp/commit/b9a8183) و lineage دقیق dashboard مالی در [`05796bc`](https://github.com/eternity-lord/KharazmiApp/commit/05796bc) تکمیل شد.
 - در این snapshot هیچ تغییر خارج از `docs/app-map/` و extractor مجاز وجود ندارد.
 - Android compile **اجرا نشد**.
 - probe اختیاری روی دیتابیس اصلی انجام نشد؛ extractor با copy در `/tmp` اجرا شد.

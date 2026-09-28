@@ -434,6 +434,33 @@ class TestPerClassDebtIsolation(unittest.TestCase):
         self.assertEqual(self._excel_rows(self.course_a.id)[0][7], 0)
         self.assertEqual(self._excel_rows(self.course_b.id)[0][7], 100)
 
+    def test_per_class_and_unassigned_rows_reconcile_to_calculate_student_debt(self):
+        expected = calculate_student_debt(self.db, self.student)
+
+        profile = get_student_full_profile(
+            id=self.student.id, authorization=self._admin(), db=self.db, role="admin",
+        )
+        profile_class_sum = sum(
+            row["debt"]
+            for row in profile["teachers_financial"]
+            if not row["is_unassigned"]
+        )
+        self.assertEqual(profile_class_sum + profile["unassigned_debt"], expected)
+
+        statement = get_student_statement(
+            student_id=self.student.id, db=self.db,
+            authorization=self._admin(), role="admin",
+        )
+        statement_class_sum = sum(
+            row["debt"] for row in statement["teachers"] if not row["is_unassigned"]
+        )
+        self.assertEqual(statement_class_sum + statement["unassigned_debt"], expected)
+
+        debtor = next(row for row in get_debtors_list(
+            branch_id=None, search="دوکلاسه", authorization=self._admin(), db=self.db, _="admin"
+        ) if row["student_id"] == self.student.id)
+        self.assertEqual(sum(row["debt"] for row in debtor["teachers"]), expected)
+
     def test_both_payment_is_split_in_admin_teacher_financial_profile(self):
         self.db.add(Transaction(
             id=4, student_id=self.student.id, course_id=self.course_b.id,

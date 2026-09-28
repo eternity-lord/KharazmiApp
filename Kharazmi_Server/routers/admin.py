@@ -499,6 +499,7 @@ def get_student_full_profile(id: int, authorization: Optional[str] = Header(None
             "debt_teacher": int(debt_teacher_course),
             "paid_institute": int(paid_inst),
             "debt_institute": int(debt_inst_course),
+            "debt": int(breakdown["debt"]),
             "is_unassigned": False,
         })
 
@@ -516,6 +517,7 @@ def get_student_full_profile(id: int, authorization: Optional[str] = Header(None
             "debt_teacher": 0,
             "paid_institute": 0,
             "debt_institute": int(unassigned_debt),
+            "debt": int(unassigned_debt),
             "is_unassigned": True,
         })
 

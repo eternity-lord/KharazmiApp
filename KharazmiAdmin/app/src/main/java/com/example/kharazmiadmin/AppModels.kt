@@ -504,6 +504,7 @@ data class TeacherFinancialItem(
     val debt_teacher: Long,
     val paid_institute: Long,
     val debt_institute: Long,
+    val debt: Long = 0,
     val enrollment_id: Int? = null,
     val course_id: Int? = null,
     val teacher_id: Int? = null,

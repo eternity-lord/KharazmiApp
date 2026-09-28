@@ -289,14 +289,7 @@
       "response_class": "SimpleResponse",
       "role": "admin",
       "status": 200,
-      "issues": [
-        {
-          "field": "message",
-          "kind": "missing-non-null",
-          "detail": "کلید غیرnullable وجود ندارد و استفاده می‌تواند NPE بدهد",
-          "line": 8
-        }
-      ],
+      "issues": [],
       "model": "SimpleResponse"
     },
     {
@@ -1562,7 +1555,7 @@
     "unmatched": 0,
     "route_non_success": 49,
     "parse": 0,
-    "npe": 6,
+    "npe": 5,
     "silent_zero": 0,
     "missing_key": 1
   }

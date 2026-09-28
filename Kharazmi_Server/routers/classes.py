@@ -1348,7 +1348,7 @@ def bulk_approve_classes(
     for course in courses:
         _record_class_decision(db, course, "approve", data.reason)
     db.commit()
-    return {"approved_count": len(courses), "course_ids": [c.id for c in courses]}
+    return {"message": "تایید شد", "approved_count": len(courses), "course_ids": [c.id for c in courses]}
 
 
 @router.post("/classes/pending_approval/bulk_reject")

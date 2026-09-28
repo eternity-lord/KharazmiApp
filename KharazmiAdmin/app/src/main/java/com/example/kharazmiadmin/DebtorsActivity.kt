@@ -52,16 +52,16 @@ data class DebtorRow(
     val last_payment_date: String? = null,
     val debt_age_days: Int? = null,
     val debt_age_bucket: String? = null,
-    val teachers: List<DebtorTeacherRow> = emptyList()
+    val teachers: List<DebtorTeacherRow>? = null
 )
 
 data class DebtorsGroupedResponse(
     val total_debt: Long = 0,
     val debtors_count: Int = 0,
-    val by_teacher: List<DebtorTeacherSummary> = emptyList(),
-    val by_age: List<DebtorAgeSummary> = emptyList(),
+    val by_teacher: List<DebtorTeacherSummary>? = null,
+    val by_age: List<DebtorAgeSummary>? = null,
     val unassigned_debt: Long = 0,
-    val rows: List<DebtorRow> = emptyList()
+    val rows: List<DebtorRow>? = null
 )
 
 interface DebtorsApi {
@@ -113,10 +113,11 @@ class DebtorsActivity : BaseActivity() {
                 val result = api.getGrouped(search)
                 withContext(Dispatchers.Main) {
                     tvSummary.text = "تعداد بدهکاران: ${result.debtors_count} | کل بدهی: ${result.total_debt} تومان | بدون انتساب معلم: ${result.unassigned_debt} تومان"
-                    tvBreakdown.text = result.by_age.joinToString(" | ") { "${it.bucket}: ${it.debt} تومان (${it.students_count})" }
-                    adapter.replace(result.rows)
-                    tvEmpty.visibility = if (result.rows.isEmpty()) View.VISIBLE else View.GONE
-                    if (result.rows.isEmpty()) tvEmpty.text = "برای این جست‌وجو بدهکاری ثبت نشده است"
+                    tvBreakdown.text = result.by_age.orEmpty().joinToString(" | ") { "${it.bucket}: ${it.debt} تومان (${it.students_count})" }
+                    val rows = result.rows.orEmpty()
+                    adapter.replace(rows)
+                    tvEmpty.visibility = if (rows.isEmpty()) View.VISIBLE else View.GONE
+                    if (rows.isEmpty()) tvEmpty.text = "برای این جست‌وجو بدهکاری ثبت نشده است"
                 }
             } catch (error: Exception) {
                 if (error is kotlinx.coroutines.CancellationException) throw error
@@ -161,7 +162,7 @@ private class DebtorsAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val row = rows[position]
-        val teacher = row.teachers.joinToString("، ") { "${it.teacher_name}: ${it.debt}" }
+        val teacher = row.teachers.orEmpty().joinToString("، ") { "${it.teacher_name}: ${it.debt}" }
         holder.text.text = buildString {
             append("${row.student_name} — بدهی کل: ${row.total_debt} تومان\n")
             append("معلم: ${if (teacher.isBlank()) "نامشخص" else teacher}\n")

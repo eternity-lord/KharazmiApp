@@ -74,7 +74,7 @@ class TestGroup6SettlementReversal(unittest.TestCase):
 
     def test_http_reverse_and_edit_routes_match_teacher_and_settlement_ids(self):
         """قرارداد واقعی HTTP: ردیف نمایش‌داده‌شده در history باید همان ID قابل‌عملیات باشد."""
-        from dependencies import check_admin_access, get_db
+        from dependencies import check_admin_access, check_user_login, get_db
         from main import app
 
         teacher = models.Teacher(first_name="T", last_name="HTTP", mobile="g6-http-t", national_code="g6-http-t")
@@ -102,8 +102,13 @@ class TestGroup6SettlementReversal(unittest.TestCase):
 
         app.dependency_overrides[get_db] = override_db
         app.dependency_overrides[check_admin_access] = lambda: "admin"
+        app.dependency_overrides[check_user_login] = lambda: "admin"
         try:
             client = TestClient(app)
+            history = client.get(f"/teachers/{teacher.id}/settlement_history")
+            self.assertEqual(history.status_code, 200, history.text)
+            self.assertEqual(history.json()[0]["id"], settlement.id,
+                             "history باید همان settlement_id قابل‌عملیات را برگرداند")
             response = client.post(
                 f"/teachers/{teacher.id}/settlements/{settlement.id}/reverse",
                 params={"reason": "رگرسیون HTTP"},

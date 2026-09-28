@@ -18,6 +18,8 @@
 - بازبینی نهایی یک مسیر ثبت‌نام دیگر را پیدا کرد: `students/register_and_enroll` هنوز شهریهٔ صفر را رد می‌کرد؛ شرط به «فقط منفی ممنوع» اصلاح و regression مستقل اضافه شد.
 - خروجی بدهکاران با هدر authorization شعبهٔ مؤثر را رعایت می‌کند؛ برای `branch_id` ناموجود به‌جای نشان دادن legacyهای بی‌شعبه خروجی خالی می‌دهد تا scope اشتباه نشود.
 - probe فقط روی `/tmp/kharazmi-real-copy.db` انجام شد: DB source در زمان probe فقط ۱ teacher، ۰ settlement، ۱ transaction و ۰ session داشت؛ `GET /teachers/1/settlement_history` پاسخ ۲۰۰ با لیست خالی داد و هیچ settlement واقعی برای بازتولید ۴۰۴ وجود نداشت. خروجی CSV بدهکاران روی همین copy با HTTP ۲۰۰ تولید شد.
+- follow-up از crash واقعی Android: پاسخ قدیمی/legacy با `conflict_course_ids=null` در `PendingClassAdapter` باعث NPE می‌شد؛ مدل nullable و adapter با `orEmpty()` مقاوم شد. هر دو مسیر افزودن دانش‌آموز (`StudentRegisterActivity` و `ClassSetupActivity`) دیگر برای شهریهٔ صفر اقساط صفر ارسال نمی‌کنند؛ خطای سرور نیز اکنون detail واقعی را نشان می‌دهد.
+- بنر «کلاس‌های منتظر تأیید شما» در پنل معلم clickable شد و جزئیات صف/علت رد را باز می‌کند؛ صف ادمین دکمهٔ refresh صریح دارد. کش history settlement نسخه‌گذاری شد تا رکورد قدیمی باعث عملیات روی ID اشتباه نشود.
 
 ## بررسی و تست
 

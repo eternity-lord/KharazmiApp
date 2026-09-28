@@ -31,6 +31,11 @@
         android:orientation="horizontal"
         android:padding="@dimen/spacing_small">
         <Button
+            android:id="@+id/btnPendingRefresh"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="بروزرسانی" />
+        <Button
             android:id="@+id/btnPendingBulkApprove"
             android:layout_width="0dp"
             android:layout_height="wrap_content"

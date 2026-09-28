@@ -384,6 +384,12 @@ class ReportActivity : BaseActivity() {
     }
 
     private fun fetchReport(scope: String) {
+        // اگر کاربر نام را تایپ کرده ولی روی suggestion نزده، شناسهٔ انتهای متن
+        // (`نام معلم (id)`) را هم resolve کن؛ گزارش نباید بی‌دلیل با «معلم انتخاب نشده» متوقف شود.
+        if (scope == "teacher" && currentUserRole != "teacher" && selectedTeacherId == null) {
+            selectedTeacherId = Regex("\\((\\d+)\\)$").find(acTeacherFilter.text.toString().trim())
+                ?.groupValues?.getOrNull(1)?.toIntOrNull()
+        }
         val yearStr = acYearFilter.text.toString().trim()
         val monthStr = acMonthFilter.text.toString().trim()
 
@@ -523,11 +529,22 @@ class ReportActivity : BaseActivity() {
                     tvStatementTeacher.text = if (teacherLines.isNotBlank()) teacherLines else
                         "معلم بدهکار: ${stmt.teacher_name ?: "بدون معلم"}"
                     tvStatementTeacher.setOnClickListener {
-                        stmt.teachers.firstOrNull { it.teacher_id != null }?.teacher_id?.let { teacherId ->
-                            startActivity(Intent(this@ReportActivity, TeacherProfileActivity::class.java).apply {
-                                putExtra("TEACHER_ID", teacherId)
-                            })
-                        }
+                        val teacherRows = stmt.teachers.filter { it.teacher_id != null }
+                        if (teacherRows.isEmpty()) return@setOnClickListener
+                        val labels = teacherRows.map {
+                            "${it.teacher_name ?: "بدون معلم"} | بدهی معلم: ${it.debt_teacher} | بدهی آموزشگاه: ${it.debt_institute}"
+                        }.toTypedArray()
+                        AlertDialog.Builder(this@ReportActivity)
+                            .setTitle("انتخاب معلم برای مشاهده پروفایل")
+                            .setItems(labels) { _, which ->
+                                teacherRows[which].teacher_id?.let { teacherId ->
+                                    startActivity(Intent(this@ReportActivity, TeacherProfileActivity::class.java).apply {
+                                        putExtra("TEACHER_ID", teacherId)
+                                    })
+                                }
+                            }
+                            .setNegativeButton(getString(R.string.common_cancel), null)
+                            .show()
                     }
                     tvStatementNextDue.text = stmt.next_installment?.let {
                         "قسط بعدی: ${it.due_date ?: "نامشخص"} | ${it.remaining_amount ?: it.amount ?: 0} تومان"

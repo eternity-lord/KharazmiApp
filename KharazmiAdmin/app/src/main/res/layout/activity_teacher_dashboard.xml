@@ -219,7 +219,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="@dimen/spacing_normal"
-                android:visibility="gone">
+                android:visibility="gone"
+                android:clickable="true"
+                android:focusable="true">
                 <TextView
                     android:id="@+id/tvPendingApproval"
                     android:layout_width="match_parent"

@@ -50,6 +50,7 @@ class PendingClassesActivity : BaseActivity() {
         rv.layoutManager = LinearLayoutManager(this)
         api = RetrofitClient.getInstance(this).create(AdminClassApi::class.java)
 
+        findViewById<Button>(R.id.btnPendingRefresh).setOnClickListener { fetchPending() }
         findViewById<Button>(R.id.btnPendingBulkApprove).setOnClickListener {
             if (selectedIds.isEmpty()) toast("حداقل یک کلاس را انتخاب کنید") else bulkApprove()
         }
@@ -215,13 +216,14 @@ class PendingClassAdapter(
         holder.check.setOnCheckedChangeListener(null)
         holder.check.isChecked = selectedIds.contains(item.id)
         holder.check.setOnCheckedChangeListener { _, checked -> onSelectionChanged(item.id, checked) }
-        holder.title.text = item.title
+        holder.title.text = item.title?.takeIf { it.isNotBlank() } ?: "کلاس بدون عنوان"
         holder.code.text = holder.itemView.context.getString(R.string.pcls_code_row, item.code ?: item.id.toString())
-        holder.teacher.text = holder.itemView.context.getString(R.string.pcls_teacher_row, item.teacher_name)
-        holder.price.text = holder.itemView.context.getString(R.string.pcls_price_row, String.format("%,d", item.teacher_price))
-        holder.schedule.text = holder.itemView.context.getString(R.string.pcls_sched_row, item.days, item.time)
-        val conflicts = if (item.conflict_course_ids.isEmpty()) "" else
-            "⚠️ تداخل با کلاس‌های ${item.conflict_course_ids.joinToString("، ")}"
+        holder.teacher.text = holder.itemView.context.getString(R.string.pcls_teacher_row, item.teacher_name?.takeIf { it.isNotBlank() } ?: "نامشخص")
+        holder.price.text = holder.itemView.context.getString(R.string.pcls_price_row, String.format("%,d", item.teacher_price ?: 0L))
+        holder.schedule.text = holder.itemView.context.getString(R.string.pcls_sched_row, item.days ?: "روز نامشخص", item.time ?: "ساعت نامشخص")
+        val conflictIds = item.conflict_course_ids.orEmpty()
+        val conflicts = if (conflictIds.isEmpty()) "" else
+            "⚠️ تداخل با کلاس‌های ${conflictIds.joinToString("، ")}"
         val rejection = item.rejection_reason?.takeIf { it.isNotBlank() }?.let { "علت رد قبلی: $it" } ?: ""
         holder.issue.text = listOf(conflicts, rejection).filter { it.isNotBlank() }.joinToString("\n")
         holder.issue.visibility = if (holder.issue.text.isNullOrBlank()) View.GONE else View.VISIBLE

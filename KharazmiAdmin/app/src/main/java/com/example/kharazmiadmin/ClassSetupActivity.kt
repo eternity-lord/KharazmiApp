@@ -30,6 +30,7 @@ import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Query
 import retrofit2.http.Path
+import retrofit2.HttpException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -328,16 +329,23 @@ class ClassSetupActivity : BaseActivity() {
                         else -> 0
                     }
                     val finalTuition = Math.max(0, baseTuition - discountAmt)
-                    val half1 = finalTuition / 2
-                    val half2 = finalTuition - half1
-                    // FIX H3-B2: due_date column is Jalali — send real Jalali dates (was Gregorian today).
-                    val todayDate = JalaliUtils.todayJalaliString()
-                    val futureDate = getFutureDateString(30)
-                    
-                    installmentList = listOf(
-                        InstallmentCreate(half1, todayDate),
-                        InstallmentCreate(half2, futureDate)
-                    )
+                    // شهریهٔ صفر قسط ندارد؛ دو قسط صفر از InstallmentCreate رد می‌شوند و
+                    // خطای ثبت دانش‌آموز را به‌اشتباه به شهریه نسبت می‌دهند.
+                    if (finalTuition > 0) {
+                        // FIX: برای مبلغ ۱ هم هیچ قسط صفر ارسال نشود.
+                        val todayDate = JalaliUtils.todayJalaliString()
+                        val futureDate = getFutureDateString(30)
+                        installmentList = if (finalTuition == 1) {
+                            listOf(InstallmentCreate(1, todayDate))
+                        } else {
+                            val half1 = finalTuition / 2
+                            val half2 = finalTuition - half1
+                            listOf(
+                                InstallmentCreate(half1, todayDate),
+                                InstallmentCreate(half2, futureDate)
+                            )
+                        }
+                    }
                 }
 
                 val selectedIds = if (selectedStudentIds.isNotEmpty()) {
@@ -426,6 +434,18 @@ class ClassSetupActivity : BaseActivity() {
         summary.text = getString(R.string.csetup_bulk_selected, selectedIds.size)
     }
 
+    private fun enrollmentError(error: Exception, fallback: String): String {
+        if (error is HttpException) {
+            val body = error.response()?.errorBody()?.string().orEmpty()
+            val detail = try {
+                val value = org.json.JSONObject(body).opt("detail")
+                if (value is String) value else value?.toString().orEmpty()
+            } catch (_: Exception) { "" }
+            if (detail.isNotBlank()) return "$fallback (HTTP ${error.code()}): $detail"
+        }
+        return "$fallback: ${error.message ?: "خطای شبکه"}"
+    }
+
     private fun addToClass(studentId: Int, baseTuition: Int, dType: String, dVal: Int, installments: List<InstallmentCreate>?) {
         val today = SimpleDateFormat("yyyy/MM/dd", Locale.US).format(Date())
 
@@ -467,7 +487,7 @@ class ClassSetupActivity : BaseActivity() {
                 // FIX: Bug 19 - cancellation is not a network/UI error.
                 if (e is kotlinx.coroutines.CancellationException) throw e;
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(this@ClassSetupActivity, getString(R.string.csetup_add_error), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@ClassSetupActivity, enrollmentError(e, getString(R.string.csetup_add_error)), Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -518,7 +538,7 @@ class ClassSetupActivity : BaseActivity() {
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(this@ClassSetupActivity, getString(R.string.csetup_bulk_error), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@ClassSetupActivity, enrollmentError(e, getString(R.string.csetup_bulk_error)), Toast.LENGTH_LONG).show()
                 }
             }
         }

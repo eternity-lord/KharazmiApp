@@ -109,19 +109,21 @@ data class ClassItemFull(
 
 data class PendingClassItem(
     val id: Int,
-    val title: String = "کلاس بدون عنوان",
-    val teacher_name: String = "نامشخص",
-    val teacher_price: Long = 0,
-    val days: String = "",
-    val time: String = "",
-    val base_institute_share: Long = 0,
+    val title: String? = null,
+    val teacher_name: String? = null,
+    val teacher_price: Long? = null,
+    val days: String? = null,
+    val time: String? = null,
+    val base_institute_share: Long? = null,
     val code: String? = null,
     val teacher_id: Int? = null,
     val capacity: Int? = null,
     val branch_id: Int? = null,
     val rejection_reason: String? = null,
     val pending_since: String? = null,
-    val conflict_course_ids: List<Int> = emptyList(),
+    // Gson can legally materialize a JSON null even when the Kotlin default is a list;
+    // keep the wire model nullable and normalize at the adapter boundary.
+    val conflict_course_ids: List<Int>? = null,
     val has_schedule_conflict: Boolean = false
 )
 
@@ -632,7 +634,7 @@ data class SettlementHistoryItem(
     val settled_at: String? = null,
     val is_reversed: Boolean = false,
     val reversal_reason: String? = null,
-    val session_ids: List<Int> = emptyList()
+    val session_ids: List<Int>? = null
 )
 
 data class BulkSmsRequest(val student_ids: List<Int>)

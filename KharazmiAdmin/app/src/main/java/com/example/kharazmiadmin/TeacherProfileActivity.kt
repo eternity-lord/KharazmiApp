@@ -369,7 +369,9 @@ class TeacherProfileActivity : BaseActivity() {
         val cacheKeyPending = "teacher_pending_settlement_" + teacherId
         val typePending = object : com.google.gson.reflect.TypeToken<TeacherPendingSettlementResponse>() {}.type
 
-        val cacheKeyHistory = "teacher_settlement_history_" + teacherId
+        // نسخه‌گذاری کش برای کنار گذاشتن history قدیمی که ممکن است شناسهٔ settlement
+        // متعلق به رکورد/معلم دیگری را نگه داشته باشد و عملیات را 404 کند.
+        val cacheKeyHistory = "teacher_settlement_history_v2_" + teacherId
         val typeHistory = object : com.google.gson.reflect.TypeToken<List<SettlementHistoryItem>>() {}.type
 
         // FIX: Bug 19 - cancel screen work when this Activity is destroyed.
@@ -438,7 +440,11 @@ class TeacherProfileActivity : BaseActivity() {
                     try {
                         RetrofitClient.getInstance(this@TeacherProfileActivity).create(SettlementSafetyApi::class.java)
                             .reverseSettlement(teacherId, item.id, "اصلاح مالی توسط ادمین")
-                        withContext(Dispatchers.Main) { fetchSettlementData() }
+                        withContext(Dispatchers.Main) {
+                            CacheManager.clear(this@TeacherProfileActivity, "teacher_settlement_history_v2_$teacherId")
+                            CacheManager.clear(this@TeacherProfileActivity, "teacher_settlement_history_$teacherId")
+                            fetchSettlementData()
+                        }
                     } catch (error: Exception) {
                         if (error is kotlinx.coroutines.CancellationException) throw error
                         withContext(Dispatchers.Main) {
@@ -460,7 +466,11 @@ class TeacherProfileActivity : BaseActivity() {
                     try {
                         RetrofitClient.getInstance(this@TeacherProfileActivity).create(SettlementSafetyApi::class.java)
                             .editSettlement(teacherId, item.id, SettlementEditRequest(amount, "تعدیل مالی توسط ادمین"))
-                        withContext(Dispatchers.Main) { fetchSettlementData() }
+                        withContext(Dispatchers.Main) {
+                            CacheManager.clear(this@TeacherProfileActivity, "teacher_settlement_history_v2_$teacherId")
+                            CacheManager.clear(this@TeacherProfileActivity, "teacher_settlement_history_$teacherId")
+                            fetchSettlementData()
+                        }
                     } catch (error: Exception) {
                         if (error is kotlinx.coroutines.CancellationException) throw error
                         withContext(Dispatchers.Main) {
@@ -500,6 +510,7 @@ class TeacherProfileActivity : BaseActivity() {
                     // ابطال کامل کش پروفایل و تسویه‌حساب معلم
                     CacheManager.clear(this@TeacherProfileActivity, "teacher_full_profile_$teacherId")
                     CacheManager.clear(this@TeacherProfileActivity, "teacher_pending_settlement_$teacherId")
+                    CacheManager.clear(this@TeacherProfileActivity, "teacher_settlement_history_v2_$teacherId")
                     CacheManager.clear(this@TeacherProfileActivity, "teacher_settlement_history_$teacherId")
                     CacheManager.clearByPrefix(this@TeacherProfileActivity, "person_list_TEACHER")
                     CacheManager.clearByPrefix(this@TeacherProfileActivity, "today_summary_admin_")

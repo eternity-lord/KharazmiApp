@@ -36,7 +36,9 @@ data class TeacherClassItem(
 
 data class TeacherPendingClassItem(
     val id: Int, val title: String? = null, val code: String? = null,
-    val status: String? = null, val rejection_reason: String? = null
+    val days_of_week: String? = null, val class_time: String? = null,
+    val capacity: Int? = null, val status: String? = null,
+    val rejection_reason: String? = null, val pending_since: String? = null
 )
 
 interface TeacherPanelApi {
@@ -61,6 +63,7 @@ class TeacherDashboardActivity : BaseActivity() {
     private lateinit var api: TeacherPanelApi
     private lateinit var rv: RecyclerView
     private var todaySummaryLoading = false
+    private var pendingApprovalItems: List<TeacherPendingClassItem> = emptyList()
     // FIX (گروه۳/آیتم۱۲): پرچم نقش برای آداپتر بنر کلاس‌ها — همان USER_SUB_ROLE موجود.
     private var isAdminUser = false
 
@@ -126,9 +129,11 @@ class TeacherDashboardActivity : BaseActivity() {
         // ============================================================
         val credsPrefs = getSharedPreferences("UserCreds", Context.MODE_PRIVATE)
         val subRole = credsPrefs.getString("USER_SUB_ROLE", "admin") ?: "admin"
-        isAdminUser = subRole == "admin"
+        val userRole = credsPrefs.getString("USER_ROLE", "") ?: ""
+        // legacy نصب‌هایی که USER_SUB_ROLE ندارند نباید یک معلم را ادمین فرض کنند.
+        isAdminUser = subRole == "admin" && userRole != "teacher"
         val cardFastInvoice = findViewById<MaterialCardView>(R.id.cardFastInvoice)
-        if (subRole != "admin") {
+        if (!isAdminUser) {
             cardFastInvoice.visibility = android.view.View.GONE
         } else {
             cardFastInvoice.setOnClickListener {
@@ -138,7 +143,13 @@ class TeacherDashboardActivity : BaseActivity() {
         }
         // ============================================================
 
-        // 5. دکمه کلاس‌های ناقص
+        // 5. صف کلاس‌های منتظر تأیید: بنر فقط اطلاع‌رسانی نیست و جزئیات وضعیت را باز می‌کند.
+        findViewById<MaterialCardView>(R.id.cardPendingApproval).setOnClickListener {
+            if (pendingApprovalItems.isEmpty()) fetchPendingClasses()
+            else showPendingApprovalDialog()
+        }
+
+        // 6. دکمه کلاس‌های ناقص
         findViewById<MaterialCardView>(R.id.cardIncompleteClasses).setOnClickListener {
             showIncompleteClassesDialog()
         }
@@ -160,12 +171,26 @@ class TeacherDashboardActivity : BaseActivity() {
         fetchPendingClasses()
     }
 
+    private fun showPendingApprovalDialog() {
+        val rows = pendingApprovalItems.map { item ->
+            val status = if (item.status == "rejected") "رد شده" else "در انتظار بررسی آموزشگاه"
+            val reason = item.rejection_reason?.takeIf { it.isNotBlank() }?.let { "\nعلت رد: $it" } ?: ""
+            "${item.title ?: "کلاس بدون عنوان"} | ${item.days_of_week ?: "روز نامشخص"} ${item.class_time ?: "ساعت نامشخص"}\n$status$reason"
+        }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("کلاس‌های منتظر تأیید شما (${rows.size})")
+            .setItems(rows, null)
+            .setPositiveButton(getString(R.string.common_ok), null)
+            .show()
+    }
+
     private fun fetchPendingClasses() {
         if (teacherId == -1) return
         lifecycleScope.launch(Dispatchers.IO) {
             try {
                 val pending_classes = api.getPendingClasses(teacherId)
                 withContext(Dispatchers.Main) {
+                    pendingApprovalItems = pending_classes
                     val card = findViewById<MaterialCardView>(R.id.cardPendingApproval)
                     val text = findViewById<TextView>(R.id.tvPendingApproval)
                     card.visibility = if (pending_classes.isEmpty()) android.view.View.GONE else android.view.View.VISIBLE
@@ -184,6 +209,7 @@ class TeacherDashboardActivity : BaseActivity() {
         super.onResume()
         if (teacherId != -1) {
             fetchClasses()
+            fetchPendingClasses()
         }
         setupLiveCard()
         fetchTeacherTodaySummary()

@@ -34,9 +34,9 @@
 آخرین اجرای کل suite پس از اصلاحات مالی، دو failure قدیمی و خارج از این task در static contract مربوط به `TeacherDashboardActivity` نشان داد؛ فایل آن در این task تغییر نکرده است. این موارد pre-existing هستند و برای رعایت scope اصلاح نشدند. Kotlin compile اجرا نشده است.
 
 ## Commit و CI
-- commit اصلی فیکس: `376dcac` (`fix per-class debt isolation`)
+- commitهای فیکس: `376dcac` (`fix per-class debt isolation`) و `f55339a` (`fix both-wallet total in student profile`)
 - commit فعال‌سازی trigger CI روی branch نشست: `5070c82` (`ci run tests on session branch`)
 - branch `arena/01a0c9b8-kharazmiapp` push شد.
-- اجرای GitHub Actions: run `36379872852`؛ نصب وابستگی و ثبت md5 موفق بود، اما اجرای کل suite با همان دو failure static contract قدیمی `TeacherDashboardActivity` متوقف شد. این failureها در فایل/کد این task نیستند؛ بخش tests مرتبط با Bug 1 سبز است.
+- اجرای GitHub Actions روی commit فیکس: run `36380259511`؛ نصب وابستگی و ثبت md5 موفق بود، اما اجرای کل suite با همان دو failure static contract قدیمی `TeacherDashboardActivity` متوقف شد. این failureها در فایل/کد این task نیستند؛ بخش tests مرتبط با Bug 1 سبز است.
 - وضعیت working tree پس از push: پاک.
 

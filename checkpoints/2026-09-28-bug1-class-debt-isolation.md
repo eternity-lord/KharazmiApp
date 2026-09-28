@@ -11,7 +11,7 @@
 - `Enrollment.total_paid` برای داده‌های legacy بدون رسید، و رسید legacy برای داده‌های متقابلاً ناقص، بدون دوباره‌شماری reconcile می‌شوند.
 - لیست کلاس‌ها، جزئیات کلاس، full report، `students_full` و Excel از breakdown همان enrollment استفاده می‌کنند؛ کلیدهای قبلی حفظ شده‌اند و `wallet_*` در ردیف `students_full` همچنان کیف کلی است.
 - پروفایل دانش‌آموز ادمین در `teachers_financial` از همان breakdown استفاده می‌کند و پرداخت‌های `both` را تفکیک می‌کند.
-- `finance.py`: شاخهٔ class در `search_advanced` قبلاً wallet کلی و `calculate_student_debt` را در هر ردیف کلاس تکرار می‌کرد؛ اصلاح شد. `student_class_status` نیز قبلاً `due_to_*` را مستقیماً از wallet کلی می‌ساخت؛ اکنون breakdown همان enrollment را مصرف می‌کند. فاکتور `/finance/invoice/{enrollment_id}` و ردیف‌های per-enrollment داشبورد مالی نیز به breakdown وصل شدند.
+- `finance.py`: شاخهٔ class در `search_advanced` قبلاً wallet کلی و `calculate_student_debt` را در هر ردیف کلاس تکرار می‌کرد؛ اصلاح شد. `student_class_status` نیز قبلاً `due_to_*` را مستقیماً از wallet کلی می‌ساخت؛ اکنون breakdown همان enrollment را مصرف می‌کند. فاکتور `/finance/invoice/{enrollment_id}` و ردیف‌های per-enrollment داشبورد مالی نیز به breakdown وصل شدند. در گزارش teacher grouping نیز بدهی wallet legacy دیگر به تنها کلاس نسبت داده نمی‌شود و در `unassigned_debt` می‌ماند؛ walletهای top-level آن گزارش همچنان صراحتاً student-global هستند.
 - `teachers.py`: endpoint `/teachers/{teacher_id}/classes` از قبل در commit `346e1fbb` به breakdown per-enrollment منتقل شده بود؛ کامنت ناسازگار اصلاح و regression واقعی برای بنر معلم اضافه شد.
 - `ClassDetailActivity.kt` برای جمع پرداختِ کلاس به `paid_teacher`/`paid_institute` per-enrollment متصل شد، نه wallet کلی. Android compile عمداً اجرا نشد.
 
@@ -61,9 +61,10 @@
 - commit اصلی فیکس: `376dcac fix per-class debt isolation`
 - commit اصلاح تست‌های قفل‌کنندهٔ گروه ۳: `91f1cfd test(group3): align teacher dashboard role guard`
 - commit فیکس finance/teacher follow-up: `8a44d5d fix finance views to use enrollment debt breakdown`
+- commit تکمیل unassigned legacy debt در گزارش معلم: `067dc06 fix unassigned legacy debt in teacher reports`
 - branch `arena/01a0c9b8-kharazmiapp` push شد.
-- CI نهایی سبز: run `36381750370`
-  - لینک: https://github.com/eternity-lord/KharazmiApp/actions/runs/36381750370
+- CI سبز روی آخرین کد: run `36382465452`
+  - لینک: https://github.com/eternity-lord/KharazmiApp/actions/runs/36382465452
   - full suite، cwd-independence guard و md5 guard همگی موفق شدند.
 - Android compile اجرا نشده است.
 - working tree پس از آخرین commit کد پاک بود؛ تغییر بعدی این checkpoint صرفاً مستندسازی است.

@@ -514,7 +514,7 @@ def get_student_full_profile(id: int, authorization: Optional[str] = Header(None
             "teacher_name": None,
             "paid_teacher": 0,
             "debt_teacher": 0,
-            "paid_institute": int(unassigned_debt),
+            "paid_institute": 0,
             "debt_institute": int(unassigned_debt),
             "is_unassigned": True,
         })

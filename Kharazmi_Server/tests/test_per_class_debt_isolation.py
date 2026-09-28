@@ -430,33 +430,60 @@ class TestPerClassDebtIsolation(unittest.TestCase):
             student_mobile="09122222222", wallet_teacher=-400, wallet_institute=-300,
             wallet_balance=-700, branch_id=1,
         )
-        self.db.add(legacy_student)
+        self.db.add_all([
+            legacy_student,
+            Enrollment(
+                id=3, student_id=legacy_student.id, course_id=self.course_a.id,
+                branch_id=1, register_date="1405/06/03", shift="عصر",
+                total_tuition=0, total_paid=0, is_deleted=False,
+            ),
+            Enrollment(
+                id=4, student_id=legacy_student.id, course_id=self.course_b.id,
+                branch_id=1, register_date="1405/06/04", shift="عصر",
+                total_tuition=0, total_paid=0, is_deleted=False,
+            ),
+        ])
         self.db.commit()
         profile = get_student_full_profile(
             id=legacy_student.id, authorization=self._admin(), db=self.db, role="admin",
         )
         self.assertEqual(profile["unassigned_debt"], 700)
-        self.assertEqual(len(profile["teachers_financial"]), 1)
-        unassigned_profile_row = profile["teachers_financial"][0]
+        profile_rows = profile["teachers_financial"]
+        self.assertEqual(len(profile_rows), 3)
+        assigned_profile_rows = [row for row in profile_rows if not row["is_unassigned"]]
+        self.assertEqual({row["course_title"] for row in assigned_profile_rows}, {"کلاس A", "کلاس B"})
+        self.assertTrue(all(row["debt_teacher"] + row["debt_institute"] == 0 for row in assigned_profile_rows))
+        unassigned_profile_row = next(row for row in profile_rows if row["is_unassigned"])
         self.assertIsNone(unassigned_profile_row["course_title"])
-        self.assertTrue(unassigned_profile_row["is_unassigned"])
+        self.assertEqual(unassigned_profile_row["paid_institute"], 0)
+        self.assertEqual(unassigned_profile_row["debt_institute"], 700)
 
         statement = get_student_statement(
             student_id=legacy_student.id, db=self.db,
             authorization=self._admin(), role="admin",
         )
         self.assertEqual(statement["unassigned_debt"], 700)
-        self.assertEqual(len(statement["teachers"]), 1)
-        self.assertIsNone(statement["teachers"][0]["course_title"])
-        self.assertTrue(statement["teachers"][0]["is_unassigned"])
+        statement_rows = statement["teachers"]
+        self.assertEqual(len(statement_rows), 3)
+        self.assertEqual(
+            {row["course_title"] for row in statement_rows if not row["is_unassigned"]},
+            {"کلاس A", "کلاس B"},
+        )
+        self.assertTrue(all(row["debt"] == 0 for row in statement_rows if not row["is_unassigned"]))
+        unassigned_statement_row = next(row for row in statement_rows if row["is_unassigned"])
+        self.assertIsNone(unassigned_statement_row["course_title"])
+        self.assertEqual(unassigned_statement_row["debt"], 700)
 
         debtor = next(row for row in get_debtors_list(
             branch_id=None, search="سارا", authorization=self._admin(), db=self.db, _="admin"
         ) if row["student_id"] == legacy_student.id)
         self.assertEqual(debtor["total_debt"], 700)
-        self.assertEqual(len(debtor["teachers"]), 1)
-        self.assertIsNone(debtor["teachers"][0]["course_title"])
-        self.assertTrue(debtor["teachers"][0]["is_unassigned"])
+        debtor_rows = debtor["teachers"]
+        self.assertEqual(len(debtor_rows), 3)
+        self.assertTrue(all(row["debt"] == 0 for row in debtor_rows if not row["is_unassigned"]))
+        unassigned_debtor_row = next(row for row in debtor_rows if row["is_unassigned"])
+        self.assertIsNone(unassigned_debtor_row["course_title"])
+        self.assertEqual(unassigned_debtor_row["debt"], 700)
 
 
 if __name__ == "__main__":

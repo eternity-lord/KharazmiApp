@@ -8,6 +8,7 @@ import datetime
 import io
 import unittest
 
+from fastapi import HTTPException
 from openpyxl import load_workbook
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -231,6 +232,55 @@ class TestPerClassDebtIsolation(unittest.TestCase):
         self.assertEqual(b["debt"], 0)
         self.assertEqual(b["debt_teacher"], 0)
         self.assertEqual(b["debt_institute"], 0)
+
+    def test_payment_with_enrollment_id_isolated_and_ambiguous_payment_rejected(self):
+        before_a = calculate_enrollment_debt_breakdown(self.db, self.enrollment_a)
+        before_b = calculate_enrollment_debt_breakdown(self.db, self.enrollment_b)
+        before_transactions = self.db.query(Transaction).count()
+
+        response = submit_payment(
+            FinanceSubmitData(
+                student_id=self.student.id,
+                amount=100,
+                target_wallet="institute",
+                description="پرداخت کلاس B",
+                payment_method="نقدی",
+                date="1405/06/04",
+                enrollment_id=self.enrollment_b.id,
+            ),
+            db=self.db,
+            _="admin",
+            branch_id=None,
+            authorization=self._admin(),
+        )
+        self.assertEqual(response["receipt_id"] > 0, True)
+        after_a = calculate_enrollment_debt_breakdown(self.db, self.enrollment_a)
+        after_b = calculate_enrollment_debt_breakdown(self.db, self.enrollment_b)
+        self.assertEqual(after_a, before_a)
+        self.assertEqual(after_b["paid_institute"], before_b["paid_institute"] + 100)
+        self.assertEqual(after_b["debt"], 0)
+        payment = self.db.query(Transaction).filter(Transaction.id == response["receipt_id"]).one()
+        self.assertEqual(payment.enrollment_id, self.enrollment_b.id)
+        self.assertEqual(payment.course_id, self.course_b.id)
+
+        with self.assertRaises(HTTPException) as raised:
+            submit_payment(
+                FinanceSubmitData(
+                    student_id=self.student.id,
+                    amount=50,
+                    target_wallet="institute",
+                    description="پرداخت مبهم",
+                    payment_method="نقدی",
+                    date="1405/06/04",
+                ),
+                db=self.db,
+                _="admin",
+                branch_id=None,
+                authorization=self._admin(),
+            )
+        self.assertEqual(raised.exception.status_code, 400)
+        self.assertIn("چند ثبت‌نام فعال دارد", str(raised.exception.detail))
+        self.assertEqual(self.db.query(Transaction).count(), before_transactions + 1)
 
     def test_class_list_details_full_report_and_excel_are_isolated(self):
         classes = {row["id"]: row for row in get_all_classes(db=self.db, _="admin")}

@@ -57,6 +57,8 @@
 
 شمارش route به‌صورت واقعی از inventory 221تایی و نقشهٔ assertion قبلی استخراج شد: `finance=11`، `attendance=10`، `classes=8` و admin/deep guard map برابر 41 (جمع قبلی 70). دو route جدیدِ دارای oracle مقداری عبارت‌اند از `POST /attendance/submit_session` و `DELETE /attendance/session/{session_code}`؛ finance و admin routes که تست جدیدشان اضافه شد، از قبل در مجموعهٔ routeهای asserted بودند. پس شمارش جدید `11 + 12 + 8 + 41 = 72 از 221` است.
 
+CI پس از push نیز سبز شد: [run 36413712720](https://github.com/eternity-lord/KharazmiApp/actions/runs/36413712720)؛ root suite، cwd-independence و checksum guard همگی موفق بودند.
+
 آخرین اجرای واقعی روی کد اصلی پس از همهٔ commitها:
 
 ```text

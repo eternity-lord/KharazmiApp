@@ -42,6 +42,6 @@ retry guards: direct payment=1؛ installment=1؛ session charge=1؛ teacher sett
 mutation validation: 10/10 caught؛ 0 escaped؛ route assertions=72/221
 ```
 
-آخرین commit پایهٔ ثبت‌شده: `2f7ccef` — [CI run 36411727281](https://github.com/eternity-lord/KharazmiApp/actions/runs/36411727281) سبز است؛ mutation validation در `mutation-validation.md` ثبت شد؛ checksum DB اصلی `f048f8d11833c4eaa944490594121d7` باقی مانده است.
+آخرین mutation-validation push سبز است: [CI run 36413712720](https://github.com/eternity-lord/KharazmiApp/actions/runs/36413712720)؛ mutation validation در `mutation-validation.md` ثبت شد؛ checksum DB اصلی `f048f8d11833c4eaa944490594121d7` باقی مانده است.
 
 این sweep جای ممیزی عمیق را نمی‌گیرد: registry همهٔ routeها را اجباری کرده، ۳۳ route از finance/attendance/classes در blockers با دلیل واقعی یک‌خطی بسته شده‌اند. calendar، branches، timeline و audit در این مرحله فقط sweep باقی مانده‌اند.

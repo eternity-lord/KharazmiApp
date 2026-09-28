@@ -14,7 +14,7 @@
 | C | 51 screen doc + `navigation.md` | 51 Activity؛ 180 edge صریح Intent | [`5bf7a58`](https://github.com/eternity-lord/KharazmiApp/commit/5bf7a58490b974c44138e9d37b5cd47efd9cf623) |
 | D | `mismatches.md`, `money-lineage.md`, `findings.md` | ناهماهنگی‌ها، money lineage و finding بدون fix | [`ec8aa87`](https://github.com/eternity-lord/KharazmiApp/commit/ec8aa8706600e913bb608011044878efa13f1b26) |
 | E | `flows.md` | 12 flow اصلی با source refs | [`3c9f9cb`](https://github.com/eternity-lord/KharazmiApp/commit/3c9f9cb2352b02b3d103a51eb4f1385d441e396) |
-| F | `test-coverage.csv` | 221 route row + 12 flow candidate row؛ تست اجرا نشد | commit فاز F هنگام تحویل ثبت می‌شود |
+| F | `test-coverage.csv` | 221 route row + 12 flow candidate row؛ تست اجرا نشد | [`2936e80`](https://github.com/eternity-lord/KharazmiApp/commit/2936e80) |
 
 ## فهرست اسناد
 

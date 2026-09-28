@@ -1,7 +1,6 @@
 package com.example.kharazmiadmin
 
 import android.content.Context
-import android.graphics.Color
 import android.os.Bundle
 import android.view.View
 import android.widget.Button
@@ -187,8 +186,8 @@ class ChartActivity : BaseActivity() {
         )
         val dataSet = BarDataSet(entries, getString(R.string.chart_ds_count))
         dataSet.colors = listOf(
-            Color.parseColor("#2196F3"),
-            Color.parseColor("#00695C")
+            UiColors.resolve(this@ChartActivity, R.color.status_info),
+            UiColors.resolve(this@ChartActivity, R.color.gaj_green_dark)
         )
         dataSet.valueTextSize = 12f
         dataSet.valueFormatter = object : ValueFormatter() {
@@ -270,7 +269,7 @@ class ChartActivity : BaseActivity() {
         }
 
         val dataSet = BarDataSet(entries, getString(R.string.chart_ds_income))
-        dataSet.color = Color.parseColor("#00695C") // رنگ سبز گاج
+        dataSet.color = UiColors.resolve(this@ChartActivity, R.color.gaj_green_dark) // رنگ سبز گاج
         dataSet.valueTextSize = 11f
 
         val barData = BarData(dataSet)
@@ -296,12 +295,12 @@ class ChartActivity : BaseActivity() {
 
         val dataSet = PieDataSet(entries, "")
         dataSet.colors = listOf(
-            Color.parseColor("#00695C"), // سبز تیره گاج
-            Color.parseColor("#FFC107"), // زرد طلایی
-            Color.parseColor("#D32F2F")  // قرمز
+            UiColors.resolve(this@ChartActivity, R.color.gaj_green_dark), // سبز تیره گاج
+            UiColors.resolve(this@ChartActivity, R.color.gaj_accent), // زرد طلایی
+            UiColors.resolve(this@ChartActivity, R.color.status_danger)  // قرمز
         )
         dataSet.valueTextSize = 14f
-        dataSet.valueTextColor = Color.WHITE
+        dataSet.valueTextColor = UiColors.resolve(this@ChartActivity, R.color.white)
 
         val pieData = PieData(dataSet)
         pieChart.data = pieData
@@ -329,15 +328,15 @@ class ChartActivity : BaseActivity() {
         }
 
         val dataSet = LineDataSet(entries, getString(R.string.chart_line_att))
-        dataSet.color = Color.parseColor("#00695C") // رنگ سبز اصلی
-        dataSet.setCircleColor(Color.parseColor("#FFC107")) // زرد طلایی
+        dataSet.color = UiColors.resolve(this@ChartActivity, R.color.gaj_green_dark) // رنگ سبز اصلی
+        dataSet.setCircleColor(UiColors.resolve(this@ChartActivity, R.color.gaj_accent)) // زرد طلایی
         dataSet.lineWidth = 3f
         dataSet.circleRadius = 5f
         dataSet.setDrawCircleHole(true)
         dataSet.valueTextSize = 11f
-        dataSet.valueTextColor = Color.parseColor("#212121")
+        dataSet.valueTextColor = UiColors.resolve(this@ChartActivity, R.color.text_primary)
         dataSet.setDrawFilled(true)
-        dataSet.fillColor = Color.parseColor("#E8F5E9") // رنگ سبز ملایم پشت خط
+        dataSet.fillColor = UiColors.resolve(this@ChartActivity, R.color.status_success_light) // رنگ سبز ملایم پشت خط
 
         val lineData = LineData(dataSet)
         lineChart.data = lineData
@@ -364,11 +363,11 @@ class ChartActivity : BaseActivity() {
 
         val dataSet = PieDataSet(entries, "")
         dataSet.colors = listOf(
-            Color.parseColor("#00695C"), // سبز تیره گاج
-            Color.parseColor("#FFC107")  // زرد طلایی گاج
+            UiColors.resolve(this@ChartActivity, R.color.gaj_green_dark), // سبز تیره گاج
+            UiColors.resolve(this@ChartActivity, R.color.gaj_accent)  // زرد طلایی گاج
         )
         dataSet.valueTextSize = 13f
-        dataSet.valueTextColor = Color.WHITE
+        dataSet.valueTextColor = UiColors.resolve(this@ChartActivity, R.color.white)
 
         val pieData = PieData(dataSet)
         pieChart.data = pieData

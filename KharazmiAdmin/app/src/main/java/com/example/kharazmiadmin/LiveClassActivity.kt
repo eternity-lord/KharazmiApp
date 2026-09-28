@@ -274,8 +274,8 @@ class LiveClassActivity : BaseActivity() {
             .setNegativeButton(getString(R.string.common_no), null)
             .create()
         dialog.show()
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(android.graphics.Color.parseColor("#F44336"))
-        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(android.graphics.Color.parseColor("#4CAF50"))
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(UiColors.resolve(this@LiveClassActivity, R.color.status_danger))
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(UiColors.resolve(this@LiveClassActivity, R.color.status_success))
     }
 
     private fun cancelLive() {
@@ -315,8 +315,8 @@ class LiveClassActivity : BaseActivity() {
             .setNegativeButton(getString(R.string.common_no), null)
             .create()
         dialog.show()
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(android.graphics.Color.parseColor("#4CAF50"))
-        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(android.graphics.Color.parseColor("#F44336"))
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(UiColors.resolve(this@LiveClassActivity, R.color.status_success))
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(UiColors.resolve(this@LiveClassActivity, R.color.status_danger))
     }
 
     private fun endLive() {

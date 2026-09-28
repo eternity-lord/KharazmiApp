@@ -136,6 +136,7 @@
             style="@style/Widget.Kharazmi.Button.Gold"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:textColor="@color/text_on_gold"
             android:text="تایید نهایی و فعال‌سازی کلاس"
             app:backgroundTint="@color/gold_primary"
             app:icon="@android:drawable/checkbox_on_background"

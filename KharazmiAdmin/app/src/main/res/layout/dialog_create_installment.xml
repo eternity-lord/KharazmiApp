@@ -77,5 +77,5 @@
         android:layout_marginTop="8dp"
         android:text="@string/installment_due_hint"
         android:textSize="11sp"
-        android:textColor="?android:attr/textColorSecondary" />
+        android:textColor="@color/text_secondary" />
 </LinearLayout>

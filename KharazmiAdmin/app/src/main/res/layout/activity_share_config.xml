@@ -333,6 +333,7 @@
         style="@style/Widget.Kharazmi.Button.Gold"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:textColor="@color/text_on_gold"
         android:text="ذخیره تنظیمات تعرفه"
         android:textSize="15sp"
         android:layout_margin="@dimen/spacing_normal"

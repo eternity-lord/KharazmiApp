@@ -27,8 +27,8 @@
             android:layout_weight="1"
             android:hint="جستجوی دانش‌آموز، معلم یا کلاس"
             android:inputType="text"
-            android:textColor="@android:color/white"
-            android:textColorHint="#AAB0BA" />
+            android:textColor="@color/text_primary"
+            android:textColorHint="@color/text_secondary" />
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnDebtorsSearch"
             android:layout_width="wrap_content"
@@ -63,21 +63,21 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
-        android:textColor="@android:color/white"
+        android:textColor="@color/text_primary"
         android:textStyle="bold" />
     <TextView
         android:id="@+id/tvDebtorsBreakdown"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
-        android:textColor="#C8CCD4" />
+        android:textColor="@color/text_secondary" />
     <TextView
         android:id="@+id/tvDebtorsEmpty"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:padding="16dp"
         android:gravity="center"
-        android:textColor="#C8CCD4" />
+        android:textColor="@color/text_secondary" />
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvDebtors"
         android:layout_width="match_parent"

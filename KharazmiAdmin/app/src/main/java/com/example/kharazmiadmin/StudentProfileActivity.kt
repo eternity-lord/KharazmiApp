@@ -2,7 +2,6 @@ package com.example.kharazmiadmin
 
 import android.content.Intent
 import android.content.Context
-import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.view.View
@@ -372,7 +371,7 @@ class StudentProfileActivity : BaseActivity() {
                     // بدهی کلی/کیف کلی به‌عنوان بدهی کلاس نمایش داده نمی‌شود؛
                     // اعداد دقیق فقط در تب مالی و بر اساس enrollment دیده می‌شوند.
                     tvTotalDebt.text = "بدهی هر کلاس در تب مالی به‌صورت تفکیک‌شده نمایش داده می‌شود"
-                    tvTotalDebt.setTextColor(android.graphics.Color.DKGRAY)
+                    tvTotalDebt.setTextColor(UiColors.resolve(this@StudentProfileActivity, R.color.text_primary))
                     tvDebtTeacher.visibility = View.GONE
                     tvDebtInstitute.visibility = View.GONE
                     // ===========================================
@@ -786,9 +785,9 @@ class StudentProfileActivity : BaseActivity() {
     }
 
     private fun colorForBalance(balance: Long): Int = when {
-        balance < 0 -> Color.parseColor("#D32F2F")
-        balance > 0 -> Color.parseColor("#388E3C")
-        else -> Color.parseColor("#616161")
+        balance < 0 -> UiColors.resolve(this, R.color.status_danger)
+        balance > 0 -> UiColors.resolve(this, R.color.status_success)
+        else -> UiColors.resolve(this, R.color.text_secondary)
     }
 
     private fun formatCurrency(value: Long): String =
@@ -1221,14 +1220,14 @@ class StudentProfileActivity : BaseActivity() {
             holder.tvDue.text = holder.itemView.context.getString(R.string.installment_due, item.due_date)
             if (item.is_paid) {
                 holder.tvStatus.text = holder.itemView.context.getString(R.string.installment_paid_label)
-                holder.tvStatus.setTextColor(Color.parseColor("#388E3C"))
+                holder.tvStatus.setTextColor(UiColors.resolve(holder.itemView.context, R.color.status_success))
                 holder.tvPaidAt.visibility = View.VISIBLE
                 holder.tvPaidAt.text = holder.itemView.context.getString(R.string.profile_inst_paidat, item.paid_at)
                 holder.layoutActions.visibility = View.GONE
             } else {
                 val overdue = JalaliUtils.isBeforeToday(item.due_date)
                 holder.tvStatus.text = if (overdue) holder.itemView.context.getString(R.string.profile_inst_overdue) else holder.itemView.context.getString(R.string.profile_inst_pending)
-                holder.tvStatus.setTextColor(if (overdue) Color.parseColor("#D32F2F") else Color.parseColor("#FF8F00"))
+                holder.tvStatus.setTextColor(if (overdue) UiColors.resolve(holder.itemView.context, R.color.status_danger) else UiColors.resolve(holder.itemView.context, R.color.status_warning))
                 holder.tvPaidAt.visibility = View.GONE
                 // FIX (گروه۳/آیتم۱۴): «پرداخت» و «یادآوری» قسط اکشن مالی ادمین/منشی‌اند؛
                 // برای معلم ردیف قسط فقط خواندنی می‌ماند (isTeacherUser از Activity بیرونی).

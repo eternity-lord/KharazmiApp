@@ -20,7 +20,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="نام یا کدملی دانش‌آموز را جستجو کنید:"
-        android:textColor="#757575"
+        android:textColor="@color/text_secondary"
         android:textSize="14sp"
         android:layout_marginBottom="@dimen/spacing_small"/>
 
@@ -136,7 +136,7 @@
         android:layout_marginTop="10dp"
         android:text="تقسیم به ۲ قسط مساوی (۵۰٪ نقدی و ۵۰٪ سررسید یک ماه بعد)"
         android:textSize="13sp"
-        android:textColor="#555"
+        android:textColor="@color/text_secondary"
         android:checked="false"/>
 
 </LinearLayout>

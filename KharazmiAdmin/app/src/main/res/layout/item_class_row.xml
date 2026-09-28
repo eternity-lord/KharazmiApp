@@ -318,7 +318,8 @@
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnSuspend"
                 android:layout_width="0dp"
-                android:layout_height="40dp"
+                android:layout_height="wrap_content"
+                android:minHeight="@dimen/min_touch_target"
                 android:layout_weight="1"
                 android:layout_marginEnd="@dimen/spacing_small"
                 android:background="@drawable/button_state_selector"
@@ -339,7 +340,8 @@
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnRegisterInvoice"
                 android:layout_width="0dp"
-                android:layout_height="40dp"
+                android:layout_height="wrap_content"
+                android:minHeight="@dimen/min_touch_target"
                 android:layout_weight="1"
                 android:layout_marginStart="@dimen/spacing_small"
                 android:backgroundTint="@color/gold_primary"

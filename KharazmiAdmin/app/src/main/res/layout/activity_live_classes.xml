@@ -33,10 +33,10 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="🔄 به‌روزرسانی خودکار هر ۱۵ ثانیه"
-        android:textColor="@color/status_danger"
+        android:textColor="@color/status_warning"
         android:textSize="12sp"
         android:textStyle="bold"
-        android:background="#FFF3E0"
+        android:background="@color/status_warning_light"
         android:padding="8dp"
         android:gravity="center" />
 
@@ -46,7 +46,7 @@
         android:layout_height="wrap_content"
         android:text="در حال حاضر هیچ کلاسی در حال برگزاری نیست."
         android:textAppearance="@style/TextAppearance.Kharazmi.Body"
-        android:textColor="?android:attr/textColorSecondary"
+        android:textColor="@color/text_secondary"
         android:gravity="center"
         android:padding="@dimen/spacing_large"
         android:visibility="gone" />

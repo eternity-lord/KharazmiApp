@@ -198,7 +198,6 @@
                                 android:id="@+id/tvTeacherWeekUnsettled"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:maxLines="1"
                                 android:text="—"
                                 android:textAppearance="@style/TextAppearance.Kharazmi.SectionTitle"
                                 android:textColor="@color/gold_primary" />

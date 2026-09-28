@@ -158,7 +158,7 @@ private class DebtorsAdapter(
             setPadding(20, 18, 20, 18)
             textSize = 15f
             isClickable = true
-            setTextColor(android.graphics.Color.WHITE)
+            setTextColor(UiColors.resolve(parent.context, R.color.text_primary))
         }
         return VH(view)
     }

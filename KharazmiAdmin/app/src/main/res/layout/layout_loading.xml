@@ -27,7 +27,7 @@
             <View
                 android:layout_width="150dp"
                 android:layout_height="24dp"
-                android:background="#D0D0D0"
+                android:background="@color/ds_border"
                 android:layout_marginBottom="@dimen/spacing_large"
                 android:layout_gravity="start"/>
 

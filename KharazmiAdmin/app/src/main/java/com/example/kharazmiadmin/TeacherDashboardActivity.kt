@@ -558,23 +558,23 @@ class TeacherClassAdapter(
             // FIX: Bug 19 - cancellation is not a network/UI error.
             if (e is kotlinx.coroutines.CancellationException) throw e;
             (holder.itemView as? com.google.android.material.card.MaterialCardView)?.setCardBackgroundColor(
-                android.graphics.Color.WHITE
+                UiColors.resolve(holder.itemView.context, R.color.gold_bg_elevated)
             )
         }
 
         if (item.is_suspended) {
             holder.status.text = holder.itemView.context.getString(R.string.tdash_suspended)
-            holder.status.setTextColor(android.graphics.Color.parseColor("#D32F2F"))
+            holder.status.setTextColor(UiColors.resolve(holder.itemView.context, R.color.status_danger))
             holder.sub.text = item.grade_level?.trim().orEmpty()
             holder.itemView.alpha = 0.5f
         } else if (item.is_admin_approved) {
             holder.status.text = holder.itemView.context.getString(R.string.tdash_active)
-            holder.status.setTextColor(android.graphics.Color.parseColor("#388E3C"))
+            holder.status.setTextColor(UiColors.resolve(holder.itemView.context, R.color.status_success))
             holder.sub.text = item.grade_level?.trim().orEmpty()
             holder.itemView.alpha = 1.0f
         } else {
             holder.status.text = holder.itemView.context.getString(R.string.tdash_pending)
-            holder.status.setTextColor(android.graphics.Color.parseColor("#F57C00"))
+            holder.status.setTextColor(UiColors.resolve(holder.itemView.context, R.color.status_warning))
             holder.sub.text = item.grade_level?.trim().orEmpty()
             holder.itemView.alpha = 1.0f
         }
@@ -599,7 +599,7 @@ class TeacherClassAdapter(
                 val tv = TextView(holder.itemView.context)
                 tv.text = holder.itemView.context.getString(R.string.common_bullet_row, name)
                 tv.textSize = 12f
-                tv.setTextColor(android.graphics.Color.parseColor("#555555")) // Gray color
+                tv.setTextColor(UiColors.resolve(holder.itemView.context, R.color.text_secondary)) // Gray color
                 tv.setPadding(0, 4, 0, 4)
                 holder.llStudentPreview.addView(tv)
             }
@@ -607,7 +607,7 @@ class TeacherClassAdapter(
             val tv = TextView(holder.itemView.context)
             tv.text = holder.itemView.context.getString(R.string.tdash_no_students)
             tv.textSize = 10f
-            tv.setTextColor(android.graphics.Color.GRAY)
+            tv.setTextColor(UiColors.resolve(holder.itemView.context, R.color.text_secondary))
             holder.llStudentPreview.addView(tv)
         }
         // -----------------------------

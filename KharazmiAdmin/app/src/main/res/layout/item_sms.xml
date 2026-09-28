@@ -33,7 +33,7 @@
                 android:layout_height="wrap_content"
                 android:text="1404/09/06"
                 android:textSize="12sp"
-                android:textColor="?android:attr/textColorSecondary"/>
+                android:textColor="@color/text_secondary"/>
         </LinearLayout>
 
         <TextView
@@ -51,7 +51,7 @@
             android:layout_height="wrap_content"
             android:text="ارسال شده به: 320 نفر"
             android:textSize="12sp"
-            android:textColor="?android:attr/textColorSecondary"
+            android:textColor="@color/text_secondary"
             android:layout_marginTop="@dimen/spacing_small"
             android:layout_gravity="left"/>
 

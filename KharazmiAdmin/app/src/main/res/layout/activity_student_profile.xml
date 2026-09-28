@@ -66,9 +66,7 @@
                 android:layout_marginTop="@dimen/spacing_small"
                 android:gravity="center"
                 android:text="@string/ds_value_placeholder"
-                android:textAppearance="@style/TextAppearance.Kharazmi.DS.PageTitle"
-                android:maxLines="2"
-                android:ellipsize="end"/>
+                android:textAppearance="@style/TextAppearance.Kharazmi.DS.PageTitle"/>
 
             <TextView
                 android:id="@+id/tvProfilePhone"
@@ -78,9 +76,7 @@
                 android:gravity="center"
                 android:text="@string/ds_value_placeholder"
                 android:textAppearance="@style/TextAppearance.Kharazmi.DS.Caption"
-                android:fontFeatureSettings="tnum"
-                android:maxLines="1"
-                android:ellipsize="end"/>
+                android:fontFeatureSettings="tnum"/>
         </LinearLayout>
 
         <!-- تب‌ها: مشخصات / مالی و شهریه / کارنامه / اقساط / ارتباطات / تایم‌لاین -->

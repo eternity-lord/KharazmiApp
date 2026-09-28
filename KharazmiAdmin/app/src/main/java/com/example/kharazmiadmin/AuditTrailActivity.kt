@@ -187,7 +187,7 @@ class AuditTrailActivity : BaseActivity() {
             .setMinYear(1395)
             .setMaxYear(today.persianYear + 1)
             .setInitDate(initYear, initMonth, initDay)
-            .setActionTextColor(android.graphics.Color.GRAY)
+            .setActionTextColor(UiColors.resolve(this@AuditTrailActivity, R.color.text_secondary))
             .setTitleType(PersianDatePickerDialog.WEEKDAY_DAY_MONTH_YEAR)
             .setShowInBottomSheet(true)
             .setListener(object : ir.hamsaa.persiandatepicker.Listener {

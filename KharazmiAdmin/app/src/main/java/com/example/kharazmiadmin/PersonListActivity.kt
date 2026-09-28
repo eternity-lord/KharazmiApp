@@ -240,10 +240,10 @@ class ImprovedTeacherAdapter(private val list: List<PersonListItem>) : RecyclerV
 
             if (item.is_suspended) {
                 holder.tvTeacherStatus.text = holder.itemView.context.getString(R.string.tprof_suspended)
-                holder.tvTeacherStatus.setTextColor(android.graphics.Color.parseColor("#FF9800"))
+                holder.tvTeacherStatus.setTextColor(UiColors.resolve(holder.itemView.context, R.color.status_warning))
             } else {
                 holder.tvTeacherStatus.text = holder.itemView.context.getString(R.string.tprof_active)
-                holder.tvTeacherStatus.setTextColor(android.graphics.Color.parseColor("#4CAF50"))
+                holder.tvTeacherStatus.setTextColor(UiColors.resolve(holder.itemView.context, R.color.status_success))
             }
 
             holder.btnCallTeacher.setOnClickListener {

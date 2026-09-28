@@ -342,10 +342,10 @@ class MainActivity : BaseActivity() {
                     val imgPulse = findViewById<ImageView>(R.id.imgLivePulse)
                     if (count > 0) {
                         tvLiveCount.text = getString(R.string.main_live_count, count)
-                        imgPulse.imageTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#D32F2F"))
+                        imgPulse.imageTintList = android.content.res.ColorStateList.valueOf(UiColors.resolve(this@MainActivity, R.color.status_danger))
                     } else {
                         tvLiveCount.text = getString(R.string.main_live)
-                        imgPulse.imageTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#9E9E9E"))
+                        imgPulse.imageTintList = android.content.res.ColorStateList.valueOf(UiColors.resolve(this@MainActivity, R.color.text_disabled))
                     }
                 }
             } catch (e: Exception) {

@@ -1015,7 +1015,7 @@ class SearchAdapter(
         val subtitle: TextView = v.findViewById(android.R.id.text2)
         init {
             subtitle.textSize = 12f
-            subtitle.setTextColor(android.graphics.Color.GRAY)
+            subtitle.setTextColor(UiColors.resolve(v.context, R.color.text_secondary))
         }
     }
 

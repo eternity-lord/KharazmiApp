@@ -283,7 +283,7 @@
                             android:layout_marginTop="4dp"
                             android:text="فقط اعداد خام — تفسیر با مدیر"
                             android:textAppearance="@style/TextAppearance.Kharazmi.Caption"
-                            android:textColor="?android:attr/textColorSecondary" />
+                            android:textColor="@color/text_secondary" />
 
                         <View
                             android:layout_width="match_parent"
@@ -335,7 +335,7 @@
                             android:layout_marginTop="8dp"
                             android:text="بازه: ---"
                             android:textAppearance="@style/TextAppearance.Kharazmi.Caption"
-                            android:textColor="?android:attr/textColorSecondary"
+                            android:textColor="@color/text_secondary"
                             android:fontFeatureSettings="tnum" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
@@ -349,9 +349,11 @@
                     style="@style/Widget.Kharazmi.Button.Gold"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:textColor="@color/text_on_gold"
                     android:text="تماس با معلم"
                     app:backgroundTint="@color/gold_primary"
                     app:icon="@drawable/ic_call_24"
+                    app:iconTint="@color/text_on_gold"
                     app:iconGravity="textStart"
                     app:elevation="@dimen/elevation_button" />
 
@@ -363,9 +365,9 @@
                     android:layout_marginTop="@dimen/spacing_normal"
                     android:text="تعلیق معلم"
                     app:backgroundTint="@color/gold_primary"
-                    android:textColor="@color/white"
+                    android:textColor="@color/text_on_gold"
                     app:icon="@android:drawable/ic_lock_lock"
-                    app:iconTint="@color/white"
+                    app:iconTint="@color/text_on_gold"
                     app:iconGravity="textStart"
                     app:elevation="@dimen/elevation_button" />
 
@@ -434,10 +436,12 @@
                     style="@style/Widget.Kharazmi.Button.Gold"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:textColor="@color/text_on_gold"
                     android:text="تسویه و ثبت پرداخت"
                     app:backgroundTint="@color/gold_primary"
                     android:layout_marginTop="@dimen/spacing_normal"
                     app:icon="@drawable/ic_save_24"
+                    app:iconTint="@color/text_on_gold"
                     app:iconGravity="textStart"
                     app:elevation="@dimen/elevation_button" />
 
@@ -510,7 +514,7 @@
                     android:padding="@dimen/spacing_large"
                     android:text="در حال دریافت تاریخچه ارتباطات..."
                     android:textAppearance="@style/TextAppearance.Kharazmi.Body"
-                    android:textColor="?android:attr/textColorSecondary" />
+                    android:textColor="@color/text_secondary" />
 
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/rvTeacherCommunicationHistory"

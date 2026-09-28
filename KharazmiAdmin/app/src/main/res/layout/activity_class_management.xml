@@ -88,8 +88,8 @@
                 android:layout_height="wrap_content"
                 android:text="تعلیق کلاس‌های انتخاب‌شده"
                 app:backgroundTint="@color/gold_primary"
-                android:textColor="@color/white"
-                app:iconTint="@color/white"
+                android:textColor="@color/text_on_gold"
+                app:iconTint="@color/text_on_gold"
                 app:icon="@android:drawable/ic_lock_lock"
                 app:iconGravity="textStart"/>
         </LinearLayout>

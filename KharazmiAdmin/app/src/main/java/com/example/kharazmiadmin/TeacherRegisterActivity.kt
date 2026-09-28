@@ -72,7 +72,7 @@ class TeacherRegisterActivity : BaseActivity() {
                 .setMinYear(1300)
                 .setMaxYear(PersianCalendar().persianYear)
                 .setInitDate(1365, 1, 1)
-                .setActionTextColor(Color.GRAY)
+                .setActionTextColor(UiColors.resolve(this@TeacherRegisterActivity, R.color.text_secondary))
                 .setTitleType(PersianDatePickerDialog.WEEKDAY_DAY_MONTH_YEAR)
                 .setShowInBottomSheet(true)
                 .setListener(object : ir.hamsaa.persiandatepicker.Listener {

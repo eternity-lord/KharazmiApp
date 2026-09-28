@@ -267,8 +267,7 @@
                             android:layout_height="wrap_content"
                             android:text="@string/ds_value_placeholder"
                             android:textAppearance="@style/TextAppearance.Kharazmi.DS.Money"
-                            android:fontFeatureSettings="tnum"
-                            android:maxLines="1"/>
+                            android:fontFeatureSettings="tnum"/>
                     </LinearLayout>
 
                     <View
@@ -310,8 +309,7 @@
                             android:text="@string/ds_value_placeholder"
                             android:textAppearance="@style/TextAppearance.Kharazmi.DS.Money"
                             android:textColor="@color/ds_success"
-                            android:fontFeatureSettings="tnum"
-                            android:maxLines="1"/>
+                            android:fontFeatureSettings="tnum"/>
                     </LinearLayout>
 
                     <View
@@ -353,8 +351,7 @@
                             android:text="@string/ds_value_placeholder"
                             android:textAppearance="@style/TextAppearance.Kharazmi.DS.Money"
                             android:textColor="@color/ds_danger"
-                            android:fontFeatureSettings="tnum"
-                            android:maxLines="1"/>
+                            android:fontFeatureSettings="tnum"/>
                     </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
@@ -421,8 +418,7 @@
                             android:layout_height="wrap_content"
                             android:text="@string/ds_value_placeholder"
                             android:textAppearance="@style/TextAppearance.Kharazmi.DS.Money"
-                            android:fontFeatureSettings="tnum"
-                            android:maxLines="1"/>
+                            android:fontFeatureSettings="tnum"/>
                     </LinearLayout>
 
                     <View
@@ -463,8 +459,7 @@
                             android:text="@string/ds_value_placeholder"
                             android:textAppearance="@style/TextAppearance.Kharazmi.DS.Money"
                             android:textColor="@color/ds_success"
-                            android:fontFeatureSettings="tnum"
-                            android:maxLines="1"/>
+                            android:fontFeatureSettings="tnum"/>
                     </LinearLayout>
 
                     <View
@@ -505,8 +500,7 @@
                             android:text="@string/ds_value_placeholder"
                             android:textAppearance="@style/TextAppearance.Kharazmi.DS.Money"
                             android:textColor="@color/ds_danger"
-                            android:fontFeatureSettings="tnum"
-                            android:maxLines="1"/>
+                            android:fontFeatureSettings="tnum"/>
                     </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
@@ -589,9 +583,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:text="@string/ds_value_placeholder"
-                            android:textAppearance="@style/TextAppearance.Kharazmi.DS.SectionTitle"
-                            android:maxLines="2"
-                            android:ellipsize="end"/>
+                            android:textAppearance="@style/TextAppearance.Kharazmi.DS.SectionTitle"/>
 
                         <TextView
                             android:id="@+id/tvStatementStudentCode"
@@ -634,8 +626,7 @@
                                 android:text="@string/ds_value_placeholder"
                                 android:textAppearance="@style/TextAppearance.Kharazmi.DS.Money"
                                 android:textColor="@color/ds_success"
-                                android:fontFeatureSettings="tnum"
-                                android:maxLines="1"/>
+                                android:fontFeatureSettings="tnum"/>
                         </LinearLayout>
 
                         <View
@@ -676,8 +667,7 @@
                                 android:text="@string/ds_value_placeholder"
                                 android:textAppearance="@style/TextAppearance.Kharazmi.DS.Money"
                                 android:textColor="@color/ds_danger"
-                                android:fontFeatureSettings="tnum"
-                                android:maxLines="1"/>
+                                android:fontFeatureSettings="tnum"/>
                         </LinearLayout>
 
                         <TextView

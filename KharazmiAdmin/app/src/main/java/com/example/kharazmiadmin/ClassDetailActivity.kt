@@ -404,8 +404,8 @@ class ClassDetailActivity : BaseActivity() {
             .create()
 
         dialog.show()
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(android.graphics.Color.parseColor("#4CAF50"))
-        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(android.graphics.Color.parseColor("#F44336"))
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(UiColors.resolve(this@ClassDetailActivity, R.color.status_success))
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(UiColors.resolve(this@ClassDetailActivity, R.color.status_danger))
     }
 
     private fun performDeleteClass(subRole: String, forgive: Boolean) {
@@ -785,19 +785,19 @@ class ClassStudentAdapter(
                     String.format("%,d", fullStudent.debt_institute)
                 )
                 holder.tvStudentStatus.text = holder.itemView.context.getString(R.string.cdetail_unsettled)
-                holder.tvStudentStatus.setTextColor(android.graphics.Color.parseColor("#D32F2F")) // Red
+                holder.tvStudentStatus.setTextColor(UiColors.resolve(holder.itemView.context, R.color.status_danger)) // Red
             } else {
                 holder.tvStudentDebt.text = holder.itemView.context.getString(
                     R.string.cdetail_debt_split, "0", "0"
                 )
                 holder.tvStudentStatus.text = holder.itemView.context.getString(R.string.cdetail_settled)
-                holder.tvStudentStatus.setTextColor(android.graphics.Color.parseColor("#388E3C")) // Green
+                holder.tvStudentStatus.setTextColor(UiColors.resolve(holder.itemView.context, R.color.status_success)) // Green
             }
 
             // Show suspension status if applicable
             if (fullStudent.is_suspended) {
                 holder.tvStudentStatus.text = holder.itemView.context.getString(R.string.cdetail_susp)
-                holder.tvStudentStatus.setTextColor(android.graphics.Color.parseColor("#FF9800")) // Orange
+                holder.tvStudentStatus.setTextColor(UiColors.resolve(holder.itemView.context, R.color.status_warning)) // Orange
             }
         } else {
             // Fallback to basic info
@@ -813,9 +813,12 @@ class ClassStudentAdapter(
             holder.tvStudentStatus.text = holder.itemView.context.getString(
                 if (hasDebt) R.string.cdetail_unsettled else R.string.cdetail_settled
             )
-            holder.tvStudentStatus.setTextColor(android.graphics.Color.parseColor(
-                if (hasDebt) "#D32F2F" else "#388E3C"
-            ))
+            holder.tvStudentStatus.setTextColor(
+                UiColors.resolve(
+                    holder.itemView.context,
+                    if (hasDebt) R.color.status_danger else R.color.status_success
+                )
+            )
 
             // Hide paid info
             holder.tvStudentPaid.visibility = View.GONE

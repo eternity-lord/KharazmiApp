@@ -160,8 +160,7 @@
                 android:layout_height="wrap_content"
                 android:text="@string/ds_value_placeholder"
                 android:textAppearance="@style/TextAppearance.Kharazmi.DS.Money"
-                android:fontFeatureSettings="tnum"
-                android:maxLines="1"/>
+                android:fontFeatureSettings="tnum"/>
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 

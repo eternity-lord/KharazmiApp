@@ -702,15 +702,15 @@ class ProfileClassAdapter(
         when {
             classItem.is_suspended -> {
                 holder.tvClassStatus.text = holder.itemView.context.getString(R.string.tprof_suspended)
-                holder.tvClassStatus.setTextColor(android.graphics.Color.parseColor("#FF9800"))
+                holder.tvClassStatus.setTextColor(UiColors.resolve(holder.itemView.context, R.color.status_warning))
             }
             !classItem.is_admin_approved -> {
                 holder.tvClassStatus.text = holder.itemView.context.getString(R.string.tprof_pending2)
-                holder.tvClassStatus.setTextColor(android.graphics.Color.parseColor("#2196F3"))
+                holder.tvClassStatus.setTextColor(UiColors.resolve(holder.itemView.context, R.color.status_info))
             }
             else -> {
                 holder.tvClassStatus.text = holder.itemView.context.getString(R.string.tprof_active)
-                holder.tvClassStatus.setTextColor(android.graphics.Color.parseColor("#4CAF50"))
+                holder.tvClassStatus.setTextColor(UiColors.resolve(holder.itemView.context, R.color.status_success))
             }
         }
 

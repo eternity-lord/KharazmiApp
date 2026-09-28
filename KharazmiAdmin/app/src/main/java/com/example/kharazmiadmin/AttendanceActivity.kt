@@ -404,10 +404,10 @@ class AttendanceActivity : BaseActivity() {
     private fun refreshNetworkStatus() {
         if (isNetworkAvailable()) {
             tvNetworkStatus.text = getString(R.string.attendance_net_online)
-            tvNetworkStatus.setBackgroundColor(android.graphics.Color.parseColor("#2E7D32"))
+            tvNetworkStatus.setBackgroundColor(UiColors.resolve(this@AttendanceActivity, R.color.gaj_green_dark))
         } else {
             tvNetworkStatus.text = getString(R.string.attendance_net_offline)
-            tvNetworkStatus.setBackgroundColor(android.graphics.Color.parseColor("#C62828"))
+            tvNetworkStatus.setBackgroundColor(UiColors.resolve(this@AttendanceActivity, R.color.gaj_red_error))
         }
     }
 
@@ -596,8 +596,8 @@ class AttendanceActivity : BaseActivity() {
             .create()
 
         dialog.show()
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(android.graphics.Color.parseColor("#4CAF50"))
-        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(android.graphics.Color.parseColor("#F44336"))
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(UiColors.resolve(this@AttendanceActivity, R.color.status_success))
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(UiColors.resolve(this@AttendanceActivity, R.color.status_danger))
     }
 
     private fun submitSession() {

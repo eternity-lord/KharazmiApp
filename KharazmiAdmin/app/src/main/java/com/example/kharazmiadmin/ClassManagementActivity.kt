@@ -24,7 +24,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import android.widget.Button
-import android.graphics.Color
 import android.content.res.ColorStateList
 
 class ClassManagementActivity : BaseActivity() {
@@ -297,7 +296,7 @@ class ClassManagementActivity : BaseActivity() {
                     val tv = TextView(holder.itemView.context)
                     tv.text = getString(R.string.common_bullet_row, name)
                     tv.textSize = 12f
-                    tv.setTextColor(android.graphics.Color.parseColor("#424242"))
+                    tv.setTextColor(UiColors.resolve(holder.itemView.context, R.color.text_primary))
                     tv.setPadding(0, 4, 0, 4)
                     tv.isClickable = true
                     tv.setOnClickListener {
@@ -309,7 +308,7 @@ class ClassManagementActivity : BaseActivity() {
                 val tv = TextView(holder.itemView.context)
                 tv.text = getString(R.string.cmgmt_no_students)
                 tv.textSize = 10f
-                tv.setTextColor(android.graphics.Color.GRAY)
+                tv.setTextColor(UiColors.resolve(holder.itemView.context, R.color.text_secondary))
                 holder.llStudentPreview.addView(tv)
             }
 
@@ -334,11 +333,11 @@ class ClassManagementActivity : BaseActivity() {
                 holder.btnSuspend.visibility = View.VISIBLE
                 if (item.is_suspended) {
                     holder.itemView.alpha = 0.5f
-                    holder.btnSuspend.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#4CAF50"))
+                    holder.btnSuspend.backgroundTintList = ColorStateList.valueOf(UiColors.resolve(holder.itemView.context, R.color.status_success))
                     holder.btnSuspend.text = getString(R.string.cmgmt_activate)
                 } else {
                     holder.itemView.alpha = 1.0f
-                    holder.btnSuspend.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#FF9800"))
+                    holder.btnSuspend.backgroundTintList = ColorStateList.valueOf(UiColors.resolve(holder.itemView.context, R.color.status_warning))
                     holder.btnSuspend.text = getString(R.string.cmgmt_suspend)
                 }
 

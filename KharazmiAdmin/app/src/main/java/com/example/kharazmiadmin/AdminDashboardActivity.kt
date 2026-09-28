@@ -2,7 +2,6 @@ package com.example.kharazmiadmin
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
-import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -110,8 +109,8 @@ class AdminDashboardActivity : BaseActivity() {
         rvCritical.isNestedScrollingEnabled = false
 
         // SwipeRefresh colors
-        swipeDashboard.setColorSchemeColors(Color.parseColor("#D4A94C"))
-        swipeDashboard.setProgressBackgroundColorSchemeColor(Color.parseColor("#171A21"))
+        swipeDashboard.setColorSchemeColors(UiColors.resolve(this@AdminDashboardActivity, R.color.gold_primary))
+        swipeDashboard.setProgressBackgroundColorSchemeColor(UiColors.resolve(this@AdminDashboardActivity, R.color.gold_bg_elevated))
     }
 
     private fun setupApis() {
@@ -431,9 +430,9 @@ class AdminDashboardActivity : BaseActivity() {
             // Category badge — critical is red, but we may get only critical here
             val label = getString(R.string.dunning_filter_critical)
             holder.tvCategory.text = "🔴 $label"
-            holder.tvCategory.setBackgroundColor(Color.parseColor("#F44336"))
-            holder.tvCategory.setTextColor(Color.WHITE)
-            holder.card.strokeColor = Color.parseColor("#D32F2F")
+            holder.tvCategory.setBackgroundColor(UiColors.resolve(holder.itemView.context, R.color.ds_danger_deep))
+            holder.tvCategory.setTextColor(UiColors.resolve(holder.itemView.context, R.color.white))
+            holder.card.strokeColor = UiColors.resolve(holder.itemView.context, R.color.status_danger)
 
             holder.card.setOnClickListener {
                 // Quick open DunningActivity filtered? Just open DunningActivity

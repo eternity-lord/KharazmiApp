@@ -70,7 +70,7 @@
                 android:text="⚠️ ۲ روز گذشته"
                 android:textAppearance="@style/TextAppearance.Kharazmi.Caption"
                 android:textStyle="bold"
-                android:textColor="@color/white"
+                android:textColor="@color/text_on_gold"
                 android:background="@color/gold_primary" />
 
             <TextView

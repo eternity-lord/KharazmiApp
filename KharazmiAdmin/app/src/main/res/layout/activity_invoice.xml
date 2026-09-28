@@ -165,9 +165,7 @@
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
                                 android:text="@string/ds_value_placeholder"
-                                android:textAppearance="@style/TextAppearance.Kharazmi.DS.SectionTitle"
-                                android:maxLines="2"
-                                android:ellipsize="end"/>
+                                android:textAppearance="@style/TextAppearance.Kharazmi.DS.SectionTitle"/>
 
                             <TextView
                                 android:id="@+id/tvStClass"
@@ -175,8 +173,7 @@
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="@dimen/spacing_2xs"
                                 android:text="@string/ds_value_placeholder"
-                                android:textAppearance="@style/TextAppearance.Kharazmi.DS.Caption"
-                                android:maxLines="3"/>
+                                android:textAppearance="@style/TextAppearance.Kharazmi.DS.Caption"/>
                         </LinearLayout>
                     </LinearLayout>
 
@@ -310,8 +307,7 @@
                         <TextView
                             style="@style/Widget.Kharazmi.DS.Pill.Neutral"
                             android:text="@string/ds_inv_receipt_no"
-                            android:textAppearance="@style/TextAppearance.Kharazmi.DS.Caption"
-                            android:maxLines="1"/>
+                            android:textAppearance="@style/TextAppearance.Kharazmi.DS.Caption"/>
                     </LinearLayout>
 
                     <!-- کیف پول مقصد پرداخت (فقط برای مدیر؛ کد آن را کنترل می‌کند) -->

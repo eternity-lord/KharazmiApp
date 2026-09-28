@@ -176,6 +176,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="@dimen/spacing_normal"
+                        android:textColor="@color/text_on_gold"
                         android:text="ثبت و پیکربندی اتاق"
                         app:backgroundTint="@color/gold_primary" />
 
@@ -213,6 +214,7 @@
                 style="@style/Widget.Kharazmi.Button.Gold"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:textColor="@color/text_on_gold"
                 android:text="بازگشت به تقویم آموزشی"
                 app:backgroundTint="@color/gold_primary" />
 

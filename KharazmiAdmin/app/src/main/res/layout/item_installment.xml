@@ -36,9 +36,7 @@
                 android:layout_weight="1"
                 android:text="@string/ds_value_placeholder"
                 android:textAppearance="@style/TextAppearance.Kharazmi.DS.Body"
-                android:textStyle="bold"
-                android:maxLines="2"
-                android:ellipsize="end"/>
+                android:textStyle="bold"/>
 
             <LinearLayout
                 android:layout_width="wrap_content"
@@ -59,8 +57,7 @@
                     android:layout_height="wrap_content"
                     android:text="@string/ds_value_placeholder"
                     android:textAppearance="@style/TextAppearance.Kharazmi.DS.Money"
-                    android:fontFeatureSettings="tnum"
-                    android:maxLines="1"/>
+                    android:fontFeatureSettings="tnum"/>
             </LinearLayout>
         </LinearLayout>
 
@@ -88,16 +85,13 @@
                 android:layout_marginStart="@dimen/spacing_xs"
                 android:text="@string/ds_value_placeholder"
                 android:textAppearance="@style/TextAppearance.Kharazmi.DS.Caption"
-                android:fontFeatureSettings="tnum"
-                android:maxLines="2"
-                android:ellipsize="end"/>
+                android:fontFeatureSettings="tnum"/>
 
             <TextView
                 android:id="@+id/tvInstallmentStatus"
                 style="@style/Widget.Kharazmi.DS.Pill.Neutral"
                 android:text="@string/profile_inst_pending"
-                android:textAppearance="@style/TextAppearance.Kharazmi.DS.Status"
-                android:maxLines="1"/>
+                android:textAppearance="@style/TextAppearance.Kharazmi.DS.Status"/>
         </LinearLayout>
 
         <!-- تاریخ پرداخت (فقط برای قسط پرداخت‌شده نمایان می‌شود) -->

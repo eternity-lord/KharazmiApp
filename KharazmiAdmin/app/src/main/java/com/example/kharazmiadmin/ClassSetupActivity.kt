@@ -120,8 +120,8 @@ class ClassSetupActivity : BaseActivity() {
 
         confirmDialog.show()
         // رنگ‌بندی دکمه‌ها به سبز و قرمز متریال
-        confirmDialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(android.graphics.Color.parseColor("#4CAF50"))
-        confirmDialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(android.graphics.Color.parseColor("#F44336"))
+        confirmDialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(UiColors.resolve(this@ClassSetupActivity, R.color.status_success))
+        confirmDialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(UiColors.resolve(this@ClassSetupActivity, R.color.status_danger))
     }
 
     private fun showClassSummaryPage() {
@@ -188,8 +188,8 @@ class ClassSetupActivity : BaseActivity() {
                         .create()
 
                     summaryDialog.show()
-                    summaryDialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(android.graphics.Color.parseColor("#4CAF50"))
-                    summaryDialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(android.graphics.Color.parseColor("#F44336"))
+                    summaryDialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(UiColors.resolve(this@ClassSetupActivity, R.color.status_success))
+                    summaryDialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(UiColors.resolve(this@ClassSetupActivity, R.color.status_danger))
                 }
             } catch (e: Exception) {
                 // FIX: Bug 19 - cancellation is not a network/UI error.

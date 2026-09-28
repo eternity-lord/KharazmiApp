@@ -60,11 +60,13 @@ else:
 | خروجی | محاسبهٔ سرور | مصرف Android | نمایش/مصرف محلی |
 |---|---|---|---|
 | وضعیت فاکتور کلاس | breakdown همان enrollment: total/paid/due/remaining/credit | `GET finance/student_class_status` در `KharazmiAdmin/app/src/main/java/com/example/kharazmiadmin/ApiInterfaces.kt:57-62` | مبلغ کل و باقیمانده/سهم‌ها در `InvoiceActivity.kt:305-310,350-365`؛ receipt مبلغ ورودی در `InvoiceActivity.kt:529-643` |
-| dashboard مالی دانش‌آموز | wallet teacher/institute، total paid per active enrollment، total debt canonical، installments و سه transaction اخیر | interface/model در `ApiInterfaces.kt:117-120` و `AppModels.kt:722-750` | نمایش invoice/dashboard در `InvoiceActivity.kt:1019-1020` و مدل/صفحه `ParentPortalActivity.kt:297-298,382-389` |
+| dashboard مالی دانش‌آموز | wallet teacher/institute، total paid per active enrollment، total debt canonical، installments و سه transaction اخیر | interface/model در `ApiInterfaces.kt:117-120` و `AppModels.kt:722-739` | برای انتخاب enrollment قسط در `StudentProfileActivity.kt:1094-1103` مصرف می‌شود؛ summary debt در `InvoiceActivity.kt:1019-1020` از مدل search است، نه این dashboard. |
+| portal والد | پاسخ `parent/child_profile` شامل wallet/debt و profile کودک | `ParentPortalActivity.kt:70-81`؛ handler `Kharazmi_Server/routers/parent.py:299` | دریافت و نمایش balance/debt در `ParentPortalActivity.kt:288-298` |
+| portal دانش‌آموز | پاسخ `students/my_profile` شامل wallet/debt | declaration در `StudentPortalActivity.kt:41-42`؛ handler `Kharazmi_Server/routers/students.py:559` | دریافت و نمایش balance/debt در `StudentPortalActivity.kt:199-209` |
 | full profile | walletها، total debt، wallet_total، total_paid_institute و `teachers_financial` per enrollment | `NewInvoiceApi.getFullStudentProfile` در `ApiInterfaces.kt:54-55`؛ مدل‌ها `AppModels.kt:465-513` | فراخوانی در `EditStudentActivity.kt:155-198` و `StudentProfileActivity.kt:335,501-527`؛ مبلغ بدهی برای فیش در `StudentProfileActivity.kt:439`. |
 | student statement | total_paid_institute، total_debt_institute، teacher details، timeline و payment link | `ReportNewApi.getStudentStatement` در `ReportActivity.kt:136-139`؛ مدل `ReportActivity.kt:68-90` | summary/statement در `ReportActivity.kt:450-530` |
 | کلاس | جمع breakdown همه enrollmentهای active کلاس؛ `total_paid` teacher+institute | `ClassApi`/مدل کلاس در screen docs و `ClassDetailActivity.kt:34-42` | جدول/CSV کلاس در `ClassDetailActivity.kt:260-285` |
-| KPI امروز | `calculate_institute_cash_collected` برای وصولی نقدی آموزشگاه؛ جدا از بدهی قرارداد | `DashboardApi` در `ApiInterfaces.kt:152-154` و مدل `AppModels.kt:902-909` | دریافت در `AdminDashboardActivity.kt:310-321` و bind مبلغ در `AdminDashboardActivity.kt:350-369`. |
+| KPI امروز | `calculate_institute_cash_collected` برای وصولی نقدی آموزشگاه؛ جدا از بدهی قرارداد | تابع در `Kharazmi_Server/financial_calculations.py:114` و مصرف در `Kharazmi_Server/routers/dashboard.py:76-85`؛ declaration `ApiInterfaces.kt:152-154` و مدل `AppModels.kt:902-909` | دریافت در `AdminDashboardActivity.kt:310-321` و bind مبلغ در `AdminDashboardActivity.kt:350-369`. |
 
 ## 4. دو مسیر متفاوت با نام‌های مشابه
 

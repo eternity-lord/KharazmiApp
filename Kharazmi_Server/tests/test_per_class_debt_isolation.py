@@ -35,11 +35,13 @@ from routers.classes import (
 )
 from routers.admin import get_student_full_profile
 from routers.finance import (
+    FinanceSubmitData,
     get_debtors_list,
     get_invoice_details,
     get_student_class_status,
     get_student_financial_dashboard,
     search_finance_advanced,
+    submit_payment,
 )
 from routers.reports import get_student_statement
 from routers.teachers import get_my_classes
@@ -128,6 +130,97 @@ class TestPerClassDebtIsolation(unittest.TestCase):
         payload = asyncio.run(read_body())
         sheet = load_workbook(io.BytesIO(payload), data_only=True).active
         return list(sheet.iter_rows(min_row=4, values_only=True))
+
+    REQUIRED_DEBT_METADATA = {
+        "enrollment_id", "course_id", "course_title",
+        "teacher_id", "teacher_name", "is_unassigned",
+    }
+
+    def _assert_debt_metadata(self, row, enrollment_id, course_id, course_title):
+        self.assertTrue(self.REQUIRED_DEBT_METADATA.issubset(row.keys()), row)
+        self.assertEqual(row["enrollment_id"], enrollment_id)
+        self.assertEqual(row["course_id"], course_id)
+        self.assertEqual(row["course_title"], course_title)
+        self.assertEqual(row["teacher_id"], self.teacher.id)
+        self.assertEqual(row["teacher_name"], "معلم مشترک")
+        self.assertFalse(row["is_unassigned"])
+
+    def test_debt_metadata_contract_is_present_on_every_debt_endpoint(self):
+        classes = {row["id"]: row for row in get_all_classes(db=self.db, _="admin")}
+        self._assert_debt_metadata(classes[self.course_b.id], None, self.course_b.id, "کلاس B")
+
+        details = get_class_details(
+            course_id=self.course_b.id, db=self.db,
+            authorization=self._admin(), sub_role="admin",
+        )["students"][0]
+        self._assert_debt_metadata(details, self.enrollment_b.id, self.course_b.id, "کلاس B")
+
+        report_student = get_class_full_report(
+            id=self.course_b.id, db=self.db,
+            authorization=self._admin(), sub_role="admin",
+        ).students[0].model_dump()
+        self._assert_debt_metadata(report_student, self.enrollment_b.id, self.course_b.id, "کلاس B")
+
+        full_student = get_class_students_full(
+            id=self.course_b.id, db=self.db,
+            authorization=self._admin(), sub_role="admin",
+        )["students"][0]
+        self._assert_debt_metadata(full_student, self.enrollment_b.id, self.course_b.id, "کلاس B")
+
+        search_class = next(row for row in search_finance_advanced(
+            query="کلاس B", branch_id=None, authorization=self._admin(),
+            db=self.db, sub_role="admin",
+        ) if row.type == "class")
+        self._assert_debt_metadata(
+            search_class.students_in_class[0], self.enrollment_b.id,
+            self.course_b.id, "کلاس B",
+        )
+
+        status = get_student_class_status(
+            student_id=self.student.id, course_id=self.course_b.id,
+            db=self.db, authorization=self._admin(), sub_role="admin",
+        )
+        self._assert_debt_metadata(status, self.enrollment_b.id, self.course_b.id, "کلاس B")
+
+        invoice = get_invoice_details(
+            enrollment_id=self.enrollment_b.id, db=self.db,
+            authorization=self._admin(), _role="admin",
+        )
+        self._assert_debt_metadata(invoice, self.enrollment_b.id, self.course_b.id, "کلاس B")
+
+        dashboard = get_student_financial_dashboard(
+            student_id=self.student.id, db=self.db,
+            authorization=self._admin(), _role="admin",
+        )
+        dashboard_row = next(row for row in dashboard["enrollments"] if row["enrollment_id"] == self.enrollment_b.id)
+        self._assert_debt_metadata(dashboard_row, self.enrollment_b.id, self.course_b.id, "کلاس B")
+
+        profile = get_student_full_profile(
+            id=self.student.id, authorization=self._admin(), db=self.db, role="admin",
+        )
+        profile_enrollment = next(row for row in profile["enrollments"] if row["enrollment_id"] == self.enrollment_b.id)
+        self._assert_debt_metadata(profile_enrollment, self.enrollment_b.id, self.course_b.id, "کلاس B")
+        profile_financial = next(row for row in profile["teachers_financial"] if row["enrollment_id"] == self.enrollment_b.id)
+        self._assert_debt_metadata(profile_financial, self.enrollment_b.id, self.course_b.id, "کلاس B")
+
+        statement = get_student_statement(
+            student_id=self.student.id, db=self.db,
+            authorization=self._admin(), role="admin",
+        )
+        statement_row = next(row for row in statement["teachers"] if row["enrollment_id"] == self.enrollment_b.id)
+        self._assert_debt_metadata(statement_row, self.enrollment_b.id, self.course_b.id, "کلاس B")
+
+        debtor = next(row for row in get_debtors_list(
+            branch_id=None, search="دوکلاسه", authorization=self._admin(), db=self.db, _="admin"
+        ) if row["student_id"] == self.student.id)
+        debtor_row = next(row for row in debtor["teachers"] if row["enrollment_id"] == self.enrollment_b.id)
+        self._assert_debt_metadata(debtor_row, self.enrollment_b.id, self.course_b.id, "کلاس B")
+
+        teacher_class = next(row for row in get_my_classes(
+            teacher_id=self.teacher.id, db=self.db,
+            authorization=self._admin(), sub_role="admin",
+        ) if row["id"] == self.course_b.id)
+        self._assert_debt_metadata(teacher_class, None, self.course_b.id, "کلاس B")
 
     def test_breakdown_does_not_copy_wallet_debt_to_legacy_class(self):
         a = calculate_enrollment_debt_breakdown(self.db, self.enrollment_a)

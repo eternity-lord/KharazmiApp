@@ -43,6 +43,7 @@ interface AdminSessionHistoryApi {
         @Query("date_from") dateFrom: String? = null,
         @Query("date_to") dateTo: String? = null,
         @Query("teacher_id") teacherId: Int? = null,
+        @Query("course_id") courseId: Int? = null,
         @Query("flag") flag: String? = null,
         @Query("status") status: String? = null,
         @Query("search") search: String? = null

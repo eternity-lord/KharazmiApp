@@ -217,6 +217,9 @@ def get_all_classes(
         total_paid = 0
         paid_to_teacher = 0
         paid_to_institute = 0
+        # فقط اطلاع‌رسانی برای بنر: «بدهی بابت چند جلسهٔ همین کلاس» (روی هیچ محاسبهٔ مالی اثر ندارد).
+        unpaid_sessions_total = 0
+        sessions_billed_total = 0
 
         # Get all students in this class
         all_enrollments = (
@@ -250,6 +253,8 @@ def get_all_classes(
                 debt_to_teacher += student_debt_teacher
                 debt_to_institute += student_debt_institute
                 total_debt += breakdown["debt"]
+                unpaid_sessions_total += int(breakdown.get("unpaid_sessions", 0) or 0)
+                sessions_billed_total += int(breakdown.get("sessions_billed", 0) or 0)
                 paid_to_teacher += student_paid_teacher
                 paid_to_institute += student_paid_institute
                 total_paid += student_paid_teacher + student_paid_institute
@@ -287,6 +292,8 @@ def get_all_classes(
                 "total_paid": total_paid,
                 "paid_to_teacher": paid_to_teacher,
                 "paid_to_institute": paid_to_institute,
+                "unpaid_sessions": unpaid_sessions_total,
+                "sessions_billed": sessions_billed_total,
                 # این ردیف aggregate کلاس است؛ enrollment_id عمداً null می‌ماند.
                 "enrollment_id": None,
                 "course_id": c.id,

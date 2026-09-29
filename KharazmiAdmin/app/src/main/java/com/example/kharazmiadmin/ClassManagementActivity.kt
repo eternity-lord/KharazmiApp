@@ -226,6 +226,7 @@ class ClassManagementActivity : BaseActivity() {
             val llStudentPreview: LinearLayout = view.findViewById(R.id.ll_student_preview)
             val tvTeacherDebt: TextView = view.findViewById(R.id.tvTeacherDebt)
             val tvInstituteDebt: TextView = view.findViewById(R.id.tvInstituteDebt)
+            val tvDebtNote: TextView = view.findViewById(R.id.tvDebtSessionsNote)
             val btnRegisterInvoice: Button = view.findViewById(R.id.btnRegisterInvoice)
             val btnSuspend: Button = view.findViewById(R.id.btnSuspend)
             val llTopStudents: LinearLayout = view.findViewById(R.id.ll_top_students)
@@ -327,6 +328,9 @@ class ClassManagementActivity : BaseActivity() {
 
             holder.tvTeacherDebt.text = String.format("%,d", item.debt_to_teacher)
             holder.tvInstituteDebt.text = String.format("%,d", item.debt_to_institute)
+            ClassBannerNotes.bindDebtNote(
+                holder.tvDebtNote, item.unpaid_sessions, item.sessions_billed, item.debt_to_teacher, item.debt_to_institute
+            )
 
             // دکمه تعلیق تکی
             if (isAdminUser && !isMultiSelectMode) {

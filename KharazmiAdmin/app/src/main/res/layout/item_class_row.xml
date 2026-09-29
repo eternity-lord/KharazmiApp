@@ -272,6 +272,19 @@
                     />
                 </LinearLayout>
             </LinearLayout>
+
+            <!-- یادداشت «بدهی بابت چند جلسه» — فقط برای همین کلاس؛ بدون داده پنهان می‌ماند -->
+            <TextView
+                android:id="@+id/tvDebtSessionsNote"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_small"
+                android:gravity="center"
+                android:textAppearance="@style/TextAppearance.GajAdmin.Caption"
+                android:textColor="@color/text_secondary"
+                android:visibility="gone"
+                tools:text="📚 بدهی بابت ۱ جلسهٔ ثبت‌شدهٔ همین کلاس"
+                tools:visibility="visible" />
         </LinearLayout>
 
         <!-- Top 10 Students Section -->

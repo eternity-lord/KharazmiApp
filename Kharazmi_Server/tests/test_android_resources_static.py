@@ -866,5 +866,53 @@ class TestArchivedClassesRedesignGuard(unittest.TestCase):
             self.assertTrue(f"R.string.{key}" in corpus or f"@string/{key}" in corpus, f"رشتهٔ بدون مصرف: {key}")
 
 
+class TestClassBannerPerClassNoteGuard(unittest.TestCase):
+    """گارد ۱۰ — بنر کلاس و ردیف دانش‌آموز: «بدهی بابت چند جلسهٔ همین کلاس» + شمارش حضور همین کلاس."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.notes = _kotlin_source("ClassBannerNotes.kt")
+        cls.mgmt = _kotlin_source("ClassManagementActivity.kt")
+        cls.teacher = _kotlin_source("TeacherDashboardActivity.kt")
+        cls.detail = _kotlin_source("ClassDetailActivity.kt")
+        cls.models = _kotlin_source("AppModels.kt")
+        cls.layout = _read(os.path.join(RES_DIR, "layout", "item_class_row.xml"))
+        cls.strings = dict(_string_entries(os.path.join(RES_DIR, "values", "strings.xml")))
+
+    def test_10a_layout_has_note_view_hidden_by_default(self):
+        m = re.search(r'<TextView[^>]*@\+id/tvDebtSessionsNote[^>]*>', self.layout, re.S)
+        self.assertIsNotNone(m)
+        self.assertIn('android:visibility="gone"', m.group(0))
+
+    def test_10b_both_banners_bind_the_note_from_their_own_row(self):
+        for src in (self.mgmt, self.teacher):
+            self.assertIn("R.id.tvDebtSessionsNote", src)
+            self.assertIn("ClassBannerNotes.bindDebtNote(", src)
+            self.assertIn("item.unpaid_sessions", src)
+            self.assertIn("item.sessions_billed", src)
+
+    def test_10c_models_carry_new_fields_nullable(self):
+        for decl in ("data class ClassListItem(", "data class TeacherClassItem("):
+            fields = _kotlin_declaration(self.models + self.teacher, decl)
+            self.assertRegex(fields, r"unpaid_sessions: Int\? = null", decl)
+            self.assertRegex(fields, r"sessions_billed: Int\? = null", decl)
+
+    def test_10d_note_hidden_for_old_server_and_for_no_debt(self):
+        body = _kotlin_function_body(self.notes, "fun debtNoteRes(")
+        self.assertIn("unpaidSessions == null && sessionsBilled == null", body)
+        self.assertIn("return null", body)
+        self.assertIn("View.GONE", _kotlin_function_body(self.notes, "fun bindDebtNote("))
+
+    def test_10e_student_row_shows_real_class_counts(self):
+        self.assertIn("R.string.cdetail_att_counts", self.detail)
+        self.assertIn("fullStudent.present_count", self.detail)
+        self.assertIn("fullStudent.total_sessions", self.detail)
+        self.assertEqual(len(_placeholders(self.strings["cdetail_att_counts"])), 3)
+
+    def test_10f_strings_exist_with_right_arity(self):
+        self.assertEqual(len(_placeholders(self.strings["banner_debt_sessions"])), 1)
+        self.assertIn("banner_debt_contract", self.strings)
+
+
 if __name__ == "__main__":
     unittest.main()

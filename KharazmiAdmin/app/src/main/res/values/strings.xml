@@ -1735,4 +1735,8 @@
     <string name="arch_share_chooser">ارسال گزارش کلاس</string>
     <string name="arch_share_header">گزارش کلاس حذف‌شده: %1$s (کد %2$s)</string>
     <string name="arch_detail_error">خطا در دریافت گزارش کلاس؛ دوباره تلاش کنید.</string>
+    <!-- بنر کلاس و ردیف دانش‌آموز: شفاف‌سازی «این بدهی مال همین کلاس است» -->
+    <string name="banner_debt_sessions">📚 بدهی بابت %1$d جلسهٔ ثبت‌شدهٔ همین کلاس</string>
+    <string name="banner_debt_contract">📄 شهریهٔ قراردادی همین کلاس (هنوز جلسه‌ای شارژ نشده)</string>
+    <string name="cdetail_att_counts">حاضر %1$d · غایب %2$d · از %3$d جلسهٔ همین کلاس</string>
 </resources>

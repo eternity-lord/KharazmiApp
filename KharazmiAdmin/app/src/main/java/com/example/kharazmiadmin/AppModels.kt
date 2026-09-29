@@ -626,7 +626,10 @@ data class ClassListItem(
     val enrollment_id: Int? = null,
     val course_id: Int? = null,
     val course_title: String? = null,
-    val is_unassigned: Boolean = false
+    val is_unassigned: Boolean = false,
+    // «بدهی بابت چند جلسهٔ همین کلاس» (nullable: سرور قدیمی نمی‌فرستد ⇒ یادداشت بنر پنهان می‌ماند)
+    val unpaid_sessions: Int? = null,
+    val sessions_billed: Int? = null
 )
 
 // ==========================================

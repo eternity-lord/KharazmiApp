@@ -31,7 +31,9 @@ data class TeacherClassItem(
     val bg_color: String? = "#FFFFFF",
     val total_debt: Long = 0,
     val debt_to_teacher: Long = 0,
-    val debt_to_institute: Long = 0
+    val debt_to_institute: Long = 0,
+    val unpaid_sessions: Int? = null,
+    val sessions_billed: Int? = null
 )
 
 data class TeacherPendingClassItem(
@@ -529,6 +531,7 @@ class TeacherClassAdapter(
         val llStudentPreview: LinearLayout = v.findViewById(R.id.ll_student_preview) // Added View Binding
         // FIX (گروه۳/آیتم۱۲): این دو در layout پیش‌فرض نمایان‌اند و آداپتر معلم قبلاً
         // هرگز به آن‌ها دست نمی‌زد ⇒ دو دکمهٔ نمایانِ بی‌عملکرد در پنل معلم.
+        val tvDebtNote: TextView = v.findViewById(R.id.tvDebtSessionsNote)
         val btnSuspend: android.view.View = v.findViewById(R.id.btnSuspend)
         val btnRegisterInvoice: android.view.View = v.findViewById(R.id.btnRegisterInvoice)
     }
@@ -583,6 +586,9 @@ class TeacherClassAdapter(
         // اعداد مالی از همان endpoint کلاس‌ها می‌آیند و در بنر معلم هم صریح bind می‌شوند.
         holder.tvTeacherDebt.text = String.format("%,d", item.debt_to_teacher)
         holder.tvInstituteDebt.text = String.format("%,d", item.debt_to_institute)
+        ClassBannerNotes.bindDebtNote(
+            holder.tvDebtNote, item.unpaid_sessions, item.sessions_billed, item.debt_to_teacher, item.debt_to_institute
+        )
 
         // FIX (گروه۳/آیتم۱۲): تعلیق و ثبت حواله از اختیارات ادمین/منشی‌اند؛ در پنل معلم
         // پنهان می‌شوند (listener هم سمت ادمینِ ClassManagementActivity می‌ماند).

@@ -874,7 +874,11 @@ class ClassStudentAdapter(
             holder.tvStudentMobile.text = holder.itemView.context.getString(R.string.common_mobile_row, fullStudent.mobile)
 
             // Show attendance rate
-            holder.tvStudentPaid.text = holder.itemView.context.getString(R.string.cdetail_att_pct, String.format("%.1f", fullStudent.attendance_rate))
+            // درصد + شمارش واقعی همین کلاس: «۰٪» یعنی غایب بوده یا هنوز جلسه‌ای نبوده؛ عدد خام این را نمی‌گفت.
+            holder.tvStudentPaid.text = holder.itemView.context.getString(R.string.cdetail_att_pct, String.format("%.1f", fullStudent.attendance_rate)) +
+                "\n" + holder.itemView.context.getString(
+                    R.string.cdetail_att_counts, fullStudent.present_count, fullStudent.absent_count, fullStudent.total_sessions
+                )
             holder.tvStudentPaid.visibility = View.VISIBLE
 
             // فقط دو سهم همین enrollment را نشان بده؛ «بدهی کل» عمداً حذف شده است.

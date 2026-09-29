@@ -292,6 +292,8 @@ def get_my_classes(
         total_debt = 0
         debt_to_teacher = 0
         debt_to_institute = 0
+        unpaid_sessions_total = 0   # فقط اطلاع‌رسانی بنر؛ روی محاسبهٔ مالی اثری ندارد
+        sessions_billed_total = 0
         all_enrollments = (
             db.query(Enrollment)
             .filter(Enrollment.is_deleted == False)
@@ -309,6 +311,8 @@ def get_my_classes(
             debt_to_teacher += breakdown["debt_teacher"]
             debt_to_institute += breakdown["debt_institute"]
             total_debt += breakdown["debt"]
+            unpaid_sessions_total += int(breakdown.get("unpaid_sessions", 0) or 0)
+            sessions_billed_total += int(breakdown.get("sessions_billed", 0) or 0)
 
         # 4. Build Result Dictionary
         class_teacher = c.teacher
@@ -329,6 +333,8 @@ def get_my_classes(
                 "total_debt": total_debt,
                 "debt_to_teacher": debt_to_teacher,
                 "debt_to_institute": debt_to_institute,
+                "unpaid_sessions": unpaid_sessions_total,
+                "sessions_billed": sessions_billed_total,
                 "enrollment_id": None,
                 "course_id": c.id,
                 "course_title": c.title,

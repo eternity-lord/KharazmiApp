@@ -914,5 +914,41 @@ class TestClassBannerPerClassNoteGuard(unittest.TestCase):
         self.assertIn("banner_debt_contract", self.strings)
 
 
+class TestReportZeroExplanationGuard(unittest.TestCase):
+    """گارد ۱۱ — گزارش‌گیری: توضیح «چرا صفر است؟» + ماه جاری دقیق (نه تقریب روز ۲۱)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.report = _kotlin_source("ReportActivity.kt")
+        cls.hints = _kotlin_source("ReportHints.kt")
+        cls.layout = _read(os.path.join(RES_DIR, "layout", "activity_report.xml"))
+        cls.strings = dict(_string_entries(os.path.join(RES_DIR, "values", "strings.xml")))
+
+    def test_11a_layout_has_hint_view_hidden_by_default(self):
+        m = re.search(r'<TextView[^>]*@\+id/tvReportHint[^>]*>', self.layout, re.S)
+        self.assertIsNotNone(m)
+        self.assertIn('android:visibility="gone"', m.group(0))
+        self.assertLess(self.layout.index("@+id/tvMonthlyUncollected"), self.layout.index("@+id/tvReportHint"))
+
+    def test_11b_model_is_nullable_for_old_server_and_activity_binds_it(self):
+        self.assertRegex(self.report, r"val diagnostics: ReportDiagnostics\? = null")
+        self.assertIn("ReportHints.bind(", self.report)
+        self.assertIn("summary.diagnostics", self.report)
+        self.assertIn("R.id.tvReportHint", self.report)
+
+    def test_11c_hint_logic_never_touches_numbers_and_hides_without_data(self):
+        self.assertIn("d == null", self.hints)
+        self.assertIn("View.GONE", self.hints)
+        self.assertNotIn("Toman", self.hints)
+        for key in ("rpt_hint_no_sessions", "rpt_hint_month_empty", "rpt_hint_month_empty_undated", "rpt_hint_zero_share", "rpt_hint_prepaid"):
+            self.assertIn(f"R.string.{key}", self.hints)
+            self.assertIn(key, self.strings)
+
+    def test_11d_current_month_uses_exact_jalali_converter(self):
+        body = _kotlin_function_body(self.report, "private fun setupDateDropdowns(")
+        self.assertIn("JalaliUtils.todayJalaliString()", body)
+        self.assertNotIn("gd < 21", body, "تقریب قدیمی روز ۲۱ ماه را اشتباه می‌دهد")
+
+
 if __name__ == "__main__":
     unittest.main()

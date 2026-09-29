@@ -32,7 +32,8 @@ from financial_calculations import (
     collected_revenue_rows,
     calculate_total_turnover,
     calculate_teacher_session_revenue,
-    calculate_teacher_collected_revenue
+    calculate_teacher_collected_revenue,
+    report_period_diagnostics,
 )
 from today_summary import jalali_date_string  # FIX O-07: برچسب قلم‌های زمانی نمودار، شمسی
 
@@ -695,7 +696,9 @@ def get_financial_summary(
                 "total": int(total_y),
                 "collected": int(collected_y),
                 "uncollected": int(uncollected_y)
-            }
+            },
+            # فقط توضیح (افزودنی): چرا عددها صفرند / پیش‌پرداخت‌ها کجایند. اعداد بالا را تغییر نمی‌دهد.
+            "diagnostics": report_period_diagnostics(db, start_date, end_date, branch_id=resolved_branch),
         }
 
     elif user_type == "teacher":
@@ -737,7 +740,8 @@ def get_financial_summary(
                 "total": int(total_y),
                 "collected": int(collected_y),
                 "uncollected": int(uncollected_y)
-            }
+            },
+            "diagnostics": report_period_diagnostics(db, start_date, end_date, teacher_id=teacher_id),
         }
 
 

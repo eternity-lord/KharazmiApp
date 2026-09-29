@@ -32,7 +32,18 @@ data class FinancialSummaryResponse(
     // O-10: پرداخت‌های بی‌تاریخ در جمع‌های ماه/سال نمی‌آیند؛ این دو فیلد آن‌ها را آشکار می‌کنند.
     // nullable با پیش‌فرض تا اپ با پاسخ سرورِ قدیمی هم نشکند.
     val undated_count: Int? = null,
-    val undated_amount: Long? = null
+    val undated_amount: Long? = null,
+    // توضیح «چرا صفر است؟» — nullable تا سرور قدیمی اپ را نشکند
+    val diagnostics: ReportDiagnostics? = null
+)
+
+data class ReportDiagnostics(
+    val session_charges_total: Int = 0,
+    val session_charges_in_period: Int = 0,
+    val session_charges_undated: Int = 0,
+    val last_session_charge_date: String? = null,
+    val prepaid_count: Int = 0,
+    val prepaid_amount: Long = 0
 )
 
 data class FinancialMetrics(
@@ -160,6 +171,7 @@ class ReportActivity : BaseActivity() {
     // O-10: خط هشدار پول بی‌تاریخ (nullable: اگر چیدمان قدیمی بود، اپ نباید بشکند)
     private var tvUndatedWarning: TextView? = null
     private var tvReportStatus: TextView? = null
+    private var tvReportHint: TextView? = null
 
     // مقادیر خروجی آمار مالی
     private lateinit var tvMonthlyTitle: TextView
@@ -209,6 +221,7 @@ class ReportActivity : BaseActivity() {
         btnExportFinancial = findViewById(R.id.btnExportFinancial)
         tvUndatedWarning = findViewById(R.id.tvUndatedWarning)
         tvReportStatus = findViewById(R.id.tvReportStatus)
+        tvReportHint = findViewById(R.id.tvReportHint)
 
         tvMonthlyTitle = findViewById(R.id.tvMonthlyTitle)
         tvMonthlyTotal = findViewById(R.id.tvMonthlyTotal)
@@ -303,31 +316,11 @@ class ReportActivity : BaseActivity() {
         val monthAdapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, months)
         acMonthFilter.setAdapter(monthAdapter)
 
-        // محاسبه حدودی سال و ماه فعلی شمسی جهت نمایش اولیه
-        val calendar = java.util.Calendar.getInstance()
-        val gy = calendar.get(java.util.Calendar.YEAR)
-        val gm = calendar.get(java.util.Calendar.MONTH) + 1
-        val gd = calendar.get(java.util.Calendar.DAY_OF_MONTH)
-
-        var jy = gy - 621
-        if (gm < 3 || (gm == 3 && gd < 21)) {
-            jy = gy - 622
-        }
-        val jm = when (gm) {
-            1 -> 10
-            2 -> 11
-            3 -> if (gd < 21) 12 else 1
-            4 -> if (gd < 21) 1 else 2
-            5 -> if (gd < 21) 2 else 3
-            6 -> if (gd < 21) 3 else 4
-            7 -> if (gd < 21) 4 else 5
-            8 -> if (gd < 21) 5 else 6
-            9 -> if (gd < 21) 6 else 7
-            10 -> if (gd < 21) 7 else 8
-            11 -> if (gd < 21) 8 else 9
-            12 -> if (gd < 21) 9 else 10
-            else -> 1
-        }
+        // سال و ماه جاری شمسی با مبدل دقیق پروژه (قبلاً تقریب «روز ۲۱ هر ماه» بود که در چند ماه
+        // ۱–۲ روز آخر/اول ماه را به ماه قبل/بعد می‌برد و گزارش ماه اشتباه را نشان می‌داد).
+        val today = JalaliUtils.todayJalaliString().split("/")
+        val jy = today[0].toInt()
+        val jm = today[1].toInt()
 
         acYearFilter.setText(jy.toString(), false)
         acMonthFilter.setText(String.format(java.util.Locale.US, "%02d", jm), false)
@@ -447,6 +440,9 @@ class ReportActivity : BaseActivity() {
                     tvMonthlyCollected.text = getString(R.string.common_toman_format, summary.monthly.collected)
                     tvMonthlyUncollected.text = getString(R.string.common_toman_format, summary.monthly.uncollected)
 
+                    // توضیح صفر بودن/پیش‌پرداخت‌ها (فقط نمایش؛ اعداد بالا دست‌نخورده‌اند)
+                    ReportHints.bind(this@ReportActivity, tvReportHint, summary.monthly, summary.diagnostics)
+
                     // O-10: هشدار «پول بی‌تاریخ» — مبلغی که در جمع‌های ماه/سالِ بالا نیست.
                     val undatedAmount = summary.undated_amount ?: 0L
                     val undatedCount = summary.undated_count ?: 0
@@ -479,6 +475,7 @@ class ReportActivity : BaseActivity() {
                 withContext(Dispatchers.Main) {
                     val detail = e.message?.takeIf { it.isNotBlank() } ?: getString(R.string.rpt_calc_error)
                     setReportStatus("گزارش بارگذاری نشد: $detail", isError = true)
+                    tvReportHint?.visibility = View.GONE   // توضیح قدیمی کنار خطای تازه نماند
                     Toast.makeText(this@ReportActivity, detail, Toast.LENGTH_LONG).show()
                 }
             }

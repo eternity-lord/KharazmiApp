@@ -1739,4 +1739,10 @@
     <string name="banner_debt_sessions">📚 بدهی بابت %1$d جلسهٔ ثبت‌شدهٔ همین کلاس</string>
     <string name="banner_debt_contract">📄 شهریهٔ قراردادی همین کلاس (هنوز جلسه‌ای شارژ نشده)</string>
     <string name="cdetail_att_counts">حاضر %1$d · غایب %2$d · از %3$d جلسهٔ همین کلاس</string>
+    <!-- توضیح صفر بودن آمار مالی -->
+    <string name="rpt_hint_no_sessions">ℹ️ هنوز هیچ جلسه‌ای با هزینه ثبت نشده است؛ «کل درآمد» از سهم جلسه‌های برگزارشده ساخته می‌شود.</string>
+    <string name="rpt_hint_month_empty">ℹ️ در این ماه جلسه‌ای ثبت نشده است. آخرین جلسهٔ ثبت‌شده: %1$s — ماه/سال را عوض کنید.</string>
+    <string name="rpt_hint_month_empty_undated">ℹ️ در این ماه جلسه‌ای با تاریخ معتبر نیست (%1$d جلسه تاریخ نامعتبر دارد).</string>
+    <string name="rpt_hint_zero_share">ℹ️ جلسه‌ای در این ماه ثبت شده ولی سهم این بخش از آن صفر است.</string>
+    <string name="rpt_hint_prepaid">💡 پیش‌پرداخت ثبت‌نام/شهریه در این ماه: %1$d مورد، %2$s تومان. این مبلغ در «وصول‌شده» نمی‌آید (فقط واریزی‌های فیش حساب می‌شود).</string>
 </resources>

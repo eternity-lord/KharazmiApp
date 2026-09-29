@@ -221,6 +221,73 @@ def count_undated_payments(db: Session, target_wallet: Optional[str] = None,
     return len(amounts), sum(amounts)
 
 
+def report_period_diagnostics(db: Session, start_date: str, end_date: str, *,
+                              teacher_id: Optional[int] = None,
+                              branch_id: Optional[int] = None) -> dict:
+    """توضیح «چرا این ماه صفر است؟» برای کارت آمار مالی — فقط خواندنی و افزودنی.
+
+    هیچ‌کدام از اعداد `total/collected/uncollected` را تغییر نمی‌دهد؛ فقط می‌شمارد:
+      • `session_charges_total`: کل ردیف‌های «هزینهٔ جلسه» در دامنه (با هر تاریخ)
+      • `session_charges_in_period`: چندتایشان در بازهٔ گزارش است
+      • `session_charges_undated`: تاریخ‌نامعتبر (در هیچ بازه‌ای نمی‌آید)
+      • `last_session_charge_date`: تاریخ جلالی آخرین جلسهٔ شارژشده (برای پیام «آخرین جلسه ...»)
+      • `prepaid_*`: پیش‌پرداخت ثبت‌نام/شهریهٔ CRM در بازه. این انواع عمداً در «وصول‌شده» نمی‌آیند
+        (تعریف قفل‌شدهٔ O-07/O-08: فقط `deposit`)؛ اینجا جدا نشان داده می‌شوند تا پول پنهان نماند.
+    """
+    start, end = _parse_report_range(start_date, end_date)
+    if start is None:
+        return {}
+    charge_query = db.query(models.Transaction.date).filter(
+        models.Transaction.type == "session_charge",
+        models.Transaction.is_deleted == False,
+        models.Transaction.is_reversed == False,
+    )
+    course_ids = None
+    if teacher_id is not None:
+        course_ids = [c.id for c in db.query(models.Course.id).filter(models.Course.teacher_id == teacher_id).all()]
+        if not course_ids:
+            charge_query = charge_query.filter(models.Transaction.id == -1)
+        else:
+            charge_query = charge_query.filter(models.Transaction.course_id.in_(course_ids))
+    elif branch_id is not None:
+        scope = branch_scope_clause(models.Transaction.branch_id, branch_id)
+        if scope is not None:
+            charge_query = charge_query.filter(scope)
+    parsed = [_parse_loose(row[0]) for row in charge_query.all()]
+    dated = [d for d in parsed if d is not None]
+    last_label = None
+    if dated:
+        from today_summary import gregorian_to_jalali
+        jy, jm, jd = gregorian_to_jalali(max(dated))
+        last_label = f"{jy:04d}/{jm:02d}/{jd:02d}"
+
+    prepaid_count = 0
+    prepaid_amount = 0
+    if teacher_id is None:   # پیش‌پرداخت ثبت‌نام همیشه به کیف آموزشگاه می‌رود
+        prepaid_query = db.query(models.Transaction.amount, models.Transaction.date).filter(
+            models.Transaction.type.in_(("enrollment_payment", "tuition")),
+            models.Transaction.amount > 0,
+            models.Transaction.is_deleted == False,
+            models.Transaction.is_reversed == False,
+        )
+        if branch_id is not None:
+            scope = branch_scope_clause(models.Transaction.branch_id, branch_id)
+            if scope is not None:
+                prepaid_query = prepaid_query.filter(scope)
+        for amount, date_value in prepaid_query.all():
+            if _row_date_in_range(date_value, start, end):
+                prepaid_count += 1
+                prepaid_amount += int(amount or 0)
+    return {
+        "session_charges_total": len(parsed),
+        "session_charges_in_period": sum(1 for d in dated if start <= d <= end),
+        "session_charges_undated": len(parsed) - len(dated),
+        "last_session_charge_date": last_label,
+        "prepaid_count": prepaid_count,
+        "prepaid_amount": prepaid_amount,
+    }
+
+
 def calculate_total_turnover(db: Session, start_date: str, end_date: str, branch_id: Optional[int] = None) -> int:
     """
     گردش مالی کل مجموعه: مجموع کل مبالغ فیزیکی دریافتی از تمام دانش‌آموزان (کل واریزی‌ها)

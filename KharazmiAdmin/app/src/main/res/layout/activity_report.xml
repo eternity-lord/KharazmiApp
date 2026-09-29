@@ -367,6 +367,16 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- توضیح «چرا صفر است؟» (دادهٔ diagnostics سرور) — فقط وقتی چیزی برای گفتن هست -->
+            <TextView
+                android:id="@+id/tvReportHint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/spacing_normal"
+                android:textAppearance="@style/TextAppearance.Kharazmi.DS.Body"
+                android:textColor="@color/ds_text_secondary"
+                android:visibility="gone"/>
+
             <!-- O-10: خط هشدار پرداخت‌های بی‌تاریخ (فقط وقتی وجود دارد نمایان می‌شود) -->
             <TextView
                 android:id="@+id/tvUndatedWarning"

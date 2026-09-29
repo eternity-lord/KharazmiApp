@@ -41,7 +41,27 @@ data class StudentClassStatus(
     // O-09: باقی‌ماندهٔ شهریه و اعتبار (هر دو نامنفی) — nullable با پیش‌فرض تا اپ با پاسخ سرورِ
     // قدیمی/ناقص هم نشکند؛ مبلغ پیش‌فرض پرداخت از remaining_tuition خوانده می‌شود.
     val remaining_tuition: Long? = null,
-    val credit_balance: Long? = null
+    val credit_balance: Long? = null,
+    // «این بدهی برای چند جلسه است؟» — همه nullable/پیش‌فرض‌دار: سرور قدیمی این کلیدها را نمی‌فرستد
+    // (sessions_billed == null یعنی سرور به‌روز نیست).
+    val course_code: String? = null,
+    val sessions_billed: Int? = null,
+    val sessions_held: Int? = null,
+    val unpaid_sessions: Int? = null,
+    val session_unit_teacher: Long? = null,
+    val session_unit_institute: Long? = null,
+    val session_unit_total: Long? = null,
+    val contract_only: Boolean = false,
+    val unpaid_session_items: List<UnpaidSessionItem>? = null
+)
+
+// یک جلسهٔ پرداخت‌نشده (قدیمی‌ترین اول) — جمع این آیتم‌ها برابر due_to_teacher / due_to_institute است
+data class UnpaidSessionItem(
+    val session_id: Int? = null,
+    val date: String? = null,
+    val remaining_teacher: Long = 0,
+    val remaining_institute: Long = 0,
+    val remaining_total: Long = 0
 )
 
 interface NewInvoiceApi {

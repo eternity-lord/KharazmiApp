@@ -350,7 +350,8 @@ def calculate_enrollment_debt_breakdown(
     """
     if enrollment is None:
         return {"tuition": 0, "paid_teacher": 0, "paid_institute": 0,
-                "debt_teacher": 0, "debt_institute": 0, "debt": 0}
+                "debt_teacher": 0, "debt_institute": 0, "debt": 0,
+                **_empty_session_breakdown()}
     from dependencies import get_enrollment_tuition_and_discount
     final_tuition, _ = get_enrollment_tuition_and_discount(enrollment)
     # قرارداد اتصال پرداخت به کلاس: ابتدا enrollment_id واقعی؛ برای legacyهایی که
@@ -436,7 +437,7 @@ def calculate_enrollment_debt_breakdown(
         models.Transaction.type == "session_charge",
         models.Transaction.is_deleted == False,
         models.Transaction.is_reversed == False,
-    ).all()
+    ).order_by(models.Transaction.id.asc()).all()
     billed_teacher = sum(int(row.share_teacher or 0) for row in charges)
     billed_institute = sum(int(row.share_institute or 0) for row in charges)
     debt = max(0, int(final_tuition or 0) - effective_paid)
@@ -450,6 +451,9 @@ def calculate_enrollment_debt_breakdown(
         # copying it to another class.
         debt_teacher = 0
         debt_institute = debt
+    session_info = _session_breakdown(db, enrollment, charges, paid_teacher, paid_institute)
+    # «فقط شهریهٔ قراردادی»: بدهی وجود دارد ولی هیچ جلسه‌ای شارژ نشده (بدهی مربوط به جلسه نیست).
+    session_info["contract_only"] = (not charges) and debt > 0
     return {
         "tuition": int(final_tuition or 0),
         "paid_teacher": paid_teacher,
@@ -457,7 +461,102 @@ def calculate_enrollment_debt_breakdown(
         "debt_teacher": debt_teacher,
         "debt_institute": debt_institute,
         "debt": debt,
+        **session_info,
     }
+
+
+def _empty_session_breakdown() -> dict:
+    return {
+        "billed_teacher": 0,
+        "billed_institute": 0,
+        "sessions_billed": 0,
+        "sessions_held": 0,
+        "unpaid_sessions": 0,
+        "unpaid_session_items": [],
+        "session_unit_teacher": 0,
+        "session_unit_institute": 0,
+        "session_unit_total": 0,
+        "credit_teacher": 0,
+        "credit_institute": 0,
+        "contract_only": False,
+    }
+
+
+def _session_breakdown(db, enrollment, charges, paid_teacher, paid_institute) -> dict:
+    """جزئیات «بدهی برای چند جلسه» — فقط خواندنی و افزوده بر خروجی قبلی.
+
+    هر ``session_charge`` یک جلسهٔ همین کلاس است. پرداخت‌های هر کیف‌پول به ترتیب قدیمی‌ترین
+    جلسه (FIFO) روی جلسه‌ها اعمال می‌شود؛ جلسه‌ای که هنوز چیزی از آن مانده «پرداخت‌نشده» است.
+    جمع ``remaining_teacher``/``remaining_institute`` آیتم‌ها دقیقاً برابر ``debt_teacher``/
+    ``debt_institute`` است، پس هیچ عدد جدیدی بدهی را تغییر نمی‌دهد؛ فقط آن را به جلسه‌ها می‌شکند.
+    """
+    info = _empty_session_breakdown()
+    charge_rows = list(charges or [])
+    rem_paid_t = int(paid_teacher or 0)
+    rem_paid_i = int(paid_institute or 0)
+    items = []
+    for row in charge_rows:
+        share_t = int(row.share_teacher or 0)
+        share_i = int(row.share_institute or 0)
+        cover_t = min(share_t, rem_paid_t)
+        cover_i = min(share_i, rem_paid_i)
+        rem_paid_t -= cover_t
+        rem_paid_i -= cover_i
+        left_t = share_t - cover_t
+        left_i = share_i - cover_i
+        if left_t > 0 or left_i > 0:
+            items.append({
+                "session_id": row.session_id,
+                "date": row.date,
+                "remaining_teacher": left_t,
+                "remaining_institute": left_i,
+                "remaining_total": left_t + left_i,
+            })
+    # نرخ هر جلسه = آخرین جلسهٔ شارژشدهٔ همین کلاس؛ بدون سابقه، نرخ ثبت‌شده روی کلاس (فقط سهم معلم).
+    unit_t = unit_i = 0
+    for row in reversed(charge_rows):
+        t_val = int(row.share_teacher or 0)
+        i_val = int(row.share_institute or 0)
+        if t_val + i_val > 0:
+            unit_t, unit_i = t_val, i_val
+            break
+    if not charge_rows:
+        course = getattr(enrollment, "course", None)
+        unit_t = int(getattr(course, "teacher_session_price", 0) or 0)
+    sessions_held = db.query(models.SessionLog.id).filter(
+        models.SessionLog.course_id == enrollment.course_id,
+        models.SessionLog.is_deleted == False,
+    ).count()
+    info.update({
+        "billed_teacher": sum(int(r.share_teacher or 0) for r in charge_rows),
+        "billed_institute": sum(int(r.share_institute or 0) for r in charge_rows),
+        "sessions_billed": len(charge_rows),
+        "sessions_held": int(sessions_held),
+        "unpaid_sessions": len(items),
+        "unpaid_session_items": items,
+        "session_unit_teacher": unit_t,
+        "session_unit_institute": unit_i,
+        "session_unit_total": unit_t + unit_i,
+        "credit_teacher": rem_paid_t,
+        "credit_institute": rem_paid_i,
+    })
+    return info
+
+
+def session_fields_for_client(breakdown: dict, *, include_items: bool = False) -> dict:
+    """زیرمجموعهٔ امن و مشترک فیلدهای «جلسه» برای پاسخ APIها (کلید یکسان در همهٔ endpointها)."""
+    fields = {
+        "sessions_billed": int(breakdown.get("sessions_billed", 0) or 0),
+        "sessions_held": int(breakdown.get("sessions_held", 0) or 0),
+        "unpaid_sessions": int(breakdown.get("unpaid_sessions", 0) or 0),
+        "session_unit_teacher": int(breakdown.get("session_unit_teacher", 0) or 0),
+        "session_unit_institute": int(breakdown.get("session_unit_institute", 0) or 0),
+        "session_unit_total": int(breakdown.get("session_unit_total", 0) or 0),
+        "contract_only": bool(breakdown.get("contract_only", False)),
+    }
+    if include_items:
+        fields["unpaid_session_items"] = list(breakdown.get("unpaid_session_items") or [])
+    return fields
 
 
 # FIX: H5/H6 - منطق یگانه‌ی تقسیم سهم جلسه؛ استخراج‌شده از submit/edit تا فقط یک‌بار نوشته/تست شود.

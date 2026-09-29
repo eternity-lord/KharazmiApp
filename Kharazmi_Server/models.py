@@ -285,6 +285,8 @@ class Transaction(Base):
     # حالت both دو رسید (teacher+institute) با یک کلید می‌سازد (finance.py) و خواننده‌ی replay هم
     # چندردیفه طراحی شده؛ یکتایی یعنی 500 قطعی روی هر پرداخت کلیددارِ both. ایندکس ساده برای سرعت lookup.
     idempotency_key = Column(String, nullable=True, index=True)
+    # تعداد جلسه‌هایی که ادمین هنگام ثبت حواله اعلام کرده (اختیاری/گزارشی؛ در هیچ محاسبهٔ مالی نقش ندارد).
+    sessions_covered = Column(Integer, nullable=True)
 
     is_deleted = Column(Boolean, default=False)
     is_reversed = Column(Boolean, default=False)

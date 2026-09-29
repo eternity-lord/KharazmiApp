@@ -25,6 +25,7 @@ from dependencies import get_db, check_admin_access, check_admin_or_secretary_ac
 from financial_calculations import (
     calculate_student_debt,
     calculate_enrollment_debt_breakdown,
+    session_fields_for_client,
     MAX_TEACHER_SESSION_PRICE,
 )
 
@@ -451,6 +452,9 @@ def get_student_full_profile(id: int, authorization: Optional[str] = Header(None
             "debt_institute": int(breakdown["debt_institute"]),
             "total_debt": int(breakdown["debt"]),
             "is_unassigned": False,
+            # «این مبلغ برای چند جلسهٔ همین کلاس است؟» — افزوده و سازگار با عقب؛ سرور قدیمی این کلیدها را ندارد
+            # و اپ از نبودشان می‌فهمد سرور به‌روز نیست.
+            **session_fields_for_client(breakdown),
         })
 
     # لیست تراکنش‌ها
@@ -478,6 +482,12 @@ def get_student_full_profile(id: int, authorization: Optional[str] = Header(None
     # محاسبات تفکیک شده مالی به ازای مربیان و آموزشگاه
     teachers_financial = []
     class_debt_total = 0
+    # calculate_student_debt: اگر هیچ ثبت‌نام فعالِ قیمت‌دار نباشد، بدهی از کیف پول (شارژ جلسه‌ها) می‌آید.
+    session_based_total = not any(
+        (en.total_tuition or 0) > 0
+        for en in st.enrollments
+        if not en.is_deleted
+    )
     for en in st.enrollments:
         # FIX: Bug 13 - do not include archived enrollments in financial class balances.
         if en.is_deleted or not en.course:
@@ -494,12 +504,19 @@ def get_student_full_profile(id: int, authorization: Optional[str] = Header(None
         paid_inst = breakdown["paid_institute"]
         debt_teacher_course = breakdown["debt_teacher"]
         debt_inst_course = breakdown["debt_institute"]
-        class_debt_total += int(breakdown["debt"])
+        # مبنای «بدهی کلاسی» با مبنای total_d یکی است: دانش‌آموزِ دارای شهریه‌ی قراردادی → بدهی شهریه؛
+        # بدون شهریه (فقط شارژ جلسه) → بدهی جلسه‌ها (سهم معلم + آموزشگاه). قبلاً حالت دوم صفر
+        # حساب می‌شد و کل شارژ جلسهٔ کلاس‌ها به‌غلط زیر «بدهی بدون کلاس» دوباره نمایش داده می‌شد.
+        if session_based_total:
+            class_debt_total += int(debt_teacher_course) + int(debt_inst_course)
+        else:
+            class_debt_total += int(breakdown["debt"])
         
         teachers_financial.append({
             "enrollment_id": en.id,
             "course_id": course.id,
             "course_title": course.title,
+            "course_code": course.code or "",
             "teacher_id": course.teacher_id,
             "teacher_name": teacher_name,
             "paid_teacher": int(paid_teacher),
@@ -508,6 +525,7 @@ def get_student_full_profile(id: int, authorization: Optional[str] = Header(None
             "debt_institute": int(debt_inst_course),
             "debt": int(breakdown["debt"]),
             "is_unassigned": False,
+            **session_fields_for_client(breakdown),
         })
 
     # Legacy wallet debt has no class scope. Keep it visible as a separate row rather

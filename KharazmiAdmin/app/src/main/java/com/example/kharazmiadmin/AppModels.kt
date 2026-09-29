@@ -433,7 +433,11 @@ data class SimpleStudentItem(
     val course_title: String? = null,
     val teacher_id: Int? = null,
     val teacher_name: String? = null,
-    val is_unassigned: Boolean = false
+    val is_unassigned: Boolean = false,
+    // «این مبلغ برای چند جلسه است؟» — nullable: null یعنی سرور قدیمی است و این فیلد را نمی‌فرستد
+    val course_code: String? = null,
+    val sessions_billed: Int? = null,
+    val unpaid_sessions: Int? = null
 )
 
 // ==========================================
@@ -449,7 +453,9 @@ data class FinanceSubmitData(
     val amount_institute: Long? = null,
     val amount_teacher: Long? = null,
     val enrollment_id: Int? = null,  // اتصال پرداخت به ثبت‌نام؛ null یعنی شارژ عمومی (سرور تک‌ثبت‌نامی را خودکار وصل می‌کند)
-    val idempotency_key: String? = null  // FIX (audit-v2/idempotency): کلید retry — قبل از اولین تلاش ساخته و تا موفقیت حفظ می‌شود
+    val idempotency_key: String? = null,  // FIX (audit-v2/idempotency): کلید retry — قبل از اولین تلاش ساخته و تا موفقیت حفظ می‌شود
+    // تعداد جلسه‌ای که ادمین برایش حواله ثبت می‌کند (اختیاری، فقط گزارشی؛ روی مبلغ اثری ندارد)
+    val sessions_covered: Int? = null
 )
 
 data class FinanceResponse(
@@ -496,7 +502,14 @@ data class ActiveStudentEnrollment(
     val debt_teacher: Long? = null,
     val debt_institute: Long? = null,
     val total_debt: Long? = null,
-    val is_unassigned: Boolean = false
+    val is_unassigned: Boolean = false,
+    // بدهی همین کلاس برای چند جلسه است؟ (nullable؛ null = سرور قدیمی)
+    val sessions_billed: Int? = null,
+    val sessions_held: Int? = null,
+    val unpaid_sessions: Int? = null,
+    val session_unit_teacher: Long? = null,
+    val session_unit_institute: Long? = null,
+    val contract_only: Boolean = false
 )
 
 data class TeacherFinancialItem(
@@ -510,7 +523,11 @@ data class TeacherFinancialItem(
     val enrollment_id: Int? = null,
     val course_id: Int? = null,
     val teacher_id: Int? = null,
-    val is_unassigned: Boolean = false
+    val is_unassigned: Boolean = false,
+    val course_code: String? = null,
+    val sessions_billed: Int? = null,
+    val unpaid_sessions: Int? = null,
+    val contract_only: Boolean = false
 )
 
 data class StudentInfo(

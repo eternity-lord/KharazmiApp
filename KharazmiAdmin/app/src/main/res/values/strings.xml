@@ -1613,4 +1613,48 @@
     <string name="ds_rpt_statement_search_hint">نام یا کد ملی دانش‌آموز</string>
     <!-- DESIGN SYSTEM (Phase 2): جای‌نگهدار مقدار تا پیش از بارگذاری داده -->
     <string name="ds_value_placeholder">—</string>
+
+    <!-- ==========================================================================
+         صدور حواله — بدهی جدای هر کلاس، نام معلم، «برای چند جلسه» و چاپ حواله
+         (دو کلاسِ هم‌معلم یک دانش‌آموز هرگز جمع نمی‌شوند؛ هر کلاس برچسب و جلسه‌ی خودش را دارد)
+         ========================================================================== -->
+    <string name="enroll_label_class">%1$s (کد: %2$s)</string>
+    <string name="enroll_label_teacher">👤 معلم: %1$s</string>
+    <string name="enroll_label_debt_teacher_named">بدهی به معلم (%1$s): %2$s تومان</string>
+    <string name="enroll_label_debt_teacher">بدهی به معلم: %1$s تومان</string>
+    <string name="enroll_label_debt_institute">بدهی به آموزشگاه: %1$s تومان</string>
+    <string name="enroll_label_sessions">📚 برای %1$s جلسه از %2$s جلسهٔ ثبت‌شدهٔ این کلاس</string>
+    <string name="enroll_label_sessions_settled">✅ همهٔ جلسه‌های این کلاس تسویه شده است</string>
+    <string name="enroll_label_sessions_none">📚 هنوز جلسه‌ای برای این دانش‌آموز در این کلاس ثبت نشده</string>
+    <string name="enroll_label_contract_only">📚 بدهی بابت شهریهٔ قراردادی است (جلسه‌ای ثبت نشده)</string>
+    <string name="invoice_stale_server">⚠️ سرور به‌روز نیست: بدهی هر کلاس هنوز جدا محاسبه نمی‌شود و ممکن است جمع دو کلاس نشان داده شود. سرور را با آخرین نسخه به‌روزرسانی (Deploy) کنید.</string>
+    <string name="invoice_session_info">📚 این مبلغ برای %1$s جلسهٔ پرداخت‌نشده از کلاس «%2$s» (معلم: %3$s) است. کل جلسه‌های ثبت‌شده: %4$s</string>
+    <string name="invoice_session_info_settled">✅ همهٔ %1$s جلسهٔ کلاس «%2$s» (معلم: %3$s) تسویه شده است.</string>
+    <string name="invoice_session_info_none">📚 برای کلاس «%1$s» (معلم: %2$s) هنوز جلسه‌ای ثبت نشده است.</string>
+    <string name="invoice_session_info_contract">📚 این مبلغ بابت شهریهٔ قراردادی کلاس «%1$s» (معلم: %2$s) است، نه جلسه.</string>
+    <string name="invoice_due_teacher_named">سهم معلم — %3$s (قابل پرداخت): %1$s %2$s تومان</string>
+    <string name="invoice_debt_teacher_named">بدهی سهم معلم (%2$s): %1$s تومان</string>
+    <string name="invoice_student_row_named">%1$s\nبدهی به معلم (%2$s): %3$s تومان | بدهی به آموزشگاه: %4$s تومان</string>
+    <string name="invoice_student_row_sessions">\n📚 برای %1$s جلسه</string>
+    <string name="invoice_sessions_hint">تعداد جلسه‌ای که این حواله برایش ثبت می‌شود (اختیاری)</string>
+    <string name="invoice_sessions_help_default">اگر عدد بنویسید، مبلغ بر اساس همین تعداد جلسهٔ پرداخت‌نشدهٔ کلاس (از قدیمی‌ترین جلسه) پر می‌شود.</string>
+    <string name="invoice_sessions_help_calc">برای %1$s جلسه: معلم %2$s + آموزشگاه %3$s = %4$s تومان</string>
+    <string name="invoice_sessions_help_prepay">" (%1$s جلسه پیش‌پرداخت با نرخ آخرین جلسه)"</string>
+    <string name="invoice_sessions_help_wallet">کیف پول انتخاب‌شده: %1$s — مبلغ همان سهم پر می‌شود.</string>
+    <string name="invoice_sessions_invalid">تعداد جلسه باید عددی بین ۱ تا ۱۰۰۰ باشد</string>
+    <string name="invoice_sessions_need_class">برای ثبت تعداد جلسه ابتدا کلاس را انتخاب کنید</string>
+    <string name="invoice_desc_sessions">%1$s (بابت %2$s جلسه)</string>
+    <string name="invoice_confirm_class">کلاس: %1$s — معلم: %2$s</string>
+    <string name="invoice_confirm_sessions">تعداد جلسه: %1$s</string>
+    <string name="invoice_lbl_teacher">معلم:</string>
+    <string name="invoice_lbl_sessions">تعداد جلسه:</string>
+    <string name="invoice_lbl_paid_to">واریز به:</string>
+    <string name="invoice_lbl_remaining">مانده بدهی کلاس (معلم / آموزشگاه):</string>
+    <string name="invoice_paid_to_value">%1$s — %2$s</string>
+    <string name="invoice_pdf_teacher">معلم: %1$s</string>
+    <string name="invoice_pdf_sessions">تعداد جلسه: %1$s</string>
+    <string name="invoice_pdf_paid_to">واریز به: %1$s</string>
+    <string name="profile_class_sessions_line">"  📚 برای %1$s جلسه پرداخت‌نشده از %2$s جلسه\n"</string>
+    <string name="profile_class_contract_line">"  📚 بدهی شهریهٔ قراردادی (جلسه‌ای ثبت نشده)\n"</string>
+    <string name="cdetail_debt_sessions">\n📚 برای %1$s جلسه</string>
 </resources>

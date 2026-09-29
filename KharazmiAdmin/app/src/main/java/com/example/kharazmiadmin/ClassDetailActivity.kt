@@ -134,7 +134,10 @@ data class StudentFullItem(
     val enrollment_id: Int,
     val discount_type: String? = "none",
     val discount_value: Int? = 0,
-    val discount_amount: Long? = 0
+    val discount_amount: Long? = 0,
+    // «این بدهی برای چند جلسه‌ی همین کلاس است؟» (nullable: سرور قدیمی نمی‌فرستد)
+    val sessions_billed: Int? = null,
+    val unpaid_sessions: Int? = null
 )
 
 // اینترفیس API
@@ -877,11 +880,15 @@ class ClassStudentAdapter(
             // فقط دو سهم همین enrollment را نشان بده؛ «بدهی کل» عمداً حذف شده است.
             val hasDebt = fullStudent.debt_teacher > 0 || fullStudent.debt_institute > 0
             if (hasDebt) {
-                holder.tvStudentDebt.text = holder.itemView.context.getString(
+                val debtText = holder.itemView.context.getString(
                     R.string.cdetail_debt_split,
                     String.format("%,d", fullStudent.debt_teacher),
                     String.format("%,d", fullStudent.debt_institute)
                 )
+                val unpaidSessions = fullStudent.unpaid_sessions ?: 0
+                holder.tvStudentDebt.text = if (unpaidSessions > 0)
+                    debtText + holder.itemView.context.getString(R.string.cdetail_debt_sessions, unpaidSessions.toString())
+                else debtText
                 holder.tvStudentStatus.text = holder.itemView.context.getString(R.string.cdetail_unsettled)
                 holder.tvStudentStatus.setTextColor(UiColors.resolve(holder.itemView.context, R.color.status_danger)) // Red
             } else {

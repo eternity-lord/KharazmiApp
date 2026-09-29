@@ -27,6 +27,7 @@ from dependencies import (get_db, check_admin_access, check_admin_or_secretary_a
 # FIX: Bug 16 - share the tuition-minus-payment debt calculation across financial views.
 from financial_calculations import (
     calculate_enrollment_debt_breakdown,
+    session_fields_for_client,
     MAX_TEACHER_SESSION_PRICE,
 )
 # FIX (F-T1): اعتبارسنجی مرکزی اقساط — همان قاعده‌ی مسیر مستقل قسط، برای مسیر ثبت‌نام همراه اقساط.
@@ -953,6 +954,7 @@ def get_class_students_full(id: int, db: Session = Depends(get_db), authorizatio
                     "teacher_id": course.teacher_id,
                     "teacher_name": class_teacher_name,
                     "is_unassigned": False,
+                    **session_fields_for_client(breakdown),
                     "present_count": present_count,
                     "absent_count": absent_count,
                     "total_sessions": len(sessions),

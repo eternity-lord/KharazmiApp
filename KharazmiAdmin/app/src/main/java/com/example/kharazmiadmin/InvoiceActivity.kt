@@ -75,7 +75,15 @@ data class ReceiptDetailsResponse(
     val target_wallet: String? = null,
     val type: String? = null,
     val is_reversed: Boolean? = null,
-    val course_name: String? = null
+    val course_name: String? = null,
+    // چاپ حواله: کدام معلم، برای چند جلسه، به کدام کیف پول واریز شده (سرور قدیمی نمی‌فرستد → null)
+    val course_code: String? = null,
+    val teacher_name: String? = null,
+    val sessions_covered: Int? = null,
+    val wallet_label: String? = null,
+    val paid_to_name: String? = null,
+    val class_remaining_teacher: Long? = null,
+    val class_remaining_institute: Long? = null
 )
 
 interface ReceiptDetailsApi {
@@ -96,6 +104,10 @@ class InvoiceActivity : BaseActivity() {
     private lateinit var tvSelectedClass: TextView
     private lateinit var tvDebtTeacher: TextView
     private lateinit var tvDebtInstitute: TextView
+    private lateinit var tvSessionInfo: TextView
+    private lateinit var layoutSessions: View
+    private lateinit var etSessionsCount: TextInputEditText
+    private lateinit var tvSessionsHint: TextView
     private lateinit var etAmount: TextInputEditText
     private lateinit var etAmountInstitute: TextInputEditText
     private lateinit var tilAmount1: View
@@ -107,6 +119,10 @@ class InvoiceActivity : BaseActivity() {
     private lateinit var btnSubmit: Button
     private lateinit var tvDate: TextView
     private var pendingPaymentKey: String? = null // FIX (audit-v2/idempotency): کلید پرداختِ درراه — تا موفقیت زنده، بعد بازنشسته
+    // وضعیت مالیِ «کلاسِ انتخاب‌شده» (فقط همان یک کلاس) + آخرین رسید سرور برای چاپ
+    private var classStatus: StudentClassStatus? = null
+    private var currentClassTitle: String = ""
+    private var lastReceipt: ReceiptDetailsResponse? = null
     private var pendingPaymentSig: String? = null // FIX (audit-v2/idempotency): امضای فرمِ همان پرداخت — تغییر فرم یعنی پرداخت تازه و کلید تازه
 
     // Logic Variables
@@ -147,6 +163,10 @@ class InvoiceActivity : BaseActivity() {
         tvSelectedClass = findViewById(R.id.tvSelectedClass)
         tvDebtTeacher = findViewById(R.id.tvDebtTeacher)
         tvDebtInstitute = findViewById(R.id.tvDebtInstitute)
+        tvSessionInfo = findViewById(R.id.tvSessionInfo)
+        layoutSessions = findViewById(R.id.layoutSessions)
+        etSessionsCount = findViewById(R.id.etSessionsCount)
+        tvSessionsHint = findViewById(R.id.tvSessionsHint)
         etAmount = findViewById(R.id.etAmount)
         etAmountInstitute = findViewById(R.id.etAmountInstitute)
         tilAmount1 = findViewById(R.id.tilAmount1)
@@ -165,10 +185,17 @@ class InvoiceActivity : BaseActivity() {
 
         if (isAdmin) {
             layoutWallet.visibility = View.VISIBLE
+            layoutSessions.visibility = View.VISIBLE   // «ثبت حواله برای چند جلسه» فقط برای ادمین
             rgWallet.check(R.id.rbWalletInstitute)
             setupWalletBothLogic()
+            etSessionsCount.addTextChangedListener(object : TextWatcher {
+                override fun afterTextChanged(s: Editable?) { recomputeAmountsFromSessions() }
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            })
         } else {
             layoutWallet.visibility = View.GONE
+            layoutSessions.visibility = View.GONE
         }
     }
 
@@ -183,7 +210,51 @@ class InvoiceActivity : BaseActivity() {
                 tilAmount2.visibility = View.GONE
                 (tilAmount1 as? com.google.android.material.textfield.TextInputLayout)?.hint = getString(R.string.invoice_hint_amount)
             }
+            // اگر ادمین تعداد جلسه نوشته، مبلغ متناسب با کیف پولِ تازه‌انتخاب‌شده دوباره پر می‌شود
+            recomputeAmountsFromSessions()
         }
+    }
+
+    /**
+     * «حواله برای N جلسه»: مبلغ از فهرست جلسه‌های پرداخت‌نشدهٔ همین کلاس (قدیمی‌ترین اول) محاسبه می‌شود؛
+     * اگر N بیشتر از جلسه‌های مانده باشد، مازاد پیش‌پرداخت با نرخ آخرین جلسه حساب می‌شود.
+     * فقط فیلدهای مبلغ را پر می‌کند؛ ادمین می‌تواند دستی اصلاح کند. سرور مبلغ را بر اساس همان چیزی که
+     * فرستاده می‌شود ثبت می‌کند (تعداد جلسه فقط توضیح گزارشی است).
+     */
+    private fun recomputeAmountsFromSessions() {
+        if (!isAdmin) return
+        val n = etSessionsCount.text?.toString()?.trim()?.toIntOrNull()
+        val status = classStatus
+        if (n == null || n <= 0 || status == null || status.sessions_billed == null) {
+            tvSessionsHint.text = getString(R.string.invoice_sessions_help_default)
+            return
+        }
+        val items = status.unpaid_session_items.orEmpty()
+        val used = items.take(n)
+        var teacherSum = used.sumOf { it.remaining_teacher }
+        var instituteSum = used.sumOf { it.remaining_institute }
+        val extra = n - used.size
+        if (extra > 0) {
+            teacherSum += extra * (status.session_unit_teacher ?: 0L)
+            instituteSum += extra * (status.session_unit_institute ?: 0L)
+        }
+        val walletName: String
+        when (rgWallet.checkedRadioButtonId) {
+            R.id.rbWalletTeacher -> { etAmount.setText(teacherSum.toString()); walletName = getString(R.string.invoice_wallet_teacher) }
+            R.id.rbWalletBoth -> {
+                etAmount.setText(teacherSum.toString())
+                etAmountInstitute.setText(instituteSum.toString())
+                walletName = getString(R.string.invoice_wallet_both, String.format("%,d", teacherSum), String.format("%,d", instituteSum), String.format("%,d", teacherSum + instituteSum))
+            }
+            else -> { etAmount.setText(instituteSum.toString()); walletName = getString(R.string.invoice_wallet_institute) }
+        }
+        var hint = getString(
+            R.string.invoice_sessions_help_calc, n.toString(),
+            String.format("%,d", teacherSum), String.format("%,d", instituteSum), String.format("%,d", teacherSum + instituteSum)
+        )
+        if (extra > 0) hint += getString(R.string.invoice_sessions_help_prepay, extra.toString())
+        hint += "\n" + getString(R.string.invoice_sessions_help_wallet, walletName)
+        tvSessionsHint.text = hint
     }
 
     private fun setupApi() {
@@ -261,6 +332,12 @@ class InvoiceActivity : BaseActivity() {
                                 ?: (status.due_to_teacher + status.due_to_institute),
                             debt_teacher = status.due_to_teacher,
                             debt_institute = status.due_to_institute,
+                            teacher_name = status.teacher_name ?: enrollment.teacher_name,
+                            // شمارش جلسه‌ی همین کلاس؛ null (سرور قدیمی) عمداً null می‌ماند تا اپ هشدار بدهد
+                            sessions_billed = status.sessions_billed,
+                            sessions_held = status.sessions_held,
+                            unpaid_sessions = status.unpaid_sessions,
+                            contract_only = status.contract_only,
                         )
                     } catch (error: Exception) {
                         if (error is kotlinx.coroutines.CancellationException) throw error
@@ -270,15 +347,20 @@ class InvoiceActivity : BaseActivity() {
                     }
                 }
                 withContext(Dispatchers.Main) {
+                    // سرور قدیمی شمارش جلسه/نام معلم هر کلاس را نمی‌فرستد و ممکن است بدهی را هنوز
+                    // جمع دو کلاس حساب کند؛ به‌جای نمایش بی‌صدا، صریح هشدار بده.
+                    if (enrollments.isNotEmpty() && enrollments.any { it.sessions_billed == null }) {
+                        Toast.makeText(this@InvoiceActivity, getString(R.string.invoice_stale_server), Toast.LENGTH_LONG).show()
+                    }
                     when {
                         // FIX(invoice): انتخاب از داده‌ی واقعی (enrollment_id/course_id) — دیگر متن نمایشی parse نمی‌شود
                         enrollments.size == 1 -> {
                             val en = enrollments[0]
-                            loadStudentClassStatus(studentId, studentName, enrollmentLabel(en), courseId = en.course_id)
+                            loadStudentClassStatus(studentId, studentName, EnrollmentLabels.classTitle(this@InvoiceActivity, en), courseId = en.course_id)
                         }
                         enrollments.size > 1 -> {
                             showEnrollmentPickerDialog(studentName, enrollments) { en ->
-                                loadStudentClassStatus(studentId, studentName, enrollmentLabel(en), courseId = en.course_id)
+                                loadStudentClassStatus(studentId, studentName, EnrollmentLabels.classTitle(this@InvoiceActivity, en), courseId = en.course_id)
                             }
                         }
                         fullProfile.classes.isEmpty() -> {
@@ -329,29 +411,7 @@ class InvoiceActivity : BaseActivity() {
                 selectedEnrollmentId = status.enrollment_id
 
                 withContext(Dispatchers.Main) {
-                    val formattedPaidTeacher = String.format("%,d", status.paid_to_teacher)
-                    val signTeacher = if (status.due_to_teacher >= 0) "+" else "-"
-                    val signInstitute = if (status.due_to_institute >= 0) "+" else "-"
-
-                    val formattedDueTeacher = String.format("%,d", abs(status.due_to_teacher))
-                    val formattedDueInstitute = String.format("%,d", abs(status.due_to_institute))
-                    tvSelectedClass.text = getString(R.string.invoice_selected_class, className)
-                    tvUnpaid.text = getString(R.string.invoice_paid_teacher, formattedPaidTeacher)
-                    tvStClass.text = className
-
-                    tvDebtTeacher.text = getString(R.string.invoice_due_teacher, signTeacher, formattedDueTeacher)
-                    tvDebtInstitute.text = getString(R.string.invoice_due_institute, signInstitute, formattedDueInstitute)
-
-                    // O-09: مقدار پیش‌فرض روی **باقی‌ماندهٔ شهریه** (نامنفی)؛ اگر سرور نفرستاده باشد
-                    // به همان منطق قبلی (due) برمی‌گردیم تا اپ با پاسخ قدیمی هم کار کند.
-                    val remaining = status.remaining_tuition
-                    val defaultPay = when {
-                        remaining != null -> remaining
-                        status.due_to_teacher > 0 -> status.due_to_teacher
-                        status.due_to_institute > 0 -> status.due_to_institute
-                        else -> 0L
-                    }
-                    etAmount.setText(if (defaultPay > 0) defaultPay.toString() else "")
+                    renderClassStatus(status, className, setDefaultAmount = true)
                 }
             } catch (e: Exception) {
                 // FIX: Bug 19 - cancellation is not a network/UI error.
@@ -359,6 +419,61 @@ class InvoiceActivity : BaseActivity() {
                 android.util.Log.e("InvoiceActivity", "loadStudentClassStatus failed", e)
             }
         }
+    }
+
+    /**
+     * نمایش وضعیت مالیِ «همین یک کلاس»: پرداخت‌شده، بدهی به معلم (با نام معلم) و آموزشگاه، و
+     * «این مبلغ برای چند جلسه است؟» بالای بدهی‌ها. هیچ عددی از کلاس دیگر یا کیف کل وارد نمی‌شود.
+     */
+    private fun renderClassStatus(status: StudentClassStatus, className: String, setDefaultAmount: Boolean) {
+        classStatus = status
+        currentClassTitle = className
+        val teacherName = status.teacher_name?.trim().orEmpty()
+        val formattedPaidTeacher = String.format("%,d", status.paid_to_teacher)
+        val signTeacher = if (status.due_to_teacher >= 0) "+" else "-"
+        val signInstitute = if (status.due_to_institute >= 0) "+" else "-"
+
+        val formattedDueTeacher = String.format("%,d", abs(status.due_to_teacher))
+        val formattedDueInstitute = String.format("%,d", abs(status.due_to_institute))
+        tvSelectedClass.text = getString(R.string.invoice_selected_class, className)
+        tvUnpaid.text = getString(R.string.invoice_paid_teacher, formattedPaidTeacher)
+        tvStClass.text = className
+
+        tvDebtTeacher.text = if (teacherName.isNotEmpty())
+            getString(R.string.invoice_due_teacher_named, signTeacher, formattedDueTeacher, teacherName)
+        else getString(R.string.invoice_due_teacher, signTeacher, formattedDueTeacher)
+        tvDebtInstitute.text = getString(R.string.invoice_due_institute, signInstitute, formattedDueInstitute)
+
+        // «برای چند جلسه؟» — بالای بدهی‌ها. سرور قدیمی (sessions_billed == null) → هشدار به‌جای حدس.
+        val whoTeacher = teacherName.ifEmpty { getString(R.string.common_unknown_class) }
+        tvSessionInfo.text = when {
+            status.sessions_billed == null -> getString(R.string.invoice_stale_server)
+            status.contract_only -> getString(R.string.invoice_session_info_contract, className, whoTeacher)
+            status.sessions_billed == 0 -> getString(R.string.invoice_session_info_none, className, whoTeacher)
+            (status.unpaid_sessions ?: 0) == 0 ->
+                getString(R.string.invoice_session_info_settled, status.sessions_billed.toString(), className, whoTeacher)
+            else -> getString(
+                R.string.invoice_session_info, status.unpaid_sessions.toString(), className, whoTeacher,
+                status.sessions_billed.toString()
+            )
+        }
+        tvSessionInfo.visibility = View.VISIBLE
+
+        if (setDefaultAmount) {
+            // O-09: مقدار پیش‌فرض روی **باقی‌ماندهٔ شهریه** (نامنفی)؛ اگر سرور نفرستاده باشد
+            // به همان منطق قبلی (due) برمی‌گردیم تا اپ با پاسخ قدیمی هم کار کند.
+            val remaining = status.remaining_tuition
+            val defaultPay = when {
+                remaining != null -> remaining
+                status.due_to_teacher > 0 -> status.due_to_teacher
+                status.due_to_institute > 0 -> status.due_to_institute
+                else -> 0L
+            }
+            etAmount.setText(if (defaultPay > 0) defaultPay.toString() else "")
+        }
+        // کلاس عوض شد: تعداد جلسه‌ی قبلی متعلق به کلاس دیگر بود
+        etSessionsCount.setText("")
+        tvSessionsHint.text = getString(R.string.invoice_sessions_help_default)
     }
 
     // لینک دقیق پرداخت به ثبت‌نام: enrollment فعال (شاگرد، کلاس) را از سرور می‌گیرد؛ در هر خطایی null می‌ماند (شارژ عمومی)
@@ -369,7 +484,12 @@ class InvoiceActivity : BaseActivity() {
                 val status = api.getStudentClassStatus(studentId, courseId, null)
                 withContext(Dispatchers.Main) {
                     // فقط اگر هنوز همان شاگرد انتخاب است (جلوگیری از race با انتخاب جدید)
-                    if (selectedStudentId == studentId) selectedEnrollmentId = status.enrollment_id
+                    if (selectedStudentId == studentId) {
+                        selectedEnrollmentId = status.enrollment_id
+                        selectedCourseId = status.course_id ?: selectedCourseId
+                        // بدهی دقیق + جلسه‌های همین کلاس (بدون دست‌زدن به مبلغی که ادمین شاید تایپ کرده)
+                        renderClassStatus(status, tvStClass.text.toString(), setDefaultAmount = false)
+                    }
                 }
             } catch (e: Exception) {
                 // FIX: Bug 19 - cancellation is not a network/UI error.
@@ -388,17 +508,27 @@ class InvoiceActivity : BaseActivity() {
         val names = students.map { student ->
             val teacherDebt = student.debtTeacher
             val instituteDebt = student.debtInstitute
-            getString(R.string.invoice_student_row, student.name, String.format("%,d", teacherDebt), String.format("%,d", instituteDebt))
+            val teacher = student.teacher_name?.trim().orEmpty()
+            // نام معلم جلوی «بدهی به معلم» و تعداد جلسهٔ پرداخت‌نشدهٔ همین کلاس (اگر سرور فرستاده باشد)
+            val base = if (teacher.isNotEmpty())
+                getString(R.string.invoice_student_row_named, student.name, teacher, String.format("%,d", teacherDebt), String.format("%,d", instituteDebt))
+            else getString(R.string.invoice_student_row, student.name, String.format("%,d", teacherDebt), String.format("%,d", instituteDebt))
+            val unpaid = student.unpaid_sessions
+            if (unpaid != null && unpaid > 0) base + getString(R.string.invoice_student_row_sessions, unpaid.toString()) else base
         }.toTypedArray()
 
         AlertDialog.Builder(this)
             .setTitle(getString(R.string.invoice_pick_student, className))
             .setItems(names) { _, which ->
                 val selected = students[which]
+                // عنوان کلاس همراه با کد (نه فقط «کلاس: ریاضی») تا دو کلاس هم‌نام از هم جدا بمانند
+                val classLabel = if (!selected.course_title.isNullOrBlank())
+                    EnrollmentLabels.classTitle(this, selected.course_title, selected.course_code)
+                else className
                 fillStudentData(
                     selected.id,
                     selected.name,
-                    className,
+                    classLabel,
                     0,
                     selected.debtTeacher,
                     selected.debtInstitute,
@@ -416,8 +546,12 @@ class InvoiceActivity : BaseActivity() {
 
         tvStName.text = name
         tvStClass.text = className
+        currentClassTitle = className
         // در ثبت سریع هم بدهی کل نمایش داده نمی‌شود؛ فقط دو سهم همین کلاس نمایش داده می‌شوند.
         tvSelectedClass.text = getString(R.string.invoice_selected_class, className)
+        classStatus = null   // تا رسیدن وضعیت دقیق همین کلاس، جلسه‌ی کلاس قبلی استفاده نشود
+        tvSessionInfo.visibility = View.GONE
+        etSessionsCount.setText("")
         tvDebtTeacher.visibility = View.VISIBLE
         tvDebtTeacher.text = getString(R.string.invoice_debt_teacher, String.format("%,d", debtTeacherVal))
         tvDebtInstitute.visibility = View.VISIBLE
@@ -449,6 +583,8 @@ class InvoiceActivity : BaseActivity() {
                 selectedEnrollmentId = prefillEnrollmentId
                 if (prefillCourseId > 0) selectedCourseId = prefillCourseId
             }
+            // بدهی دقیق + «برای چند جلسه» + نام معلم همان کلاس (نه اعداد خام Intent)
+            if (prefillCourseId > 0) resolveEnrollmentIdAsync(prefillStudentId, prefillCourseId)
         }
 
         intent.getStringExtra(EXTRA_PREFILL_SEARCH_NAME)?.takeIf { it.isNotBlank() }?.let { query ->
@@ -499,7 +635,24 @@ class InvoiceActivity : BaseActivity() {
                 etAmount.error = getString(R.string.invoice_amount_invalid)
                 return@setOnClickListener
             }
-            val desc = etDesc.text.toString()
+            var desc = etDesc.text.toString()
+
+            // «حواله برای N جلسه» (فقط ادمین): اختیاری؛ اگر پر باشد باید عددی معتبر و کلاس مشخص باشد
+            var sessionsCovered: Int? = null
+            val sessionsRaw = if (isAdmin) etSessionsCount.text?.toString()?.trim().orEmpty() else ""
+            if (sessionsRaw.isNotEmpty()) {
+                val parsed = sessionsRaw.toIntOrNull()
+                if (parsed == null || parsed < 1 || parsed > 1000) {
+                    etSessionsCount.error = getString(R.string.invoice_sessions_invalid)
+                    return@setOnClickListener
+                }
+                if (classStatus == null && selectedEnrollmentId == null) {
+                    Toast.makeText(this, getString(R.string.invoice_sessions_need_class), Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                sessionsCovered = parsed
+                if (!desc.contains("جلسه")) desc = getString(R.string.invoice_desc_sessions, desc.ifBlank { getString(R.string.invoice_desc_tuition) }, parsed.toString())
+            }
 
             // اگر both انتخاب شده، سهم آموزشگاه را هم بخوان
             if (targetWallet == "both") {
@@ -528,16 +681,16 @@ class InvoiceActivity : BaseActivity() {
             // چندکلاسه پیکر انتخاب کلاس را می‌بیند و submit تا انتخاب واقعی متوقف می‌ماند.
             if (selectedEnrollmentId == null) {
                 ensureEnrollmentForSubmit { ok ->
-                    if (ok) showPaymentConfirmation(amount, payMethod, targetWallet, desc, amountTeacher, amountInstitute, totalForDisplay)
+                    if (ok) showPaymentConfirmation(amount, payMethod, targetWallet, desc, amountTeacher, amountInstitute, totalForDisplay, sessionsCovered)
                 }
                 return@setOnClickListener
             }
-            showPaymentConfirmation(amount, payMethod, targetWallet, desc, amountTeacher, amountInstitute, totalForDisplay)
+            showPaymentConfirmation(amount, payMethod, targetWallet, desc, amountTeacher, amountInstitute, totalForDisplay, sessionsCovered)
         }
     }
 
     // FIX(invoice): دیالوگ تأیید پرداخت (جدا شده تا بعد از resolve هم از همان مسیر اصلی continue شود)
-    private fun showPaymentConfirmation(amount: Long, payMethod: String, targetWallet: String, desc: String, amountTeacher: Long?, amountInstitute: Long?, totalForDisplay: Long) {
+    private fun showPaymentConfirmation(amount: Long, payMethod: String, targetWallet: String, desc: String, amountTeacher: Long?, amountInstitute: Long?, totalForDisplay: Long, sessionsCovered: Int? = null) {
         val walletDisplay = when(targetWallet) {
             "teacher" -> getString(R.string.invoice_wallet_teacher)
             "institute" -> getString(R.string.invoice_wallet_institute)
@@ -545,12 +698,19 @@ class InvoiceActivity : BaseActivity() {
             else -> targetWallet
         }
 
-        val confirmationMessage = """
-            |${getString(R.string.invoice_confirm_amount, String.format("%,d", totalForDisplay), tvStName.text)}
-            |
-            |${getString(R.string.invoice_confirm_wallet, walletDisplay)}
-            |${getString(R.string.invoice_confirm_paymethod, payMethod)}
-        """.trimMargin()
+        // کلاس + معلم + تعداد جلسه در پنجرهٔ تأیید، تا ادمین قبل از ثبت نهایی ببیند حواله برای کدام کلاس/معلم است
+        val teacherForConfirm = classStatus?.teacher_name?.trim().orEmpty().ifEmpty { getString(R.string.common_unknown_class) }
+        val classLine = if (classStatus != null && currentClassTitle.isNotEmpty())
+            getString(R.string.invoice_confirm_class, currentClassTitle, teacherForConfirm) else ""
+        val sessionsLine = if (sessionsCovered != null) getString(R.string.invoice_confirm_sessions, sessionsCovered.toString()) else ""
+        val confirmationMessage = listOf(
+            getString(R.string.invoice_confirm_amount, String.format("%,d", totalForDisplay), tvStName.text),
+            "",
+            classLine,
+            sessionsLine,
+            getString(R.string.invoice_confirm_wallet, walletDisplay),
+            getString(R.string.invoice_confirm_paymethod, payMethod)
+        ).filterIndexed { index, line -> index == 1 || line.isNotEmpty() }.joinToString("\n")
 
         AlertDialog.Builder(this)
             .setTitle(getString(R.string.invoice_confirm_title))
@@ -559,7 +719,7 @@ class InvoiceActivity : BaseActivity() {
                 // FIX (audit-v2/idempotency): همان کلید برای همه‌ی retryها (نه تازه)؛ ولی اگر کاربر بعد از
                 // خطا فرم را عوض کرد (پرداخت تازه)، امضا عوض می‌شود و کلید تازه ساخته می‌شود — وگرنه replay
                 // اشتباهِ رسید قبلی یا گیرکردن روی 422 رخ می‌داد. چرخش صفحه کلید را می‌اندازد (رفتار قبلی).
-                val formSig = "$selectedStudentId|$amount|$targetWallet|$desc|$payMethod|$amountTeacher|$amountInstitute|$selectedEnrollmentId|$currentPersianDate"
+                val formSig = "$selectedStudentId|$amount|$targetWallet|$desc|$payMethod|$amountTeacher|$amountInstitute|$selectedEnrollmentId|$currentPersianDate|$sessionsCovered"
                 val idemKey = if (pendingPaymentKey != null && pendingPaymentSig == formSig) pendingPaymentKey!! else UUID.randomUUID().toString().also { pendingPaymentKey = it; pendingPaymentSig = formSig }
                 sendData(FinanceSubmitData(
                     student_id = selectedStudentId,
@@ -571,7 +731,8 @@ class InvoiceActivity : BaseActivity() {
                     amount_institute = amountInstitute,
                     amount_teacher = amountTeacher,
                     enrollment_id = selectedEnrollmentId,
-                    idempotency_key = idemKey
+                    idempotency_key = idemKey,
+                    sessions_covered = sessionsCovered
                 ))
             }
             .setNegativeButton(getString(R.string.common_cancel), null)
@@ -601,7 +762,7 @@ class InvoiceActivity : BaseActivity() {
                         // چند enrollment فعال: پرداخت متوقف — فقط بعد از انتخاب واقعی کلاس ادامه پیدا می‌کند
                         showEnrollmentPickerDialog(tvStName.text.toString(), active) { en ->
                             selectedEnrollmentId = en.enrollment_id
-                            tvStClass.text = enrollmentLabel(en)
+                            tvStClass.text = EnrollmentLabels.classTitle(this@InvoiceActivity, en)
                             onResolved(true)
                         }
                         onResolved(false)
@@ -614,29 +775,13 @@ class InvoiceActivity : BaseActivity() {
 
     // FIX(invoice): پیکر انتخاب کلاس از enrollmentهای واقعی (برچسب فقط برای UI — شناسه از داده می‌آید)
     private fun showEnrollmentPickerDialog(studentName: String, active: List<ActiveStudentEnrollment>, onPicked: (ActiveStudentEnrollment) -> Unit) {
-        val labels = active.map { enrollmentLabel(it) }.toTypedArray()
+        // هر ردیف: کلاس (کد) / معلم / بدهی به معلم (نام معلم) / بدهی به آموزشگاه / برای چند جلسه
+        val labels = active.map { EnrollmentLabels.pickerLabel(this, it) }.toTypedArray()
         AlertDialog.Builder(this)
             .setTitle(getString(R.string.invoice_pick_class, studentName))
             .setItems(labels) { _, which -> onPicked(active[which]) }
             .setNegativeButton(getString(R.string.common_cancel), null)
             .show()
-    }
-
-    // FIX(invoice): برچسب نمایشی فقط برای UI — هیچ‌جا از روی این متن شناسه استخراج نمی‌شود
-    private fun enrollmentLabel(en: ActiveStudentEnrollment): String {
-        val title = (en.course_title ?: en.title)?.trim().orEmpty()
-        val code = en.code?.trim().orEmpty()
-        val teacher = en.teacher_name?.trim().orEmpty()
-        val classLabel = when {
-            title.isNotEmpty() && code.isNotEmpty() -> "$title (کد: $code)"
-            title.isNotEmpty() -> title
-            code.isNotEmpty() -> code
-            else -> getString(R.string.common_unknown_class)
-        }
-        val debtTeacher = String.format("%,d", en.debt_teacher ?: 0L)
-        val debtInstitute = String.format("%,d", en.debt_institute ?: 0L)
-        val ownerLabel = if (teacher.isNotEmpty()) "$classLabel — معلم $teacher" else classLabel
-        return "$ownerLabel | بدهی به معلم: $debtTeacher | بدهی به آموزشگاه: $debtInstitute"
     }
 
     // FIX(invoice): «detail» کنترل‌شده‌ی سرور از بدنه‌ی خطا (پیام فارسی قابل فهم)؛ بدنه‌ی غیرJSON → null
@@ -717,6 +862,7 @@ class InvoiceActivity : BaseActivity() {
             try {
                 val d = receiptApi.getReceiptDetails(txnId)
                 withContext(Dispatchers.Main) {
+                    lastReceipt = d   // چاپ/PDF از همین رسید سرور (معلم، جلسه، کیف پول) ساخته می‌شود
                     tvStName.text = d.student_name ?: "-"
                     tvStClass.text = d.course_name ?: "-"
                     etAmount.setText((d.amount ?: 0).toString())
@@ -800,6 +946,10 @@ class InvoiceActivity : BaseActivity() {
             selectedStudentId = -1
             selectedCourseId = -1
             selectedEnrollmentId = null
+            classStatus = null
+            currentClassTitle = ""
+            etSessionsCount.setText("")
+            tvSessionInfo.visibility = View.GONE
             etAmount.setText("")
             etDesc.setText("")
             etSearch.requestFocus()
@@ -816,6 +966,10 @@ class InvoiceActivity : BaseActivity() {
                 etSearch.setText("")
                 selectedStudentId = -1
                 selectedEnrollmentId = null
+                classStatus = null
+                currentClassTitle = ""
+                etSessionsCount.setText("")
+                tvSessionInfo.visibility = View.GONE
                 etAmount.setText("")
                 etDesc.setText("")
             }
@@ -865,7 +1019,8 @@ class InvoiceActivity : BaseActivity() {
 
                         <div class="box">
                             <div class="row"><span class="label">${getString(R.string.invoice_lbl_student)}</span> $studentName</div>
-                            <div class="row"><span class="label">${getString(R.string.invoice_lbl_class)}</span> $className</div>
+                            <div class="row"><span class="label">${getString(R.string.invoice_lbl_class)}</span> ${android.text.TextUtils.htmlEncode(receiptClassLabel(className))}</div>
+                            ${receiptHtmlExtraRows()}
                             <div class="row"><span class="label">${getString(R.string.invoice_lbl_amount)}</span> ${String.format("%,d", amount)} ${getString(R.string.attendance_toman)}</div>
                             <div class="row"><span class="label">${getString(R.string.invoice_lbl_date)}</span> $date</div>
                             <div class="row"><span class="label">${getString(R.string.invoice_lbl_desc)}</span> $desc</div>
@@ -948,8 +1103,23 @@ class InvoiceActivity : BaseActivity() {
 
                 canvas.drawText(getString(R.string.invoice_pdf_student, studentName), startX, startY, paint)
                 startY += lineHeight
-                canvas.drawText(getString(R.string.invoice_pdf_class, className), startX, startY, paint)
+                canvas.drawText(getString(R.string.invoice_pdf_class, receiptClassLabel(className)), startX, startY, paint)
                 startY += lineHeight
+                // کدام معلم / برای چند جلسه / به کدام کیف پول (فقط وقتی سرور فرستاده باشد)
+                lastReceipt?.let { r ->
+                    r.teacher_name?.takeIf { it.isNotBlank() }?.let {
+                        canvas.drawText(getString(R.string.invoice_pdf_teacher, it), startX, startY, paint)
+                        startY += lineHeight
+                    }
+                    r.sessions_covered?.let {
+                        canvas.drawText(getString(R.string.invoice_pdf_sessions, it.toString()), startX, startY, paint)
+                        startY += lineHeight
+                    }
+                    receiptPaidToLabel(r)?.let {
+                        canvas.drawText(getString(R.string.invoice_pdf_paid_to, it), startX, startY, paint)
+                        startY += lineHeight
+                    }
+                }
                 canvas.drawText(getString(R.string.invoice_pdf_amount, String.format("%,d", amount)), startX, startY, paint)
                 startY += lineHeight
                 canvas.drawText(getString(R.string.invoice_pdf_date, date), startX, startY, paint)
@@ -986,6 +1156,41 @@ class InvoiceActivity : BaseActivity() {
                 android.util.Log.e("InvoiceActivity", "generatePdfClientSide failed", e)
             }
         }
+    }
+
+    /** «ریاضی (کد: 100002)» — کد کلاس از رسید سرور، تا دو کلاس هم‌نام روی حواله قابل‌تشخیص باشند. */
+    private fun receiptClassLabel(className: String): String {
+        val r = lastReceipt ?: return className
+        val code = r.course_code?.trim().orEmpty()
+        return if (code.isNotEmpty() && !className.contains(code)) getString(R.string.enroll_label_class, className, code) else className
+    }
+
+    /** «سهم معلم — علی احمدی» یا «سهم آموزشگاه»؛ null برای رسید قدیمی. */
+    private fun receiptPaidToLabel(r: ReceiptDetailsResponse): String? {
+        val wallet = r.wallet_label?.trim().orEmpty()
+        if (wallet.isEmpty()) return null
+        val who = r.paid_to_name?.trim().orEmpty()
+        return if (who.isNotEmpty() && who != wallet) getString(R.string.invoice_paid_to_value, wallet, who) else wallet
+    }
+
+    /** ردیف‌های اضافهٔ حوالهٔ چاپی: معلم، تعداد جلسه، واریز به، مانده بدهی کلاس (همه اختیاری). */
+    private fun receiptHtmlExtraRows(): String {
+        val r = lastReceipt ?: return ""
+        val sb = StringBuilder()
+        fun row(label: String, value: String) {
+            sb.append("<div class=\"row\"><span class=\"label\">").append(label).append("</span> ")
+                .append(android.text.TextUtils.htmlEncode(value)).append("</div>")
+        }
+        r.teacher_name?.takeIf { it.isNotBlank() }?.let { row(getString(R.string.invoice_lbl_teacher), it) }
+        r.sessions_covered?.let { row(getString(R.string.invoice_lbl_sessions), it.toString()) }
+        receiptPaidToLabel(r)?.let { row(getString(R.string.invoice_lbl_paid_to), it) }
+        if (r.class_remaining_teacher != null && r.class_remaining_institute != null) {
+            row(
+                getString(R.string.invoice_lbl_remaining),
+                String.format("%,d / %,d", r.class_remaining_teacher, r.class_remaining_institute) + " " + getString(R.string.attendance_toman)
+            )
+        }
+        return sb.toString()
     }
 
     private fun getSimplePersianDate(): String {

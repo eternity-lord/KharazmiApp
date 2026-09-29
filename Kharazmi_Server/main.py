@@ -281,6 +281,8 @@ def auto_patch_database():
             # «Cannot add a UNIQUE column» می‌دهد؛ یکتایی با ایندکس جداگانه پایین اعمال می‌شود.
             ("transactions", "idempotency_key", "VARCHAR", None),
             ("transactions", "session_id", "INTEGER", None),
+            # حواله‌ی «برای N جلسه»: ستون اختیاری گزارشی؛ ردیف‌های قدیمی NULL می‌مانند (بی‌اثر روی مالی).
+            ("transactions", "sessions_covered", "INTEGER", None),
             ("institute_settings", "footer_text", "VARCHAR DEFAULT 'با تشکر'", None),
             ("institute_settings", "card_number", "VARCHAR DEFAULT '۶۰۳۷۹۹۷۹۷۹۷۹۷۹۷۹'", None),
             ("institute_settings", "manager_mobile_1", "VARCHAR DEFAULT '09121112222'", None),

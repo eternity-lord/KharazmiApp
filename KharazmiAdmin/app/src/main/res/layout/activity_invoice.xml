@@ -3,7 +3,7 @@
      PHASE 2 — activity_invoice (صدور فیش و ثبت حواله)
      شناسه‌های حفظ‌شده (InvoiceActivity.kt): etSearch / rvSearchResults / cardStudentInfo /
        cardPaymentForm / tvStName / tvStClass / tvUnpaidSessions / tvSelectedClass / tvDebtTeacher /
-       tvDebtInstitute / etAmount / etAmountInstitute / tilAmount1 / tilAmount2 / etDesc /
+       tvDebtInstitute / tvSessionInfo / layoutSessions / etSessionsCount / tvSessionsHint / etAmount / etAmountInstitute / tilAmount1 / tilAmount2 / etDesc /
        rgPaymentMethod / rbCard / rbCash / rbCheque / layoutWalletSelector / rgTargetWallet /
        rbWalletTeacher / rbWalletInstitute / rbWalletBoth / btnSubmit / tvDate
      قیدهای حفظ‌شده: inputType همه فیلدها، نام و قرارداد endpointها، اعتبارسنجی Kotlin،
@@ -207,6 +207,18 @@
                         android:textColor="@color/ds_danger"
                         android:fontFeatureSettings="tnum"/>
 
+                    <!-- «این مبلغ برای چند جلسه‌ی این کلاس است؟» — بالای دو ردیف بدهی؛ متن از سمت کد می‌آید -->
+                    <TextView
+                        android:id="@+id/tvSessionInfo"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_xs"
+                        android:layout_marginBottom="@dimen/spacing_xs"
+                        android:gravity="center_vertical"
+                        android:text="@string/ds_value_placeholder"
+                        android:textAppearance="@style/TextAppearance.Kharazmi.DS.Body"
+                        android:visibility="gone"/>
+
                     <!-- سهم معلم -->
                     <LinearLayout
                         android:id="@+id/layoutDebtTeacher"
@@ -358,6 +370,40 @@
                                 android:text="@string/ds_inv_wallet_both"
                                 android:textAppearance="@style/TextAppearance.Kharazmi.DS.Body"/>
                         </RadioGroup>
+                    </LinearLayout>
+
+                    <!-- ثبت حواله برای «N جلسه» (فقط ادمین؛ visibility با کد کنترل می‌شود) -->
+                    <LinearLayout
+                        android:id="@+id/layoutSessions"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="@dimen/spacing_normal"
+                        android:orientation="vertical"
+                        android:visibility="gone">
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            style="@style/Widget.Kharazmi.DS.Input"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:hint="@string/invoice_sessions_hint">
+
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/etSessionsCount"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:inputType="number"
+                                android:maxLength="4"
+                                android:textColor="@color/ds_text_primary"
+                                android:fontFeatureSettings="tnum"/>
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                        <TextView
+                            android:id="@+id/tvSessionsHint"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/spacing_xs"
+                            android:text="@string/invoice_sessions_help_default"
+                            android:textAppearance="@style/TextAppearance.Kharazmi.DS.Caption"/>
                     </LinearLayout>
 
                     <!-- مبلغ اصلی -->

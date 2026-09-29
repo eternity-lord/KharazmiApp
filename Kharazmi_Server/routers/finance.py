@@ -22,7 +22,7 @@ from dependencies import get_db, check_admin_access, check_admin_or_secretary_ac
 
 # FIX: Bug 16 - share the tuition-minus-payment debt calculation across financial views.
 from dependencies import limiter  # FIX F-B1: ریت‌لیمیت کال‌بک پرداخت (endpoint پول بدون احراز).
-from financial_calculations import calculate_student_debt, calculate_enrollment_debt_breakdown
+from financial_calculations import calculate_student_debt, calculate_enrollment_debt_breakdown, session_fields_for_client
 # FIX (F-T2): اعتبارسنجی مرکزی تاریخ/مبلغ قسط — یک منبع حقیقت برای هر دو مسیر ساخت قسط.
 from validation import validate_installment_amount, validate_jalali_due_date
 # FIX: Bug 11 - the existing refund audit write needs its model imported at runtime.
@@ -100,9 +100,11 @@ def search_finance_advanced(
                         "enrollment_id": en.id,
                         "course_id": c.id,
                         "course_title": c.title,
+                        "course_code": c.code or "",
                         "teacher_id": c.teacher_id,
                         "teacher_name": t_name,
                         "is_unassigned": False,
+                        **session_fields_for_client(breakdown),
                     }
                 )
 
@@ -265,6 +267,11 @@ def submit_payment(
         elif len(active_enroll_ids) > 1:
             raise HTTPException(status_code=400, detail="این دانش‌آموز چند ثبت‌نام فعال دارد، enrollment_id مشخص کنید")
 
+    # «حواله برای چند جلسه»: فقط توضیح/گزارش است و محاسبهٔ مالی را تغییر نمی‌دهد؛ ولی باید به یک کلاس مشخص
+    # وصل باشد وگرنه معلوم نیست «جلسه‌های کدام کلاس» است.
+    if data.sessions_covered is not None and linked_enrollment is None:
+        raise HTTPException(status_code=400, detail="برای ثبت تعداد جلسه، کلاس (ثبت‌نام) دانش‌آموز را مشخص کنید")
+
     # FIX B1: بدون خواندن-جمع‌زدن در پایتون (RMW) — اینجا فقط سهم هر کیف‌پول محاسبه می‌شود؛
     # افزایش واقعی با یک UPDATE اتمیک SQL بعد از شاخه‌ها انجام می‌شود (رجوع به بلوک «آپدیت اتمیک» پایین).
     add_teacher = 0
@@ -412,6 +419,7 @@ def submit_payment(
         for t in transactions_created:
             t.enrollment_id = linked_enrollment.id
             t.course_id = linked_enrollment.course_id
+            t.sessions_covered = data.sessions_covered  # None برای کلاینت قدیمی = رفتار قبلی
         # FIX B1 (الگوی H8-P4): اگر ثبت‌نام بین اعتبارسنجی بالا و این لحظه حذف شده باشد، rowcount صفر می‌شود.
         paid_rows = (
             db.query(Enrollment)
@@ -536,6 +544,7 @@ def submit_payment(
         "receipt_ids": [t.id for t in transactions_created],
         "new_balance_teacher": final_w_t,
         "new_balance_institute": final_w_i,
+        "sessions_covered": data.sessions_covered,
     }
 
 
@@ -545,6 +554,49 @@ def submit_payment(
 class PrintReceiptRequest(BaseModel):
     transaction_id: int
     print_type: str  # "print" or "pdf"
+
+
+def _receipt_context(db: Session, trans) -> dict:
+    """اطلاعات کلاس/معلم/جلسهٔ یک حواله برای نمایش و چاپ (فقط خواندنی؛ حتی برای رسید قدیمی بدون این فیلدها).
+
+    حوالهٔ «هر دو» دو رسید جدا دارد (سهم معلم و سهم آموزشگاه)؛ هر رسید همان کیف‌پول خودش را نشان می‌دهد.
+    """
+    course = None
+    enrollment = None
+    _enroll_id = getattr(trans, "enrollment_id", None)
+    if _enroll_id:
+        enrollment = db.query(Enrollment).filter(Enrollment.id == _enroll_id).first()
+        if enrollment is not None and getattr(enrollment, "course_id", None):
+            course = db.query(Course).filter(Course.id == enrollment.course_id).first()
+    if course is None and getattr(trans, "course_id", None):
+        course = db.query(Course).filter(Course.id == trans.course_id).first()
+    teacher = None
+    if course is not None and course.teacher_id:
+        teacher = db.query(Teacher).filter(Teacher.id == course.teacher_id).first()
+    teacher_name = display_name(teacher, "") if teacher is not None else ""
+    wallet = getattr(trans, "target_wallet", None)
+    wallet_label = {"teacher": "سهم معلم", "institute": "سهم آموزشگاه"}.get(wallet or "", "")
+    ctx = {
+        "course_name": (course.title if course is not None and course.title else "---"),
+        "course_code": (course.code if course is not None and course.code else ""),
+        "course_id": (course.id if course is not None else None),
+        "teacher_id": (course.teacher_id if course is not None else None),
+        "teacher_name": teacher_name,
+        "sessions_covered": getattr(trans, "sessions_covered", None),
+        "wallet_label": wallet_label,
+        "paid_to_name": teacher_name if wallet == "teacher" else ("آموزشگاه" if wallet == "institute" else ""),
+        # مانده‌ی «همین لحظه» ی همان کلاس (نه لحظه‌ی صدور) — برای مدیر که هنگام چاپ ببیند چقدر مانده.
+        "class_remaining_teacher": None,
+        "class_remaining_institute": None,
+    }
+    if enrollment is not None and not enrollment.is_deleted:
+        try:
+            breakdown = calculate_enrollment_debt_breakdown(db, enrollment)
+            ctx["class_remaining_teacher"] = int(breakdown["debt_teacher"])
+            ctx["class_remaining_institute"] = int(breakdown["debt_institute"])
+        except Exception:  # چاپ رسید هرگز به‌خاطر این بخش اطلاعاتی نباید شکست بخورد
+            pass
+    return ctx
 
 
 @router.post("/finance/receipt/print")
@@ -577,6 +629,7 @@ def print_receipt(req: PrintReceiptRequest, db: Session = Depends(get_db), autho
         "description": transaction.description,
         "target_wallet": transaction.target_wallet,
         "type": transaction.type,
+        **_receipt_context(db, transaction),
     }
 
     # در اینجا منطق ارسال به پرینتر سیستم اجرا می‌شود
@@ -620,6 +673,7 @@ def generate_pdf_receipt(req: PrintReceiptRequest, db: Session = Depends(get_db)
         "description": transaction.description,
         "target_wallet": transaction.target_wallet,
         "type": transaction.type,
+        **_receipt_context(db, transaction),
     }
 
     # در اینجا منطق تولید PDF اجرا می‌شود
@@ -683,7 +737,11 @@ def get_student_class_status(student_id: int, course_id: Optional[int] = None, c
         "teacher_name": display_name(enroll.course.teacher, "نامشخص") if enroll.course and enroll.course.teacher else None,
         "is_unassigned": False,
         # لینک دقیق ثبت‌نام فعال (همان سطری که شهریه از آن خوانده شد) برای اتصال پرداخت بعدی
-        "enrollment_id": enroll.id
+        "enrollment_id": enroll.id,
+        "course_code": (enroll.course.code if enroll.course and enroll.course.code else ""),
+        # «این مبلغ برای چند جلسه است؟» + فهرست جلسه‌های پرداخت‌نشده (قدیمی‌ترین اول) برای محاسبهٔ
+        # مبلغ «حواله برای N جلسه». فقط خواندنی؛ جمع فهرست = due_to_teacher / due_to_institute.
+        **session_fields_for_client(breakdown, include_items=True),
     }
 
 
@@ -2217,18 +2275,9 @@ def get_receipt_details(
     student_name = display_name(student, "نامشخص")
     student_national = student.national_code if student else "---"
     # FIX H16: نام کلاس برای چاپ مجددِ سرور-محور؛ بدون فیلتر is_deleted (رسید سند تاریخی است).
-    course_name = "---"
-    _enroll_id = getattr(trans, "enrollment_id", None)
-    if _enroll_id:
-        _en = db.query(Enrollment).filter(Enrollment.id == _enroll_id).first()
-        if _en is not None and getattr(_en, "course_id", None):
-            _c = db.query(Course).filter(Course.id == _en.course_id).first()
-            if _c is not None and _c.title:
-                course_name = _c.title
-    if course_name == "---" and getattr(trans, "course_id", None):
-        _c2 = db.query(Course).filter(Course.id == trans.course_id).first()
-        if _c2 is not None and _c2.title:
-            course_name = _c2.title
+    # کلاس/معلم/تعداد جلسه با همان helper مشترک چاپ می‌آید.
+    ctx = _receipt_context(db, trans)
+    course_name = ctx["course_name"]
     
     return {
         "transaction_id": trans.id,
@@ -2243,7 +2292,16 @@ def get_receipt_details(
         "course_name": course_name,  # FIX H16: نام کلاس برای بازسازی چاپ مجدد از سرور
         "target_wallet": trans.target_wallet,
         "type": trans.type,
-        "is_reversed": trans.is_reversed
+        "is_reversed": trans.is_reversed,
+        "course_code": ctx["course_code"],
+        "course_id": ctx["course_id"],
+        "teacher_id": ctx["teacher_id"],
+        "teacher_name": ctx["teacher_name"],
+        "sessions_covered": ctx["sessions_covered"],
+        "wallet_label": ctx["wallet_label"],
+        "paid_to_name": ctx["paid_to_name"],
+        "class_remaining_teacher": ctx["class_remaining_teacher"],
+        "class_remaining_institute": ctx["class_remaining_institute"],
     }
 
 

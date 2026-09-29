@@ -702,5 +702,93 @@ class TestClassDetailSessionHistoryGuard(unittest.TestCase):
         self.assertIn("display_name(", routines, "نامِ حاضر/غایب باید از هلپرِ امنِ نام بیاید")
 
 
+class TestInvoicePerClassSessionsGuard(unittest.TestCase):
+    """گارد ۸ — صدور فیش/حواله: هر کلاس جدا، نام معلم، «برای چند جلسه»، چاپ حواله."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.invoice = _kotlin_source("InvoiceActivity.kt")
+        cls.labels = _kotlin_source("EnrollmentLabels.kt")
+        cls.profile = _kotlin_source("StudentProfileActivity.kt")
+        cls.models = _kotlin_source("AppModels.kt")
+        cls.api = _kotlin_source("ApiInterfaces.kt")
+        cls.strings = dict(_string_entries(os.path.join(RES_DIR, "values", "strings.xml")))
+        cls.layout = _read(os.path.join(RES_DIR, "layout", "activity_invoice.xml"))
+
+    def test_8a_layout_has_every_view_the_activity_looks_up(self):
+        for view_id in ("tvSessionInfo", "layoutSessions", "etSessionsCount", "tvSessionsHint"):
+            self.assertIn(f'@+id/{view_id}', self.layout, f"شناسهٔ {view_id} در activity_invoice.xml نیست ⇒ findViewById کرش می‌کند")
+            self.assertIn(f"R.id.{view_id}", self.invoice)
+        self.assertLess(self.layout.index("@+id/tvSessionInfo"), self.layout.index("@+id/layoutDebtTeacher"),
+                        "«برای چند جلسه» باید بالای ردیف‌های بدهی باشد")
+
+    def test_8b_no_multiline_picker_label_is_used_as_class_name(self):
+        """قبلاً برچسب چندخطی (با بدهی‌ها) به‌عنوان نام کلاس روی فرم و حواله می‌رفت."""
+        self.assertNotIn("enrollmentLabel(", self.invoice)
+        self.assertNotIn("enrollmentLabel(", self.profile)
+        self.assertNotIn("pickerLabel(", "\n".join(re.findall(r"loadStudentClassStatus\([^\n]*", self.invoice)))
+        for chunk in re.findall(r"openInvoice\([^\n]*", self.profile):
+            self.assertNotIn("pickerLabel", chunk)
+
+    def test_8c_picker_label_shows_teacher_name_and_per_class_debts(self):
+        body = _kotlin_function_body(self.labels, "fun pickerLabel(")
+        self.assertTrue(body, "pickerLabel در EnrollmentLabels نیست")
+        self.assertIn("debtTeacherLine(", body)
+        self.assertIn("debtInstituteLine(", body)
+        self.assertIn("sessionsLine(", body)
+        teacher_line = _kotlin_function_body(self.labels, "fun debtTeacherLine(")
+        self.assertIn("enroll_label_debt_teacher_named", teacher_line, "نام معلم باید کنار «بدهی به معلم» بیاید")
+        self.assertIn("%2$s", self.strings["enroll_label_debt_teacher_named"])
+
+    def test_8d_form_shows_session_info_above_debts_and_flags_stale_server(self):
+        body = _kotlin_function_body(self.invoice, "private fun renderClassStatus(")
+        self.assertTrue(body, "renderClassStatus پیدا نشد")
+        for token in ("tvSessionInfo.text", "invoice_session_info", "invoice_stale_server", "invoice_due_teacher_named"):
+            self.assertIn(token, body)
+        self.assertIn("sessions_billed == null", body, "سرور/APK قدیمی باید صریح گزارش شود، نه اعداد بی‌صدا")
+
+    def test_8e_admin_session_field_is_admin_only_and_validated(self):
+        self.assertRegex(self.invoice, r"layoutSessions\.visibility = View\.VISIBLE")
+        self.assertIn("if (isAdmin) etSessionsCount", self.invoice, "فیلد جلسه فقط برای ادمین خوانده شود")
+        self.assertIn("parsed < 1 || parsed > 1000", self.invoice)
+        self.assertIn("sessions_covered = sessionsCovered", self.invoice, "تعداد جلسه باید به سرور برسد")
+        self.assertIn("$sessionsCovered", self.invoice, "تعداد جلسه باید در امضای ضد-دوباره‌ثبتی (formSig) باشد")
+        self.assertRegex(self.models, r"class FinanceSubmitData\((?:.|\n)*?sessions_covered: Int\? = null")
+        recompute = _kotlin_function_body(self.invoice, "private fun recomputeAmountsFromSessions(")
+        self.assertIn("if (!isAdmin) return", recompute)
+        self.assertIn("unpaid_session_items", recompute)
+
+    def test_8f_receipt_print_and_pdf_use_server_receipt_fields(self):
+        self.assertIn("lastReceipt = d", _kotlin_function_body(self.invoice, "private fun loadAndShowReceipt("))
+        html = _kotlin_function_body(self.invoice, "private fun receiptHtmlExtraRows(")
+        for token in ("invoice_lbl_teacher", "invoice_lbl_sessions", "invoice_lbl_paid_to", "invoice_lbl_remaining", "htmlEncode"):
+            self.assertIn(token, html)
+        self.assertIn("receiptHtmlExtraRows()", _kotlin_function_body(self.invoice, "private fun printReceiptClientSide("))
+        pdf = _kotlin_function_body(self.invoice, "private fun generatePdfClientSide(")
+        for token in ("invoice_pdf_teacher", "invoice_pdf_sessions", "invoice_pdf_paid_to"):
+            self.assertIn(token, pdf)
+
+    def test_8g_models_carry_session_fields_as_nullable(self):
+        for src, decl in ((self.models, "data class ActiveStudentEnrollment("), (self.models, "data class TeacherFinancialItem("),
+                          (self.api, "data class StudentClassStatus(")):
+            fields = _kotlin_declaration(src, decl)
+            self.assertTrue(fields, f"{decl} پیدا نشد")
+            self.assertRegex(fields, r"sessions_billed: Int\? = null", f"{decl} باید sessions_billed nullable داشته باشد")
+            self.assertIn("contract_only", fields)
+        self.assertIn("unpaid_session_items", _kotlin_declaration(self.api, "data class StudentClassStatus("))
+
+    def test_8h_all_new_strings_exist_and_are_used(self):
+        prefixes = ("enroll_label_", "invoice_session", "invoice_sessions_", "invoice_stale_server", "invoice_lbl_teacher",
+                    "invoice_lbl_sessions", "invoice_lbl_paid_to", "invoice_lbl_remaining", "invoice_pdf_teacher",
+                    "invoice_pdf_sessions", "invoice_pdf_paid_to", "invoice_confirm_class", "invoice_confirm_sessions",
+                    "profile_class_", "cdetail_debt_sessions")
+        keys = [k for k in self.strings if k.startswith(prefixes)]
+        self.assertGreaterEqual(len(keys), 20)
+        corpus = "\n".join(_kotlin_source(f) for f in os.listdir(os.path.join(JAVA_DIR, "com", "example", "kharazmiadmin"))
+                           if f.endswith(".kt")) + self.layout
+        for key in keys:
+            self.assertTrue(f"R.string.{key}" in corpus or f"@string/{key}" in corpus, f"رشتهٔ بدون مصرف: {key}")
+
+
 if __name__ == "__main__":
     unittest.main()

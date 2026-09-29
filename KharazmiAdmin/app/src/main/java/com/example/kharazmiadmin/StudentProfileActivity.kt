@@ -401,16 +401,17 @@ class StudentProfileActivity : BaseActivity() {
             enrollments.size == 1 -> {
                 // FIX(invoice): تنها کلاس فعال → شناسه‌ی واقعی همان enrollment می‌رود (نه نام نمایشی)
                 val en = enrollments[0]
-                openInvoice(en.enrollment_id, en.course_id, enrollmentLabel(en), en)
+                openInvoice(en.enrollment_id, en.course_id, EnrollmentLabels.classTitle(this, en), en)
             }
             enrollments.size > 1 -> {
                 // FIX(invoice): چند کلاس فعال → اول انتخاب کلاس (با شناسه واقعی)؛ فیش هرگز با نام کلاس حدس‌زده نمی‌شود
-                val labels = enrollments.map { enrollmentLabel(it) }
+                // هر ردیف: کلاس (کد) / معلم / بدهی به معلم (نام معلم) / بدهی به آموزشگاه / برای چند جلسه
+                val labels = enrollments.map { EnrollmentLabels.pickerLabel(this, it) }
                 AlertDialog.Builder(this)
                     .setTitle(getString(R.string.invoice_pick_class, profile.info.name))
                     .setItems(labels.toTypedArray()) { _, which ->
                         val en = enrollments[which]
-                        openInvoice(en.enrollment_id, en.course_id, enrollmentLabel(en), en)
+                        openInvoice(en.enrollment_id, en.course_id, EnrollmentLabels.classTitle(this, en), en)
                     }
                     .setNegativeButton(R.string.common_cancel, null)
                     .show()
@@ -443,23 +444,6 @@ class StudentProfileActivity : BaseActivity() {
             }
         }
         startActivity(intent)
-    }
-
-    // FIX(invoice): برچسب نمایشی فقط برای UI — هیچ‌جا از روی این متن شناسه استخراج نمی‌شود
-    private fun enrollmentLabel(en: ActiveStudentEnrollment): String {
-        val title = (en.course_title ?: en.title)?.trim().orEmpty()
-        val code = en.code?.trim().orEmpty()
-        val teacher = en.teacher_name?.trim().orEmpty()
-        val classLabel = when {
-            title.isNotEmpty() && code.isNotEmpty() -> "$title (کد: $code)"
-            title.isNotEmpty() -> title
-            code.isNotEmpty() -> code
-            else -> getString(R.string.common_unknown_class)
-        }
-        val debtTeacher = String.format("%,d", en.debt_teacher ?: 0L)
-        val debtInstitute = String.format("%,d", en.debt_institute ?: 0L)
-        val ownerLabel = if (teacher.isNotEmpty()) "$classLabel — معلم $teacher" else classLabel
-        return "$ownerLabel | بدهی به معلم: $debtTeacher | بدهی به آموزشگاه: $debtInstitute"
     }
 
     private fun showInfo() {
@@ -498,9 +482,15 @@ class StudentProfileActivity : BaseActivity() {
                         if (row.is_unassigned) {
                             sb.append("بدهی بدون کلاس — آموزشگاه: ${formatCurrency(row.debt_institute)}\n")
                         } else {
-                            sb.append("کلاس ${row.course_title ?: "کلاس نامشخص"} — معلم ${row.teacher_name ?: "بدون معلم"}\n")
-                            sb.append("  بدهی به معلم: ${formatCurrency(row.debt_teacher)}\n")
-                            sb.append("  بدهی به آموزشگاه: ${formatCurrency(row.debt_institute)}\n")
+                            val classLabel = EnrollmentLabels.classTitle(this, row.course_title, row.course_code)
+                            sb.append("کلاس $classLabel — معلم ${row.teacher_name ?: "بدون معلم"}\n")
+                            // نام معلم جلوی بدهی به معلم؛ هر کلاس جدا (دو کلاسِ هم‌معلم جمع نمی‌شوند)
+                            sb.append("  ${EnrollmentLabels.debtTeacherLine(this, row.teacher_name, row.debt_teacher)}\n")
+                            sb.append("  ${EnrollmentLabels.debtInstituteLine(this, row.debt_institute)}\n")
+                            // «این بدهی برای چند جلسه است؟»
+                            if (row.contract_only) sb.append(getString(R.string.profile_class_contract_line))
+                            else if (row.sessions_billed != null && (row.unpaid_sessions ?: 0) > 0)
+                                sb.append(getString(R.string.profile_class_sessions_line, row.unpaid_sessions.toString(), row.sessions_billed.toString()))
                         }
                     }
                 }

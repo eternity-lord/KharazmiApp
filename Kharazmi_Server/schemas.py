@@ -450,6 +450,8 @@ class FinanceSubmitData(BaseModel):
     amount_teacher: Optional[int] = None
     enrollment_id: Optional[int] = None  # اتصال پرداخت به یک ثبت‌نام خاص (اختیاری؛ اگر خالی باشد و شاگرد فقط یک ثبت‌نام فعال داشته باشد، خودکار وصل می‌شود)
     idempotency_key: Optional[str] = None  # FIX (audit-v2/idempotency): اختیاری و backward-compatible — کلاینت قدیمی نفرستد = رفتار فعلی
+    # «این حواله برای چند جلسه است؟» — اختیاری و فقط گزارشی (روی مبلغ/کیف‌پول اثر ندارد)؛ نیازمند enrollment مشخص.
+    sessions_covered: Optional[int] = Field(default=None, ge=1, le=1000)
 
 class PrintReceiptRequest(BaseModel):
     transaction_id: int

@@ -293,10 +293,32 @@ class ClassStudentData(BaseModel):
     teacher_name: Optional[str] = None
     is_unassigned: bool = False
 
+class ClassSessionStudent(BaseModel):
+    """FIX (تاریخچهٔ جلسات): یک ردیف حاضر/غایبِ داخل یک جلسه — نام برای نمایش، شناسه‌ها برای
+    استفاده‌های بعدی (مثل لینک به پروفایل شاگرد)."""
+    student_id: int
+    name: str  # نام نمایشی (legacy NULL ⇒ «نامشخص»)
+    student_code: Optional[int] = None
+    status: str = "Present"  # Present / Late / Absent
+    excused: bool = False
+
+
 class ClassSessionHistory(BaseModel):
     date: str
     present_count: int
     absent_count: int
+    # FIX (تاریخچهٔ جلسات): فیلدهای نمایشی این تب برای هر کلاس اضافه شد (نام حاضرین/غایبین،
+    # روز هفته، هزینه و ساعت جلسه). همه با پیش‌فرض‌اند تا پاسخ برای کلاینت قدیمی سازگار بماند
+    # و کش قدیمیِ اپ هم نشکند.
+    session_id: Optional[int] = None
+    session_code: Optional[int] = None
+    weekday: str = ""
+    present_students: List[ClassSessionStudent] = []
+    absent_students: List[ClassSessionStudent] = []
+    total_cost: int = 0
+    cost_per_student: int = 0
+    start_time: str = ""
+    end_time: str = ""
 
 class FullClassReport(BaseModel):
     info: ClassReportInfo

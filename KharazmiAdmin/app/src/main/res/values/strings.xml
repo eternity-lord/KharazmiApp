@@ -729,6 +729,14 @@
     <string name="cdetail_hist_row">"جلسه %1$s: %2$s\n"</string>
     <string name="cdetail_hist_present">"   ✅ حاضرین: %1$s نفر\n"</string>
     <string name="cdetail_hist_absent">"   ❌ غایبین: %1$s نفر\n"</string>
+    <!-- FIX (تاریخچهٔ جلسات): روز هفته، سرجمع دوره، نام حاضرین/غایبین، هزینه و ساعت هر جلسه -->
+    <string name="cdetail_hist_row_weekday">"جلسه %1$s: %2$s (%3$s)\n"</string>
+    <string name="cdetail_hist_summary">"📊 جمع دوره: %1$s جلسه • ✅ حاضر %2$s نفر • ❌ غایب %3$s نفر\n\n"</string>
+    <string name="cdetail_hist_student_row">"      • %1$s%2$s\n"</string>
+    <string name="cdetail_hist_late_tag">" (با تأخیر)"</string>
+    <string name="cdetail_hist_excused_tag">" (موجه)"</string>
+    <string name="cdetail_hist_cost">"   💰 هزینهٔ این جلسه: %1$s تومان (هر شاگرد: %2$s تومان)\n"</string>
+    <string name="cdetail_hist_time">"   ⏰ ساعت: %1$s تا %2$s\n"</string>
     <string name="cdetail_students_error">خطا در دریافت لیست دانش‌آموزان</string>
     <string name="cdetail_students_empty">هیچ دانش‌آموزی در این کلاس نیست — با دکمه‌ی + شروع به کلاس‌بندی کنید</string>
     <string name="cdetail_att_title">تاریخچه حضور و غیاب: %1$s</string>

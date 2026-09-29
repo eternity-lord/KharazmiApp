@@ -1,7 +1,6 @@
-from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Header, Request
 from sqlalchemy.orm import Session, joinedload
-from typing import List, Optional, Union
+from typing import Optional, Union
 from sqlalchemy import desc, or_, text, func
 import io
 import uuid
@@ -441,36 +440,10 @@ def get_student_grades(student_id: int, db: Session = Depends(get_db), authoriza
     }
 
 
-# ==========================================
-# 15. API گزارش جامع کلاس (Class Full Report)
-# ==========================================
-class ClassReportInfo(BaseModel):
-    title: str
-    code: str
-    teacher_name: str
-    session_count: int  # تعداد جلسات برگزار شده
-    total_students: int
-    total_revenue: int  # کل درآمد وصول شده
-    total_debt: int  # کل مطالبات (بدهی‌ها)
-
-
-class ClassStudentData(BaseModel):
-    name: str
-    mobile: str
-    paid: int
-    debt: int
-
-
-class ClassSessionHistory(BaseModel):
-    date: str
-    present_count: int
-    absent_count: int
-
-
-class FullClassReport(BaseModel):
-    info: ClassReportInfo
-    students: List[ClassStudentData]
-    sessions: List[ClassSessionHistory]
+# FIX (تاریخچهٔ جلسات): چهار کلاسِ تکراریِ زیر (ClassReportInfo/ClassStudentData/ClassSessionHistory/
+# FullClassReport) سایهٔ نسخهٔ `schemas.py` بودند، هیچ‌جا در این فایل استفاده نمی‌شدند و هیچ روتِ
+# full-reportی هم این‌جا وجود ندارد (پیاده‌سازی در `routers/classes.py` است) ⇒ حذف شدند تا
+# «یک منبعِ حقیقت» بماند و شکلِ پاسخِ تاریخچهٔ جلسات دو جا واگرا نشود.
 
 
 @router.get("/students/{student_id}/communication_history")

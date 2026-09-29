@@ -609,5 +609,98 @@ class TestClassDetailFinanceFreshnessGuard(unittest.TestCase):
                       "هر پرداخت «درآمد وصول شده» و بدهی‌ها را عوض می‌کند ⇒ کش گزارش کلاس باید باطل شود")
 
 
+# ---------------------------------------------------------------------------
+# FIX (تاریخچهٔ جلسات) — گارد ۷: تبِ دومِ صفحهٔ کلاس باید «نامِ» حاضر/غایب‌ها و روزِ هفته را نشان دهد
+#
+# خواستهٔ کاربر (اسکرین‌شات تبِ «تاریخچه جلسات» کلاس ۱۰۰۰۰۲): قبلاً هر جلسه فقط
+# «✅ حاضرین: N نفر / ❌ غایبین: M نفر» بود؛ نه نامِ کسی دیده می‌شد و نه روزِ هفته.
+# سمتِ سرور تستِ رفتاریِ مستقل دارد (`test_class_session_history_details.py`)؛ این گاردها
+# قراردادِ سمتِ اندروید/اسکیما را قفل می‌کنند چون این‌جا Gradle/JDK نیست و اجرای اپ ممکن نیست.
+# ---------------------------------------------------------------------------
+
+def _kotlin_declaration(source: str, signature: str) -> str:
+    """متنِ داخل پرانتزهای یک declaration (مثل `data class X(`) را با تطبیقِ پرانتز برمی‌گرداند."""
+    index = source.find(signature)
+    if index < 0:
+        return ""
+    opening = source.find("(", index)
+    if opening < 0:
+        return ""
+    depth = 0
+    for position in range(opening, len(source)):
+        char = source[position]
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+            if depth == 0:
+                return source[opening + 1:position]
+    return ""
+
+
+class TestClassDetailSessionHistoryGuard(unittest.TestCase):
+    """گارد ۷ — نامِ حاضر/غایب + روزِ هفته در تبِ «تاریخچه جلسات» صفحهٔ کلاس."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.source = _kotlin_source("ClassDetailActivity.kt")
+        cls.strings = dict(_string_entries(os.path.join(RES_DIR, "values", "strings.xml")))
+
+    def test_7a_session_model_carries_names_weekday_and_cost(self):
+        fields = _kotlin_declaration(self.source, "data class ClassSessionHistory(")
+        self.assertTrue(fields, "مدل ClassSessionHistory در ClassDetailActivity پیدا نشد")
+        for expected in (
+            "present_students: List<ClassSessionStudent> = emptyList()",
+            "absent_students: List<ClassSessionStudent> = emptyList()",
+            'weekday: String = ""',
+        ):
+            self.assertIn(expected, fields, f"فیلد «{expected}» از مدلِ تاریخچهٔ جلسات حذف شده است")
+
+    def test_7b_student_row_model_has_name_status_and_excused(self):
+        fields = _kotlin_declaration(self.source, "data class ClassSessionStudent(")
+        self.assertTrue(fields, "مدل ClassSessionStudent در ClassDetailActivity پیدا نشد")
+        for expected in ('name: String = ""', 'status: String = "Present"', "excused: Boolean = false"):
+            self.assertIn(expected, fields, f"فیلد «{expected}» از مدلِ ردیفِ شاگرد حذف شده است")
+
+    def test_7c_tab_render_prints_student_names_and_weekday(self):
+        body = _kotlin_function_body(self.source, "private fun updateUI(")
+        self.assertTrue(body, "updateUI در ClassDetailActivity پیدا نشد")
+        self.assertIn("R.string.cdetail_hist_summary", body, "خطِ جمعِ دوره (جلسه/حاضر/غایب) حذف شده است")
+        self.assertIn("R.string.cdetail_hist_row_weekday", body, "روزِ هفته کنارِ تاریخِ جلسه باید چاپ شود")
+        self.assertIn("appendSessionStudents(sb, sess.present_students)", body,
+                      "نامِ حاضرینِ هر جلسه باید نوشته شود، نه فقط تعدادشان")
+        self.assertIn("appendSessionStudents(sb, sess.absent_students)", body,
+                      "نامِ غایبینِ هر جلسه باید نوشته شود، نه فقط تعدادشان")
+
+    def test_7d_student_helper_prints_names_with_late_and_excused_tags(self):
+        helper = _kotlin_function_body(self.source, "private fun appendSessionStudents(")
+        self.assertTrue(helper, "هلپر appendSessionStudents پیدا نشد")
+        for key in ("cdetail_hist_student_row", "cdetail_hist_late_tag", "cdetail_hist_excused_tag"):
+            self.assertIn(f"R.string.{key}", helper, f"هلپر باید از رشتهٔ {key} استفاده کند")
+        self.assertIn("isBlank()", helper, "نامِ خالی نباید خطِ خالی چاپ کند")
+
+    def test_7e_new_strings_exist_and_weekday_fallback_is_available(self):
+        for name in (
+            "cdetail_hist_row_weekday", "cdetail_hist_summary", "cdetail_hist_student_row",
+            "cdetail_hist_late_tag", "cdetail_hist_excused_tag", "cdetail_hist_cost", "cdetail_hist_time",
+        ):
+            self.assertIn(name, self.strings, f"رشتهٔ «{name}» در values/strings.xml نیست")
+        self.assertIn("JalaliUtils.persianWeekdayName(", self.source,
+                      "برای پاسخ/کشِ قدیمیِ بدون weekday باید fallbackِ محلی محاسبه شود")
+        jalali = _kotlin_source("JalaliUtils.kt")
+        self.assertIn("fun persianWeekdayName(", jalali, "fallbackِ روزِ هفته حذف شده است")
+
+    def test_7f_server_schema_and_report_keep_the_new_fields(self):
+        schemas = _read(os.path.join(SERVER_DIR, "schemas.py"))
+        self.assertIn("class ClassSessionStudent(BaseModel):", schemas)
+        session_schema = schemas.split("class ClassSessionHistory(BaseModel):", 1)[-1].split("class ", 1)[0]
+        for expected in ("present_students", "absent_students", "weekday", "total_cost",
+                         "cost_per_student", "session_id", "start_time", "end_time"):
+            self.assertIn(expected, session_schema, f"فیلد «{expected}» از اسکیمای تاریخچهٔ جلسات حذف شده است")
+        routines = _read(os.path.join(SERVER_DIR, "routers", "classes.py"))
+        self.assertIn("PERSIAN_DAY_NAMES", routines, "روزِ هفته باید از تقویمِ مرکزیِ سرور بیاید")
+        self.assertIn("display_name(", routines, "نامِ حاضر/غایب باید از هلپرِ امنِ نام بیاید")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -17,7 +17,7 @@ from models import (
     Attendance, Course, Enrollment, Grade, InstituteShare, SessionLog, SmsLog, Student, Teacher, Transaction, User, UserSession, Installment, ActivityLog
 )
 from schemas import (
-    HistoryRequest, LoginRequest, TeacherInfo, FullTeacherProfile, StudentCreate, TeacherCreate, CourseCreate, EnrollmentCreate, BulkEnrollmentCreate, GradeCreate, GradeItem, AttendanceLogRequest, AttendanceItem, AttendanceSubmitData, SmsSendRequest, ChangePasswordRequest, StudentProfileInfo, FullStudentProfile, TeacherProfileInfo, FullTeacherProfile, ClassReportInfo, ClassStudentData, ClassSessionHistory, FullClassReport, ShareConfigModel, StudentUpdate, TeacherUpdate, PersonListItem, TransactionUpdate, StudentAttendanceHistoryRequest, AdvancedSearchItem, FinanceSubmitData, PrintReceiptRequest, TransactionTestData
+    HistoryRequest, LoginRequest, TeacherInfo, FullTeacherProfile, StudentCreate, TeacherCreate, CourseCreate, EnrollmentCreate, BulkEnrollmentCreate, GradeCreate, GradeItem, AttendanceLogRequest, AttendanceItem, AttendanceSubmitData, SmsSendRequest, ChangePasswordRequest, StudentProfileInfo, FullStudentProfile, TeacherProfileInfo, FullTeacherProfile, ClassReportInfo, ClassStudentData, ClassSessionHistory, ClassSessionStudent, FullClassReport, ShareConfigModel, StudentUpdate, TeacherUpdate, PersonListItem, TransactionUpdate, StudentAttendanceHistoryRequest, AdvancedSearchItem, FinanceSubmitData, PrintReceiptRequest, TransactionTestData
 )
 from dependencies import (get_db, check_admin_access, check_admin_or_secretary_access,
                             check_admin_secretary_or_teacher_access, resolve_session_teacher,
@@ -649,28 +649,78 @@ def get_class_full_report(id: int, db: Session = Depends(get_db), authorization:
     # 3. محاسبه جلسات برگزار شده (اصلاح شده با ساختار جدید) ✅
     # اول لیست جلسات این کلاس رو میگیریم
     # FIX: Bug 14 - exclude archived SessionLog rows from this active view.
-    sessions = db.query(SessionLog).filter(SessionLog.is_deleted == False).filter(SessionLog.course_id == id).all()
+    # FIX (تاریخچهٔ جلسات): ترتیب صریح بر اساس id (ترتیب ثبت) تا شمارهٔ «جلسه ۱، ۲، …» پایدار بماند.
+    sessions = (
+        db.query(SessionLog)
+        .filter(SessionLog.is_deleted == False)
+        .filter(SessionLog.course_id == id)
+        .order_by(SessionLog.id.asc())
+        .all()
+    )
+
+    # FIX (تاریخچهٔ جلسات): نام روز هفته از مبدل مرکزی تاریخ (همان منبع بقیهٔ اپ).
+    from today_summary import parse_project_date, PERSIAN_DAY_NAMES  # lazy، مثل attendance/finance
 
     session_history = []
     for sess in sessions:
-        # برای هر جلسه، تعداد حاضرین و غایبین رو از جدول Attendance میشماریم
-        # FIX (F-S2): ردیف‌های آرشیوشده در شمارش گزارش کلاس نمی‌آیند.
-        p_count = (
-            db.query(Attendance)
-            .filter(Attendance.session_id == sess.id, Attendance.status == "Present",
-                    Attendance.is_deleted == False)
-            .count()
+        # FIX (تاریخچهٔ جلسات): یک کوئری ردیف‌های حضور/غیاب همین جلسه (قبلاً دو count جدا بود).
+        # حالا شمارش و نام‌ها از یک منبع می‌آیند تا «حاضرین: ۲ نفر» با لیست نام‌ها ناسازگار نشود.
+        # FIX (F-S2): ردیف‌های آرشیوشده در گزارش کلاس نمی‌آیند.
+        attendance_rows = (
+            db.query(Attendance, Student)
+            .outerjoin(Student, Student.id == Attendance.student_id)
+            .filter(Attendance.session_id == sess.id, Attendance.is_deleted == False)
+            .order_by(Attendance.id.asc())
+            .all()
         )
-        a_count = (
-            db.query(Attendance)
-            .filter(Attendance.session_id == sess.id, Attendance.status == "Absent",
-                    Attendance.is_deleted == False)
-            .count()
-        )
+        present_students = []
+        absent_students = []
+        for att, att_student in attendance_rows:
+            status_value = att.status or ""
+            if status_value in ("Present", "Late"):
+                # «تأخیر» هم حاضر است — همان قرارداد بقیهٔ اپ (students_full/تاریخچهٔ شاگرد).
+                present_students.append(
+                    ClassSessionStudent(
+                        student_id=att.student_id,
+                        name=display_name(att_student, "نامشخص"),
+                        student_code=getattr(att_student, "student_code", None),
+                        status=status_value or "Present",
+                        excused=bool(att.excused),
+                    )
+                )
+            elif status_value == "Absent":
+                absent_students.append(
+                    ClassSessionStudent(
+                        student_id=att.student_id,
+                        name=display_name(att_student, "نامشخص"),
+                        student_code=getattr(att_student, "student_code", None),
+                        status="Absent",
+                        excused=bool(att.excused),
+                    )
+                )
+            # وضعیت ناشناس (legacy) در هیچ‌کدام شمرده نمی‌شود — مثل رفتار قبلیِ شمارش‌ها.
 
+        day = parse_project_date(sess.date)
         session_history.append(
             ClassSessionHistory(
-                date=sess.date, present_count=p_count, absent_count=a_count
+                date=sess.date,
+                present_count=len(present_students),
+                absent_count=len(absent_students),
+                session_id=sess.id,
+                session_code=sess.session_code,
+                weekday=PERSIAN_DAY_NAMES.get(day.weekday(), "") if day else "",
+                present_students=present_students,
+                absent_students=absent_students,
+                # همان فرمول هزینهٔ جلسه در attendance/get_history (خواندنی؛ هیچ مالی‌ای نوشته نمی‌شود).
+                total_cost=int(
+                    (sess.final_teacher_cost or 0)
+                    + (sess.final_institute_share or 0)
+                    + (sess.absent_penalty_teacher or 0)
+                    + (sess.absent_penalty_institute or 0)
+                ),
+                cost_per_student=int(sess.cost_per_student or 0),
+                start_time=sess.start_time or "",
+                end_time=sess.end_time or "",
             )
         )
 

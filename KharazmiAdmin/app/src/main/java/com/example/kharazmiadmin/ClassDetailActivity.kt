@@ -55,7 +55,29 @@ data class ClassStudentData(
     val teacher_name: String? = null,
     val is_unassigned: Boolean = false
 )
-data class ClassSessionHistory(val date: String, val present_count: Int, val absent_count: Int)
+// FIX (تاریخچهٔ جلسات): ردیف هر شاگرد داخل یک جلسه (نام حاضر/غایب + برچسب تأخیر/موجه).
+// فیلدهای اختیاری‌اند تا کش/پاسخ قدیمی (بدون این کلیدها) صفحه را نشکند.
+data class ClassSessionStudent(
+    val student_id: Int = 0,
+    val name: String = "",
+    val student_code: Int? = null,
+    val status: String = "Present",  // Present / Late / Absent
+    val excused: Boolean = false
+)
+data class ClassSessionHistory(
+    val date: String,
+    val present_count: Int,
+    val absent_count: Int,
+    val session_id: Int? = null,
+    val session_code: Int? = null,
+    val weekday: String = "",
+    val present_students: List<ClassSessionStudent> = emptyList(),
+    val absent_students: List<ClassSessionStudent> = emptyList(),
+    val total_cost: Long = 0,
+    val cost_per_student: Long = 0,
+    val start_time: String = "",
+    val end_time: String = ""
+)
 
 // مدل‌های جدید برای تاریخچه حضور و غیاب دانش‌آموز
 data class StudentAttendanceHistoryRequest(val student_id: Int, val course_id: Int)
@@ -583,14 +605,69 @@ class ClassDetailActivity : BaseActivity() {
                 sb.append(getString(R.string.cdetail_hist_title))
                 if (data.sessions.isEmpty()) sb.append(getString(R.string.cdetail_hist_empty))
 
+                // FIX (تاریخچهٔ جلسات): سرجمع دوره بالای لیست — یک نگاه، کلِ حضور و غیاب کلاس.
+                if (data.sessions.isNotEmpty()) {
+                    sb.append(
+                        getString(
+                            R.string.cdetail_hist_summary,
+                            data.sessions.size,
+                            data.sessions.sumOf { it.present_count },
+                            data.sessions.sumOf { it.absent_count }
+                        )
+                    )
+                }
+
                 data.sessions.forEachIndexed { index, sess ->
-                    sb.append(getString(R.string.cdetail_hist_row, index + 1, sess.date))
+                    // FIX (تاریخچهٔ جلسات): روز هفته کنار تاریخ (سرور می‌فرستد؛ اگر پاسخ قدیمی بود،
+                    // همین‌جا از تاریخ محاسبه می‌شود) تا «جلسه ۱: 1405/07/07 (دوشنبه)» دیده شود.
+                    val weekday = sess.weekday.ifBlank { JalaliUtils.persianWeekdayName(sess.date) }
+                    sb.append(
+                        if (weekday.isBlank()) {
+                            getString(R.string.cdetail_hist_row, index + 1, sess.date)
+                        } else {
+                            getString(R.string.cdetail_hist_row_weekday, index + 1, sess.date, weekday)
+                        }
+                    )
                     sb.append(getString(R.string.cdetail_hist_present, sess.present_count))
+                    // FIX (تاریخچهٔ جلسات): نام تکی حاضرین/غایبین همین جلسه (خواستهٔ کاربر) —
+                    // «فلان دانش‌آموز حاضر، فلان دانش‌آموز غایب» به‌جای فقط تعداد.
+                    appendSessionStudents(sb, sess.present_students)
                     sb.append(getString(R.string.cdetail_hist_absent, sess.absent_count))
+                    appendSessionStudents(sb, sess.absent_students)
+                    // هزینه/ساعت فقط وقتی داده دارد (جلسه‌های قدیمی این‌ها را ندارند).
+                    if (sess.total_cost > 0) {
+                        sb.append(
+                            getString(
+                                R.string.cdetail_hist_cost,
+                                String.format("%,d", sess.total_cost),
+                                String.format("%,d", sess.cost_per_student)
+                            )
+                        )
+                    }
+                    if (!sess.start_time.isNullOrBlank()) {
+                        sb.append(getString(R.string.cdetail_hist_time, sess.start_time, sess.end_time ?: ""))
+                    }
                     sb.append("---------------------------\n")
                 }
                 tvContent.text = sb.toString()
             }
+        }
+    }
+
+    /**
+     * FIX (تاریخچهٔ جلسات): فهرست نام شاگردان یک جلسه (حاضرین یا غایبین)، هر نفر در یک خط
+     * با برچسب «(با تأخیر)» یا «(موجه)». اگر پاسخِ کش‌شده قدیمی باشد و نامی نداشته باشد،
+     * خط اضافه‌ای چاپ نمی‌شود و همان شمارش «حاضرین/غایبین» بالا سر جایش می‌ماند.
+     */
+    private fun appendSessionStudents(sb: StringBuilder, students: List<ClassSessionStudent>) {
+        students.forEach { student ->
+            if (student.name.isBlank()) return@forEach
+            val tag = when {
+                student.status == "Late" -> getString(R.string.cdetail_hist_late_tag)
+                student.excused -> getString(R.string.cdetail_hist_excused_tag)
+                else -> ""
+            }
+            sb.append(getString(R.string.cdetail_hist_student_row, student.name, tag))
         }
     }
 

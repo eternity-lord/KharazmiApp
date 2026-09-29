@@ -164,6 +164,27 @@ object JalaliUtils {
         return formatJalali(jy, jm, jd)
     }
 
+    /**
+     * FIX (تاریخچهٔ جلسات): نام روز هفته برای یک تاریخ ذخیره‌شده (شمسی یا میلادی).
+     *
+     * منبع اصلی این نام سرور است (فیلد `weekday` در پاسخ)؛ این تابع فقط fallback برای پاسخ/کش
+     * قدیمی است که آن فیلد را ندارد. روزِ هفته به تقویم وابسته نیست (یک لحظهٔ زمانی واحد است)،
+     * پس همان Calendar میلادی برای تاریخ شمسی هم درست جواب می‌دهد. نامعتبر ⇒ "".
+     */
+    fun persianWeekdayName(value: String?): String {
+        val cal = parseProjectDate(value) ?: return ""
+        return when (cal.get(Calendar.DAY_OF_WEEK)) {
+            Calendar.SATURDAY -> "شنبه"
+            Calendar.SUNDAY -> "یکشنبه"
+            Calendar.MONDAY -> "دوشنبه"
+            Calendar.TUESDAY -> "سه‌شنبه"
+            Calendar.WEDNESDAY -> "چهارشنبه"
+            Calendar.THURSDAY -> "پنجشنبه"
+            Calendar.FRIDAY -> "جمعه"
+            else -> ""
+        }
+    }
+
     /** (Today - daysAgo) as a real Jalali string. */
     fun jalaliStringDaysAgo(daysAgo: Int): String {
         val cal = GregorianCalendar.getInstance()

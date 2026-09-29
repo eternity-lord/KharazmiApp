@@ -134,8 +134,20 @@ def test_admin_profiles_archive_and_today_contracts(client, auth_headers):
     assert deleted_detail.json()["id"] == 4
     assert deleted_detail.json()["archived_enrollments_count"] == 1
     assert {"date", "day_name", "scheduled_classes", "today_payments", "installment_alerts"} <= today.json().keys()
-    assert today.json()["date"] == "1405/07/06"
-    assert today.json()["scheduled_classes"] == 3
+    # FIX(test-date-rot): «امروز» در این تست هاردکد بود (انتظارِ روزِ نوشتنِ تست) و با گذشت روز
+    # قرمز می‌شد؛ حالا date/day_name با همان تقویمِ مرکزی پروژه و تعدادِ کلاس‌های برنامه‌ریزی‌شده
+    # با همان هلپرِ `schedule_matches_date` (روزهای seed = «شنبه,دوشنبه») انتظارِ درست را می‌سازد.
+    import datetime as _datetime
+
+    from today_summary import PERSIAN_DAY_NAMES as _PERSIAN_DAY_NAMES
+    from today_summary import jalali_date_string as _jalali_date_string
+    from today_summary import schedule_matches_date as _schedule_matches_date
+
+    _today = _datetime.date.today()
+    assert today.json()["date"] == _jalali_date_string(_today)
+    assert today.json()["day_name"] == _PERSIAN_DAY_NAMES[_today.weekday()]
+    _expected_scheduled = 3 if _schedule_matches_date("شنبه,دوشنبه", _today) else 0
+    assert today.json()["scheduled_classes"] == _expected_scheduled
     assert credentials.json()["name"] == "رضا فعال"
     assert credentials.json()["teacher_code"] == 1001
     assert credentials.json()["password"]

@@ -209,4 +209,12 @@
     <color name="ds_ripple_neutral">#22FFFFFF</color>
     <color name="ds_scrim">#99000000</color>
 
+
+    <!-- آرشیو کلاس‌های حذف‌شده: سرصفحهٔ تیره‌ی ثابت در هر دو تم (متن سفید/طلایی همیشه خوانا) -->
+    <color name="archive_hero_start">#1B2438</color>
+    <color name="archive_hero_end">#3A2A12</color>
+    <color name="archive_hero_text">#FFFFFF</color>
+    <color name="archive_hero_text_dim">#E6D7B4</color>
+    <color name="archive_hero_gold">#E0B45A</color>
+    <color name="archive_hero_pill">#29FFFFFF</color>
 </resources>

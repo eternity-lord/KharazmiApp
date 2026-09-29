@@ -351,7 +351,8 @@ class TestClassRestoreMetadata(unittest.TestCase):
 
         with open(os.path.join(java_dir, "AppModels.kt"), encoding="utf-8") as handle:
             models_src = handle.read()
-        with open(os.path.join(java_dir, "MainActivity.kt"), encoding="utf-8") as handle:
+        # بازیابی از دیالوگ MainActivity به صفحهٔ جزئیات آرشیو منتقل شد (ArchivedClassDetailActivity)
+        with open(os.path.join(java_dir, "ArchivedClassDetailActivity.kt"), encoding="utf-8") as handle:
             main_src = handle.read()
 
         # ۱) مدل پاسخ بازیابی، فیلد warnings را از JSON می‌گیرد (nullable/default ⇒ سازگار با سرور قدیمی)

@@ -1787,6 +1787,224 @@ def _archived_class_aggregates(db: Session, course_ids: List[int]) -> dict:
     return stats
 
 
+def _archive_search_variants(term: str) -> List[str]:
+    """«ی/ي» و «ک/ك» عربی و فارسی را هم‌ارز می‌کند تا جست‌وجوی آرشیو به تایپ کیبورد حساس نباشد."""
+    term = (term or "").strip()
+    fa = term.replace("ي", "ی").replace("ك", "ک")
+    ar = term.replace("ی", "ي").replace("ک", "ك")
+    out: List[str] = []
+    for v in (term, fa, ar):
+        if v and v not in out:
+            out.append(v)
+    return out
+
+
+def _archive_parse_filter_date(value: Optional[str], label: str) -> Optional[datetime.date]:
+    """تاریخ فیلتر آرشیو: جلالی (۱۴۰۵/۰۷/۰۶) یا میلادی؛ نامعتبر ⇒ ۴۲۲ (نه نادیده‌گرفتن بی‌صدا)."""
+    if value is None or not str(value).strip():
+        return None
+    from today_summary import parse_project_date  # lazy: مثل بقیهٔ روترها
+    parsed = parse_project_date(str(value))
+    if parsed is None:
+        raise HTTPException(status_code=422, detail=f"{label} نامعتبر است؛ قالب درست: 1405/07/06")
+    return parsed
+
+
+def _archive_jalali(dt: Optional[datetime.datetime]) -> dict:
+    """تاریخ حذف به جلالی + روز هفته (اپ فارسی است؛ تاریخ میلادی برای کاربر بی‌معنی بود)."""
+    if not dt:
+        return {"deleted_at_jalali": "", "deleted_weekday": ""}
+    from today_summary import jalali_date_string, PERSIAN_DAY_NAMES
+    return {
+        "deleted_at_jalali": f"{jalali_date_string(dt.date())} {dt.strftime('%H:%M')}",
+        "deleted_weekday": PERSIAN_DAY_NAMES.get(dt.weekday(), ""),
+    }
+
+
+def _archived_snapshot_students(db: Session, course_id: int) -> dict:
+    """اسنپ‌شات مالی لحظهٔ حذف/درخواست حذف (student_id → ردیف). خرابیِ JSON ⇒ خالی (بدون کرش)."""
+    row = (
+        db.query(models.ClassDeletionRequest)
+        .filter(models.ClassDeletionRequest.course_id == course_id,
+                models.ClassDeletionRequest.status == "approved",
+                models.ClassDeletionRequest.snapshot_json.isnot(None))
+        .order_by(models.ClassDeletionRequest.id.desc())
+        .first()
+    )
+    if not row:
+        return {}
+    try:
+        data = json.loads(row.snapshot_json or "{}")
+    except (TypeError, ValueError):
+        return {}
+    out = {}
+    for item in (data.get("students") or []):
+        if isinstance(item, dict) and item.get("student_id") is not None:
+            out[item["student_id"]] = item
+    return out
+
+
+def _archived_class_people_report(db: Session, course, forgive_session_charges: bool) -> dict:
+    """گزارش کامل تاریخیِ یک کلاس آرشیوشده: حضور/غیاب، فهرست دانش‌آموزان و وضعیت مالی.
+
+    فقط خواندنی است و هیچ رکوردی نمی‌نویسد. قواعد:
+      • حضور و غیاب از ردیف‌های «فعال» Attendance (is_deleted=False) جلساتِ همین کلاس؛ ردیفِ جلسه‌ای
+        که پیش‌تر جداگانه برگشت خورده آرشیو شده و شمرده نمی‌شود (حذف کلاس ردیف حضور را آرشیو نمی‌کند).
+      • Present و Late «حاضر» هستند؛ Absent با excused=True «غیبت موجه» و بقیه «غیرموجه».
+      • مالی: اگر اسنپ‌شات لحظهٔ حذف موجود باشد همان (source=snapshot)، وگرنه محاسبهٔ ledger که
+        پرداخت‌های واقعی‌اش هنگام حذف آرشیو نمی‌شوند (source=computed).
+    """
+    from today_summary import parse_project_date, PERSIAN_DAY_NAMES
+    from dependencies import display_name
+
+    # ---------- حضور و غیاب ----------
+    att_rows = (
+        db.query(Attendance.student_id, Attendance.session_id, Attendance.status, Attendance.excused)
+        .join(SessionLog, SessionLog.id == Attendance.session_id)
+        .filter(SessionLog.course_id == course.id, Attendance.is_deleted == False)  # noqa: E712
+        .all()
+    )
+    per_student: dict = {}
+    per_session: dict = {}
+    for student_id, session_id, status_value, excused in att_rows:
+        st = per_student.setdefault(student_id, {"present": 0, "late": 0, "absent_excused": 0, "absent_unexcused": 0})
+        ss = per_session.setdefault(session_id, {"present": 0, "absent": 0, "absent_excused": 0})
+        if status_value in ("Present", "Late"):
+            st["present"] += 1
+            ss["present"] += 1
+            if status_value == "Late":
+                st["late"] += 1
+        elif status_value == "Absent":
+            ss["absent"] += 1
+            if excused:
+                st["absent_excused"] += 1
+                ss["absent_excused"] += 1
+            else:
+                st["absent_unexcused"] += 1
+
+    # ---------- دانش‌آموزان (ثبت‌نام‌های آرشیوی هم) ----------
+    enrollments = db.query(Enrollment).filter(Enrollment.course_id == course.id).order_by(Enrollment.id).all()
+    student_ids = {e.student_id for e in enrollments if e.student_id is not None} | set(per_student.keys())
+    students = {
+        s.id: s for s in db.query(Student).filter(Student.id.in_(student_ids)).all()
+    } if student_ids else {}
+    snapshot = _archived_snapshot_students(db, course.id)
+
+    # هزینه‌ای که با حذف کلاس ابطال شد: session_charge آرشیوشده‌ای که حضور فعالِ همان (جلسه، شاگرد) دارد.
+    forgiven: dict = {}
+    if forgive_session_charges:
+        active_pairs = {(sid, ses) for sid, ses, _, _ in att_rows}
+        session_ids = [r[0] for r in db.query(SessionLog.id).filter(SessionLog.course_id == course.id).all()]
+        if session_ids:
+            for t in db.query(Transaction).filter(
+                Transaction.type == "session_charge",
+                Transaction.is_deleted == True,  # noqa: E712
+                Transaction.session_id.in_(session_ids),
+            ).all():
+                if (t.student_id, t.session_id) in active_pairs:
+                    f = forgiven.setdefault(t.student_id, [0, 0])
+                    f[0] += int(t.share_teacher or 0)
+                    f[1] += int(t.share_institute or 0)
+
+    finance: dict = {}
+    for en in enrollments:
+        if en.student_id is None:
+            continue
+        b = calculate_enrollment_debt_breakdown(db, en)
+        row = finance.setdefault(en.student_id, {"tuition": 0, "paid": 0, "tuition_debt": 0,
+                                                  "debt_teacher": 0, "debt_institute": 0, "source": "computed"})
+        row["tuition"] += int(b["tuition"] or 0)
+        row["paid"] += int(b["paid_teacher"] or 0) + int(b["paid_institute"] or 0)
+        row["tuition_debt"] += int(b["debt"] or 0)
+        # بدهی جلسه‌ای فقط وقتی چارج‌ها هنوز زنده‌اند (حذف بدون ابطال هزینه‌ها) معنا دارد.
+        if not forgive_session_charges and (b.get("sessions_billed") or 0) > 0:
+            row["debt_teacher"] += int(b["debt_teacher"] or 0)
+            row["debt_institute"] += int(b["debt_institute"] or 0)
+    # اسنپ‌شات لحظهٔ حذف، مرجعِ «مانده/پرداختیِ زمان حذف» است و بر محاسبهٔ فعلی مقدم می‌شود.
+    for sid, snap in snapshot.items():
+        row = finance.get(sid)
+        if row is None:
+            continue
+        row["tuition"] = int(snap.get("tuition_final") or 0)
+        row["paid"] = int(snap.get("total_paid") or 0)
+        row["tuition_debt"] = int(snap.get("debt") or 0)
+        row["source"] = "snapshot"
+
+    rows = []
+    for sid in sorted(student_ids, key=lambda i: display_name(students.get(i), "نامشخص")):
+        stu = students.get(sid)
+        att = per_student.get(sid, {"present": 0, "late": 0, "absent_excused": 0, "absent_unexcused": 0})
+        fin = finance.get(sid, {"tuition": 0, "paid": 0, "tuition_debt": 0, "debt_teacher": 0,
+                                "debt_institute": 0, "source": "none"})
+        absent = att["absent_excused"] + att["absent_unexcused"]
+        total = att["present"] + absent
+        f_t, f_i = forgiven.get(sid, [0, 0])
+        rows.append({
+            "student_id": sid,
+            "name": display_name(stu, "نامشخص"),
+            "student_code": getattr(stu, "student_code", None),
+            "present": att["present"],
+            "late": att["late"],
+            "absent": absent,
+            "absent_excused": att["absent_excused"],
+            "absent_unexcused": att["absent_unexcused"],
+            "attendance_rate": round(att["present"] * 100 / total) if total else None,
+            "tuition": fin["tuition"],
+            "paid": fin["paid"],
+            "tuition_debt": fin["tuition_debt"],
+            "session_debt_teacher": fin["debt_teacher"],
+            "session_debt_institute": fin["debt_institute"],
+            "debt_total": fin["tuition_debt"] + fin["debt_teacher"] + fin["debt_institute"],
+            "forgiven_teacher": f_t,
+            "forgiven_institute": f_i,
+            "finance_source": fin["source"],
+        })
+
+    totals_att = {
+        "present": sum(r["present"] for r in rows),
+        "late": sum(r["late"] for r in rows),
+        "absent": sum(r["absent"] for r in rows),
+        "absent_excused": sum(r["absent_excused"] for r in rows),
+        "absent_unexcused": sum(r["absent_unexcused"] for r in rows),
+    }
+    denom = totals_att["present"] + totals_att["absent"]
+    totals_att["attendance_rate"] = round(totals_att["present"] * 100 / denom) if denom else None
+    totals_fin = {
+        "tuition": sum(r["tuition"] for r in rows),
+        "paid": sum(r["paid"] for r in rows),
+        "tuition_debt": sum(r["tuition_debt"] for r in rows),
+        "session_debt": sum(r["session_debt_teacher"] + r["session_debt_institute"] for r in rows),
+        "debt_total": sum(r["debt_total"] for r in rows),
+        "debtors": sum(1 for r in rows if r["debt_total"] > 0),
+        "forgiven_total": sum(r["forgiven_teacher"] + r["forgiven_institute"] for r in rows),
+    }
+
+    # ---------- جلسه‌ها ----------
+    session_rows = []
+    for sess in db.query(SessionLog).filter(SessionLog.id.in_(list(per_session.keys()))).order_by(SessionLog.id).all() if per_session else []:
+        d = parse_project_date(sess.date)
+        agg = per_session.get(sess.id, {"present": 0, "absent": 0, "absent_excused": 0})
+        session_rows.append({
+            "session_id": sess.id,
+            "date": sess.date or "",
+            "weekday": PERSIAN_DAY_NAMES.get(d.weekday(), "") if d else "",
+            "present": agg["present"],
+            "absent": agg["absent"],
+            "absent_excused": agg["absent_excused"],
+            "absent_unexcused": agg["absent"] - agg["absent_excused"],
+        })
+    return {
+        "students": rows,
+        "attendance_totals": totals_att,
+        "finance_totals": totals_fin,
+        "sessions_held": len(per_session),
+        "sessions_history": session_rows,
+        "first_session_date": session_rows[0]["date"] if session_rows else "",
+        "last_session_date": session_rows[-1]["date"] if session_rows else "",
+        "has_snapshot": bool(snapshot),
+    }
+
+
 class ClassRestoreRequest(BaseModel):
     """ورودی بازیابی کلاس آرشیوشده (فاز ۱ — فقط متادیتا)."""
     mode: str
@@ -1796,6 +2014,11 @@ class ClassRestoreRequest(BaseModel):
 @router.get("/admin/deleted_classes")
 def get_deleted_classes(
     query: Optional[str] = None,
+    title: Optional[str] = None,
+    teacher: Optional[str] = None,
+    code: Optional[str] = None,
+    deleted_from: Optional[str] = None,
+    deleted_to: Optional[str] = None,
     branch_id: Optional[int] = None,
     db: Session = Depends(get_db),
     authorization: Optional[str] = Header(None),
@@ -1816,20 +2039,44 @@ def get_deleted_classes(
     q = db.query(Course).filter(Course.is_deleted == True)  # noqa: E712
     if resolved_branch is not None:
         q = q.filter(Course.branch_id == resolved_branch)
-    if query and query.strip():
-        like = f"%{query.strip()}%"
-        q = q.outerjoin(Teacher, Teacher.id == Course.teacher_id).filter(
-            or_(
-                Course.title.ilike(like),
-                Course.code.ilike(like),
-                Teacher.first_name.ilike(like),
-                Teacher.last_name.ilike(like),
-            )
-        )
+    # فیلترهای جست‌وجو (همه با AND): عبارت آزاد، نام کلاس، نام معلم، کد کلاس. هر واژه جدا حساب می‌شود
+    # (ترتیب «نام و نام‌خانوادگی» مهم نیست) و ی/ي و ک/ك یکی‌اند.
+    teacher_full = (
+        func.coalesce(Teacher.first_name, "").op("||")(" ").op("||")(func.coalesce(Teacher.last_name, ""))
+    )
+    field_map = {"title": Course.title, "code": Course.code, "teacher": teacher_full}
+
+    def _apply_terms(q_, raw: Optional[str], fields):
+        for token in (raw or "").split():
+            clauses = [f.ilike(f"%{v}%") for v in _archive_search_variants(token) for f in fields]
+            q_ = q_.filter(or_(*clauses))
+        return q_
+
+    q = q.outerjoin(Teacher, Teacher.id == Course.teacher_id)
+    q = _apply_terms(q, query, [field_map["title"], field_map["code"], field_map["teacher"]])
+    q = _apply_terms(q, title, [field_map["title"]])
+    q = _apply_terms(q, code, [field_map["code"]])
+    q = _apply_terms(q, teacher, [field_map["teacher"]])
+
+    date_from = _archive_parse_filter_date(deleted_from, "تاریخ شروع")
+    date_to = _archive_parse_filter_date(deleted_to, "تاریخ پایان")
+    if date_from and date_to and date_from > date_to:
+        date_from, date_to = date_to, date_from   # بازهٔ وارونه ⇒ جابه‌جا (خطا نده)
     courses = q.all()
     course_ids = [c.id for c in courses]
 
     meta_map = _archived_deletion_meta(db, course_ids)
+    if date_from or date_to:
+        # کلاسِ بدون تاریخ حذف (legacy) در بازهٔ زمانی «نامعلوم» است و وارد نتیجه نمی‌شود.
+        def _in_range(cid: int) -> bool:
+            when = meta_map.get(cid, {}).get("deleted_at")
+            if not when:
+                return False
+            day = when.date()
+            return (date_from is None or day >= date_from) and (date_to is None or day <= date_to)
+        courses = [c for c in courses if _in_range(c.id)]
+        course_ids = [c.id for c in courses]
+        meta_map = {cid: meta_map[cid] for cid in course_ids if cid in meta_map}
     stats_map = _archived_class_aggregates(db, course_ids)
 
     teacher_ids = {c.teacher_id for c in courses if c.teacher_id is not None}
@@ -1865,6 +2112,7 @@ def get_deleted_classes(
             "sessions_count": st.get("sessions_total", 0),
             "transactions_count": st.get("transactions_count", 0),
             "deleted_at": _fmt_datetime(meta.get("deleted_at")),
+            **_archive_jalali(meta.get("deleted_at")),
             "forgive_session_charges": bool(meta.get("forgive_session_charges", False)),
             "is_suspended": bool(c.is_suspended),
             "bg_color": c.bg_color or "#FFFFFF",
@@ -1935,6 +2183,9 @@ def get_deleted_class_detail(
         "forgive_session_charges": bool(meta.get("forgive_session_charges", False)),
         "requested_by_role": meta.get("requested_by_role") or "",
         "admin_note": meta.get("admin_note") or "",
+        **_archive_jalali(meta.get("deleted_at")),
+        # گزارش کامل تاریخی: حضور/غیاب (موجه/غیرموجه)، فهرست دانش‌آموزان، پرداخت و مانده (فیلدهای افزوده)
+        **_archived_class_people_report(db, course, bool(meta.get("forgive_session_charges", False))),
     }
 
 

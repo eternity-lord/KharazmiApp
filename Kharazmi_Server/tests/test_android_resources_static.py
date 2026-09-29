@@ -790,5 +790,81 @@ class TestInvoicePerClassSessionsGuard(unittest.TestCase):
             self.assertTrue(f"R.string.{key}" in corpus or f"@string/{key}" in corpus, f"رشتهٔ بدون مصرف: {key}")
 
 
+class TestArchivedClassesRedesignGuard(unittest.TestCase):
+    """گارد ۹ — کلاس‌های حذفی: صفحهٔ لیست + جست‌وجوی زنده + صفحهٔ گزارش (به‌جای دیالوگ متنی)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.main = _kotlin_source("MainActivity.kt")
+        cls.listing = _kotlin_source("ArchivedClassesActivity.kt")
+        cls.detail = _kotlin_source("ArchivedClassDetailActivity.kt")
+        cls.models = _kotlin_source("AppModels.kt")
+        cls.strings = dict(_string_entries(os.path.join(RES_DIR, "values", "strings.xml")))
+        cls.manifest = _read(os.path.join(ANDROID_MAIN, "AndroidManifest.xml"))
+
+    def test_9a_both_screens_registered_and_not_exported(self):
+        for name in ("ArchivedClassesActivity", "ArchivedClassDetailActivity"):
+            m = re.search(r'<activity\s+android:name="\.%s"[^>]*?/>' % name, self.manifest, re.S)
+            self.assertIsNotNone(m, f"{name} در AndroidManifest ثبت نشده ⇒ ActivityNotFoundException")
+            self.assertIn('android:exported="false"', m.group(0))
+
+    def test_9b_main_opens_the_new_page_instead_of_the_text_dialog(self):
+        self.assertIn("ArchivedClassesActivity::class.java", _kotlin_function_body(self.main, "fun openArchivedClasses("))
+        self.assertNotIn("showDeletedClassesDialog", self.main)
+        self.assertNotIn("showArchivedClassDetail", self.main)
+        self.assertGreaterEqual(self.main.count("openArchivedClasses()"), 3, "منوی کشویی و داشبورد و تعریف تابع")
+
+    def test_9c_list_screen_searches_by_all_four_criteria_live_and_debounced(self):
+        for token in ("title =", "teacher =", "code =", "deletedFrom =", "deletedTo ="):
+            self.assertIn(token, self.listing, f"فیلتر {token} به API فرستاده نمی‌شود")
+        self.assertIn("addTextChangedListener", self.listing)
+        self.assertIn("delay(", self.listing, "جست‌وجو باید debounce داشته باشد")
+        self.assertIn("requestSeq", self.listing, "پاسخ کهنه نباید نتیجهٔ جدیدتر را بازنویسی کند")
+        self.assertIn("EXTRA_COURSE_ID", self.listing)
+
+    def test_9d_api_exposes_the_filters_as_optional_query_params(self):
+        body = _kotlin_function_body(self.main, "interface DeletedClassesApi")
+        self.assertTrue(body, "DeletedClassesApi پیدا نشد")
+        for q in ("query", "title", "teacher", "code", "deleted_from", "deleted_to"):
+            self.assertRegex(body, r'@Query\("%s"\) \w+: String\? = null' % q)
+
+    def test_9e_detail_models_are_defaulted_so_old_server_and_legacy_rows_do_not_crash(self):
+        for decl in ("data class ArchivedClassDetail(", "data class ArchivedStudentRow(", "data class ArchivedAttendanceTotals(",
+                     "data class ArchivedFinanceTotals(", "data class ArchivedSessionRow("):
+            fields = _kotlin_declaration(self.models, decl)
+            self.assertTrue(fields, f"{decl} پیدا نشد")
+            for line in fields.split("@SerializedName")[1:]:
+                self.assertIn("=", line, f"فیلد بدون مقدار پیش‌فرض در {decl}: {line.strip()[:60]}")
+
+    def test_9f_detail_screen_renders_every_requested_number(self):
+        body = _kotlin_function_body(self.detail, "private fun render(")
+        self.assertTrue(body)
+        for token in ("at.present", "at.absent.toString()", "at.absentUnexcused", "at.absentExcused",
+                      "fin.paid", "fin.debtTotal", "students.size", "studentCard("):
+            self.assertIn(token, body, f"{token} در گزارش کلاس حذفی نمایش داده نمی‌شود")
+        self.assertLess(body.index("arch_s_students"), body.index("studentCard("), "عدد دانش‌آموزان باید بالای فهرست باشد")
+
+    def test_9g_restore_flow_moved_intact_with_confirm_and_warnings_dialog(self):
+        confirm = _kotlin_function_body(self.detail, "private fun confirmRestoreArchivedClass(")
+        self.assertIn("main_trash_restore_confirm_msg", confirm)
+        self.assertIn("restoreArchivedClass(courseId)", confirm)
+        restore = _kotlin_function_body(self.detail, "private fun restoreArchivedClass(")
+        self.assertIn("ClassRestoreRequest()", restore)
+        self.assertIn("warnings", restore)
+        self.assertIn("AlertDialog", restore)
+        self.assertIn("CancellationException", restore)
+
+    def test_9h_all_arch_strings_exist_and_are_used(self):
+        keys = [k for k in self.strings if k.startswith("arch_")]
+        self.assertGreaterEqual(len(keys), 60)
+        corpus = "\n".join(_kotlin_source(f) for f in os.listdir(os.path.join(JAVA_DIR, "com", "example", "kharazmiadmin"))
+                           if f.endswith(".kt"))
+        for name in os.listdir(os.path.join(RES_DIR, "layout")):
+            if name.endswith(".xml"):
+                corpus += _read(os.path.join(RES_DIR, "layout", name))
+        for key in keys:
+            self.assertTrue(f"R.string.{key}" in corpus or f"@string/{key}" in corpus, f"رشتهٔ بدون مصرف: {key}")
+
+
 if __name__ == "__main__":
     unittest.main()

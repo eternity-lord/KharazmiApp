@@ -197,6 +197,14 @@
             android:exported="false"
             android:label="تاریخچه تغییرات مالی" />
         <activity
+            android:name=".ArchivedClassesActivity"
+            android:exported="false"
+            android:label="کلاس‌های حذفی (آرشیو)" />
+        <activity
+            android:name=".ArchivedClassDetailActivity"
+            android:exported="false"
+            android:label="گزارش کلاس حذف‌شده" />
+        <activity
             android:name=".DunningActivity"
             android:exported="false"
             android:label="یادآوری اقساط" />

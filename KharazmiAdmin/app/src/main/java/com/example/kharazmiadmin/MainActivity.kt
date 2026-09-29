@@ -37,7 +37,14 @@ interface DashboardSettingsApi {
 interface DeletedClassesApi {
     // FIX(archive): مدل درست آرشیو (ArchivedClassItem) + جست‌وجو + جزئیات کنترول‌شده.
     @GET("admin/deleted_classes")
-    suspend fun getDeletedClasses(@Query("query") query: String? = null): List<ArchivedClassItem>
+    suspend fun getDeletedClasses(
+        @Query("query") query: String? = null,
+        @Query("title") title: String? = null,
+        @Query("teacher") teacher: String? = null,
+        @Query("code") code: String? = null,
+        @Query("deleted_from") deletedFrom: String? = null,
+        @Query("deleted_to") deletedTo: String? = null
+    ): List<ArchivedClassItem>
 
     @GET("admin/deleted_classes/{id}")
     suspend fun getArchivedClassDetail(@Path("id") id: Int): ArchivedClassDetail
@@ -182,7 +189,7 @@ class MainActivity : BaseActivity() {
                 // صفحه را باز نمی‌کرد (فقط در AndroidManifest ثبت بود) ⇒ اعلان ادمین هرگز دیده نمی‌شد.
                 R.id.nav_notifications -> startActivity(Intent(this, NotificationCenterActivity::class.java))
                 R.id.nav_institute_settings -> startActivity(Intent(this, InstituteSettingsActivity::class.java))
-                R.id.nav_deleted_classes -> showDeletedClassesDialog()
+                R.id.nav_deleted_classes -> openArchivedClasses()
                 R.id.nav_audit_radar -> {
                     if (dashboardSubRole != "admin") {
                         Toast.makeText(this, getString(R.string.common_no_access), Toast.LENGTH_SHORT).show()
@@ -582,7 +589,7 @@ class MainActivity : BaseActivity() {
                         2 -> startActivity(Intent(this, PendingTeachersActivity::class.java))
                         3 -> startActivity(Intent(this, ClassManagementActivity::class.java))
                         4 -> startActivity(Intent(this, PendingClassesActivity::class.java))
-                        5 -> showDeletedClassesDialog()
+                        5 -> openArchivedClasses()
                         6 -> startActivity(Intent(this, CrmLeadsActivity::class.java))
                         7 -> startActivity(Intent(this, AuditDashboardActivity::class.java))
                         8 -> startActivity(Intent(this, DunningActivity::class.java))
@@ -626,145 +633,12 @@ class MainActivity : BaseActivity() {
             .show()
     }
 
-    private fun showDeletedClassesDialog() {
-        val retrofit = RetrofitClient.getInstance(this)
-        val api = retrofit.create(DeletedClassesApi::class.java)
-
-        // FIX: Bug 19 - cancel screen work when this Activity is destroyed.
-
-        lifecycleScope.launch(Dispatchers.IO) {
-            try {
-                val list = api.getDeletedClasses()
-                withContext(Dispatchers.Main) {
-                    if (list.isEmpty()) {
-                        Toast.makeText(this@MainActivity, getString(R.string.main_trash_empty), Toast.LENGTH_SHORT).show()
-                        return@withContext
-                    }
-
-                    // FIX(archive): ردیف آرشیو حالا معلم/شعبه/تعداد دانش‌آموز و تاریخ حذف را نشان می‌دهد
-                    // و رکورد ناقص (title/teacher/branch خالی) هم امن رندر می‌شود (بدون «null»).
-                    val unknownClass = getString(R.string.common_unknown_class)
-                    val unknownPerson = getString(R.string.common_person_unknown)
-                    val noDate = getString(R.string.main_trash_no_date)
-                    val labels = list.map { item ->
-                        getString(
-                            R.string.main_trash_row_rich,
-                            item.title?.takeIf { it.isNotBlank() } ?: unknownClass,
-                            item.code ?: "",
-                            item.teacherName?.takeIf { it.isNotBlank() } ?: unknownPerson,
-                            item.branchName?.takeIf { it.isNotBlank() } ?: unknownPerson,
-                            item.studentsCount,
-                            item.deletedAt?.takeIf { it.isNotBlank() } ?: noDate
-                        )
-                    }.toTypedArray()
-                    AlertDialog.Builder(this@MainActivity)
-                        .setTitle(getString(R.string.main_trash_title))
-                        .setItems(labels, { _, which -> showArchivedClassDetail(list[which].id) })
-                        .setPositiveButton(getString(R.string.btn_dismiss), null)
-                        .show()
-                }
-            } catch (e: Exception) {
-                // FIX: Bug 19 - cancellation is not a network/UI error.
-                if (e is kotlinx.coroutines.CancellationException) throw e;
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(this@MainActivity, getString(R.string.main_trash_error), Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
-    }
-
-    private fun showArchivedClassDetail(courseId: Int) {
-        val retrofit = RetrofitClient.getInstance(this)
-        val api = retrofit.create(DeletedClassesApi::class.java)
-
-        // FIX: Bug 19 - cancel screen work when this Activity is destroyed.
-
-        lifecycleScope.launch(Dispatchers.IO) {
-            try {
-                val detail = api.getArchivedClassDetail(courseId)
-                withContext(Dispatchers.Main) {
-                    // FIX(archive): جزئیات کنترول‌شده‌ی کلاس آرشیوشده — همه‌ی فیلدها null-safe
-                    // (رکورد legacy نباید باعث «null» در متن یا crash شود).
-                    val unknownClass = getString(R.string.common_unknown_class)
-                    val unknownPerson = getString(R.string.common_person_unknown)
-                    val lines = listOf(
-                        getString(R.string.main_trash_d_code, detail.code?.takeIf { it.isNotBlank() } ?: "-"),
-                        getString(R.string.main_trash_d_teacher, detail.teacherName?.takeIf { it.isNotBlank() } ?: unknownPerson),
-                        getString(R.string.main_trash_d_branch, detail.branchName?.takeIf { it.isNotBlank() } ?: unknownPerson),
-                        getString(R.string.main_trash_d_time, detail.daysOfWeek?.takeIf { it.isNotBlank() } ?: "-", detail.classTime?.takeIf { it.isNotBlank() } ?: "-"),
-                        getString(R.string.main_trash_d_students, detail.studentsCount),
-                        getString(R.string.main_trash_d_sessions, detail.sessionsCount),
-                        getString(R.string.main_trash_d_tx, detail.transactionsCount, detail.transactionsTotal),
-                        getString(R.string.main_trash_d_deleted_at, detail.deletedAt?.takeIf { it.isNotBlank() } ?: getString(R.string.main_trash_no_date)),
-                        getString(R.string.main_trash_d_forgive, if (detail.forgiveSessionCharges) getString(R.string.common_yes) else getString(R.string.common_no))
-                    )
-                    AlertDialog.Builder(this@MainActivity)
-                        .setTitle(detail.title?.takeIf { it.isNotBlank() } ?: unknownClass)
-                        .setMessage(lines.joinToString("\n"))
-                        // FIX(D1): «بازیابی» فقط متادیتا است ⇒ پیام تأیید صریح می‌گوید که
-                        // ثبت‌نام‌ها و سابقه‌ی مالی برنمی‌گردند تا ادمین انتظار اشتباه نداشته باشد.
-                        .setNeutralButton(getString(R.string.main_trash_restore)) { _, _ ->
-                            confirmRestoreArchivedClass(courseId)
-                        }
-                        .setPositiveButton(getString(R.string.btn_dismiss), null)
-                        .show()
-                }
-            } catch (e: Exception) {
-                // FIX: Bug 19 - cancellation is not a network/UI error.
-                if (e is kotlinx.coroutines.CancellationException) throw e;
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(this@MainActivity, getString(R.string.main_trash_detail_error), Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
-    }
-
-    // FIX(D1): تأیید دوم برای بازیابی کلاس — حذف/بازیابی مالی برگشت‌ناپذیر است،
-    // پس یک مرحله تأیید صریح با توضیح اثر واقعی (فقط پوسته‌ی کلاس برمی‌گردد) گرفته می‌شود.
-    private fun confirmRestoreArchivedClass(courseId: Int) {
-        AlertDialog.Builder(this)
-            .setTitle(getString(R.string.main_trash_restore_confirm_title))
-            .setMessage(getString(R.string.main_trash_restore_confirm_msg))
-            .setPositiveButton(getString(R.string.main_trash_restore)) { _, _ ->
-                restoreArchivedClass(courseId)
-            }
-            .setNegativeButton(getString(R.string.btn_cancel), null)
-            .show()
-    }
-
-    private fun restoreArchivedClass(courseId: Int) {
-        val retrofit = RetrofitClient.getInstance(this)
-        val api = retrofit.create(DeletedClassesApi::class.java)
-
-        lifecycleScope.launch(Dispatchers.IO) {
-            try {
-                val result = api.restoreArchivedClass(courseId, ClassRestoreRequest())
-                withContext(Dispatchers.Main) {
-                    // O-13: هشدارهای سرور (مثل «معلم این کلاس آرشیو شده است؛ کلاس بدون معلم فعال
-                    // برمی‌گردد») قبلاً نادیده گرفته می‌شد و مدیر فقط Toast موفقیت می‌دید.
-                    val warnings = result.warnings.orEmpty().filter { it.isNotBlank() }
-                    if (warnings.isNotEmpty()) {
-                        AlertDialog.Builder(this@MainActivity)
-                            .setTitle(R.string.main_trash_restore_warnings_title)
-                            .setMessage(warnings.joinToString("\n\n") { "• $it" })
-                            .setPositiveButton(R.string.common_ok, null)
-                            .show()
-                    } else {
-                        val msg = result.message?.takeIf { it.isNotBlank() }
-                            ?: getString(R.string.main_trash_restore_ok)
-                        Toast.makeText(this@MainActivity, msg, Toast.LENGTH_LONG).show()
-                    }
-                }
-            } catch (e: Exception) {
-                // FIX: Bug 19 - cancellation is not a network/UI error.
-                if (e is kotlinx.coroutines.CancellationException) throw e;
-                // خطاهای 400/404/409 سرور (بازیابی کامل، کلاس ناموجود، از قبل فعال) به همین
-                // catch می‌رسند؛ پیام کاربردی به ادمین نشان داده می‌شود.
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(this@MainActivity, getString(R.string.main_trash_restore_fail), Toast.LENGTH_LONG).show()
-                }
-            }
-        }
+    /**
+     * «کلاس‌های حذفی (آرشیو ادمین)» — قبلاً یک AlertDialog خشک بود؛ حالا صفحهٔ مستقل با جست‌وجو
+     * (نام کلاس/معلم/کد/بازهٔ تاریخ حذف) و صفحهٔ گزارش کامل هر کلاس (ArchivedClassDetailActivity).
+     */
+    private fun openArchivedClasses() {
+        startActivity(Intent(this, ArchivedClassesActivity::class.java))
     }
 
     private fun showEditSessionDialog() {

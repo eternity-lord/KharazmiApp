@@ -233,7 +233,10 @@ class TestAdminArchivedClasses(unittest.TestCase):
              "bg_color", "teacher_id", "teacher_name", "branch_id", "branch_name", "students_count",
              "students_active_count", "archived_enrollments_count", "sessions_count",
              "archived_sessions_count", "transactions_count", "transactions_total", "deleted_at",
-             "has_deletion_record", "forgive_session_charges", "requested_by_role", "admin_note"},
+             "has_deletion_record", "forgive_session_charges", "requested_by_role", "admin_note",
+             # گزارش کامل تاریخی (صفحهٔ جزئیات آرشیو): تاریخ جلالی، حضور/غیاب، فهرست شاگردان، مالی
+             "deleted_at_jalali", "deleted_weekday", "students", "attendance_totals", "finance_totals",
+             "sessions_held", "sessions_history", "first_session_date", "last_session_date", "has_snapshot"},
         )
         self.assertEqual(body["students_count"], 1)
         self.assertEqual(body["archived_enrollments_count"], 1)

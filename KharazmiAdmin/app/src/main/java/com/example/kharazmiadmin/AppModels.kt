@@ -160,6 +160,9 @@ data class ArchivedClassItem(
     @SerializedName("sessions_count") val sessionsCount: Int = 0,
     @SerializedName("transactions_count") val transactionsCount: Int = 0,
     @SerializedName("deleted_at") val deletedAt: String? = null,
+    // تاریخ حذف جلالی + روز هفته (سرور قدیمی نمی‌فرستد ⇒ null و به deletedAt برمی‌گردیم)
+    @SerializedName("deleted_at_jalali") val deletedAtJalali: String? = null,
+    @SerializedName("deleted_weekday") val deletedWeekday: String? = null,
     @SerializedName("forgive_session_charges") val forgiveSessionCharges: Boolean = false,
     @SerializedName("is_suspended") val isSuspended: Boolean = false,
     @SerializedName("bg_color") val bgColor: String? = null
@@ -188,7 +191,68 @@ data class ArchivedClassDetail(
     @SerializedName("has_deletion_record") val hasDeletionRecord: Boolean = false,
     @SerializedName("forgive_session_charges") val forgiveSessionCharges: Boolean = false,
     @SerializedName("requested_by_role") val requestedByRole: String? = null,
-    @SerializedName("admin_note") val adminNote: String? = null
+    @SerializedName("admin_note") val adminNote: String? = null,
+    // ---- گزارش کامل تاریخی (همه nullable/پیش‌فرض‌دار: سرور قدیمی فقط فیلدهای بالا را می‌فرستد) ----
+    @SerializedName("deleted_at_jalali") val deletedAtJalali: String? = null,
+    @SerializedName("deleted_weekday") val deletedWeekday: String? = null,
+    @SerializedName("students") val students: List<ArchivedStudentRow>? = null,
+    @SerializedName("attendance_totals") val attendanceTotals: ArchivedAttendanceTotals? = null,
+    @SerializedName("finance_totals") val financeTotals: ArchivedFinanceTotals? = null,
+    @SerializedName("sessions_held") val sessionsHeld: Int? = null,
+    @SerializedName("sessions_history") val sessionsHistory: List<ArchivedSessionRow>? = null,
+    @SerializedName("first_session_date") val firstSessionDate: String? = null,
+    @SerializedName("last_session_date") val lastSessionDate: String? = null,
+    @SerializedName("has_snapshot") val hasSnapshot: Boolean = false
+)
+
+data class ArchivedStudentRow(
+    @SerializedName("student_id") val studentId: Int = 0,
+    @SerializedName("name") val name: String? = null,
+    @SerializedName("student_code") val studentCode: Int? = null,
+    @SerializedName("present") val present: Int = 0,
+    @SerializedName("late") val late: Int = 0,
+    @SerializedName("absent") val absent: Int = 0,
+    @SerializedName("absent_excused") val absentExcused: Int = 0,
+    @SerializedName("absent_unexcused") val absentUnexcused: Int = 0,
+    @SerializedName("attendance_rate") val attendanceRate: Int? = null,
+    @SerializedName("tuition") val tuition: Long = 0,
+    @SerializedName("paid") val paid: Long = 0,
+    @SerializedName("tuition_debt") val tuitionDebt: Long = 0,
+    @SerializedName("session_debt_teacher") val sessionDebtTeacher: Long = 0,
+    @SerializedName("session_debt_institute") val sessionDebtInstitute: Long = 0,
+    @SerializedName("debt_total") val debtTotal: Long = 0,
+    @SerializedName("forgiven_teacher") val forgivenTeacher: Long = 0,
+    @SerializedName("forgiven_institute") val forgivenInstitute: Long = 0,
+    @SerializedName("finance_source") val financeSource: String? = null
+)
+
+data class ArchivedAttendanceTotals(
+    @SerializedName("present") val present: Int = 0,
+    @SerializedName("late") val late: Int = 0,
+    @SerializedName("absent") val absent: Int = 0,
+    @SerializedName("absent_excused") val absentExcused: Int = 0,
+    @SerializedName("absent_unexcused") val absentUnexcused: Int = 0,
+    @SerializedName("attendance_rate") val attendanceRate: Int? = null
+)
+
+data class ArchivedFinanceTotals(
+    @SerializedName("tuition") val tuition: Long = 0,
+    @SerializedName("paid") val paid: Long = 0,
+    @SerializedName("tuition_debt") val tuitionDebt: Long = 0,
+    @SerializedName("session_debt") val sessionDebt: Long = 0,
+    @SerializedName("debt_total") val debtTotal: Long = 0,
+    @SerializedName("debtors") val debtors: Int = 0,
+    @SerializedName("forgiven_total") val forgivenTotal: Long = 0
+)
+
+data class ArchivedSessionRow(
+    @SerializedName("session_id") val sessionId: Int = 0,
+    @SerializedName("date") val date: String? = null,
+    @SerializedName("weekday") val weekday: String? = null,
+    @SerializedName("present") val present: Int = 0,
+    @SerializedName("absent") val absent: Int = 0,
+    @SerializedName("absent_excused") val absentExcused: Int = 0,
+    @SerializedName("absent_unexcused") val absentUnexcused: Int = 0
 )
 
 // FIX(D1): بازیابی «فقط متادیتا» کلاس آرشیوشده — درخواست/پاسخ پنل ادمین.

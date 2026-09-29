@@ -2,7 +2,7 @@
 
 - **تاریخ:** ۲۰۲۶-۰۹-۲۹ · **Branch:** `arena/01a0ec4f-kharazmiapp` (شاخهٔ کاری جدید این نشست) · **زبان:** فارسی
 - **Base HEAD:** `2bb1c48` (fix: allow Persian action labels to wrap) · **کامیت فیکس:** `58ce896`
-- **وضعیت:** فیکس شد + گارد ایستا اضافه شد + کل سوئیت سبز. کامپایل اندروید در این محیط ممکن نیست ⇒ تأیید نهایی روی دستگاه کاربر.
+- **وضعیت:** فیکس شد + گارد ایستا اضافه شد + کل سوئیت سبز + CI سبز (`36544939571`). کامپایل اندروید در این محیط ممکن نیست ⇒ تأیید نهایی روی دستگاه کاربر.
 
 ---
 
@@ -88,7 +88,7 @@ KharazmiAdmin/.../layout/activity_design_system.xml:810/818/825/832 → از sty
 | XML سالم در کل `res/` | ۲۱۵ فایل، **۰ فایل خراب** |
 | باقی‌ماندهٔ attribute چندخطی روی چیپ در `res/` | **۰** (بقیهٔ موارد فقط روی دکمه/TextAppearance هستند و مشکل‌ساز نیستند) |
 | تغییر در Kotlin / layout | **صفر** |
-| CI | شاخهٔ `arena/01a0ec4f-kharazmiapp` به تریگر `push` در `.github/workflows/tests.yml` اضافه شد تا pushهای این نشست هم تست شوند |
+| CI | شاخهٔ `arena/01a0ec4f-kharazmiapp` به تریگر `push` در `.github/workflows/tests.yml` اضافه شد ⇒ رانِ `36544939571` **سبز** (https://github.com/eternity-lord/KharazmiApp/actions/runs/36544939571) |
 
 دستور اجرای تست (مستند پروژه):
 ```bash

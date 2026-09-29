@@ -177,6 +177,10 @@ class ClassDetailActivity : BaseActivity() {
     private lateinit var rvStudents: RecyclerView
     private lateinit var studentAdapter: ClassStudentAdapter
     private lateinit var tabLayout: TabLayout
+    // FIX (کلاس-مالی/تازگی): اولین onResume بعد از onCreate نباید دوباره fetch کند (onCreate خودش
+    // دو فراخوانی تازه دارد)؛ از بازگشت دوم به بعد (از «ثبت حضور و غیاب»، «ثبت‌نام شاگرد»، پروفایل
+    // شاگرد و ...) اعداد مالی کلاس دوباره از سرور/کش خوانده می‌شوند.
+    private var firstResumeHandled = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -302,6 +306,21 @@ class ClassDetailActivity : BaseActivity() {
             )
         }
 
+        fetchData()
+        fetchStudentsFullData()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // FIX (کلاس-مالی/تازگی): قبلاً گزارش کلاس فقط یک‌بار در onCreate خوانده می‌شد. با بازگشت از
+        // «ثبت حضور و غیاب» (که بدهی/درآمد را عوض می‌کند) باگ‌ها: اطلاعات کلی همان snapshot قدیمی را
+        // نشان می‌داد (کاربر بعد از برگزاری جلسه «درآمد وصول شده: 0 / بدهی به معلم: 0 / بدهی به
+        // آموزشگاه: 0» می‌دید، در حالی که تب«دانش‌آموزان»/برگهٔ حضور اعداد درست را داشتند). الان مثل
+        // ClassManagementActivity/StudentProfileActivity هر بازگشت به صفحه، اعداد را تازه می‌کند.
+        if (!firstResumeHandled) {
+            firstResumeHandled = true
+            return
+        }
         fetchData()
         fetchStudentsFullData()
     }
@@ -481,7 +500,9 @@ class ClassDetailActivity : BaseActivity() {
                 onSuccess = { data, isOffline, timestamp ->
                     reportData = data
                     findViewById<TextView>(R.id.tvPageTitle).text = getString(R.string.cdetail_page_title, data.info.title, data.info.code)
-                    updateUI(0) // نمایش تب اول
+                    // FIX (کلاس-مالی/تازگی): تبِ فعلی دوباره رندر شود، نه پرش اجباری به تب اول؛
+                    // وگرنه تازه‌سازی پس‌زمینه (onResume) کاربر را از تب دانش‌آموزان/جلسات بیرون می‌انداخت.
+                    updateUI(tabLayout.selectedTabPosition)
                     if (isOffline) {
                         CachedApiCall.showOfflineBanner(this@ClassDetailActivity, timestamp)
                     } else {

@@ -525,5 +525,89 @@ class TestAndroidChipIsNeverMultiLine(unittest.TestCase):
             self.assertEqual(items.get("android:maxLines"), "1", f"{style_name}: maxLines باید ۱ باشد")
 
 
+# ---------------------------------------------------------------------------
+# FIX(class-finance-freshness) — گارد ۶: اعداد مالی «اطلاعات کلی» صفحهٔ کلاس نباید snapshot قدیمی بماند
+#
+# باگ گزارش‌شده (اسکرین‌شات کاربر از کلاس ریاضی ۱۰۰۰۰۲): بعد از برگزاری و ثبت یک جلسه،
+# «💰 درآمد وصول شده / ⚠️ بدهی به معلم / ⚠️ بدهی به آموزشگاه» صفر دیده می‌شد، در حالی که
+# تب «لیست دانش‌آموزان» (و برگهٔ حضور) همان دو بدهی را غیرصفر نشان می‌داد. چون هر دو endpoint سرور
+# از یک تابع می‌خوانند (`calculate_enrollment_debt_breakdown`)، اختلاف فقط می‌تواند از «سنّ داده»
+# باشد: گزارش کلاس فقط یک‌بار در onCreate خوانده می‌شد (بدون refresh در بازگشت از «ثبت حضور و غیاب»/
+# «ثبت‌نام شاگرد») و کش `class_report_*` هم بعد از ثبت جلسه باطل نمی‌شد ⇒ در fallback آفلاین
+# (کش ≤۵ دقیقه) یا نمایش درون‌حافظه‌ای، snapshot قبل از جلسه با همان صفرها نشان داده می‌شد.
+# این گارد الزامات fix را قفل می‌کند؛ منطق مالی سرور هیچ تغییری نکرده است.
+# ---------------------------------------------------------------------------
+
+def _kotlin_source(file_name: str) -> str:
+    path = os.path.join(JAVA_DIR, "com", "example", "kharazmiadmin", file_name)
+    return _strip_comments(_read(path))
+
+
+def _kotlin_function_body(source: str, signature: str) -> str:
+    """بدنهٔ یک تابع کاتلین را با تطبیق آکولاد برمی‌گرداند (اسکن فقط همان تابع، نه کل فایل)."""
+    index = source.find(signature)
+    if index < 0:
+        return ""
+    opening = source.find("{", index)
+    if opening < 0:
+        return ""
+    depth = 0
+    for position in range(opening, len(source)):
+        char = source[position]
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return source[opening + 1:position]
+    return ""
+
+
+class TestClassDetailFinanceFreshnessGuard(unittest.TestCase):
+    """گارد ۶ — گزارش مالی صفحهٔ کلاس باید در بازگشت به صفحه تازه شود و کش بعد از تغییر مالی باطل شود."""
+
+    def test_6a_class_detail_refetches_report_when_returning_to_screen(self):
+        body = _kotlin_function_body(_kotlin_source("ClassDetailActivity.kt"), "override fun onResume()")
+        self.assertTrue(body, "onResume در ClassDetailActivity وجود ندارد ⇒ اعداد مالی بعد از "
+                              "بازگشت از ثبت حضور/غیاب همچنان snapshot قدیمی می‌مانند")
+        self.assertIn("fetchData()", body, "onResume باید گزارش کلاس («اطلاعات کلی») را دوباره بخواند")
+        self.assertIn("fetchStudentsFullData()", body, "onResume باید لیست دانش‌آموزان را هم تازه کند")
+        self.assertIn("firstResumeHandled", body,
+                      "اولین onResume (بلافاصله بعد از onCreate) باید بی‌اثر باشد تا fetch تکراری نزنیم")
+
+    def test_6b_report_refresh_keeps_the_selected_tab(self):
+        body = _kotlin_function_body(_kotlin_source("ClassDetailActivity.kt"), "private fun fetchData()")
+        self.assertTrue(body, "fetchData در ClassDetailActivity پیدا نشد")
+        self.assertIn("updateUI(tabLayout.selectedTabPosition)", body,
+                      "بعد از تازه‌سازی، همان تبِ انتخاب‌شده باید رندر شود")
+        self.assertNotIn("updateUI(0)", body,
+                         "پرش اجباری به تب اول در fetchData ⇒ تازه‌سازی onResume کاربر را از تب جاری بیرون می‌اندازد")
+
+    def test_6c_session_submit_invalidates_the_class_caches(self):
+        source = _kotlin_source("AttendanceActivity.kt")
+        helper = _kotlin_function_body(source, "private fun invalidateClassCaches(")
+        self.assertTrue(helper, "invalidateClassCaches در AttendanceActivity وجود ندارد")
+        self.assertIn('"class_report_$courseId"', helper,
+                      "کش گزارش کلاس (اعداد «اطلاعات کلی») باید باطل شود")
+        self.assertIn('"class_students_full_$courseId"', helper,
+                      "کش لیست دانش‌آموزان کلاس هم باید باطل شود")
+
+        direct = _kotlin_function_body(source, "private fun executeSessionSubmissionOnServer(")
+        self.assertTrue(direct, "مسیر ثبت آنلاین جلسه پیدا نشد")
+        self.assertIn("invalidateClassCaches(data.classId)", direct,
+                      "ثبت/ویرایش موفق جلسه باید کش همان کلاس را باطل کند")
+
+        queued = _kotlin_function_body(source, "private suspend fun sendQueueItem(")
+        self.assertTrue(queued, "مسیر ارسال صف آفلاین جلسه پیدا نشد")
+        self.assertIn("invalidateClassCaches(item.courseId)", queued,
+                      "ارسال موفق از صف آفلاین هم مالی کلاس را عوض می‌کند ⇒ کش باید باطل شود")
+
+    def test_6d_payment_success_invalidates_the_class_report_cache(self):
+        body = _kotlin_function_body(_kotlin_source("InvoiceActivity.kt"), "private fun sendData(")
+        self.assertTrue(body, "sendData در InvoiceActivity پیدا نشد")
+        self.assertIn('clearByPrefix(this@InvoiceActivity, "class_report")', body,
+                      "هر پرداخت «درآمد وصول شده» و بدهی‌ها را عوض می‌کند ⇒ کش گزارش کلاس باید باطل شود")
+
+
 if __name__ == "__main__":
     unittest.main()

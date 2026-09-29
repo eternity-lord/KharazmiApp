@@ -665,6 +665,10 @@ class InvoiceActivity : BaseActivity() {
                     // ابطال کش تراز و پروفایل دانش‌آموز به همراه لیست کلاس‌ها
                     CacheManager.clear(this@InvoiceActivity, "student_full_profile_${data.student_id}")
                     CacheManager.clearByPrefix(this@InvoiceActivity, "class_students_full")
+                    // FIX (کلاس-مالی/تازگی): «درآمد وصول شده / بدهی به معلم / بدهی به آموزشگاه» صفحهٔ کلاس
+                    // هم با هر پرداخت عوض می‌شود؛ کش گزارش کلاس هم باید باطل شود (قبلاً فقط کش لیست
+                    // دانش‌آموزان پاک می‌شد و اعداد صفحهٔ کلاس می‌توانست قدیمی بماند).
+                    CacheManager.clearByPrefix(this@InvoiceActivity, "class_report")
                     CacheManager.clearByPrefix(this@InvoiceActivity, "today_summary_admin_")
                     
                     // بازخورد لمسی برای ثبت نهایی تراکنش موفقیت‌آمیز

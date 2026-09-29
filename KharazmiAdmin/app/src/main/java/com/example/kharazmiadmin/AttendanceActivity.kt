@@ -197,6 +197,21 @@ class AttendanceActivity : BaseActivity() {
      * - Stale SENDING items (a previous flush died mid-flight) are retried: only one flush runs
      *   at a time, so SENDING always means "interrupted", never "in progress elsewhere".
      */
+    /**
+     * FIX (کلاس-مالی/تازگی): کش سبک صفحهٔ کلاس برای همین کلاس را باطل می‌کند.
+     *
+     * چرا لازم است؟ ثبت/ویرایش جلسه، بدهی و درآمد کلاس را عوض می‌کند، ولی کش `class_report_*`
+     * و `class_students_full_*` دست‌نخورده می‌ماند. اگر کاربر بعد از ثبت، صفحهٔ کلاس را با شبکهٔ
+     * قطع (fallback کش ≤۵ دقیقه) باز کند، صفحهٔ کلاس اعداد *قبل از جلسه* را نشان می‌دهد؛ همان باگ
+     * «درآمد وصول شده / بدهی به معلم / بدهی به آموزشگاه = ۰ بعد از برگزاری جلسه». الگوی موجود
+     * پروژه: `ClassSetupActivity` و `StudentRegisterActivity` هم بعد از تغییر ثبت‌نام همین دو کلید
+     * را پاک می‌کنند؛ اینجا همان کار برای تغییر جلسه انجام می‌شود (منطق مالی هیچ تغییری نمی‌کند).
+     */
+    private fun invalidateClassCaches(courseId: Int) {
+        CacheManager.clear(this, "class_report_$courseId")
+        CacheManager.clear(this, "class_students_full_$courseId")
+    }
+
     private fun flushPendingQueue() {
         if (!isNetworkAvailable()) return
         if (isFlushingQueue) return
@@ -256,6 +271,9 @@ class AttendanceActivity : BaseActivity() {
                 apiSubmit.submitSession(payload)
             }
             PendingAttendanceStore.remove(this, item.id)
+            // FIX (کلاس-مالی/تازگی): ارسال موفق از صف آفلاین هم مثل ثبت آنلاین، اعداد مالی کلاس را
+            // عوض کرده؛ کش صفحهٔ همان کلاس پاک می‌شود تا صفحه snapshot قبل از جلسه را نشان ندهد.
+            invalidateClassCaches(item.courseId)
             QueueSendResult.SENT
         } catch (e: Exception) {
             // FIX: Bug 19 - cancellation is not a network/UI error.
@@ -273,6 +291,8 @@ class AttendanceActivity : BaseActivity() {
                     if (e.code() == 409) {
                         // Already registered (e.g. from another device) — not an error.
                         PendingAttendanceStore.remove(this, item.id)
+                        // FIX (کلاس-مالی/تازگی): جلسه از قبل ثبت شده ⇒ مالی همان کلاس تغییر کرده است.
+                        invalidateClassCaches(item.courseId)
                         QueueSendResult.ALREADY_REGISTERED
                     } else {
                         val serverMsg = try {
@@ -633,6 +653,10 @@ class AttendanceActivity : BaseActivity() {
                 } else {
                     apiSubmit.submitSession(data)
                 }
+                // FIX (کلاس-مالی/تازگی): بعد از ثبت/ویرایش موفق جلسه، snapshot قبل از جلسهٔ صفحهٔ کلاس
+                // بی‌اعتبار شود؛ وگرنه بازگشت به صفحهٔ کلاس (یا حالت آفلاین با کش ≤۵ دقیقه) همان
+                // «درآمد وصول شده / بدهی به معلم / بدهی به آموزشگاه» قدیمی — مثلاً صفر — را نشان می‌داد.
+                invalidateClassCaches(data.classId)
                 withContext(Dispatchers.Main) {
                     showAttendancePrintDialog(res)
                 }

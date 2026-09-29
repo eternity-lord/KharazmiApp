@@ -245,8 +245,10 @@
         <item name="android:textColor">@color/ds_chip_text</item>
         <item name="android:textSize">@dimen/font_size_caption</item>
         <item name="chipMinHeight">@dimen/min_touch_target</item>
-        <item name="android:singleLine">false</item>
-        <item name="android:maxLines">2</item>
+        <!-- FIX(chip-multiline): Chip فقط تک‌خطی است؛ singleLine=false یا maxLines>1 در سازندهٔ Chip
+             استثنای «Chip does not support multi-line text» می‌دهد (کرش inflate) — پس تک‌خطی قفل می‌شود. -->
+        <item name="android:singleLine">true</item>
+        <item name="android:maxLines">1</item>
         <item name="android:paddingVertical">6dp</item>
         <item name="ensureMinTouchTargetSize">true</item>
         <item name="checkedIconVisible">false</item>
@@ -261,8 +263,9 @@
         <item name="android:textColor">@color/ds_chip_text</item>
         <item name="android:textSize">@dimen/font_size_caption</item>
         <item name="chipMinHeight">@dimen/min_touch_target</item>
-        <item name="android:singleLine">false</item>
-        <item name="android:maxLines">2</item>
+        <!-- FIX(chip-multiline): همان دلیل استایل بالا — Chip چندخطی پشتیبانی نمی‌شود. -->
+        <item name="android:singleLine">true</item>
+        <item name="android:maxLines">1</item>
         <item name="android:paddingVertical">6dp</item>
         <item name="ensureMinTouchTargetSize">true</item>
         <item name="checkedIconVisible">false</item>

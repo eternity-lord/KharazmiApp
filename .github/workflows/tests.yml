@@ -24,6 +24,8 @@ on:
       - arena/01a0c867-kharazmiapp
       # Session branch: run the same DB-integrity and full-suite guards here too.
       - arena/01a0c9b8-kharazmiapp
+      # شاخهٔ کاری نشست جاری (۲۰۲۶-۰۹-۲۹) — محتوای یکسان با arena/01a0c9b8-kharazmiapp.
+      - arena/01a0ec4f-kharazmiapp
   workflow_dispatch:
 
 permissions:

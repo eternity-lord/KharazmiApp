@@ -8,9 +8,12 @@
 #   ۳) تعداد/نوع آرگومان‌های `getString(R.string.X, …)` باید با placeholderهای رشته بخواند
 #      (وگرنه در زمان اجرا MissingFormatArgumentException).
 #   ۴) هر `R.<نوع>.<نام>` استفاده‌شده در Kotlin باید منبع متناظر داشته باشد (لینک R).
+#   ۵) گارد چیپ: هیچ `Chip` ای نباید چندخطی باشد. `aapt2` این را نمی‌گیرد (خطای build نیست) ولی
+#      در زمان اجرا inflate را با UnsupportedOperationException می‌ترکاند ⇒ کرش صفحه.
 #
 # انگیزهٔ واقعی: باگ build «attendance_server_error دو بار تعریف شده بود» (یک بار با ۲ آرگومان و
-# یک بار با ۱ آرگومان) که mergeDebugResources را می‌شکست.
+# یک بار با ۱ آرگومان) که mergeDebugResources را می‌شکست؛ و باگ کرش «Chip does not support
+# multi-line text» در layout/item_class_row.xml (صفحهٔ مدیریت کلاس‌ها).
 import os
 import re
 import unittest
@@ -284,6 +287,242 @@ class TestAttendanceServerErrorRegression(unittest.TestCase):
         # فراخوانی تک‌آرگومانی (۵۰۰..۵۹۹ در ثبت جلسه) باید به کلید retry منتقل شده باشد
         self.assertRegex(source, r"R\.string\.attendance_server_error_retry,\s*e\.code\(\)",
                          "فراخوانی ۱-آرگومانی باید از کلید retry استفاده کند")
+
+
+# ---------------------------------------------------------------------------
+# FIX(chip-multiline) — گارد ۵: هیچ Chip ای نباید چندخطی باشد
+#
+# خطای واقعی روی دستگاه کاربر:
+#   java.lang.UnsupportedOperationException: Chip does not support multi-line text
+#     at com.google.android.material.chip.Chip.setMaxLines(Chip.java:699)
+#     at android.widget.TextView.<init>(TextView.java:1390)
+#     ⇒ InflateException: Binary XML file line #123 in ...:layout/item_class_row
+#     ⇒ کرش ClassManagementActivity (صفحهٔ «مدیریت کلاس‌ها»)
+#
+# چرا: کلاس Chip چهار متد متنی TextView را قفل کرده و اگر مقدار چندخطی بگیرند استثنا می‌دهد:
+#   setSingleLine(false) · setLines(>1) · setMinLines(>1) · setMaxLines(>1)
+# این مقادیر از **زنجیرهٔ style** هم به Chip می‌رسند (مثل `style="@style/GajChipStyle"`)،
+# از **theme** هم (چون theme آخرین fallback حلِ attribute است). aapt2 هیچ‌کدام را خطای build
+# نمی‌داند ⇒ فقط با این گارد ایستا یا با کرش روی دستگاه لو می‌رود.
+# ---------------------------------------------------------------------------
+
+CHIP_VIEW_TAG = "com.google.android.material.chip.Chip"
+# attributeهایی که Chip روی آن‌ها سخت‌گیر است (هر کدام > ۱ خط / غیر تک‌خطی ⇒ استثنا)
+CHIP_TEXT_CONSTRAINT_ATTRS = ("android:singleLine", "android:maxLines", "android:minLines", "android:lines")
+
+_START_TAG_RE = re.compile(
+    r"<([A-Za-z_][\w.:]*)((?:\s+[\w.:-]+\s*=\s*(?:\"[^\"]*\"|'[^']*'))*)\s*/?>",
+    re.S,
+)
+_ATTR_RE = re.compile(r"([\w.:-]+)\s*=\s*(?:\"([^\"]*)\"|'([^']*)')", re.S)
+_STYLE_TAG_RE = re.compile(r"<style\b(?P<attrs>[^>]*)>", re.S)
+_COMMENT_RE = re.compile(r"<!--.*?-->", re.S)
+
+
+def _strip_xml_comments(source: str) -> str:
+    """کامنت‌های XML را (با حفظ شمارهٔ خط‌ها) حذف می‌کند تا اسکن روی محتوای واقعی باشد."""
+    return _COMMENT_RE.sub(lambda m: "\n" * m.group(0).count("\n"), source)
+
+
+def _line_of(source: str, index: int) -> int:
+    return source[:index].count("\n") + 1
+
+
+def _attrs_of(attr_block: str) -> dict:
+    return {m.group(1): (m.group(2) if m.group(2) is not None else m.group(3)) for m in _ATTR_RE.finditer(attr_block)}
+
+
+def _view_tags(source: str):
+    """[(نام تگ, دیکشنری attributeها, شمارهٔ خط)] برای همهٔ تگ‌های بازِ یک layout."""
+    stripped = _strip_xml_comments(source)
+    for match in _START_TAG_RE.finditer(stripped):
+        yield match.group(1), _attrs_of(match.group(2)), _line_of(source, match.start())
+
+
+def _layout_files():
+    folders = sorted(
+        os.path.join(RES_DIR, name)
+        for name in os.listdir(RES_DIR)
+        if name == "layout" or name.startswith("layout-")
+    )
+    files = []
+    for folder in folders:
+        files += [os.path.join(folder, name) for name in sorted(os.listdir(folder)) if name.endswith(".xml")]
+    return files
+
+
+def _values_dirs():
+    return sorted(
+        os.path.join(RES_DIR, name)
+        for name in os.listdir(RES_DIR)
+        if name == "values" or name.startswith("values-")
+    )
+
+
+def _style_definitions():
+    """{پیکربندی: {نام استایل: {parent, items, file, line}}} — مثل values و values-night جدا نگه داشته می‌شوند."""
+    definitions = {}
+    for folder in _values_dirs():
+        config = os.path.basename(folder)
+        bucket = definitions.setdefault(config, {})
+        for name in sorted(os.listdir(folder)):
+            if not name.endswith(".xml"):
+                continue
+            path = os.path.join(folder, name)
+            source = _read(path)
+            if "<style" not in source:
+                continue
+            lines_by_name = {}
+            for match in _STYLE_TAG_RE.finditer(source):
+                style_name = _attrs_of(match.group("attrs")).get("name")
+                if style_name and style_name not in lines_by_name:
+                    lines_by_name[style_name] = _line_of(source, match.start())
+            for element in ET.parse(path).getroot():
+                if element.tag != "style" or not element.get("name"):
+                    continue
+                style_name = element.get("name")
+                if style_name in bucket:  # نام تکراری ⇒ همان گارد ۱ آن را می‌گیرد
+                    continue
+                bucket[style_name] = {
+                    "parent": element.get("parent") or "",
+                    "items": {
+                        item.get("name"): "".join(item.itertext()).strip()
+                        for item in element
+                        if item.get("name")
+                    },
+                    "file": path,
+                    "line": lines_by_name.get(style_name, 0),
+                }
+    return definitions
+
+
+def _style_chain(style_name: str, config: str, definitions: dict):
+    """[(نام استایل, تعریف)] از خودِ استایل تا والدها — با fallback از values-night به values."""
+    chain = []
+    seen = set()
+    current = style_name
+    while current and current not in seen:
+        seen.add(current)
+        definition = definitions.get(config, {}).get(current) or definitions.get("values", {}).get(current)
+        if definition is None:
+            break
+        chain.append((current, definition))
+        parent = definition["parent"]
+        if not parent or parent.startswith(("@android:", "?")):
+            break
+        current = parent.split("/")[-1]
+    return chain
+
+
+def _chip_attribute_hazard(attr: str, value: str):
+    """آیا این attribute مقدارِ ممنوع برای Chip دارد؟ ⇒ True/False"""
+    value = value.strip()
+    if attr == "android:singleLine":
+        return value.lower() == "false"
+    if attr in ("android:maxLines", "android:minLines", "android:lines"):
+        if value.startswith(("@", "?")):  # مقدار ارجاعی ⇒ قابل اتکا نیست، محافظه‌کارانه خطا
+            return True
+        try:
+            return int(value) > 1
+        except ValueError:
+            return True
+    return False
+
+
+def _hazard_origin(attr, element_attrs, style_name, config, definitions):
+    """منبع یک attribute برای یک Chip: (مقدار, توضیح منبع) یا (None, None)."""
+    if attr in element_attrs:
+        return element_attrs[attr], "خودِ view در layout"
+    if style_name:
+        for chain_name, definition in _style_chain(style_name, config, definitions):
+            if attr in definition["items"]:
+                where = f"{os.path.relpath(definition['file'], REPO_ROOT)}:{definition['line']}"
+                return definition["items"][attr], f"style «{chain_name}» ({where})"
+    return None, None
+
+
+def _theme_chip_attrs(config, definitions):
+    """[(نام تم, attribute, مقدار, فایل:خط)] — attributeهای محدودکننده در سطح تم (به همهٔ TextViewها از
+    جمله Chip می‌رسند چون theme آخرین fallback حلِ attribute است)."""
+    hazards = []
+    for style_name, definition in definitions.get(config, {}).items():
+        if not style_name.startswith("Theme."):
+            continue
+        for chain_name, chained in _style_chain(style_name, config, definitions):
+            for attr, value in chained["items"].items():
+                if attr in CHIP_TEXT_CONSTRAINT_ATTRS and _chip_attribute_hazard(attr, value):
+                    where = f"{os.path.relpath(chained['file'], REPO_ROOT)}:{chained['line']}"
+                    hazards.append(f"تم «{style_name}» → «{chain_name}» {attr}={value} ({where})")
+    return hazards
+
+
+def _chip_hazards(config: str):
+    """همهٔ Chipهای layoutها با مقدارهای ممنوع ⇒ (فهرست مشکلات, تعداد چیپ‌های اسکن‌شده, شمارهٔ چیپ‌های هر فایل)."""
+    definitions = _style_definitions()
+    problems = []
+    scanned = 0
+    per_file = {}
+    for path in _layout_files():
+        relative = os.path.relpath(path, REPO_ROOT)
+        source = _read(path)
+        for tag, attrs, line in _view_tags(source):
+            if tag != CHIP_VIEW_TAG:
+                continue
+            scanned += 1
+            per_file[relative] = per_file.get(relative, 0) + 1
+            element_id = attrs.get("android:id", "").split("/")[-1] or f"خط {line}"
+            style_ref = attrs.get("style", "")
+            style_name = style_ref.split("/")[-1] if style_ref.startswith("@style/") else ""
+            for attr in CHIP_TEXT_CONSTRAINT_ATTRS:
+                value, origin = _hazard_origin(attr, attrs, style_name, config, definitions)
+                if value is not None and _chip_attribute_hazard(attr, value):
+                    problems.append(f"{relative}:{line} «{element_id}» → {attr}={value} از {origin}")
+    return problems, scanned, per_file
+
+
+class TestAndroidChipIsNeverMultiLine(unittest.TestCase):
+    """گارد ۵ — کرش واقعی «Chip does not support multi-line text» (صفحهٔ مدیریت کلاس‌ها)."""
+
+    def test_5a_no_layout_chip_resolves_to_multi_line_text(self):
+        offenders = []
+        scanned_total = 0
+        for config in ("values", "values-night"):
+            problems, scanned, _per_file = _chip_hazards(config)
+            scanned_total = max(scanned_total, scanned)
+            offenders += [f"[{config}] {problem}" for problem in problems]
+        self.assertGreater(scanned_total, 0, "هیچ Chip ای در layoutها اسکن نشد — گارد بی‌اثر است")
+        self.assertEqual(
+            offenders,
+            [],
+            "Chip چندخطی ⇒ UnsupportedOperationException در inflate (کرش صفحه):\n" + "\n".join(offenders),
+        )
+
+    def test_5b_reported_crash_file_still_has_chips_and_is_scanned(self):
+        """قفل رگرسیون: فایلِ گزارش‌شدهٔ کاربر (`item_class_row.xml`) واقعاً چیپ دارد و اسکن می‌شود."""
+        _problems, _scanned, per_file = _chip_hazards("values")
+        crash_file = "KharazmiAdmin/app/src/main/res/layout/item_class_row.xml"
+        self.assertIn(crash_file, per_file, f"فایل ${crash_file} دیگر چیپ ندارد — گارد باید بازبینی شود")
+        self.assertEqual(per_file[crash_file], 3, "item_class_row باید ۳ چیپ داشته باشد (پایه/جنسیت/جلسه)")
+
+    def test_5c_theme_level_chip_attributes_are_safe(self):
+        offenders = []
+        for config in ("values", "values-night"):
+            offenders += [f"[{config}] {item}" for item in _theme_chip_attrs(config, _style_definitions())]
+        self.assertEqual(
+            offenders,
+            [],
+            "attribute چندخطی در سطح تم ⇒ همهٔ Chipها کرش می‌کنند:\n" + "\n".join(offenders),
+        )
+
+    def test_5d_chip_styles_are_explicitly_single_line(self):
+        """استایل‌های چیپ باید صریحاً تک‌خطی باشند تا به پیش‌فرض کتابخانه وابسته نباشیم."""
+        definitions = _style_definitions()
+        for style_name in ("GajChipStyle", "Widget.Kharazmi.DS.Chip", "Widget.Kharazmi.DS.Chip.Tag"):
+            definition = definitions["values"].get(style_name)
+            self.assertIsNotNone(definition, f"استایل چیپ «{style_name}» پیدا نشد")
+            items = definition["items"]
+            self.assertEqual(items.get("android:singleLine"), "true", f"{style_name}: singleLine باید true باشد")
+            self.assertEqual(items.get("android:maxLines"), "1", f"{style_name}: maxLines باید ۱ باشد")
 
 
 if __name__ == "__main__":

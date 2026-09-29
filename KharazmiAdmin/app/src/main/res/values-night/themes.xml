@@ -167,8 +167,12 @@
         <item name="cornerRadius">16dp</item>
         <item name="android:textColor">?attr/colorOnSurface</item>
         <item name="android:textSize">12sp</item>
-        <item name="android:singleLine">false</item>
-        <item name="android:maxLines">2</item>
+        <!-- FIX(chip-multiline): Chip فقط متن تک‌خطی را پشتیبانی می‌کند. با singleLine=false یا
+             maxLines=2 سازندهٔ Chip استثنای «Chip does not support multi-line text» می‌دهد و
+             layout/item_class_row.xml (صفحهٔ مدیریت کلاس‌ها) با InflateException می‌ترکد.
+             پس صریحاً تک‌خطی قفل می‌شود — پیش‌فرض کتابخانه هم همین است. -->
+        <item name="android:singleLine">true</item>
+        <item name="android:maxLines">1</item>
         <item name="android:minHeight">@dimen/min_touch_target</item>
         <item name="android:paddingVertical">6dp</item>
     </style>

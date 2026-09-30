@@ -1745,4 +1745,6 @@
     <string name="rpt_hint_month_empty_undated">ℹ️ در این ماه جلسه‌ای با تاریخ معتبر نیست (%1$d جلسه تاریخ نامعتبر دارد).</string>
     <string name="rpt_hint_zero_share">ℹ️ جلسه‌ای در این ماه ثبت شده ولی سهم این بخش از آن صفر است.</string>
     <string name="rpt_hint_prepaid">💡 پیش‌پرداخت ثبت‌نام/شهریه در این ماه: %1$d مورد، %2$s تومان. این مبلغ در «وصول‌شده» نمی‌آید (فقط واریزی‌های فیش حساب می‌شود).</string>
+    <string name="arch_stale_server">⚠️ سرور به‌روز نیست: گزارش کامل این کلاس (دانش‌آموزان، حضور و غیاب، مبالغ) از سرور نمی‌رسد. سرور را با آخرین نسخه به‌روزرسانی (Deploy) و دوباره اجرا کنید.</string>
+    <string name="arch_s_students_plain">دانش‌آموزان</string>
 </resources>

@@ -860,6 +860,12 @@ class TestArchivedClassesRedesignGuard(unittest.TestCase):
         self.assertIn("AlertDialog", restore)
         self.assertIn("CancellationException", restore)
 
+    def test_9i_old_server_shows_stale_notice_not_fake_zeros(self):
+        body = _kotlin_function_body(self.detail, "private fun render(")
+        self.assertIn("d.students == null && d.attendanceTotals == null && d.financeTotals == null", body)
+        self.assertIn("R.string.arch_stale_server", body)
+        self.assertIn("arch_stale_server", self.strings)
+
     def test_9h_all_arch_strings_exist_and_are_used(self):
         keys = [k for k in self.strings if k.startswith("arch_")]
         self.assertGreaterEqual(len(keys), 60)

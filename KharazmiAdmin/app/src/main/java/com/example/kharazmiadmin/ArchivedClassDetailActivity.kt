@@ -216,6 +216,21 @@ class ArchivedClassDetailActivity : BaseActivity() {
             }
         }
 
+        // سرور قدیمی (قبل از نسخهٔ «گزارش کلاس حذفی») students/attendance_totals/finance_totals را
+        // نمی‌فرستد؛ نمایش «۰ نفر / ۰ تومان» گمراه‌کننده است ⇒ به‌جای صفرِ قلابی، صریح می‌گوییم سرور قدیمی است.
+        if (d.students == null && d.attendanceTotals == null && d.financeTotals == null) {
+            val stale = getString(R.string.arch_stale_server)
+            listOf(rowAttendance1, rowAttendance2, rowFinance1, rowFinance2).forEach { it.visibility = View.GONE }
+            pbRate.visibility = View.GONE
+            tvAttendanceNote.text = stale
+            tvFinanceNote.text = stale
+            tvStudentsHeader.text = getString(R.string.arch_s_students_plain)
+            llStudents.removeAllViews()
+            llStudents.addView(plainText(stale))
+            llSessions.removeAllViews()
+            llSessions.addView(plainText(stale))
+        }
+
         body.visibility = View.VISIBLE
         btnShare.isEnabled = true
         btnRestore.isEnabled = true

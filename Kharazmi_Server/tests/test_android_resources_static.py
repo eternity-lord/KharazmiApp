@@ -594,8 +594,14 @@ class TestClassDetailFinanceFreshnessGuard(unittest.TestCase):
 
         direct = _kotlin_function_body(source, "private fun executeSessionSubmissionOnServer(")
         self.assertTrue(direct, "مسیر ثبت آنلاین جلسه پیدا نشد")
-        self.assertIn("invalidateClassCaches(data.classId)", direct,
+        self.assertIn("invalidateClassCaches(data.course_id)", direct,
                       "ثبت/ویرایش موفق جلسه باید کش همان کلاس را باطل کند")
+        # بیلد واقعی شکست خورد: SessionSubmitData فیلد classId ندارد (course_id دارد) ⇒ «Unresolved reference».
+        # هر `data.<فیلد>` در این تابع باید فیلد واقعی SessionSubmitData باشد.
+        fields = set(re.findall(r"val (\w+):", _kotlin_declaration(_kotlin_source("AppModels.kt"), "data class SessionSubmitData(")))
+        self.assertEqual(fields, {"course_id", "date", "items"})
+        for used in set(re.findall(r"\bdata\.(\w+)", direct)):
+            self.assertIn(used, fields, f"data.{used} در SessionSubmitData وجود ندارد ⇒ خطای کامپایل")
 
         queued = _kotlin_function_body(source, "private suspend fun sendQueueItem(")
         self.assertTrue(queued, "مسیر ارسال صف آفلاین جلسه پیدا نشد")

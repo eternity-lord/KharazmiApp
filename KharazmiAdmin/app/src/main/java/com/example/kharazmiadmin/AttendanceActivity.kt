@@ -656,7 +656,7 @@ class AttendanceActivity : BaseActivity() {
                 // FIX (کلاس-مالی/تازگی): بعد از ثبت/ویرایش موفق جلسه، snapshot قبل از جلسهٔ صفحهٔ کلاس
                 // بی‌اعتبار شود؛ وگرنه بازگشت به صفحهٔ کلاس (یا حالت آفلاین با کش ≤۵ دقیقه) همان
                 // «درآمد وصول شده / بدهی به معلم / بدهی به آموزشگاه» قدیمی — مثلاً صفر — را نشان می‌داد.
-                invalidateClassCaches(data.classId)
+                invalidateClassCaches(data.course_id)
                 withContext(Dispatchers.Main) {
                     showAttendancePrintDialog(res)
                 }

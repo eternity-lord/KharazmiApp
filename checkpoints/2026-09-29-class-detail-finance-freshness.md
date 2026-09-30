@@ -82,3 +82,6 @@ md5 دیتابیس واقعی `Kharazmi_Server/gaj_db.db` قبل و بعد: `f04
    باید همان لحظه «بدهی به معلم» و «بدهی به آموزشگاه» به‌روز شده باشند (نه صفر).
 2. اگر عددی باز هم صفر بود، یعنی دادهٔ همان کلاس روی سرور صفر است (نه نمایش)؛ در آن حالت
    تب «لیست دانش‌آموزان» و خروجی اکسل همان کلاس ملاک تشخیص است و باید همان‌جا مقدار شهریه/بدهی را بررسی کنیم.
+
+## اصلاحیهٔ بیلد (2026-09-30)
+در `AttendanceActivity.executeSessionSubmissionOnServer` نوشته بودم `invalidateClassCaches(data.classId)` ولی `SessionSubmitData` فیلد `classId` ندارد (`course_id` دارد) ⇒ `Unresolved reference 'classId'` در `compileDebugKotlin`. اصلاح: `data.course_id`. تست 6c هم خودِ اشتباه را قفل کرده بود؛ حالا هر `data.<فیلد>` در آن تابع با فیلدهای واقعی `SessionSubmitData` مقایسه می‌شود (با کد قدیمی قرمز، با کد جدید سبز).

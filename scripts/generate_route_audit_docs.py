@@ -50,6 +50,9 @@ PARTIAL_XFAILS = {
     ("POST", "/automation/run_rules"): "RA-automation-03",
     ("POST", "/resources/bookings"): "RA-branches-01",
     ("PUT", "/resources/{id}"): "RA-branches-02",
+    ("POST", "/messages/conversations/create"): "RA-messages-02",
+    ("POST", "/messages/conversations/{id}/send"): "RA-messages-01",
+    ("POST", "/messages/broadcast"): "RA-messages-03",
 }
 
 

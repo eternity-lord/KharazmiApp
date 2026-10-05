@@ -13,7 +13,7 @@
 
 ## routerها
 
-۲۳ router دارای suite متمرکز/مقداری هستند، اما پوشش هنوز **partial** است و تمام branchهای 219 route این گروه deep نشده‌اند:
+۲۴ router دارای suite متمرکز/مقداری هستند، اما پوشش هنوز **partial** است و تمام branchهای 220 route این گروه deep نشده‌اند:
 
 | router | routes | وضعیت فعلی |
 |---|---:|---|
@@ -30,6 +30,7 @@
 | dashboard | 2 | KPI exact values و local push status؛ fixed clock overdue/dunning values asserted |
 | dunning | 2 | due-bucket boundaries/order/messages، 48h ActivityLog/SmsLog idempotency، missing/deleted/paid/no-mobile/suspended, admin-only roles, exact local logs/retry و Kotlin/Gson DTO؛ Q-027 برای deleted/suspended direct-ID eligibility |
 | messages | 7 | list/history role/order/filter, conversation create, send/retry, broadcast fanout, soft-delete, per-role pin، exact Notification/push spy و Kotlin/Gson DTO؛ `RA-messages-01/02/03` چهار strict-xfail case و Q-028..Q-031 policyها |
+| serve_upload | 1 | temp file bytes/MIME/length, five authenticated roles, auth/missing/path-validation responses, exact DB no-write; Glide screen source/Authorization header and placeholder |
 | reports | 9 | debtor/statement/chart subset و date/order assertions |
 | analytics | 6 | filter/date/limit/funnel subset |
 | exports | 3 | CSV header/rows subset؛ PDF/XLSX کامل هنوز مانع دارد |
@@ -41,13 +42,13 @@
 | branches | 9 | branch/resource CRUD and filters, exact branch-stat financial/count oracle, slot/no-conflict bookings; `RA-branches-01/02` strict xfail for duplicate-slot 500 and duplicate-serial update 500; toggle/update/stat/booking-policy questions Q-019..Q-022 |
 | calendar | 4 | room CRUD/list and empty/full, teacher/room/student/resource conflict matrix, role-scoped exact calendar events, Kotlin/Gson contract; null-description candidate (Q-023), event/conflict/branch policies Q-024..Q-026 |
 
-۲ router باقی‌مانده و **2 route** هنوز deep suite ندارند: `serve_upload(1)`, `timeline(1)`. Dunning هر دو و messages هر هفت route را در suite متمرکز دارند؛ دو router باقی‌مانده smoke/map دارند، نه audit رفتاری.
+۱ router باقی‌مانده و **1 route** هنوز deep suite ندارد: `timeline(1)`. Dunning، messages و serve_upload اکنون suite متمرکز دارند؛ فقط timeline هنوز smoke/map دارد، نه audit رفتاری.
 
 ## آخرین اجراهای واقعی
 
 ```text
 PYTHONPATH=. /tmp/kharazmi-route-audit-venv/bin/pytest -q tests/route_audit
-180 passed, 29 xfailed, 4 warnings in 16.15s
+190 passed, 29 xfailed, 4 warnings in 16.91s
 
 focused CRM + report generator: 18 passed, 8 xfailed
 focused automation route suite: 14 passed, 3 strict-xfailed
@@ -55,6 +56,7 @@ focused branches route suite: 7 passed, 2 strict-xfailed
 focused calendar route suite: 4 passed
 focused dunning route suite: 6 passed; both routes have targeted references
 focused messages route suite: 10 passed, 4 strict-xfailed; all seven routes have targeted references
+focused serve_upload route suite: 11 passed; exact temp-file and Android Glide source contract
 CRM behavioral routes: 13 passed, 8 strict-xfailed; all five CRM routes have targeted references
 automation behavior: 13 passed, 3 strict-xfailed; all five routes have targeted references
 branches behavior: 6 passed, 2 strict-xfailed; all nine routes have targeted references
@@ -79,8 +81,8 @@ Markdown generator: 25 ledgers, every generated row has 8 intact cells and no un
 
 ۲۲ strict xfail ID فعلی: O-02/RA-auth-02, O-12/RA-exams-02, O-19/RA-admin-19, RA-ai-01, RA-audit_trail-01 (دو قالب ISO/Jalali), RA-finance-02, RA-homework-01, RA-attendance-01/02/03, RA-teachers-01, RA-crm-01 (شش پارامتری), RA-crm-02/03، RA-automation-01/02/03، RA-branches-01/02 و RA-messages-01/02/03 (چهار case در مجموع)؛ در pytest کامل 29 case xfailed دیده می‌شود. O-14 xfail نیست. contract simulator خام candidate ثبت می‌کند؛ `bugs.md`/Q-006..008 آن را از باگ قابل‌مشاهده جدا می‌کنند.
 
-`docs/route-tests/routes/*.md` برای هر route: یک جملهٔ purpose/handler، actor و status probe، caller/screen جاری، ورودی و response schema، DB read/write statically extracted، side effect و test-reference یا smoke-only status دارد. 149 route test source literal request reference دارند؛ این شمارش به‌تنهایی عمق assertion را اثبات نمی‌کند. 72 مسیر literal match ندارند؛ ledger per-route قید هر مورد را نشان می‌دهد.
+`docs/route-tests/routes/*.md` برای هر route: یک جملهٔ purpose/handler، actor و status probe، caller/screen جاری، ورودی و response schema، DB read/write statically extracted، side effect و test-reference یا smoke-only status دارد. 150 route test source literal request reference دارند؛ این شمارش به‌تنهایی عمق assertion را اثبات نمی‌کند. 71 مسیر literal match ندارند؛ ledger per-route قید هر مورد را نشان می‌دهد.
 
 ## دیتابیس اصلی و commit
 
-در اجرای کامل 2026-10-05، `md5sum Kharazmi_Server/gaj_db.db` قبل و بعد از pytest برابر `f048f8d118b33c4eaa944490594121d7` ثبت شد؛ sweep/contract/boundary/large و تمام route testها از DB موقت استفاده کردند. این snapshot شامل زیرساخت deterministic seed، audit QR، socket blocking، oracle invoice، CRM، automation، branch/resource، calendar، dunning و messages audit/log assertions و ledgerهای جاری است. تمام routerهای دارای suite از DB موقت استفاده می‌کنند؛ دو router و 2 route هنوز به deep behavioral audit نیاز دارند و باگ application code عمداً اصلاح نشده است.
+در اجرای کامل 2026-10-05، `md5sum Kharazmi_Server/gaj_db.db` قبل و بعد از pytest برابر `f048f8d118b33c4eaa944490594121d7` ثبت شد؛ sweep/contract/boundary/large و تمام route testها از DB موقت استفاده کردند. این snapshot شامل زیرساخت deterministic seed، audit QR، socket blocking، oracle invoice، CRM، automation، branch/resource، calendar، dunning، messages و serve_upload audit/log/file assertions و ledgerهای جاری است. تمام routerهای دارای suite از DB موقت استفاده می‌کنند؛ فقط یک router و route (`timeline`) هنوز به deep behavioral audit نیاز دارد و باگ application code عمداً اصلاح نشده است.

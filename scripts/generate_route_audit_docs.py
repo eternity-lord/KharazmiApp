@@ -55,6 +55,21 @@ PARTIAL_XFAILS = {
     ("POST", "/messages/broadcast"): "RA-messages-03",
 }
 
+# Direct file/image consumers do not appear in the Retrofit-only Android map.
+DIRECT_ANDROID_CALLERS = {
+    ("GET", "/uploads/{}"): {
+        "callers": (
+            "Glide authenticated image loads — `StudentProfileActivity.kt:344` "
+            "(`profile_image`); `TeacherProfileActivity.kt:291` (`profile_image`); "
+            "`InstituteSettingsActivity.kt:109` (`logo_path`)."
+        ),
+        "display": (
+            "`FileResponse` bytes displayed by Glide `ImageView`; request uses "
+            "`Authorization: Bearer <SecureLoginStore token>`. No Retrofit DTO."
+        ),
+    },
+}
+
 
 def read_csv(path: Path) -> list[dict[str, str]]:
     with path.open(encoding="utf-8-sig", newline="") as stream:
@@ -183,6 +198,8 @@ def main() -> None:
                 role_status += f"; invalid={invalid.get('status', '—')}"
 
             android = android_by_key.get(key, [])
+            direct_android = DIRECT_ANDROID_CALLERS.get(key)
+            display_contract = None
             if android:
                 callers = "<br>".join(
                     f"`{item['interface/method']}` — `{Path(item['file:line'].split(':')[0]).name}`:{item['file:line'].rsplit(':', 1)[-1]}"
@@ -192,6 +209,10 @@ def main() -> None:
                     f"`{item['response class']}` ({item.get('response fields/types + JSON name', '')})"
                     for item in android
                 )
+            elif direct_android:
+                callers = direct_android["callers"]
+                android_models = "—"
+                display_contract = direct_android["display"]
             else:
                 callers = "No static Retrofit caller in current overlay; server-only/deferred screen attribution."
                 android_models = "—"
@@ -199,6 +220,8 @@ def main() -> None:
             values = f"Input: {row.get('input', '')}<br>Server response: {response}"
             if android_models != "—":
                 values += f"<br>Android model: {android_models}"
+            if display_contract:
+                values += f"<br>Android display: {display_contract}"
 
             direct_refs = []
             seen_test_refs = set()

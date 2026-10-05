@@ -326,7 +326,6 @@ def test_auth_teacher_change_mobile_normalizes_digits_and_updates_linked_rows(cl
             models.ActivityLog.admin_username == old_mobile,
             models.ActivityLog.details.contains(new_mobile),
         ).one()
-        log_id = log.id
         assert log.target_name == user.full_name
         assert old_mobile in log.details and new_mobile in log.details
         after = _database_snapshot(db)

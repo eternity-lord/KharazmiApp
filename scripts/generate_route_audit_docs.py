@@ -36,6 +36,11 @@ KNOWN_XFAILS = {
     ("GET", "/exams/student/list"): "O-12",
     ("POST", "/admin/deleted_classes/{course_id}/restore"): "O-19",
 }
+# The route has passing response/tool cases, but this specific state invariant
+# is a strict xfail; do not label the whole route as failing.
+PARTIAL_XFAILS = {
+    ("POST", "/ai/chat"): "RA-ai-01",
+}
 
 
 def read_csv(path: Path) -> list[dict[str, str]]:
@@ -199,6 +204,9 @@ def main() -> None:
                 audit += "; assertion depth is per linked test, not inferred here."
             else:
                 audit = "221-route smoke only; business values/DB effects need a focused test or an explicit blocker."
+            partial_xfail = PARTIAL_XFAILS.get((method, path))
+            if partial_xfail:
+                audit += f" Open behavior xfail `{partial_xfail}` (route also has passing assertions); see `../bugs.md`."
             if issues and not xfail:
                 audit += f" Contract candidates: {len(issues)} ({', '.join(issue_types)}); triage in `../questions.md`/`../bugs.md`."
             if row.get("verification"):

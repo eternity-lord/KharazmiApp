@@ -1,47 +1,64 @@
 # پیشرفت ممیزی routeها
 
-**تاریخ شروع:** 2026-09-28 — **branch:** `arena/01a0c9b8-kharazmiapp`
+**شروع پروژهٔ ممیزی:** 2026-09-28 — **snapshot فعلی:** 2026-10-05 — **branch ثابت این نشست:** `arena/01a10aa8-kharazmiapp` (از branch ارائه‌شدهٔ اولیه متفاوت است؛ branch عوض نشده است).
 
-## وضعیت زیرساخت
+## زیرساخت و مرحلهٔ صفر
 
-- seed قطعی در `tests/route_audit/seed.py` و wrapper در `scripts/seed_demo.py` ساخته شد.
-- seed عادی: ۳۰ دانش‌آموز؛ seed حجیم: ۳۰۰ دانش‌آموز و ۳۰ کلاس.
-- oracle مستقل و شبیه‌ساز قرارداد Kotlin ساخته شد.
-- پلاگین/registry ممیزی همهٔ ۲۲۱ route را به فایل `test_audit_<router>.py` وصل می‌کند.
-- seed فقط روی مسیر ورودی صریح و غیر از `Kharazmi_Server/gaj_db.db` کار می‌کند.
+- `docs/app-map/*` به‌عنوان ورودی اصلی حفظ شده است؛ هیچ فایل آن تغییر نکرده.
+- بررسی map جاری: server inventory برابر 221/221 با routeهای runtime است؛ ورودی Retrofit تاریخی 162 declaration دارد، در برابر 169 declaration در Kotlin فعلی. مقایسهٔ جاری 158 زوج یکتای method/path، 156 route ثابت یکتا و 1 `@Url` پویا را نشان می‌دهد. 7 declaration جاری در map تاریخی نیستند؛ overlayهای `android-api-current.csv` و `android-route-diff.md` اختلاف را ثبت می‌کنند. 65 server-only و 0 Android-only route باقی است.
+- seed canonical فقط DB موقت را می‌سازد؛ salted password hash، JWT، timestampهای ORM و داده‌های business ثابت‌اند. `test_seed_reproducibility.py` دو DB را با schema/row canonical digest مقایسه می‌کند.
+- seed عادی 30 دانش‌آموز و seed حجیم 300 دانش‌آموز/30 کلاس دارد. role fixtures: admin, secretary, teacher, student, parent؛ شماره‌های دانش‌آموز/والد در seed با قالب 11 رقمی معتبرند.
+- ساعت سرور در `clock.py` روی `2026-09-28 09:00:00` ثابت است. sweep، contract، boundary، large و pytest هرکدام DB موقت استفاده می‌کنند؛ `requests`, `urllib` و اتصال socket خروجی مسدود است (subprocess regression در `test_sweep_network_guard.py`)، FCM key خالی است و worker زنده برای runnerهای مستقل start نمی‌شود.
+- oracle مالی مستقل، simulator Kotlin/Gson، route registry و 25 گزارش per-router موجودند. گزارش‌های per-router اکنون از ورودی map، caller فعلی Kotlin، actor probe، پاسخ/نمونه، static DB effects، sweep و test-reference استفاده می‌کنند؛ probe actor را به‌عنوان مجوز نهایی endpoint معرفی نمی‌کنند.
 
 ## routerها
 
-| اولویت | router | route | وضعیت | commit گزارش |
-|---:|---|---:|---|---|
-| 1 | finance | 26 | **ممیزی اولیه + mutation validation انجام شد**؛ 11 route دارای assertion مقداری، و 4 oracle مالی جدید | این turn |
-| 2 | attendance | 15 | **ممیزی اولیه + mutation validation انجام شد**؛ 12 route دارای assertion مقداری/ماشین‌حالت و 2 oracle جبرانی | این turn |
-| 3 | classes | 21 | **ممیزی اولیه انجام شد**؛ 8 route تست مقداری، state و Excel دارند و همهٔ 21 route در inventory حاضرند | این turn |
-| 4 | admin | 41 | **deep audit کامل قبلی + RA-admin-01 fix**؛ 41/41 route assertion/guard | `1ac90d0`؛ CI `36411439389` |
-| 5 | teachers | 18 | **deep slice انجام شد**؛ settlement/retry/reversal/payout/wallet و responseهای لیست assert شدند | `cdb72b5`؛ CI `36411439389` |
-| 6 | students | 13 | **deep slice انجام شد**؛ profile/grades/access/empty search/version conflict | `cdb72b5`؛ CI `36411439389` |
-| 7 | dashboard | 2 | **deep slice انجام شد**؛ KPI exact values و push redaction | `cdb72b5`؛ CI `36411439389` |
-| 8 | reports | 9 | **deep slice انجام شد**؛ debtor/statement/chart/order/access | `cdb72b5`؛ CI `36411439389` |
-| 9 | analytics | 6 | **deep slice انجام شد**؛ custom date/filter/limit/funnel invalid range | `cdb72b5`؛ CI `36411439389` |
-| 10 | exports | 3 | **deep slice انجام شد**؛ CSV headers/rows/BOM/role guard | `cdb72b5`؛ CI `36411439389` |
-| 11 | exams | 7 | **deep slice انجام شد**؛ list shape، attempt retry و O-12 untouched | `cdb72b5`؛ CI `36411439389` |
-| 12 | homework | 6 | **deep slice انجام شد**؛ parent/student scope و optional defaults | `cdb72b5`؛ CI `36411439389` |
-| 13 | parent | 5 | **deep slice انجام شد**؛ child profile values، portal HTML و no-SMS | `cdb72b5`؛ CI `36411439389` |
-| 14 | crm / dunning / messages / automation | 19 | scaffold صریح؛ functional audit هنوز انجام نشده | — |
-| 15 | calendar / branches / timeline / audit | 15 | scaffold صریح؛ functional audit هنوز انجام نشده | — |
-| 16 | auth / ai / serve_upload | 14 | scaffold صریح؛ functional audit هنوز انجام نشده | — |
+۱۳ router دارای suite متمرکز/مقداری هستند، اما پوشش هنوز **partial** است و تمام branchهای 172 route این گروه deep نشده‌اند:
 
-## آخرین اجرای ثبت‌شده
+| router | routes | وضعیت فعلی |
+|---|---:|---|
+| finance | 26 | oracle مالی/پرداخت و invoice، retry/FIFO؛ route والد معتبر باگ `RA-finance-02` را بازتولید می‌کند؛ side-effect/gateway و چند CRUD هنوز blocker دارند |
+| attendance | 15 | read/history، live start/status/cancel، retry مالی، suspended guard و QR stale/same-day success با DB restore |
+| classes | 21 | list/detail/debt/export و subset state/approval؛ create/bulk/delete/enrollment transitionها هنوز عمیق نیستند |
+| admin | 41 | مقدار/KPI/state/export/guard، coverage مقداری پیشین؛ `RA-admin-01` فعلی سبز است |
+| teachers | 18 | settlement/wallet slice، incomplete-class minimum fields؛ fractional live timestamp strict xfail |
+| students | 13 | profile/grade/access/version conflict؛ `parent_mobile` در StudentPortal فعلاً فقط Q-007 است |
+| dashboard | 2 | KPI exact values و local push status؛ fixed clock overdue/dunning values asserted |
+| reports | 9 | debtor/statement/chart subset و date/order assertions |
+| analytics | 6 | filter/date/limit/funnel subset |
+| exports | 3 | CSV header/rows subset؛ PDF/XLSX کامل هنوز مانع دارد |
+| exams | 7 | list/attempt subset؛ O-12 strict xfail؛ O-14 در این checkout fixed/سبز |
+| homework | 6 | scope/optional defaults؛ graded parent row با `max_score` غایب در strict xfail |
+| parent | 5 | profile/portal values و role slice؛ OTP/select-child transitionها هنوز deep نشده‌اند |
+
+۱۲ router باقی‌مانده و **49 route** هنوز deep suite ندارند: `ai(1)`, `audit(1)`, `audit_trail(1)`, `auth(12)`, `automation(5)`, `branches(9)`, `calendar(4)`, `crm(5)`, `dunning(2)`, `messages(7)`, `serve_upload(1)`, `timeline(1)`. گزارش‌هایشان smoke و map را دارند؛ این معادل audit رفتاری نیست.
+
+## آخرین اجراهای واقعی
 
 ```text
-pytest tests/route_audit -q: 86 passed, 3 xfailed, 4 warnings
-admin deep audit: 41/41 route assertion/guard؛ RA-admin-01 fixed؛ direct student fallback سبز
-route sweep: 221 route؛ status 500=0؛ invalid-target=220؛ invalid status 500=0
-Retrofit contract: 151 unique؛ dynamic=1؛ unmatched=0؛ issue=0؛ RA-sweep=4 normal assertions
-retry guards: direct payment=1؛ installment=1؛ session charge=1؛ teacher settlement/reversal=1
-mutation validation: 10/10 caught؛ 0 escaped؛ route assertions=72/221
+PYTHONPATH=. /tmp/kharazmi-route-audit-venv/bin/pytest -q tests/route_audit
+98 passed, 9 xfailed, 4 warnings
+
+route sweep: 221/221; main 500=0; 220/221 invalid-target probes; invalid 500=0
+invalid observations: 422=146, 200=70, 400=3, 403=1, 404=1
+empty probes: 11; null-list observations=0; non-JSON responses=14
+status: 200=182, 400=17, 422=8, 404=7, 409=5, 403=1, 401=1
+403 با role/fixture معتبر: فقط GET /finance/parent/dashboard (RA-finance-02)
+
+roles: admin=168, teacher=21, student=18, public=9, parent=5
+contract: declarations=169, unique_calls=158, unique_static_routes=156,
+          dynamic=1, unmatched=0, route_non_success=28, successful_non_json=4,
+          parse=4, NPE-candidates=5, silent-zero-candidates=8,
+          missing_key=0, simulation_gap=0
+boundary: 4 routes, 500=0, raw candidates=5, confirmed contract bugs=0 (Q-006)
+large seed: 300 students/30 classes + 300 transaction/session rows; 8/8 limit/order/filter checks pass
+Markdown generator: 25 ledgers, every generated row has 8 intact cells and no unwrapped segment >300 chars
 ```
 
-آخرین mutation-validation push سبز است: [CI run 36413712720](https://github.com/eternity-lord/KharazmiApp/actions/runs/36413712720)؛ mutation validation در `mutation-validation.md` ثبت شد؛ checksum DB اصلی `f048f8d11833c4eaa944490594121d7` باقی مانده است.
+۹ strict xfail فعلی: O-02/RA-auth-02, O-12/RA-exams-02, O-19/RA-admin-19, RA-finance-02, RA-homework-01, RA-attendance-01/02/03 و RA-teachers-01. O-14 xfail نیست. contract simulator خام candidate ثبت می‌کند؛ `bugs.md`/Q-006..008 آن را از باگ قابل‌مشاهده جدا می‌کنند.
 
-این sweep جای ممیزی عمیق را نمی‌گیرد: registry همهٔ routeها را اجباری کرده، ۳۳ route از finance/attendance/classes در blockers با دلیل واقعی یک‌خطی بسته شده‌اند. calendar، branches، timeline و audit در این مرحله فقط sweep باقی مانده‌اند.
+`docs/route-tests/routes/*.md` برای هر route: یک جملهٔ purpose/handler، actor و status probe، caller/screen جاری، ورودی و response schema، DB read/write statically extracted، side effect و test-reference یا smoke-only status دارد. 102 route test source literal request reference دارند؛ این شمارش به‌تنهایی عمق assertion را اثبات نمی‌کند. 119 مسیر literal match ندارند؛ ledger per-route قید هر مورد را نشان می‌دهد.
+
+## دیتابیس اصلی و commit
+
+در اجرای نهایی، `md5sum Kharazmi_Server/gaj_db.db` قبل و بعد از pytest برابر `f048f8d118b33c4eaa944490594121d7` ثبت شد؛ sweep/contract/boundary/large نیز هرکدام DB موقت داشتند. این snapshot شامل زیرساخت deterministic seed، audit QR، socket blocking، oracle invoice و ledgerهای جاری است. این checkpoint روی branch ثابت نشست نگهداری می‌شود؛ 49 route هنوز به deep behavioral audit نیاز دارند و باگ application code عمداً اصلاح نشده است.

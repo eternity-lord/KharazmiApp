@@ -9,6 +9,8 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from ..clock import freeze_loaded_server_modules
+from .common import block_external_network_calls
 from .large_seed import seed_large_list_database
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -20,9 +22,24 @@ def run() -> dict:
         os.environ["JWT_SECRET_KEY"] = "route-audit-large-secret-" + "x" * 40
         manifest = seed_large_list_database(Path(tmp) / "large.db")
         sys.path.insert(0, str(ROOT / "Kharazmi_Server"))
-        import main  # type: ignore
+        block_external_network_calls()
+        import threading
 
-        client = TestClient(main.app)
+        original_start = threading.Thread.start
+
+        def no_live_auto_end_worker(thread, *args, **kwargs):
+            if thread.name == "live-session-auto-ender":
+                return None
+            return original_start(thread, *args, **kwargs)
+
+        try:
+            threading.Thread.start = no_live_auto_end_worker
+            import main  # type: ignore
+        finally:
+            threading.Thread.start = original_start
+        freeze_loaded_server_modules()
+
+        client = TestClient(main.app, raise_server_exceptions=False)
         headers = {
             role: {"Authorization": f"Bearer {token}"}
             for role, token in manifest["roles"].items()

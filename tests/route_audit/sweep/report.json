@@ -24,6 +24,18 @@
       "status": 409,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": {
+          "message": "تداخل زمان‌بندی وجود دارد",
+          "conflict_course_ids": {
+            "length": 2,
+            "first_items": [
+              "<nested>",
+              "<nested>"
+            ]
+          }
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -43,6 +55,21 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "status": "success",
+        "message": "تعداد 1 کلاس با موفقیت معلق شدند.",
+        "results": {
+          "length": 1,
+          "first_items": [
+            {
+              "course_id": "<nested>",
+              "course_title": "<nested>",
+              "status": "<nested>",
+              "message": "<nested>"
+            }
+          ]
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -62,6 +89,10 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "وضعیت کلاس به معلق (غیرفعال) تغییر کرد.",
+        "is_suspended": true
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -81,6 +112,33 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 1,
+        "first_items": [
+          {
+            "id": 4,
+            "title": "کلاس آرشیوی",
+            "code": "C-ARCH",
+            "teacher_id": 1,
+            "teacher_name": "رضا فعال",
+            "branch_id": 2,
+            "branch_name": "شعبه غرب تست",
+            "grade_level": "عالی",
+            "days_of_week": "شنبه,دوشنبه",
+            "class_time": "16:00",
+            "students_count": 1,
+            "students_active_count": 0,
+            "sessions_count": 0,
+            "transactions_count": 0,
+            "deleted_at": "",
+            "deleted_at_jalali": "",
+            "deleted_weekday": "",
+            "forgive_session_charges": false,
+            "is_suspended": false,
+            "bg_color": "#FFFFFF"
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -97,9 +155,32 @@
       "path": "/admin/deleted_classes/{course_id}",
       "handler": "routers.admin.get_deleted_class_detail",
       "role": "admin",
-      "status": 404,
+      "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "id": 4,
+        "title": "کلاس آرشیوی",
+        "code": "C-ARCH",
+        "grade_level": "عالی",
+        "days_of_week": "شنبه,دوشنبه",
+        "class_time": "16:00",
+        "is_suspended": false,
+        "bg_color": "#FFFFFF",
+        "teacher_id": 1,
+        "teacher_name": "رضا فعال",
+        "branch_id": 2,
+        "branch_name": "شعبه غرب تست",
+        "students_count": 1,
+        "students_active_count": 0,
+        "archived_enrollments_count": 1,
+        "sessions_count": 0,
+        "archived_sessions_count": 0,
+        "transactions_count": 0,
+        "transactions_total": 0,
+        "deleted_at": "",
+        "<omitted_keys>": 14
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -116,9 +197,27 @@
       "path": "/admin/deleted_classes/{course_id}/restore",
       "handler": "routers.admin.restore_deleted_class",
       "role": "admin",
-      "status": 409,
+      "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "کلاس بازیابی شد (فقط متادیتا) — ثبت‌نام‌ها و سابقهٔ مالی دست‌نخورده است",
+        "id": 4,
+        "title": "کلاس آرشیوی",
+        "code": "C-ARCH",
+        "is_deleted": false,
+        "is_suspended": false,
+        "mode": "metadata_only",
+        "finances_untouched": true,
+        "teacher_archived": false,
+        "warnings": {
+          "length": 0,
+          "first_items": []
+        },
+        "note": "برای ادامهٔ کلاس، ثبت‌نام‌های جدید بسازید؛ سابقهٔ مالی قبلی عمداً بازیابی نشده است.",
+        "deleted_at_was": "",
+        "reason": ""
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -138,6 +237,25 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "id": 1,
+        "logo_path": null,
+        "phone": "02100000000",
+        "footer_text": "پاورقی تست",
+        "manager_mobile_1": "09121112222",
+        "card_number_1": "۶۰۳۷۹۹۷۹۷۹۷۹۷۹۷۹",
+        "card_number_2": "۵۸۹۲۱۰۱۰۱۰۱۰۱۰۱۰",
+        "teachers_active": true,
+        "teacher_settlement_alert_days": 30,
+        "address": "تهران",
+        "name": "آموزشگاه ممیزی",
+        "official_email": "audit@example.test",
+        "card_number": "6037000000000000",
+        "manager_mobile_2": "09123334444",
+        "card_holder_1": "خانم لطفی",
+        "card_holder_2": "آقای علوی",
+        "live_session_max_minutes": 180
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -157,6 +275,28 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "تنظیمات آموزشگاه با موفقیت بروزرسانی شد",
+        "settings": {
+          "id": 1,
+          "logo_path": null,
+          "phone": "route-audit",
+          "footer_text": "route-audit",
+          "manager_mobile_1": "09120000001",
+          "card_number_1": "route-audit",
+          "card_number_2": "route-audit",
+          "teachers_active": false,
+          "teacher_settlement_alert_days": 30,
+          "address": "route-audit",
+          "name": "route-audit",
+          "official_email": "audit@example.test",
+          "card_number": "route-audit",
+          "manager_mobile_2": "09120000001",
+          "card_holder_1": "route-audit",
+          "card_holder_2": "route-audit",
+          "live_session_max_minutes": 1
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -176,6 +316,19 @@
       "status": 422,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": {
+          "length": 1,
+          "first_items": [
+            {
+              "type": "<nested>",
+              "loc": "<nested>",
+              "msg": "<nested>",
+              "input": "<nested>"
+            }
+          ]
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -195,6 +348,25 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 1,
+        "first_items": [
+          {
+            "live_session_id": 1,
+            "course_id": 2,
+            "class_title": "فیزیک دوکلاسه",
+            "course_code": "C-MULTI",
+            "teacher_name": "رضا فعال",
+            "start_time": "2026-09-28T09:00:00",
+            "started_at_ts": 1790586000.25,
+            "elapsed_minutes": 0,
+            "total_enrolled": 1,
+            "present": 1,
+            "absent": 0,
+            "undetermined": 0
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -214,6 +386,33 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "live_session_id": 1,
+        "course_id": 2,
+        "class_title": "فیزیک دوکلاسه",
+        "course_code": "C-MULTI",
+        "teacher_name": "رضا فعال",
+        "start_time": "2026-09-28T09:00:00",
+        "started_at_ts": 1790586000.25,
+        "elapsed_minutes": 0,
+        "total_enrolled": 1,
+        "present": 1,
+        "absent": 0,
+        "undetermined": 0,
+        "students": {
+          "length": 1,
+          "first_items": [
+            {
+              "student_id": "<nested>",
+              "student_name": "<nested>",
+              "status": "<nested>",
+              "excused": "<nested>",
+              "student_mobile": "<nested>",
+              "parent_mobile": "<nested>"
+            }
+          ]
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -233,6 +432,36 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 29,
+        "first_items": [
+          {
+            "student_id": 1,
+            "student_name": "دانش‌آموز تست 1",
+            "student_mobile": "09350000001",
+            "parent_mobile": "09360000001",
+            "classes": {
+              "length": 2,
+              "first_items": [
+                "<nested>",
+                "<nested>"
+              ]
+            }
+          },
+          {
+            "student_id": 2,
+            "student_name": "دانش‌آموز تست 2",
+            "student_mobile": "09350000002",
+            "parent_mobile": "09360000002",
+            "classes": {
+              "length": 1,
+              "first_items": [
+                "<nested>"
+              ]
+            }
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -252,6 +481,60 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 2,
+        "first_items": [
+          {
+            "id": 5,
+            "title": "کلاس در انتظار",
+            "code": "C-PEND",
+            "teacher_id": 1,
+            "teacher_name": "رضا فعال",
+            "teacher_price": 300000,
+            "days": "شنبه,دوشنبه",
+            "days_of_week": "شنبه,دوشنبه",
+            "time": "16:00",
+            "class_time": "16:00",
+            "capacity": 20,
+            "branch_id": 1,
+            "status": "rejected",
+            "rejection_reason": "ظرفیت تکمیل",
+            "pending_since": "2026-09-28T09:00:00",
+            "conflict_course_ids": {
+              "length": 2,
+              "first_items": [
+                "<nested>",
+                "<nested>"
+              ]
+            },
+            "has_schedule_conflict": true,
+            "base_institute_share": 0
+          },
+          {
+            "id": 6,
+            "title": "کلاس ردشده",
+            "code": "C-REJ",
+            "teacher_id": 2,
+            "teacher_name": "مریم معلق",
+            "teacher_price": 310000,
+            "days": "شنبه,دوشنبه",
+            "days_of_week": "شنبه,دوشنبه",
+            "time": "16:00",
+            "class_time": "16:00",
+            "capacity": 20,
+            "branch_id": 2,
+            "status": "rejected",
+            "rejection_reason": "ظرفیت تکمیل",
+            "pending_since": "2026-09-28T09:00:00",
+            "conflict_course_ids": {
+              "length": 0,
+              "first_items": []
+            },
+            "has_schedule_conflict": false,
+            "base_institute_share": 0
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -271,6 +554,20 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 1,
+        "first_items": [
+          {
+            "id": 1,
+            "count_2": 200,
+            "count_4": 400,
+            "count_3": 300,
+            "category": "elementary",
+            "count_1": 100,
+            "count_5": 500
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -290,6 +587,9 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "جدول قیمت‌گذاری با موفقیت بروزرسانی شد"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -309,6 +609,10 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "کلاس رد و حذف شد و ترازهای مالی اصلاح گردید.",
+        "reason": "رد درخواست توسط مدیر"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -328,6 +632,65 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "items": {
+          "length": 2,
+          "first_items": [
+            {
+              "id": "<nested>",
+              "course_id": "<nested>",
+              "course_title": "<nested>",
+              "teacher_id": "<nested>",
+              "teacher_name": "<nested>",
+              "branch_id": "<nested>",
+              "date": "<nested>",
+              "time": "<nested>",
+              "start_time": "<nested>",
+              "end_time": "<nested>",
+              "status": "<nested>",
+              "attendance_count": "<nested>",
+              "attendance": "<nested>",
+              "financial_status": "<nested>",
+              "problem_flags": "<nested>",
+              "attendance_missing": "<nested>",
+              "started_late": "<nested>",
+              "auto_ended": "<nested>",
+              "reopen_allowed": "<nested>"
+            },
+            {
+              "id": "<nested>",
+              "course_id": "<nested>",
+              "course_title": "<nested>",
+              "teacher_id": "<nested>",
+              "teacher_name": "<nested>",
+              "branch_id": "<nested>",
+              "date": "<nested>",
+              "time": "<nested>",
+              "start_time": "<nested>",
+              "end_time": "<nested>",
+              "status": "<nested>",
+              "attendance_count": "<nested>",
+              "attendance": "<nested>",
+              "financial_status": "<nested>",
+              "problem_flags": "<nested>",
+              "attendance_missing": "<nested>",
+              "started_late": "<nested>",
+              "auto_ended": "<nested>",
+              "reopen_allowed": "<nested>"
+            }
+          ]
+        },
+        "count": 2,
+        "filters": {
+          "date_from": null,
+          "date_to": null,
+          "teacher_id": null,
+          "course_id": null,
+          "flag": null,
+          "status": null,
+          "search": null
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -347,6 +710,9 @@
       "status": 409,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": "جلسهٔ دارای اثر مالی قابل بازگشایی نیست"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -366,6 +732,27 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 29,
+        "first_items": [
+          {
+            "id": 1,
+            "name": "دانش‌آموز تست 1",
+            "national_code": "0020000001",
+            "mobile": "09350000001",
+            "role": "student",
+            "is_suspended": false
+          },
+          {
+            "id": 2,
+            "name": "دانش‌آموز تست 2",
+            "national_code": "0020000002",
+            "mobile": "09350000002",
+            "role": "student",
+            "is_suspended": true
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -385,6 +772,9 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "دانش‌آموز با موفقیت آرشیو شد و سوابق مالی او حفظ گردید."
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -404,6 +794,136 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "info": {
+          "name": "دانش‌آموز تست 1",
+          "national_code": "0020000001",
+          "student_mobile": "09350000001",
+          "parent_mobile": "09360000001",
+          "address": "آدرس تست",
+          "is_suspended": false,
+          "profile_image": null,
+          "student_code": 2001
+        },
+        "classes": {
+          "length": 2,
+          "first_items": [
+            "ریاضی پایه فعال (کد: C-ACTIVE)",
+            "فیزیک دوکلاسه (کد: C-MULTI)"
+          ]
+        },
+        "enrollments": {
+          "length": 2,
+          "first_items": [
+            {
+              "enrollment_id": "<nested>",
+              "course_id": "<nested>",
+              "title": "<nested>",
+              "course_title": "<nested>",
+              "code": "<nested>",
+              "branch_id": "<nested>",
+              "teacher_id": "<nested>",
+              "teacher_name": "<nested>",
+              "debt": "<nested>",
+              "debt_teacher": "<nested>",
+              "debt_institute": "<nested>",
+              "total_debt": "<nested>",
+              "is_unassigned": "<nested>",
+              "sessions_billed": "<nested>",
+              "sessions_held": "<nested>",
+              "unpaid_sessions": "<nested>",
+              "session_unit_teacher": "<nested>",
+              "session_unit_institute": "<nested>",
+              "session_unit_total": "<nested>",
+              "contract_only": "<nested>"
+            },
+            {
+              "enrollment_id": "<nested>",
+              "course_id": "<nested>",
+              "title": "<nested>",
+              "course_title": "<nested>",
+              "code": "<nested>",
+              "branch_id": "<nested>",
+              "teacher_id": "<nested>",
+              "teacher_name": "<nested>",
+              "debt": "<nested>",
+              "debt_teacher": "<nested>",
+              "debt_institute": "<nested>",
+              "total_debt": "<nested>",
+              "is_unassigned": "<nested>",
+              "sessions_billed": "<nested>",
+              "sessions_held": "<nested>",
+              "unpaid_sessions": "<nested>",
+              "session_unit_teacher": "<nested>",
+              "session_unit_institute": "<nested>",
+              "session_unit_total": "<nested>",
+              "contract_only": "<nested>"
+            }
+          ]
+        },
+        "transactions": {
+          "length": 2,
+          "first_items": [
+            "1405/06/04: 500,000 (پرداخت split)",
+            "1405/06/03: 300,000 (پرداخت enrollment اول)"
+          ]
+        },
+        "total_debt": 2000000,
+        "debt_teacher": 10000,
+        "debt_institute": 0,
+        "wallet_teacher": -10000,
+        "wallet_institute": 5000,
+        "wallet_total": -5000,
+        "total_paid_institute": 550000,
+        "unassigned_debt": 0,
+        "teachers_financial": {
+          "length": 2,
+          "first_items": [
+            {
+              "enrollment_id": "<nested>",
+              "course_id": "<nested>",
+              "course_title": "<nested>",
+              "course_code": "<nested>",
+              "teacher_id": "<nested>",
+              "teacher_name": "<nested>",
+              "paid_teacher": "<nested>",
+              "debt_teacher": "<nested>",
+              "paid_institute": "<nested>",
+              "debt_institute": "<nested>",
+              "debt": "<nested>",
+              "is_unassigned": "<nested>",
+              "sessions_billed": "<nested>",
+              "sessions_held": "<nested>",
+              "unpaid_sessions": "<nested>",
+              "session_unit_teacher": "<nested>",
+              "session_unit_institute": "<nested>",
+              "session_unit_total": "<nested>",
+              "contract_only": "<nested>"
+            },
+            {
+              "enrollment_id": "<nested>",
+              "course_id": "<nested>",
+              "course_title": "<nested>",
+              "course_code": "<nested>",
+              "teacher_id": "<nested>",
+              "teacher_name": "<nested>",
+              "paid_teacher": "<nested>",
+              "debt_teacher": "<nested>",
+              "paid_institute": "<nested>",
+              "debt_institute": "<nested>",
+              "debt": "<nested>",
+              "is_unassigned": "<nested>",
+              "sessions_billed": "<nested>",
+              "sessions_held": "<nested>",
+              "unpaid_sessions": "<nested>",
+              "session_unit_teacher": "<nested>",
+              "session_unit_institute": "<nested>",
+              "session_unit_total": "<nested>",
+              "contract_only": "<nested>"
+            }
+          ]
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -423,6 +943,9 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "لینک پورتال با موفقیت پیامک شد."
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -442,6 +965,10 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "وضعیت دانش‌آموز به معلق (غیرفعال) تغییر کرد.",
+        "is_suspended": true
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -461,6 +988,27 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 2,
+        "first_items": [
+          {
+            "id": 1,
+            "name": "رضا فعال",
+            "national_code": "0010000001",
+            "mobile": "09120000001",
+            "role": "teacher",
+            "is_suspended": false
+          },
+          {
+            "id": 2,
+            "name": "مریم معلق",
+            "national_code": "0010000002",
+            "mobile": "09120000002",
+            "role": "teacher",
+            "is_suspended": true
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -480,6 +1028,15 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "id": 1,
+        "name": "رضا فعال",
+        "national_code": "0010000001",
+        "mobile": "09120000001",
+        "teacher_code": 1001,
+        "password": "$pbkdf2-sha256$29000$hPC.VyqlVOp9DwEAYOw9hw$k4pFY4N8BjfSlD7a3ywiqumZwyJ70pPH4cS9ub25F7A",
+        "card_number": "603700000001"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -499,6 +1056,9 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "اطلاعات تماس و حساب بانکی معلم با موفقیت به‌روزرسانی شد"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -518,6 +1078,10 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "رمز عبور جدید معلم با موفقیت صادر شد",
+        "new_password": "8BBYATht"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -537,6 +1101,9 @@
       "status": 400,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": "امکان حذف معلم وجود ندارد. این معلم 3 کلاس فعال دارد."
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -556,6 +1123,10 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "معلم تعلیق شد",
+        "is_suspended": true
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -575,6 +1146,40 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "date": "1405/07/06",
+        "day_name": "دوشنبه",
+        "scheduled_classes": 3,
+        "started_classes": 1,
+        "late_classes": {
+          "length": 0,
+          "first_items": []
+        },
+        "today_payments": 0,
+        "payment_visible": true,
+        "today_enrollments": 0,
+        "smart_alerts_visible": true,
+        "teacher_settlement_alert_days": 30,
+        "installment_alerts": {
+          "count": 2,
+          "total_amount": 700000,
+          "items": {
+            "length": 2,
+            "first_items": [
+              "<nested>",
+              "<nested>"
+            ]
+          }
+        },
+        "teacher_settlement_alerts": {
+          "count": 0,
+          "total_amount": 0,
+          "items": {
+            "length": 0,
+            "first_items": []
+          }
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -594,6 +1199,33 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 5,
+        "first_items": [
+          {
+            "id": 6,
+            "student_id": 8,
+            "student_name": "دانش‌آموز تست 8",
+            "course_id": 2,
+            "course_name": "فیزیک دوکلاسه",
+            "amount": 125000,
+            "date": "2026-09-20",
+            "description": "پرداخت کارتی میلادی legacy",
+            "type": "deposit"
+          },
+          {
+            "id": 4,
+            "student_id": 6,
+            "student_name": "دانش‌آموز تست 6",
+            "course_id": null,
+            "course_name": "---",
+            "amount": 75000,
+            "date": "",
+            "description": "legacy بی‌تاریخ",
+            "type": "deposit"
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -613,6 +1245,7 @@
       "status": 200,
       "json": false,
       "shape": "non-json",
+      "sample_value": null,
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -632,6 +1265,9 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "تراکنش حذف شد و حساب‌ها اصلاح گردید."
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -651,6 +1287,9 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "تراکنش ویرایش و تراز مالی به‌روز شد."
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -670,6 +1309,12 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "status": "success",
+        "response": "⚠️ [نسخه‌ی آزمایشی — پاسخ‌ها بر پایه‌ی الگوی ثابت و شبیه‌سازی‌شده هستند]\n\nمن دستیار هوشمند مدیریت خوارزمی هستم. چطور می‌توانم در تحلیل ترازهای مالی، مدیریت ش...",
+        "role": "admin",
+        "suggested_action": null
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -689,6 +1334,27 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 6,
+        "first_items": [
+          {
+            "course_id": 1,
+            "course_code": "C-ACTIVE",
+            "title": "ریاضی پایه فعال",
+            "student_count": 4,
+            "average_grade": 15.5,
+            "attendance_rate": 33.3
+          },
+          {
+            "course_id": 2,
+            "course_code": "C-MULTI",
+            "title": "فیزیک دوکلاسه",
+            "student_count": 1,
+            "average_grade": 0.0,
+            "attendance_rate": 100.0
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -708,6 +1374,23 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "period": {
+          "start": "2026/08/29",
+          "end": "2026/09/28",
+          "filter": "Month"
+        },
+        "active_students": 5,
+        "new_registrations": 0,
+        "retention_rate": 20.0,
+        "attendance_rate": 50.0,
+        "average_grade": 15.5,
+        "outstanding_debt": 2800000,
+        "monthly_revenue": 0,
+        "total_turnover": 125000,
+        "lead_conversion_rate": 0.0,
+        "payment_collection_rate": 58.8
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -727,6 +1410,19 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "period": {
+          "start_date": "2026/09/11",
+          "end_date": "2026/09/11"
+        },
+        "branch_id": 1,
+        "total_leads": 0,
+        "converted_leads": 0,
+        "conversion_rate": 0.0,
+        "average_conversion_hours": 0.0,
+        "average_conversion_days": 0.0,
+        "timed_conversions": 0
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -752,6 +1448,7 @@
       "status": 200,
       "json": false,
       "shape": "non-json",
+      "sample_value": null,
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -771,6 +1468,7 @@
       "status": 200,
       "json": false,
       "shape": "non-json",
+      "sample_value": null,
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -790,6 +1488,27 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 2,
+        "first_items": [
+          {
+            "teacher_id": 1,
+            "teacher_name": "رضا فعال",
+            "student_count": 5,
+            "average_grade": 15.5,
+            "attendance_rate": 50.0,
+            "wallet_balance": 300000
+          },
+          {
+            "teacher_id": 2,
+            "teacher_name": "مریم معلق",
+            "student_count": 1,
+            "average_grade": 0.0,
+            "attendance_rate": 100.0,
+            "wallet_balance": 0
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -809,6 +1528,10 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 0,
+        "first_items": []
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -828,6 +1551,21 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 1,
+        "first_items": [
+          {
+            "session_id": 1,
+            "date": "1405/06/10",
+            "attendees": 3,
+            "cost_per_student": 200000,
+            "total_cost": 600000,
+            "status": "Finished",
+            "start_time": "16:00",
+            "end_time": "17:30"
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -847,6 +1585,16 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "live_session_id": 1,
+        "course_id": 2,
+        "class_title": "فیزیک دوکلاسه",
+        "course_code": "C-MULTI",
+        "status": "LIVE",
+        "start_time": "2026-09-28T09:00:00",
+        "started_at_ts": 1790586000.25,
+        "max_minutes": 180
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -863,9 +1611,12 @@
       "path": "/attendance/qr_check-in",
       "handler": "routers.attendance.qr_student_check_in",
       "role": "student",
-      "status": 403,
+      "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "حضور شما با موفقیت با اسکن کد QR ثبت گردید"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -885,6 +1636,9 @@
       "status": 409,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": "این جلسه قبلاً با معلم تسویه شده و قابل حذف نیست؛ برای اصلاح، ابتدا با بخش مالی/تسویه هماهنگ کنید"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -904,6 +1658,35 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "session_id": 1,
+        "session_code": 5001,
+        "course_id": 1,
+        "class_title": "ریاضی پایه فعال",
+        "class_code": "C-ACTIVE",
+        "teacher_name": "رضا فعال",
+        "date": "1405/06/10",
+        "attendee_count": 3,
+        "items": {
+          "length": 3,
+          "first_items": [
+            {
+              "student_id": "<nested>",
+              "name": "<nested>",
+              "status": "<nested>",
+              "excused": "<nested>",
+              "student_code": "<nested>"
+            },
+            {
+              "student_id": "<nested>",
+              "name": "<nested>",
+              "status": "<nested>",
+              "excused": "<nested>",
+              "student_code": "<nested>"
+            }
+          ]
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -923,6 +1706,9 @@
       "status": 409,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": "این جلسه قبلاً با معلم تسویه شده و قابل ویرایش نیست؛ برای اصلاح، ابتدا با بخش مالی/تسویه هماهنگ کنید"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -942,6 +1728,27 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "student_name": "دانش‌آموز تست 1",
+        "course_title": "ریاضی پایه فعال",
+        "course_code": "C-ACTIVE",
+        "total_sessions": 1,
+        "present_count": 1,
+        "absent_count": 0,
+        "attendance_rate": 100.0,
+        "attendance_history": {
+          "length": 1,
+          "first_items": [
+            {
+              "session_id": "<nested>",
+              "date": "<nested>",
+              "status": "<nested>",
+              "session_cost": "<nested>",
+              "attendee_count": "<nested>"
+            }
+          ]
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -961,6 +1768,20 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "جلسه ثبت شد.",
+        "session_id": 4,
+        "session_code": 100001,
+        "details": {
+          "present_count": 1,
+          "cost_per_student": 0,
+          "teacher_share": 0,
+          "institute_share": 0,
+          "absent_penalty_teacher": 0,
+          "absent_penalty_institute": 0,
+          "total_session_cost": 0
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -976,10 +1797,19 @@
       "method": "POST",
       "path": "/attendance/{course_id}/start_live",
       "handler": "routers.attendance.start_live_session",
-      "role": "admin",
+      "role": "teacher",
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "جلسه‌ی زنده شروع شد.",
+        "live_session_id": 3,
+        "course_id": 1,
+        "status": "LIVE",
+        "start_time": "2026-09-28 09:00",
+        "started_at_ts": 1790586000,
+        "max_minutes": 180
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -995,10 +1825,15 @@
       "method": "POST",
       "path": "/attendance/{session_id}/cancel_live",
       "handler": "routers.attendance.cancel_live_session",
-      "role": "admin",
+      "role": "teacher",
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "کلاس زنده لغو شد و هیچ شهریه، حضور و غیاب یا تراکنشی ثبت نشد.",
+        "live_session_id": 1,
+        "status": "CANCELLED"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1014,10 +1849,26 @@
       "method": "POST",
       "path": "/attendance/{session_id}/end_live",
       "handler": "routers.attendance.end_live_session",
-      "role": "admin",
+      "role": "teacher",
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "جلسه‌ی زنده پایان یافت و محاسبات مالی انجام شد.",
+        "live_session_id": 1,
+        "ended_automatically": false,
+        "session_id": 4,
+        "session_code": 100001,
+        "details": {
+          "present_count": 1,
+          "cost_per_student": 0,
+          "teacher_share": 0,
+          "institute_share": 0,
+          "absent_penalty_teacher": 0,
+          "absent_penalty_institute": 0,
+          "total_session_cost": 0
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1033,10 +1884,14 @@
       "method": "POST",
       "path": "/attendance/{session_id}/live_status",
       "handler": "routers.attendance.save_live_status",
-      "role": "admin",
+      "role": "teacher",
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "وضعیت لحظه‌ای ذخیره شد.",
+        "count": 1
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1056,6 +1911,63 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "logs": {
+          "length": 5,
+          "first_items": [
+            {
+              "id": "<nested>",
+              "timestamp": "<nested>",
+              "username": "<nested>",
+              "action": "<nested>",
+              "entity_type": "<nested>",
+              "entity_id": "<nested>",
+              "old_values": "<nested>",
+              "new_values": "<nested>",
+              "ip_address": "<nested>",
+              "changed_fields": "<nested>",
+              "labels": "<nested>",
+              "changed_labels": "<nested>",
+              "change_summary": "<nested>",
+              "action_label": "<nested>",
+              "change_type": "<nested>",
+              "action_color": "<nested>",
+              "icon_color": "<nested>",
+              "entity_refs": "<nested>",
+              "student_id": "<nested>",
+              "student_name": "<nested>",
+              "<omitted_keys>": 5
+            },
+            {
+              "id": "<nested>",
+              "timestamp": "<nested>",
+              "username": "<nested>",
+              "action": "<nested>",
+              "entity_type": "<nested>",
+              "entity_id": "<nested>",
+              "old_values": "<nested>",
+              "new_values": "<nested>",
+              "ip_address": "<nested>",
+              "changed_fields": "<nested>",
+              "labels": "<nested>",
+              "changed_labels": "<nested>",
+              "change_summary": "<nested>",
+              "action_label": "<nested>",
+              "change_type": "<nested>",
+              "action_color": "<nested>",
+              "icon_color": "<nested>",
+              "entity_refs": "<nested>",
+              "student_id": "<nested>",
+              "student_name": "<nested>",
+              "<omitted_keys>": 5
+            }
+          ]
+        },
+        "total": 5,
+        "page": 1,
+        "limit": 50,
+        "pages": 1
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1075,6 +1987,10 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 0,
+        "first_items": []
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1091,9 +2007,12 @@
       "path": "/auth/change-mobile",
       "handler": "routers.auth.change_mobile",
       "role": "admin",
-      "status": 400,
+      "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "شماره‌ی شما با موفقیت تغییر کرد، لطفاً دوباره با شماره‌ی جدید وارد شوید"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1110,9 +2029,12 @@
       "path": "/auth/change-password",
       "handler": "routers.auth.change_password",
       "role": "admin",
-      "status": 403,
+      "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "رمز عبور مدیر با موفقیت تغییر کرد"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1132,6 +2054,9 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "توکن دستگاه با موفقیت ثبت شد"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1147,10 +2072,13 @@
       "method": "POST",
       "path": "/auth/login",
       "handler": "routers.auth.login_user",
-      "role": "admin",
+      "role": "public",
       "status": 400,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": "رمز عبور اشتباه است"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1170,6 +2098,9 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "خروج با موفقیت انجام شد و نشست باطل گردید"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1189,6 +2120,17 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "user_id": 1,
+        "name": "ادمین ممیزی",
+        "role": "admin",
+        "permissions": {
+          "length": 1,
+          "first_items": [
+            "*"
+          ]
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1204,10 +2146,13 @@
       "method": "POST",
       "path": "/auth/student/login",
       "handler": "routers.auth.student_login",
-      "role": "admin",
+      "role": "public",
       "status": 400,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": "کد تایید نامعتبر یا منقضی شده است"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1223,10 +2168,14 @@
       "method": "POST",
       "path": "/auth/student/request_otp",
       "handler": "routers.auth.request_student_otp",
-      "role": "admin",
-      "status": 404,
+      "role": "public",
+      "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "status": "success",
+        "message": "کد یک‌بارمصرف ورود دانش‌آموز با موفقیت ارسال شد"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1246,6 +2195,17 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 1,
+        "first_items": [
+          {
+            "id": 1,
+            "rule_id": 1,
+            "triggered_at": "2026-09-28T09:00:00",
+            "details": "seed"
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1265,6 +2225,19 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 1,
+        "first_items": [
+          {
+            "id": 1,
+            "threshold": 1.0,
+            "active": true,
+            "action_type": "parent_alert",
+            "name": "قسط معوق",
+            "condition_type": "installment_overdue"
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1284,6 +2257,9 @@
       "status": 400,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": "نوع شرط نامعتبر است"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1303,6 +2279,9 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "قانون خودکارسازی با موفقیت بروزرسانی شد"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1322,6 +2301,11 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "status": "success",
+        "message": "قوانین خودکارسازی با موفقیت بررسی و اجرا شدند.",
+        "triggered_actions_count": 2
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1341,6 +2325,27 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 2,
+        "first_items": [
+          {
+            "manager": "مدیر تست",
+            "address": "تهران",
+            "name": "شعبه مرکزی تست",
+            "id": 1,
+            "phone": "02100000000",
+            "active": true
+          },
+          {
+            "manager": "مدیر دوم",
+            "address": "تهران غرب",
+            "name": "شعبه غرب تست",
+            "id": 2,
+            "phone": "02100000001",
+            "active": true
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1360,6 +2365,11 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "status": "success",
+        "message": "شعبه جدید با موفقیت ایجاد شد",
+        "branch_id": 3
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1379,6 +2389,10 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "status": "success",
+        "message": "اطلاعات شعبه با موفقیت بروزرسانی شد"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1398,6 +2412,10 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "status": "success",
+        "message": "شعبه با موفقیت به وضعیت 'غیرفعال (تعلیق)' تغییر یافت"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1417,6 +2435,14 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "has_conflict": false,
+        "message": "برنامه زمانی کاملاً آزاد و بدون تداخل است.",
+        "details": {
+          "length": 0,
+          "first_items": []
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1436,6 +2462,23 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 6,
+        "first_items": [
+          {
+            "type": "class",
+            "title": "🎓 کلاس: ریاضی پایه فعال",
+            "detail": "کد: C-ACTIVE | مربی: رضا فعال",
+            "schedule": "شنبه,دوشنبه 16:00"
+          },
+          {
+            "type": "class",
+            "title": "🎓 کلاس: فیزیک دوکلاسه",
+            "detail": "کد: C-MULTI | مربی: رضا فعال",
+            "schedule": "شنبه,دوشنبه 16:00"
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1455,6 +2498,9 @@
       "status": 400,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": "شعبه مشخص نیست: سیستم چند شعبه‌ی فعال دارد و شعبه‌ی قابل‌اعتمادی برای این داده پیدا نشد. لطفاً branch_id معتبر ارسال کنید یا شعبه‌ی کاربر/معلم را تنظیم کنید."
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1474,6 +2520,10 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 0,
+        "first_items": []
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1490,9 +2540,12 @@
       "path": "/classes/deletion_requests/{request_id}/approve",
       "handler": "routers.classes.approve_class_deletion",
       "role": "admin",
-      "status": 404,
+      "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "حذف کلاس تایید و اعمال شد."
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1509,9 +2562,12 @@
       "path": "/classes/deletion_requests/{request_id}/reject",
       "handler": "routers.classes.reject_class_deletion",
       "role": "admin",
-      "status": 404,
+      "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "درخواست حذف رد شد؛ کلاس دست نخورده باقی ماند."
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1531,6 +2587,63 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 6,
+        "first_items": [
+          {
+            "id": 7,
+            "title": "کلاس معلم حذف‌شده",
+            "code": "C-DELETED-TEACHER",
+            "grade_level": "متوسطه",
+            "gender": "mixed",
+            "teacher_id": 3,
+            "teacher_name": "معلم حذف‌شده",
+            "students_preview": {
+              "length": 0,
+              "first_items": []
+            },
+            "session_count": 0,
+            "total_debt": 0,
+            "debt_to_teacher": 0,
+            "debt_to_institute": 0,
+            "total_paid": 0,
+            "paid_to_teacher": 0,
+            "paid_to_institute": 0,
+            "unpaid_sessions": 0,
+            "sessions_billed": 0,
+            "enrollment_id": null,
+            "course_id": 7,
+            "course_title": "کلاس معلم حذف‌شده",
+            "<omitted_keys>": 2
+          },
+          {
+            "id": 6,
+            "title": "کلاس ردشده",
+            "code": "C-REJ",
+            "grade_level": "متوسطه",
+            "gender": "mixed",
+            "teacher_id": 2,
+            "teacher_name": "مریم معلق",
+            "students_preview": {
+              "length": 0,
+              "first_items": []
+            },
+            "session_count": 0,
+            "total_debt": 0,
+            "debt_to_teacher": 0,
+            "debt_to_institute": 0,
+            "total_paid": 0,
+            "paid_to_teacher": 0,
+            "paid_to_institute": 0,
+            "unpaid_sessions": 0,
+            "sessions_billed": 0,
+            "enrollment_id": null,
+            "course_id": 6,
+            "course_title": "کلاس ردشده",
+            "<omitted_keys>": 2
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1550,6 +2663,35 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 2,
+        "first_items": [
+          {
+            "id": 6,
+            "title": "کلاس ردشده",
+            "code": "C-REJ",
+            "teacher_id": 2,
+            "teacher_name": "مریم معلق",
+            "days_of_week": "شنبه,دوشنبه",
+            "class_time": "16:00",
+            "capacity": 20,
+            "rejection_reason": "ظرفیت تکمیل",
+            "pending_since": "2026-09-28T09:00:00"
+          },
+          {
+            "id": 5,
+            "title": "کلاس در انتظار",
+            "code": "C-PEND",
+            "teacher_id": 1,
+            "teacher_name": "رضا فعال",
+            "days_of_week": "شنبه,دوشنبه",
+            "class_time": "16:00",
+            "capacity": 20,
+            "rejection_reason": "ظرفیت تکمیل",
+            "pending_since": "2026-09-28T09:00:00"
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1569,6 +2711,14 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "تایید شد",
+        "approved_count": 0,
+        "course_ids": {
+          "length": 0,
+          "first_items": []
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1588,6 +2738,9 @@
       "status": 400,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": "علت رد کلاس الزامی است"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1607,6 +2760,18 @@
       "status": 409,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": {
+          "message": "تداخل زمان‌بندی با کلاس فعال",
+          "conflict_course_ids": {
+            "length": 2,
+            "first_items": [
+              "<nested>",
+              "<nested>"
+            ]
+          }
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1626,6 +2791,9 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "اطلاعات کلاس با موفقیت ویرایش شد."
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1645,6 +2813,7 @@
       "status": 200,
       "json": false,
       "shape": "non-json",
+      "sample_value": null,
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1664,6 +2833,9 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "کلاس با موفقیت حذف و آرشیو شد."
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1683,6 +2855,78 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "course_info": {
+          "education_type": "school",
+          "rule_prepay_institute": true,
+          "pending_since": null,
+          "grade_level": "ابتدایی",
+          "rule_prepay_teacher": true,
+          "is_deleted": false,
+          "id": 1,
+          "gender_type": "mixed",
+          "rule_calc_absent": true,
+          "title": "ریاضی پایه فعال",
+          "class_type": "خصوصی",
+          "is_admin_approved": true,
+          "branch_id": 1,
+          "days_of_week": "شنبه,دوشنبه",
+          "is_suspended": false,
+          "code": "C-ACTIVE",
+          "class_time": "16:00",
+          "is_paused": false,
+          "teacher_id": 1,
+          "teacher_session_price": 260000,
+          "<omitted_keys>": 4
+        },
+        "students": {
+          "length": 4,
+          "first_items": [
+            {
+              "student_name": "<nested>",
+              "student_id": "<nested>",
+              "student_code": "<nested>",
+              "total_tuition": "<nested>",
+              "paid": "<nested>",
+              "paid_teacher": "<nested>",
+              "paid_institute": "<nested>",
+              "debt": "<nested>",
+              "debt_teacher": "<nested>",
+              "debt_institute": "<nested>",
+              "enrollment_id": "<nested>",
+              "course_id": "<nested>",
+              "course_title": "<nested>",
+              "teacher_id": "<nested>",
+              "teacher_name": "<nested>",
+              "is_unassigned": "<nested>",
+              "discount_type": "<nested>",
+              "discount_value": "<nested>",
+              "discount_amount": "<nested>"
+            },
+            {
+              "student_name": "<nested>",
+              "student_id": "<nested>",
+              "student_code": "<nested>",
+              "total_tuition": "<nested>",
+              "paid": "<nested>",
+              "paid_teacher": "<nested>",
+              "paid_institute": "<nested>",
+              "debt": "<nested>",
+              "debt_teacher": "<nested>",
+              "debt_institute": "<nested>",
+              "enrollment_id": "<nested>",
+              "course_id": "<nested>",
+              "course_title": "<nested>",
+              "teacher_id": "<nested>",
+              "teacher_name": "<nested>",
+              "is_unassigned": "<nested>",
+              "discount_type": "<nested>",
+              "discount_value": "<nested>",
+              "discount_amount": "<nested>"
+            }
+          ]
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1698,10 +2942,15 @@
       "method": "POST",
       "path": "/classes/{course_id}/request_delete",
       "handler": "routers.classes.request_class_deletion",
-      "role": "admin",
-      "status": 403,
+      "role": "teacher",
+      "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "request_id": 1,
+        "status": "pending",
+        "message": "درخواست حذف ثبت شد و پس از تایید ادمین اعمال می‌گردد."
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1721,6 +2970,10 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "وضعیت کلاس به معلق (غیرفعال) تغییر کرد.",
+        "is_suspended": true
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1740,6 +2993,71 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "info": {
+          "title": "ریاضی پایه فعال",
+          "code": "C-ACTIVE",
+          "teacher_name": "رضا فعال",
+          "session_count": 1,
+          "total_students": 4,
+          "total_revenue": 300000,
+          "total_debt": 1500000,
+          "debt_to_teacher": 0,
+          "debt_to_institute": 1500000
+        },
+        "students": {
+          "length": 4,
+          "first_items": [
+            {
+              "name": "<nested>",
+              "mobile": "<nested>",
+              "paid": "<nested>",
+              "debt": "<nested>",
+              "debt_to_teacher": "<nested>",
+              "debt_to_institute": "<nested>",
+              "enrollment_id": "<nested>",
+              "course_id": "<nested>",
+              "course_title": "<nested>",
+              "teacher_id": "<nested>",
+              "teacher_name": "<nested>",
+              "is_unassigned": "<nested>"
+            },
+            {
+              "name": "<nested>",
+              "mobile": "<nested>",
+              "paid": "<nested>",
+              "debt": "<nested>",
+              "debt_to_teacher": "<nested>",
+              "debt_to_institute": "<nested>",
+              "enrollment_id": "<nested>",
+              "course_id": "<nested>",
+              "course_title": "<nested>",
+              "teacher_id": "<nested>",
+              "teacher_name": "<nested>",
+              "is_unassigned": "<nested>"
+            }
+          ]
+        },
+        "sessions": {
+          "length": 1,
+          "first_items": [
+            {
+              "date": "<nested>",
+              "present_count": "<nested>",
+              "absent_count": "<nested>",
+              "session_id": "<nested>",
+              "session_code": "<nested>",
+              "weekday": "<nested>",
+              "present_students": "<nested>",
+              "absent_students": "<nested>",
+              "total_cost": "<nested>",
+              "cost_per_student": "<nested>",
+              "start_time": "<nested>",
+              "end_time": "<nested>"
+            }
+          ]
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1759,6 +3077,66 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "course_info": {
+          "id": 1,
+          "title": "ریاضی پایه فعال",
+          "code": "C-ACTIVE",
+          "teacher_id": 1,
+          "is_suspended": false
+        },
+        "students": {
+          "length": 4,
+          "first_items": [
+            {
+              "student_id": "<nested>",
+              "student_code": "<nested>",
+              "student_name": "<nested>",
+              "national_code": "<nested>",
+              "mobile": "<nested>",
+              "total_tuition": "<nested>",
+              "paid": "<nested>",
+              "paid_teacher": "<nested>",
+              "paid_institute": "<nested>",
+              "debt": "<nested>",
+              "debt_teacher": "<nested>",
+              "debt_institute": "<nested>",
+              "wallet_teacher": "<nested>",
+              "wallet_institute": "<nested>",
+              "course_id": "<nested>",
+              "course_title": "<nested>",
+              "teacher_id": "<nested>",
+              "teacher_name": "<nested>",
+              "is_unassigned": "<nested>",
+              "sessions_billed": "<nested>",
+              "<omitted_keys>": 15
+            },
+            {
+              "student_id": "<nested>",
+              "student_code": "<nested>",
+              "student_name": "<nested>",
+              "national_code": "<nested>",
+              "mobile": "<nested>",
+              "total_tuition": "<nested>",
+              "paid": "<nested>",
+              "paid_teacher": "<nested>",
+              "paid_institute": "<nested>",
+              "debt": "<nested>",
+              "debt_teacher": "<nested>",
+              "debt_institute": "<nested>",
+              "wallet_teacher": "<nested>",
+              "wallet_institute": "<nested>",
+              "course_id": "<nested>",
+              "course_title": "<nested>",
+              "teacher_id": "<nested>",
+              "teacher_name": "<nested>",
+              "is_unassigned": "<nested>",
+              "sessions_billed": "<nested>",
+              "<omitted_keys>": 15
+            }
+          ]
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1778,6 +3156,24 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "count_1": 10000,
+        "count_2": 20000,
+        "count_4": 40000,
+        "count_6": 60000,
+        "count_8": 80000,
+        "count_10": 100000,
+        "count_12": 120000,
+        "count_14": 140000,
+        "count_3": 30000,
+        "id": 1,
+        "count_5": 50000,
+        "count_7": 70000,
+        "count_9": 90000,
+        "count_11": 110000,
+        "count_13": 130000,
+        "count_15": 150000
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1797,6 +3193,9 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "تنظیمات سهم آموزشگاه ذخیره شد"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1816,6 +3215,9 @@
       "status": 400,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": "شعبه مشخص نیست؛ لطفاً branch_id معتبر ارسال کنید"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1835,6 +3237,22 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 1,
+        "first_items": [
+          {
+            "id": 1,
+            "name": "سرنخ تست",
+            "mobile": "09120000999",
+            "interested_course": "ریاضی",
+            "source": "Demo",
+            "status": "NEW",
+            "notes": "seed",
+            "next_follow_up": null,
+            "created_at": "2026/09/28"
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1854,6 +3272,10 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "سرنخ با موفقیت به دانش‌آموز 'سرنخ تست' با کد 100001 تبدیل شد.",
+        "student_id": 31
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1873,6 +3295,9 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "یادداشت پیگیری با موفقیت ثبت شد"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1888,10 +3313,24 @@
       "method": "POST",
       "path": "/crm/register_online",
       "handler": "routers.crm.public_online_registration",
-      "role": "admin",
+      "role": "public",
       "status": 422,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": {
+          "length": 1,
+          "first_items": [
+            {
+              "type": "<nested>",
+              "loc": "<nested>",
+              "msg": "<nested>",
+              "input": "<nested>",
+              "ctx": "<nested>"
+            }
+          ]
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1911,6 +3350,83 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "revenue_by_branch": {
+          "length": 2,
+          "first_items": [
+            {
+              "branch_id": "<nested>",
+              "branch_name": "<nested>",
+              "amount": "<nested>"
+            },
+            {
+              "branch_id": "<nested>",
+              "branch_name": "<nested>",
+              "amount": "<nested>"
+            }
+          ]
+        },
+        "students_by_branch": {
+          "length": 2,
+          "first_items": [
+            {
+              "branch_id": "<nested>",
+              "branch_name": "<nested>",
+              "count": "<nested>"
+            },
+            {
+              "branch_id": "<nested>",
+              "branch_name": "<nested>",
+              "count": "<nested>"
+            }
+          ]
+        },
+        "teachers_by_branch": {
+          "length": 2,
+          "first_items": [
+            {
+              "branch_id": "<nested>",
+              "branch_name": "<nested>",
+              "count": "<nested>"
+            },
+            {
+              "branch_id": "<nested>",
+              "branch_name": "<nested>",
+              "count": "<nested>"
+            }
+          ]
+        },
+        "classes_by_branch": {
+          "length": 2,
+          "first_items": [
+            {
+              "branch_id": "<nested>",
+              "branch_name": "<nested>",
+              "count": "<nested>"
+            },
+            {
+              "branch_id": "<nested>",
+              "branch_name": "<nested>",
+              "count": "<nested>"
+            }
+          ]
+        },
+        "attendance_by_branch": {
+          "length": 2,
+          "first_items": [
+            {
+              "branch_id": "<nested>",
+              "branch_name": "<nested>",
+              "count": "<nested>"
+            },
+            {
+              "branch_id": "<nested>",
+              "branch_name": "<nested>",
+              "count": "<nested>"
+            }
+          ]
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1930,6 +3446,14 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "today_revenue": 0,
+        "total_overdue_amount": 700000,
+        "overdue_installments_count": 2,
+        "active_students_count": 29,
+        "suspicious_alerts_count": 0,
+        "dunning_pending_count": 2
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1949,6 +3473,10 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "fcm_configured": false,
+        "device_token_count": 0
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1968,6 +3496,21 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "student_count": 29,
+        "class_count": 7,
+        "last_transaction": {
+          "student_name": "دانش‌آموز تست 8",
+          "amount": 125000,
+          "date": "2026-09-20"
+        },
+        "last_course": {
+          "title": "کلاس معلم حذف‌شده",
+          "code": "C-DELETED-TEACHER",
+          "teacher": "معلم حذف‌شده",
+          "grade": "متوسطه"
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -1987,6 +3530,29 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 2,
+        "first_items": [
+          {
+            "installment_id": 1,
+            "student_name": "دانش‌آموز تست 1",
+            "parent_mobile": "09360000001",
+            "amount": 350000,
+            "due_date": "1405/06/01",
+            "category": "critical",
+            "suggested_message": "⚠️ هشدار: قسط شهریه فرزند شما دانش‌آموز تست 1 به مبلغ 350,000 تومان از تاریخ 1405/06/01 (36 روز گذشته) پرداخت نشده است. جهت جلوگیری از محدودیت ثبت‌نام، سریعا..."
+          },
+          {
+            "installment_id": 2,
+            "student_name": "دانش‌آموز تست 1",
+            "parent_mobile": "09360000001",
+            "amount": 350000,
+            "due_date": "1405/07/01",
+            "category": "overdue",
+            "suggested_message": "سلام ولی محترم دانش‌آموز تست 1، قسط شهریه فرزند شما به مبلغ 350,000 تومان سررسید 1405/07/01 (5 روز گذشته) معوق شده است. لطفاً در اسرع وقت پرداخت فرمایید. - خ..."
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2006,6 +3572,22 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "sent_count": 1,
+        "skipped_count": 0,
+        "sent_ids": {
+          "length": 1,
+          "first_items": [
+            1
+          ]
+        },
+        "skipped_ids": {
+          "length": 0,
+          "first_items": []
+        },
+        "skipped_reasons": {},
+        "message": "1 پیام ارسال شد، 0 مورد رد شد (تکراری یا نامعتبر)"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2025,6 +3607,9 @@
       "status": 400,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": "این دانش‌آموز قبلاً در این کلاس ثبت شده است"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2044,6 +3629,24 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "0 اضافه شد، 1 رد شد",
+        "added_count": 0,
+        "rejected_count": 1,
+        "added_student_ids": {
+          "length": 0,
+          "first_items": []
+        },
+        "rejected": {
+          "length": 1,
+          "first_items": [
+            {
+              "student_id": "<nested>",
+              "reason": "<nested>"
+            }
+          ]
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2063,6 +3666,9 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "دانش‌آموز از کلاس حذف شد و حساب‌ها اصلاح گردید."
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2082,6 +3688,9 @@
       "status": 400,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": "این پاسخ‌برگ قبلاً تحویل داده شده است"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2101,6 +3710,9 @@
       "status": 400,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": "شما قبلاً در این آزمون شرکت کرده‌اید"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2116,10 +3728,14 @@
       "method": "POST",
       "path": "/exams/create",
       "handler": "routers.exams.create_exam",
-      "role": "admin",
-      "status": 403,
+      "role": "teacher",
+      "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "آزمون با موفقیت ایجاد شد",
+        "exam_id": 3
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2139,6 +3755,35 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 2,
+        "first_items": [
+          {
+            "id": 1,
+            "title": "آزمون منتشرشده",
+            "course_title": "ریاضی پایه فعال",
+            "date": "1405/06/25",
+            "duration": 60,
+            "description": "",
+            "due_date": "",
+            "max_score": 20.0,
+            "status": "attempted",
+            "score": 19.0
+          },
+          {
+            "id": 2,
+            "title": "آزمون پیش‌نویس",
+            "course_title": "فیزیک دوکلاسه",
+            "date": "1405/07/01",
+            "duration": 45,
+            "description": "",
+            "due_date": "",
+            "max_score": 20.0,
+            "status": "pending",
+            "score": null
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2154,10 +3799,13 @@
       "method": "POST",
       "path": "/exams/{id}/questions",
       "handler": "routers.exams.add_exam_question",
-      "role": "admin",
-      "status": 403,
+      "role": "teacher",
+      "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "سوال با موفقیت به آزمون اضافه شد"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2177,6 +3825,7 @@
       "status": 200,
       "json": false,
       "shape": "non-json",
+      "sample_value": null,
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2196,6 +3845,7 @@
       "status": 200,
       "json": false,
       "shape": "non-json",
+      "sample_value": null,
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2215,6 +3865,7 @@
       "status": 200,
       "json": false,
       "shape": "non-json",
+      "sample_value": null,
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2234,6 +3885,22 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "1 یادآوری بدهی ثبت شد",
+        "sent_count": 1,
+        "skipped_count": 0,
+        "sent": {
+          "length": 1,
+          "first_items": [
+            1
+          ]
+        },
+        "skipped": {
+          "length": 0,
+          "first_items": []
+        },
+        "skipped_reasons": {}
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2253,6 +3920,29 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 3,
+        "first_items": [
+          {
+            "id": 1,
+            "enrollment_id": 1,
+            "course_title": "ریاضی پایه فعال",
+            "amount": 350000,
+            "due_date": "1405/06/01",
+            "is_paid": false,
+            "paid_at": "---"
+          },
+          {
+            "id": 3,
+            "enrollment_id": 2,
+            "course_title": "فیزیک دوکلاسه",
+            "amount": 500000,
+            "due_date": "1405/06/20",
+            "is_paid": true,
+            "paid_at": "1405/06/20"
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2272,6 +3962,10 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "قسط شهریه با موفقیت ایجاد شد",
+        "installment_id": 5
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2291,6 +3985,9 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "قسط شهریه با موفقیت حذف گردید"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2310,6 +4007,9 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "قسط شهریه با موفقیت بروزرسانی شد"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2329,6 +4029,10 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "قسط تسویه و رسید پرداخت ثبت شد",
+        "receipt_id": 7
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2348,6 +4052,10 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "status": "success",
+        "message": "پیامک و نوتیفیکیشن یادآوری قسط شهریه با موفقیت ارسال شد."
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2367,6 +4075,43 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "enrollment_id": 1,
+        "course_id": 1,
+        "student_name": "دانش‌آموز تست 1",
+        "course_title": "ریاضی پایه فعال",
+        "teacher_id": 1,
+        "teacher_name": "رضا فعال",
+        "is_unassigned": false,
+        "base_tuition": 1000000,
+        "discount_type": "none",
+        "discount_value": 0,
+        "discount_amount": 0,
+        "final_tuition": 1000000,
+        "total_paid": 300000,
+        "balance_due": 700000,
+        "remaining_tuition": 700000,
+        "credit_balance": 0,
+        "installments": {
+          "length": 2,
+          "first_items": [
+            {
+              "id": "<nested>",
+              "amount": "<nested>",
+              "due_date": "<nested>",
+              "is_paid": "<nested>",
+              "paid_at": "<nested>"
+            },
+            {
+              "id": "<nested>",
+              "amount": "<nested>",
+              "due_date": "<nested>",
+              "is_paid": "<nested>",
+              "paid_at": "<nested>"
+            }
+          ]
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2382,10 +4127,13 @@
       "method": "GET",
       "path": "/finance/mock_payment_page",
       "handler": "routers.finance.mock_payment_page",
-      "role": "admin",
+      "role": "public",
       "status": 404,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": "درگاه پرداخت آنلاین غیرفعال است"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2411,6 +4159,9 @@
       "status": 403,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": "نقش کاربری برای این دسترسی معتبر نیست"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2430,6 +4181,9 @@
       "status": 400,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": "این دانش‌آموز چند ثبت‌نام فعال دارد، enrollment_id مشخص کنید"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2445,10 +4199,13 @@
       "method": "GET",
       "path": "/finance/payment/callback",
       "handler": "routers.finance.payment_callback",
-      "role": "admin",
+      "role": "public",
       "status": 404,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": "درگاه پرداخت آنلاین غیرفعال است"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2474,6 +4231,9 @@
       "status": 400,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": "⚠️ پرداخت آنلاین در حال حاضر غیرفعال است (پرداخت آنلاین به‌زودی فعال خواهد شد). لطفا جهت پرداخت به صورت حضوری یا کارت به کارت اقدام فرمایید."
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2493,6 +4253,33 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "status": "success",
+        "message": "فایل PDF حواله آماده دانلود است.",
+        "pdf_url": "/downloads/receipt_1_0020000001.pdf",
+        "filename": "receipt_1_0020000001.pdf",
+        "receipt_data": {
+          "receipt_id": 1,
+          "student_name": "دانش‌آموز تست 1",
+          "student_national_code": "0020000001",
+          "amount": 300000,
+          "payment_method": "نقدی",
+          "date": "1405/06/03",
+          "description": "پرداخت enrollment اول",
+          "target_wallet": "institute",
+          "type": "deposit",
+          "course_name": "ریاضی پایه فعال",
+          "course_code": "C-ACTIVE",
+          "course_id": 1,
+          "teacher_id": 1,
+          "teacher_name": "رضا فعال",
+          "sessions_covered": null,
+          "wallet_label": "سهم آموزشگاه",
+          "paid_to_name": "آموزشگاه",
+          "class_remaining_teacher": 0,
+          "class_remaining_institute": 700000
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2512,6 +4299,32 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "status": "success",
+        "message": "درخواست چاپ حواله به سیستم ارسال شد.",
+        "print_job_id": "PRINT_1_1790586000",
+        "receipt_data": {
+          "receipt_id": 1,
+          "student_name": "دانش‌آموز تست 1",
+          "student_national_code": "0020000001",
+          "amount": 300000,
+          "payment_method": "نقدی",
+          "date": "1405/06/03",
+          "description": "پرداخت enrollment اول",
+          "target_wallet": "institute",
+          "type": "deposit",
+          "course_name": "ریاضی پایه فعال",
+          "course_code": "C-ACTIVE",
+          "course_id": 1,
+          "teacher_id": 1,
+          "teacher_name": "رضا فعال",
+          "sessions_covered": null,
+          "wallet_label": "سهم آموزشگاه",
+          "paid_to_name": "آموزشگاه",
+          "class_remaining_teacher": 0,
+          "class_remaining_institute": 700000
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2531,6 +4344,29 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "transaction_id": 1,
+        "remittance_number": 100001,
+        "student_name": "دانش‌آموز تست 1",
+        "student_national_code": "0020000001",
+        "amount": 300000,
+        "payment_method": "نقدی",
+        "tracking_code": "AUD-1",
+        "date": "1405/06/03",
+        "description": "پرداخت enrollment اول",
+        "course_name": "ریاضی پایه فعال",
+        "target_wallet": "institute",
+        "type": "deposit",
+        "is_reversed": false,
+        "course_code": "C-ACTIVE",
+        "course_id": 1,
+        "teacher_id": 1,
+        "teacher_name": "رضا فعال",
+        "sessions_covered": null,
+        "wallet_label": "سهم آموزشگاه",
+        "paid_to_name": "آموزشگاه",
+        "<omitted_keys>": 2
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2550,6 +4386,84 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "total_debt": 2800000,
+        "debtors_count": 2,
+        "wallet_debt_teacher": 10000,
+        "wallet_debt_institute": 0,
+        "by_teacher": {
+          "length": 1,
+          "first_items": [
+            {
+              "teacher_id": "<nested>",
+              "teacher_name": "<nested>",
+              "debt": "<nested>",
+              "students_count": "<nested>",
+              "student_ids": "<nested>",
+              "courses": "<nested>"
+            }
+          ]
+        },
+        "by_age": {
+          "length": 4,
+          "first_items": [
+            {
+              "bucket": "<nested>",
+              "debt": "<nested>",
+              "students_count": "<nested>",
+              "student_ids": "<nested>"
+            },
+            {
+              "bucket": "<nested>",
+              "debt": "<nested>",
+              "students_count": "<nested>",
+              "student_ids": "<nested>"
+            }
+          ]
+        },
+        "unassigned_debt": 0,
+        "rows": {
+          "length": 2,
+          "first_items": [
+            {
+              "student_id": "<nested>",
+              "student_name": "<nested>",
+              "national_code": "<nested>",
+              "parent_mobile": "<nested>",
+              "student_mobile": "<nested>",
+              "contact_mobile": "<nested>",
+              "debt_teacher": "<nested>",
+              "debt_institute": "<nested>",
+              "wallet_debt_teacher": "<nested>",
+              "wallet_debt_institute": "<nested>",
+              "total_debt": "<nested>",
+              "active_courses": "<nested>",
+              "last_payment_date": "<nested>",
+              "debt_age_days": "<nested>",
+              "debt_age_bucket": "<nested>",
+              "teachers": "<nested>"
+            },
+            {
+              "student_id": "<nested>",
+              "student_name": "<nested>",
+              "national_code": "<nested>",
+              "parent_mobile": "<nested>",
+              "student_mobile": "<nested>",
+              "contact_mobile": "<nested>",
+              "debt_teacher": "<nested>",
+              "debt_institute": "<nested>",
+              "wallet_debt_teacher": "<nested>",
+              "wallet_debt_institute": "<nested>",
+              "total_debt": "<nested>",
+              "active_courses": "<nested>",
+              "last_payment_date": "<nested>",
+              "debt_age_days": "<nested>",
+              "debt_age_bucket": "<nested>",
+              "teachers": "<nested>"
+            }
+          ]
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2569,6 +4483,69 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 2,
+        "first_items": [
+          {
+            "student_id": 1,
+            "student_name": "دانش‌آموز تست 1",
+            "national_code": "0020000001",
+            "parent_mobile": "09360000001",
+            "student_mobile": "09350000001",
+            "contact_mobile": "09360000001",
+            "debt_teacher": 0,
+            "debt_institute": 2000000,
+            "wallet_debt_teacher": 10000,
+            "wallet_debt_institute": 0,
+            "total_debt": 2000000,
+            "active_courses": {
+              "length": 2,
+              "first_items": [
+                "<nested>",
+                "<nested>"
+              ]
+            },
+            "last_payment_date": "1405/06/04",
+            "debt_age_days": 33,
+            "debt_age_bucket": "over_30",
+            "teachers": {
+              "length": 2,
+              "first_items": [
+                "<nested>",
+                "<nested>"
+              ]
+            }
+          },
+          {
+            "student_id": 6,
+            "student_name": "دانش‌آموز تست 6",
+            "national_code": "0020000006",
+            "parent_mobile": "09360000006",
+            "student_mobile": "09350000006",
+            "contact_mobile": "09360000006",
+            "debt_teacher": 0,
+            "debt_institute": 800000,
+            "wallet_debt_teacher": 0,
+            "wallet_debt_institute": 0,
+            "total_debt": 800000,
+            "active_courses": {
+              "length": 1,
+              "first_items": [
+                "<nested>"
+              ]
+            },
+            "last_payment_date": "",
+            "debt_age_days": null,
+            "debt_age_bucket": "no_payment",
+            "teachers": {
+              "length": 1,
+              "first_items": [
+                "<nested>"
+              ]
+            }
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2588,6 +4565,27 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "revenue_by_wallet": {
+          "teacher_wallet": {
+            "cash": "<nested>",
+            "card": "<nested>",
+            "online": "<nested>",
+            "total": "<nested>"
+          },
+          "institute_wallet": {
+            "cash": "<nested>",
+            "card": "<nested>",
+            "online": "<nested>",
+            "total": "<nested>"
+          }
+        },
+        "totals": {
+          "total_revenue": 675000,
+          "refund_count": 0,
+          "refund_total_amount": 0
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2607,6 +4605,35 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 3,
+        "first_items": [
+          {
+            "teacher_id": 1,
+            "teacher_name": "رضا فعال",
+            "mobile": "09120000001",
+            "card_number": "603700000001",
+            "session_count": 2,
+            "wallet_balance": 300000,
+            "pending_total_amount": 300000,
+            "settled_total_amount": 0,
+            "earned_total_amount": 300000,
+            "last_settled_at": "---"
+          },
+          {
+            "teacher_id": 2,
+            "teacher_name": "مریم معلق",
+            "mobile": "09120000002",
+            "card_number": "603700000002",
+            "session_count": 0,
+            "wallet_balance": 0,
+            "pending_total_amount": 0,
+            "settled_total_amount": 0,
+            "earned_total_amount": 0,
+            "last_settled_at": "---"
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2626,6 +4653,10 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 0,
+        "first_items": []
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2651,6 +4682,90 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "wallet": {
+          "balance": -5000,
+          "wallet_teacher": -10000,
+          "wallet_institute": 5000,
+          "total_paid": 800000,
+          "total_debt": 2000000
+        },
+        "enrollments": {
+          "length": 2,
+          "first_items": [
+            {
+              "enrollment_id": "<nested>",
+              "course_id": "<nested>",
+              "course_title": "<nested>",
+              "teacher_id": "<nested>",
+              "teacher_name": "<nested>",
+              "is_unassigned": "<nested>",
+              "total_tuition": "<nested>",
+              "discount": "<nested>",
+              "final_tuition": "<nested>",
+              "total_paid": "<nested>",
+              "outstanding": "<nested>"
+            },
+            {
+              "enrollment_id": "<nested>",
+              "course_id": "<nested>",
+              "course_title": "<nested>",
+              "teacher_id": "<nested>",
+              "teacher_name": "<nested>",
+              "is_unassigned": "<nested>",
+              "total_tuition": "<nested>",
+              "discount": "<nested>",
+              "final_tuition": "<nested>",
+              "total_paid": "<nested>",
+              "outstanding": "<nested>"
+            }
+          ]
+        },
+        "installments": {
+          "length": 3,
+          "first_items": [
+            {
+              "id": "<nested>",
+              "course_title": "<nested>",
+              "amount": "<nested>",
+              "due_date": "<nested>",
+              "is_paid": "<nested>",
+              "status": "<nested>",
+              "paid_at": "<nested>"
+            },
+            {
+              "id": "<nested>",
+              "course_title": "<nested>",
+              "amount": "<nested>",
+              "due_date": "<nested>",
+              "is_paid": "<nested>",
+              "status": "<nested>",
+              "paid_at": "<nested>"
+            }
+          ]
+        },
+        "recent_transactions": {
+          "length": 2,
+          "first_items": [
+            {
+              "id": "<nested>",
+              "amount": "<nested>",
+              "date": "<nested>",
+              "description": "<nested>",
+              "type": "<nested>",
+              "target_wallet": "<nested>"
+            },
+            {
+              "id": "<nested>",
+              "amount": "<nested>",
+              "date": "<nested>",
+              "description": "<nested>",
+              "type": "<nested>",
+              "target_wallet": "<nested>"
+            }
+          ]
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2670,6 +4785,10 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 0,
+        "first_items": []
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2689,6 +4808,35 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 2,
+        "first_items": [
+          {
+            "id": 2,
+            "remittance_number": 100002,
+            "amount": 500000,
+            "payment_method": "کارت",
+            "tracking_code": "AUD-2",
+            "date": "1405/06/04",
+            "description": "پرداخت split",
+            "type": "deposit",
+            "target_wallet": "both",
+            "is_reversed": false
+          },
+          {
+            "id": 1,
+            "remittance_number": 100001,
+            "amount": 300000,
+            "payment_method": "نقدی",
+            "tracking_code": "AUD-1",
+            "date": "1405/06/03",
+            "description": "پرداخت enrollment اول",
+            "type": "deposit",
+            "target_wallet": "institute",
+            "is_reversed": false
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2705,9 +4853,32 @@
       "path": "/finance/student_class_status",
       "handler": "routers.finance.get_student_class_status",
       "role": "admin",
-      "status": 404,
+      "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "total_amount": 1000000,
+        "paid_to_teacher": 0,
+        "paid_to_institute": 300000,
+        "due_to_teacher": 0,
+        "due_to_institute": 700000,
+        "remaining_tuition": 700000,
+        "credit_balance": 0,
+        "course_id": 1,
+        "course_title": "ریاضی پایه فعال",
+        "teacher_id": 1,
+        "teacher_name": "رضا فعال",
+        "is_unassigned": false,
+        "enrollment_id": 1,
+        "course_code": "C-ACTIVE",
+        "sessions_billed": 0,
+        "sessions_held": 1,
+        "unpaid_sessions": 0,
+        "session_unit_teacher": 260000,
+        "session_unit_institute": 0,
+        "session_unit_total": 260000,
+        "<omitted_keys>": 2
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2733,6 +4904,11 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "status": "success",
+        "message": "تراکنش مالی با موفقیت استرداد و کیف پول مربوطه کسر گردید.",
+        "refund_transaction_id": 7
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2752,6 +4928,9 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "نمره با موفقیت ثبت شد"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2767,10 +4946,21 @@
       "method": "POST",
       "path": "/homework/create",
       "handler": "routers.homework.create_homework",
-      "role": "admin",
-      "status": 403,
+      "role": "teacher",
+      "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "id": 2,
+        "course_id": 1,
+        "course_title": "ریاضی پایه فعال",
+        "title": "route-audit",
+        "description": "route-audit",
+        "due_date": "1405/06/20",
+        "max_score": 20.0,
+        "status": "pending",
+        "created_at": "2026/09/28"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2786,10 +4976,25 @@
       "method": "GET",
       "path": "/homework/parent/child/{student_id}",
       "handler": "routers.homework.get_parent_child_homework",
-      "role": "admin",
+      "role": "parent",
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 1,
+        "first_items": [
+          {
+            "id": 1,
+            "course_title": "ریاضی پایه فعال",
+            "title": "تمرین هفته",
+            "description": "حل تمرین",
+            "due_date": "1405/07/01",
+            "status": "submitted",
+            "score": null,
+            "feedback": null
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2809,6 +5014,22 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 1,
+        "first_items": [
+          {
+            "id": 1,
+            "course_title": "ریاضی پایه فعال",
+            "title": "تمرین هفته",
+            "description": "حل تمرین",
+            "due_date": "1405/07/01",
+            "max_score": 20.0,
+            "status": "submitted",
+            "score": null,
+            "feedback": null
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2824,10 +5045,23 @@
       "method": "POST",
       "path": "/homework/submissions/{homework_id}/submit",
       "handler": "routers.homework.submit_homework_file",
-      "role": "admin",
+      "role": "student",
       "status": 422,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": {
+          "length": 1,
+          "first_items": [
+            {
+              "type": "<nested>",
+              "loc": "<nested>",
+              "msg": "<nested>",
+              "input": "<nested>"
+            }
+          ]
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2843,10 +5077,13 @@
       "method": "POST",
       "path": "/homework/submissions/{sub_id}/grade",
       "handler": "routers.homework.grade_homework_submission",
-      "role": "admin",
-      "status": 403,
+      "role": "teacher",
+      "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "نمره و بازخورد با موفقیت ثبت شد"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2862,10 +5099,13 @@
       "method": "DELETE",
       "path": "/homework/{id}",
       "handler": "routers.homework.delete_homework",
-      "role": "admin",
-      "status": 403,
+      "role": "teacher",
+      "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "تکلیف با موفقیت حذف شد"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2885,6 +5125,9 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "پیام گروهی با موفقیت ارسال شد"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2904,6 +5147,19 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 1,
+        "first_items": [
+          {
+            "id": 1,
+            "title": "گفتگوی ممیزی",
+            "type": "group",
+            "last_message": "پیام seed",
+            "last_time": "2026/09/28 09:00",
+            "is_pinned": false
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2923,6 +5179,10 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "گفتگو با موفقیت آغاز شد",
+        "conversation_id": 2
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2939,9 +5199,22 @@
       "path": "/messages/conversations/{id}/history",
       "handler": "routers.messages.get_conversation_history",
       "role": "admin",
-      "status": 403,
+      "status": 200,
       "json": true,
-      "shape": "object",
+      "shape": "list",
+      "sample_value": {
+        "length": 1,
+        "first_items": [
+          {
+            "id": 1,
+            "sender_id": 1,
+            "sender_role": "admin",
+            "body": "پیام seed",
+            "attachment": null,
+            "created_at": "2026/09/28 09:00"
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2958,9 +5231,12 @@
       "path": "/messages/conversations/{id}/pin",
       "handler": "routers.messages.toggle_conversation_pin",
       "role": "admin",
-      "status": 404,
+      "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "is_pinned": false
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2977,9 +5253,12 @@
       "path": "/messages/conversations/{id}/send",
       "handler": "routers.messages.send_message",
       "role": "admin",
-      "status": 403,
+      "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "پیام با موفقیت ارسال شد"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -2996,9 +5275,12 @@
       "path": "/messages/{id}",
       "handler": "routers.messages.delete_own_message",
       "role": "admin",
-      "status": 404,
+      "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "پیام با موفقیت حذف شد"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3018,6 +5300,19 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 1,
+        "first_items": [
+          {
+            "id": 1,
+            "type": "payment",
+            "title": "پرداخت تست",
+            "body": "اعلان تست",
+            "is_read": false,
+            "created_at": "2026/09/28 09:00"
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3037,6 +5332,9 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "تمامی اعلان‌ها خوانده شدند"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3056,6 +5354,10 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "unread": 1,
+        "total": 1
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3075,6 +5377,9 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "اعلان به عنوان خوانده شده ثبت شد"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3094,6 +5399,142 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "info": {
+          "name": "دانش‌آموز تست 1",
+          "national_code": "0020000001",
+          "parent_mobile": "09360000001",
+          "profile_image": null,
+          "is_suspended": false
+        },
+        "classes": {
+          "length": 2,
+          "first_items": [
+            "ریاضی پایه فعال (C-ACTIVE) - ابتدایی",
+            "فیزیک دوکلاسه (C-MULTI) - متوسطه"
+          ]
+        },
+        "wallet": {
+          "balance": -5000,
+          "total_debt": 2000000
+        },
+        "grades": {
+          "length": 1,
+          "first_items": [
+            {
+              "course_name": "<nested>",
+              "exam_title": "<nested>",
+              "score": "<nested>",
+              "max_score": "<nested>",
+              "date": "<nested>",
+              "description": "<nested>"
+            }
+          ]
+        },
+        "averages": {
+          "ریاضی پایه فعال": 18.5
+        },
+        "attendance": {
+          "length": 2,
+          "first_items": [
+            {
+              "date": "<nested>",
+              "course_title": "<nested>",
+              "status": "<nested>"
+            },
+            {
+              "date": "<nested>",
+              "course_title": "<nested>",
+              "status": "<nested>"
+            }
+          ]
+        },
+        "installments": {
+          "length": 3,
+          "first_items": [
+            {
+              "course_title": "<nested>",
+              "amount": "<nested>",
+              "due_date": "<nested>",
+              "is_paid": "<nested>",
+              "status": "<nested>",
+              "paid_at": "<nested>"
+            },
+            {
+              "course_title": "<nested>",
+              "amount": "<nested>",
+              "due_date": "<nested>",
+              "is_paid": "<nested>",
+              "status": "<nested>",
+              "paid_at": "<nested>"
+            }
+          ]
+        },
+        "homework": {
+          "length": 1,
+          "first_items": [
+            {
+              "course_title": "<nested>",
+              "title": "<nested>",
+              "due_date": "<nested>",
+              "status": "<nested>"
+            }
+          ]
+        },
+        "exams": {
+          "length": 2,
+          "first_items": [
+            {
+              "course_title": "<nested>",
+              "title": "<nested>",
+              "date": "<nested>",
+              "max_score": "<nested>"
+            },
+            {
+              "course_title": "<nested>",
+              "title": "<nested>",
+              "date": "<nested>",
+              "max_score": "<nested>"
+            }
+          ]
+        },
+        "upcoming_sessions": {
+          "length": 2,
+          "first_items": [
+            {
+              "course_title": "<nested>",
+              "date": "<nested>",
+              "time": "<nested>"
+            },
+            {
+              "course_title": "<nested>",
+              "date": "<nested>",
+              "time": "<nested>"
+            }
+          ]
+        },
+        "notifications": {
+          "length": 2,
+          "first_items": [
+            {
+              "id": "<nested>",
+              "type": "<nested>",
+              "title": "<nested>",
+              "body": "<nested>",
+              "date": "<nested>",
+              "is_read": "<nested>"
+            },
+            {
+              "id": "<nested>",
+              "type": "<nested>",
+              "title": "<nested>",
+              "body": "<nested>",
+              "date": "<nested>",
+              "is_read": "<nested>"
+            }
+          ]
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3109,10 +5550,13 @@
       "method": "POST",
       "path": "/parent/login",
       "handler": "routers.parent.parent_login",
-      "role": "parent",
+      "role": "public",
       "status": 400,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": "کد تایید نامعتبر یا منقضی شده است"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3132,6 +5576,7 @@
       "status": 200,
       "json": false,
       "shape": "non-json",
+      "sample_value": null,
       "error": null,
       "invalid_target": false,
       "status_500": false,
@@ -3147,10 +5592,14 @@
       "method": "POST",
       "path": "/parent/request_otp",
       "handler": "routers.parent.request_parent_otp",
-      "role": "parent",
-      "status": 404,
+      "role": "public",
+      "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "status": "success",
+        "message": "کد یک‌بارمصرف ورود با موفقیت صادر و پیامک شد (لاگ آن در جدول پیامک‌ها درج شد)"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3170,6 +5619,9 @@
       "status": 401,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": "نشست موقت معتبر نیست یا منقضی شده است"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3189,6 +5641,55 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "income_chart": {
+          "length": 31,
+          "first_items": [
+            {
+              "day": "<nested>",
+              "amount": "<nested>"
+            },
+            {
+              "day": "<nested>",
+              "amount": "<nested>"
+            }
+          ]
+        },
+        "student_chart": {
+          "length": 2,
+          "first_items": [
+            {
+              "label": "<nested>",
+              "count": "<nested>"
+            },
+            {
+              "label": "<nested>",
+              "count": "<nested>"
+            }
+          ]
+        },
+        "attendance_trend": {
+          "length": 2,
+          "first_items": [
+            {
+              "date": "<nested>",
+              "present": "<nested>",
+              "absent": "<nested>",
+              "percentage": "<nested>"
+            },
+            {
+              "date": "<nested>",
+              "present": "<nested>",
+              "absent": "<nested>",
+              "percentage": "<nested>"
+            }
+          ]
+        },
+        "shares_chart": {
+          "teacher": 625000,
+          "institute": 625000
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3208,6 +5709,27 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 2,
+        "first_items": [
+          {
+            "student_id": 1,
+            "student_name": "دانش‌آموز تست 1",
+            "amount": 2000000,
+            "date": "-",
+            "description": "بدهی",
+            "payment_method": "-"
+          },
+          {
+            "student_id": 6,
+            "student_name": "دانش‌آموز تست 6",
+            "amount": 800000,
+            "date": "-",
+            "description": "بدهی",
+            "payment_method": "-"
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3227,6 +5749,7 @@
       "status": 200,
       "json": false,
       "shape": "non-json",
+      "sample_value": null,
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3246,6 +5769,51 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 5,
+        "first_items": [
+          {
+            "transaction_id": 6,
+            "student_id": 8,
+            "student_name": "دانش‌آموز تست 8",
+            "amount": 125000,
+            "date": "2026-09-20",
+            "description": "پرداخت کارتی میلادی legacy",
+            "payment_method": "کارت به کارت",
+            "target_wallet": "teacher",
+            "type": "deposit",
+            "course_id": 2,
+            "course_title": "فیزیک دوکلاسه",
+            "teacher_id": 1,
+            "teacher_name": "رضا فعال",
+            "branch_id": 2,
+            "branch_name": "شعبه غرب تست",
+            "share_teacher": 125000,
+            "share_institute": 0,
+            "student_statement_path": "/reports/student_statement?student_id=8"
+          },
+          {
+            "transaction_id": 4,
+            "student_id": 6,
+            "student_name": "دانش‌آموز تست 6",
+            "amount": 75000,
+            "date": "",
+            "description": "legacy بی‌تاریخ",
+            "payment_method": "کارت",
+            "target_wallet": "institute",
+            "type": "deposit",
+            "course_id": null,
+            "course_title": "کلاس عمومی/نامشخص",
+            "teacher_id": null,
+            "teacher_name": "بدون معلم",
+            "branch_id": null,
+            "branch_name": "شعبهٔ legacy/نامشخص",
+            "share_teacher": 0,
+            "share_institute": 75000,
+            "student_statement_path": "/reports/student_statement?student_id=6"
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3265,6 +5833,7 @@
       "status": 200,
       "json": false,
       "shape": "non-json",
+      "sample_value": null,
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3284,6 +5853,9 @@
       "status": 400,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": "user_type باید institute یا teacher باشد"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3309,6 +5881,7 @@
       "status": 200,
       "json": false,
       "shape": "non-json",
+      "sample_value": null,
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3330,15 +5903,125 @@
       "method": "GET",
       "path": "/reports/student_statement",
       "handler": "routers.reports.get_student_statement",
-      "role": "student",
+      "role": "admin",
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "student_id": 1,
+        "student_name": "دانش‌آموز تست 1",
+        "student_code": 2001,
+        "teacher_name": "رضا فعال",
+        "teachers": {
+          "length": 2,
+          "first_items": [
+            {
+              "enrollment_id": "<nested>",
+              "teacher_id": "<nested>",
+              "teacher_name": "<nested>",
+              "course_id": "<nested>",
+              "course_title": "<nested>",
+              "course_code": "<nested>",
+              "branch_id": "<nested>",
+              "paid_teacher": "<nested>",
+              "paid_institute": "<nested>",
+              "debt_teacher": "<nested>",
+              "debt_institute": "<nested>",
+              "debt": "<nested>",
+              "tuition": "<nested>",
+              "enrollment_status": "<nested>",
+              "teacher_profile_path": "<nested>",
+              "student_profile_path": "<nested>",
+              "is_unassigned": "<nested>"
+            },
+            {
+              "enrollment_id": "<nested>",
+              "teacher_id": "<nested>",
+              "teacher_name": "<nested>",
+              "course_id": "<nested>",
+              "course_title": "<nested>",
+              "course_code": "<nested>",
+              "branch_id": "<nested>",
+              "paid_teacher": "<nested>",
+              "paid_institute": "<nested>",
+              "debt_teacher": "<nested>",
+              "debt_institute": "<nested>",
+              "debt": "<nested>",
+              "tuition": "<nested>",
+              "enrollment_status": "<nested>",
+              "teacher_profile_path": "<nested>",
+              "student_profile_path": "<nested>",
+              "is_unassigned": "<nested>"
+            }
+          ]
+        },
+        "active_enrollments": {
+          "length": 2,
+          "first_items": [
+            {
+              "enrollment_id": "<nested>",
+              "course_id": "<nested>",
+              "status": "<nested>",
+              "register_date": "<nested>",
+              "branch_id": "<nested>"
+            },
+            {
+              "enrollment_id": "<nested>",
+              "course_id": "<nested>",
+              "status": "<nested>",
+              "register_date": "<nested>",
+              "branch_id": "<nested>"
+            }
+          ]
+        },
+        "total_paid_institute": 300000,
+        "total_debt_institute": 0,
+        "class_paid_institute": 550000,
+        "class_debt_institute": 2000000,
+        "class_debt_total": 2000000,
+        "unassigned_debt": 0,
+        "total_debt": 2000000,
+        "payment_timeline": {
+          "length": 2,
+          "first_items": [
+            {
+              "transaction_id": "<nested>",
+              "date": "<nested>",
+              "amount": "<nested>",
+              "target_wallet": "<nested>",
+              "description": "<nested>",
+              "payment_link": "<nested>"
+            },
+            {
+              "transaction_id": "<nested>",
+              "date": "<nested>",
+              "amount": "<nested>",
+              "target_wallet": "<nested>",
+              "description": "<nested>",
+              "payment_link": "<nested>"
+            }
+          ]
+        },
+        "next_installment": {
+          "id": 1,
+          "amount": 350000,
+          "paid_amount": 0,
+          "due_date": "1405/06/01",
+          "remaining_amount": 350000,
+          "payment_link": "/finance/payment/initiate?installment_id=1"
+        },
+        "payment_link": "/finance/payment/initiate?installment_id=1",
+        "institute_card_number": "6037000000000000",
+        "institute_name": "آموزشگاه ممیزی",
+        "address": "تهران",
+        "phone": "02100000000",
+        "<omitted_keys>": 1
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
       "empty": {
-        "status": 403,
+        "status": 404,
         "json": true,
         "shape": "object",
         "is_null_list": false,
@@ -3355,17 +6038,18 @@
       "method": "GET",
       "path": "/reports/student_statement/print",
       "handler": "routers.reports.print_student_statement",
-      "role": "student",
+      "role": "admin",
       "status": 200,
       "json": false,
       "shape": "non-json",
+      "sample_value": null,
       "error": null,
       "invalid_target": true,
       "status_500": false,
       "empty": {
-        "status": 403,
-        "json": true,
-        "shape": "object",
+        "status": 200,
+        "json": false,
+        "shape": "non-json",
         "is_null_list": false,
         "value": null
       },
@@ -3384,6 +6068,10 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 0,
+        "first_items": []
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3403,6 +6091,11 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "status": "success",
+        "message": "منبع جدید با موفقیت ثبت شد",
+        "resource_id": 1
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3422,6 +6115,9 @@
       "status": 404,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": "منبع یافت نشد"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3441,6 +6137,9 @@
       "status": 404,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": "منبع یافت نشد"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3460,6 +6159,15 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "id": 3,
+        "name": "route-audit",
+        "capacity": 30,
+        "location": "route-audit",
+        "equipment": null,
+        "active": true,
+        "branch_id": 1
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3479,6 +6187,29 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 2,
+        "first_items": [
+          {
+            "id": 1,
+            "name": "اتاق آفتاب",
+            "capacity": 20,
+            "location": "طبقه اول",
+            "equipment": "برد",
+            "active": true,
+            "branch_id": 1
+          },
+          {
+            "id": 2,
+            "name": "اتاق آرشیو",
+            "capacity": 10,
+            "location": "طبقه دوم",
+            "equipment": null,
+            "active": false,
+            "branch_id": 2
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3498,6 +6229,25 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 7,
+        "first_items": [
+          {
+            "id": 7,
+            "target_group": "notif_student_4",
+            "message_text": "🔔 💰 سررسید قسط شهریه شما\nبدینوسیله به اطلاع می‌رساند قسط شهریه شما به مبلغ 350,000 تومان سررسید ***/07/01 شده است. لطفاً اقدام فرمایید.",
+            "sent_count": 1,
+            "date": "2026/10/05 07:02"
+          },
+          {
+            "id": 6,
+            "target_group": "notif_parent_5",
+            "message_text": "🔔 💰 سررسید قسط شهریه فرزند شما\nبدینوسیله به اطلاع می‌رساند قسط شهریه فرزند شما دانش‌آموز به مبلغ 350,000 تومان سررسید ***/07/01 شده است. لطفاً جهت تسویه حساب...",
+            "sent_count": 1,
+            "date": "2026/10/05 07:02"
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3517,6 +6267,10 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "ارسال شد",
+        "count": 0
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3536,6 +6290,21 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "status": "success",
+        "message": "پیامک برای 1 دانش‌آموز با موفقیت ارسال شد.",
+        "results": {
+          "length": 1,
+          "first_items": [
+            {
+              "student_id": "<nested>",
+              "student_name": "<nested>",
+              "status": "<nested>",
+              "message": "<nested>"
+            }
+          ]
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3555,6 +6324,141 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "info": {
+          "name": "دانش‌آموز تست 1",
+          "national_code": "0020000001",
+          "student_mobile": "09350000001",
+          "profile_image": null
+        },
+        "classes": {
+          "length": 2,
+          "first_items": [
+            "ریاضی پایه فعال (C-ACTIVE) - ابتدایی",
+            "فیزیک دوکلاسه (C-MULTI) - متوسطه"
+          ]
+        },
+        "wallet": {
+          "balance": -5000,
+          "total_debt": 2000000
+        },
+        "grades": {
+          "length": 1,
+          "first_items": [
+            {
+              "course_name": "<nested>",
+              "exam_title": "<nested>",
+              "score": "<nested>",
+              "max_score": "<nested>",
+              "date": "<nested>",
+              "description": "<nested>"
+            }
+          ]
+        },
+        "averages": {
+          "ریاضی پایه فعال": 18.5
+        },
+        "attendance": {
+          "length": 2,
+          "first_items": [
+            {
+              "date": "<nested>",
+              "course_title": "<nested>",
+              "status": "<nested>"
+            },
+            {
+              "date": "<nested>",
+              "course_title": "<nested>",
+              "status": "<nested>"
+            }
+          ]
+        },
+        "installments": {
+          "length": 3,
+          "first_items": [
+            {
+              "course_title": "<nested>",
+              "amount": "<nested>",
+              "due_date": "<nested>",
+              "is_paid": "<nested>",
+              "status": "<nested>",
+              "paid_at": "<nested>"
+            },
+            {
+              "course_title": "<nested>",
+              "amount": "<nested>",
+              "due_date": "<nested>",
+              "is_paid": "<nested>",
+              "status": "<nested>",
+              "paid_at": "<nested>"
+            }
+          ]
+        },
+        "homework": {
+          "length": 1,
+          "first_items": [
+            {
+              "course_title": "<nested>",
+              "title": "<nested>",
+              "due_date": "<nested>",
+              "status": "<nested>"
+            }
+          ]
+        },
+        "exams": {
+          "length": 2,
+          "first_items": [
+            {
+              "course_title": "<nested>",
+              "title": "<nested>",
+              "date": "<nested>",
+              "max_score": "<nested>"
+            },
+            {
+              "course_title": "<nested>",
+              "title": "<nested>",
+              "date": "<nested>",
+              "max_score": "<nested>"
+            }
+          ]
+        },
+        "upcoming_sessions": {
+          "length": 2,
+          "first_items": [
+            {
+              "course_title": "<nested>",
+              "date": "<nested>",
+              "time": "<nested>"
+            },
+            {
+              "course_title": "<nested>",
+              "date": "<nested>",
+              "time": "<nested>"
+            }
+          ]
+        },
+        "notifications": {
+          "length": 2,
+          "first_items": [
+            {
+              "id": "<nested>",
+              "type": "<nested>",
+              "title": "<nested>",
+              "body": "<nested>",
+              "date": "<nested>",
+              "is_read": "<nested>"
+            },
+            {
+              "id": "<nested>",
+              "type": "<nested>",
+              "title": "<nested>",
+              "body": "<nested>",
+              "date": "<nested>",
+              "is_read": "<nested>"
+            }
+          ]
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3574,6 +6478,20 @@
       "status": 422,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": {
+          "length": 1,
+          "first_items": [
+            {
+              "type": "<nested>",
+              "loc": "<nested>",
+              "msg": "<nested>",
+              "input": "<nested>",
+              "ctx": "<nested>"
+            }
+          ]
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3593,6 +6511,20 @@
       "status": 422,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": {
+          "length": 1,
+          "first_items": [
+            {
+              "type": "<nested>",
+              "loc": "<nested>",
+              "msg": "<nested>",
+              "input": "<nested>",
+              "ctx": "<nested>"
+            }
+          ]
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3612,6 +6544,10 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 0,
+        "first_items": []
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3637,6 +6573,10 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 0,
+        "first_items": []
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3662,6 +6602,9 @@
       "status": 400,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": "نسخه‌ی رکورد (version) اجباری است؛ ابتدا رکورد را مجدد بخوانید و دوباره تلاش کنید"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3681,6 +6624,19 @@
       "status": 422,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": {
+          "length": 1,
+          "first_items": [
+            {
+              "type": "<nested>",
+              "loc": "<nested>",
+              "msg": "<nested>",
+              "input": "<nested>"
+            }
+          ]
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3700,6 +6656,21 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "id": 1,
+        "first_name": "دانش‌آموز",
+        "last_name": "تست 1",
+        "father_name": "پدر تست",
+        "national_code": "0020000001",
+        "birth_date": "1390/01/01",
+        "student_mobile": "09350000001",
+        "parent_mobile": "09360000001",
+        "home_phone": "02100000000",
+        "address": "آدرس تست",
+        "study_status": "active",
+        "gender": "mixed",
+        "version": 1
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3715,10 +6686,37 @@
       "method": "GET",
       "path": "/students/{student_id}/communication_history",
       "handler": "routers.students.get_student_communication_history",
-      "role": "student",
-      "status": 403,
+      "role": "admin",
+      "status": 200,
       "json": true,
-      "shape": "object",
+      "shape": "list",
+      "sample_value": {
+        "length": 2,
+        "first_items": [
+          {
+            "source_id": 5,
+            "type": "sms",
+            "type_label": "پیامک",
+            "summary": "سلام ولی محترم دانش‌آموز دانش‌آموز تست 1، بدینوسیله به اطلاع می‌رساند قسط شهریه فرزند شما به مبلغ 350,000 تومان سررسید 1405/07/01 شده است. لطفاً جهت واریز اق...",
+            "date": "2026/10/05 07:02",
+            "sender": "آموزشگاه",
+            "recipient": "ولی دانش‌آموز تست 1",
+            "direction": "incoming",
+            "conversation_id": null
+          },
+          {
+            "source_id": 2,
+            "type": "sms",
+            "type_label": "پیامک",
+            "summary": "سلام ولی محترم دانش‌آموز دانش‌آموز تست 1، بدینوسیله به اطلاع می‌رساند قسط شهریه فرزند شما به مبلغ 350,000 تومان سررسید 1405/06/01 شده است. لطفاً جهت واریز اق...",
+            "date": "2026/10/05 07:02",
+            "sender": "آموزشگاه",
+            "recipient": "ولی دانش‌آموز تست 1",
+            "direction": "incoming",
+            "conversation_id": null
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3738,6 +6736,24 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "grades": {
+          "length": 1,
+          "first_items": [
+            {
+              "course_name": "<nested>",
+              "exam_title": "<nested>",
+              "score": "<nested>",
+              "max_score": "<nested>",
+              "date": "<nested>",
+              "description": "<nested>"
+            }
+          ]
+        },
+        "averages": {
+          "ریاضی پایه فعال": 18.5
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3757,6 +6773,27 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 3,
+        "first_items": [
+          {
+            "id": 1,
+            "course_title": "ریاضی پایه فعال",
+            "amount": 350000,
+            "due_date": "1405/06/01",
+            "is_paid": false,
+            "paid_at": "---"
+          },
+          {
+            "id": 3,
+            "course_title": "فیزیک دوکلاسه",
+            "amount": 500000,
+            "due_date": "1405/06/20",
+            "is_paid": true,
+            "paid_at": "1405/06/20"
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3776,6 +6813,32 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "student_name": "دانش‌آموز تست 1",
+        "national_code": "0020000001",
+        "overall_average": 18.5,
+        "courses": {
+          "length": 2,
+          "first_items": [
+            {
+              "course_title": "<nested>",
+              "teacher_name": "<nested>",
+              "attendance_percentage": "<nested>",
+              "grades": "<nested>",
+              "average_score": "<nested>"
+            },
+            {
+              "course_title": "<nested>",
+              "teacher_name": "<nested>",
+              "attendance_percentage": "<nested>",
+              "grades": "<nested>",
+              "average_score": "<nested>"
+            }
+          ]
+        },
+        "comments": "بسیار تلاش‌گر و منظم در کلاس‌ها.",
+        "final_status": "قبول با تراز الف"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3795,6 +6858,7 @@
       "status": 200,
       "json": false,
       "shape": "non-json",
+      "sample_value": null,
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3814,6 +6878,27 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 6,
+        "first_items": [
+          {
+            "timestamp": "2026-09-23",
+            "type": "installment",
+            "title": "قسط معوق 350,000 تومان",
+            "subtitle": "کلاس: ریاضی پایه فعال — سررسید: 1405/07/01",
+            "icon_name": "ic_overdue",
+            "color_hex": "#F44336"
+          },
+          {
+            "timestamp": "2026-09-11",
+            "type": "installment",
+            "title": "قسط پرداخت شده 500,000 تومان",
+            "subtitle": "کلاس: فیزیک دوکلاسه — سررسید: 1405/06/20 — پرداخت: 1405/06/20",
+            "icon_name": "ic_paid",
+            "color_hex": "#4CAF50"
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3833,6 +6918,9 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "معلم با موفقیت تایید شد و اکنون می‌تواند وارد شود"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3852,6 +6940,21 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 1,
+        "first_items": [
+          {
+            "id": 1,
+            "first_name": "رضا",
+            "last_name": "فعال",
+            "mobile": "09120000001",
+            "teacher_code": 1001,
+            "profile_image": null,
+            "is_approved": true,
+            "is_suspended": false
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3867,18 +6970,19 @@
       "method": "GET",
       "path": "/teachers/list/excel",
       "handler": "routers.teachers.get_teachers_excel",
-      "role": "teacher",
-      "status": 403,
-      "json": true,
-      "shape": "object",
+      "role": "admin",
+      "status": 200,
+      "json": false,
+      "shape": "non-json",
+      "sample_value": null,
       "error": null,
       "invalid_target": true,
       "status_500": false,
       "empty": null,
       "invalid": {
-        "status": 403,
-        "json": true,
-        "shape": "object",
+        "status": 200,
+        "json": false,
+        "shape": "non-json",
         "status_500": false
       }
     },
@@ -3890,6 +6994,10 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 0,
+        "first_items": []
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3905,10 +7013,24 @@
       "method": "POST",
       "path": "/teachers/register",
       "handler": "routers.teachers.register_teacher",
-      "role": "teacher",
+      "role": "public",
       "status": 422,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": {
+          "length": 1,
+          "first_items": [
+            {
+              "type": "<nested>",
+              "loc": "<nested>",
+              "msg": "<nested>",
+              "input": "<nested>",
+              "ctx": "<nested>"
+            }
+          ]
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3928,6 +7050,9 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "message": "درخواست ثبت‌نام معلم رد و آرشیو شد"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3943,16 +7068,19 @@
       "method": "PUT",
       "path": "/teachers/update/{teacher_id}",
       "handler": "routers.teachers.update_teacher",
-      "role": "teacher",
-      "status": 403,
+      "role": "admin",
+      "status": 400,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": "نسخه‌ی رکورد (version) اجباری است؛ ابتدا رکورد را مجدد بخوانید و دوباره تلاش کنید"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
       "empty": null,
       "invalid": {
-        "status": 403,
+        "status": 422,
         "json": true,
         "shape": "object",
         "status_500": false
@@ -3966,6 +7094,27 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "info": {
+          "name": "رضا فعال",
+          "mobile": "09120000001",
+          "national_code": "0010000001",
+          "status": "فعال",
+          "profile_image": null,
+          "teacher_code": 1001
+        },
+        "total_students": 5,
+        "total_revenue": 800000,
+        "active_classes_count": 4,
+        "classes": {
+          "length": 4,
+          "first_items": [
+            "ریاضی پایه فعال (C-ACTIVE) - ابتدایی",
+            "فیزیک دوکلاسه (C-MULTI) - متوسطه"
+          ]
+        },
+        "collaboration_summary": null
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -3985,6 +7134,22 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "date": "1405/07/06",
+        "day_name": "دوشنبه",
+        "live_class": {
+          "live_session_id": 1,
+          "course_id": 2,
+          "class_name": "فیزیک دوکلاسه",
+          "started_at_ts": 1790586000.25,
+          "elapsed_minutes": 0
+        },
+        "next_class": null,
+        "week_summary": {
+          "sessions_taught": 0,
+          "unsettled_amount": 0
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -4000,10 +7165,23 @@
       "method": "POST",
       "path": "/teachers/{id}/upload_photo",
       "handler": "routers.teachers.upload_teacher_photo",
-      "role": "teacher",
+      "role": "admin",
       "status": 422,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": {
+          "length": 1,
+          "first_items": [
+            {
+              "type": "<nested>",
+              "loc": "<nested>",
+              "msg": "<nested>",
+              "input": "<nested>"
+            }
+          ]
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -4023,6 +7201,21 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "id": 1,
+        "first_name": "رضا",
+        "last_name": "فعال",
+        "father_name": "علی",
+        "national_code": "0010000001",
+        "birth_date": "1370/01/01",
+        "mobile": "09120000001",
+        "home_phone": "02100000001",
+        "marital_status": "single",
+        "gender": "male",
+        "employment_type": "full",
+        "card_number": "603700000001",
+        "version": 1
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -4042,6 +7235,61 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 3,
+        "first_items": [
+          {
+            "id": 5,
+            "title": "کلاس در انتظار",
+            "code": "C-PEND",
+            "grade_level": "ابتدایی",
+            "is_admin_approved": false,
+            "is_suspended": false,
+            "students_preview": {
+              "length": 0,
+              "first_items": []
+            },
+            "bg_color": "#FFFFFF",
+            "total_debt": 0,
+            "debt_to_teacher": 0,
+            "debt_to_institute": 0,
+            "unpaid_sessions": 0,
+            "sessions_billed": 0,
+            "enrollment_id": null,
+            "course_id": 5,
+            "course_title": "کلاس در انتظار",
+            "teacher_id": 1,
+            "teacher_name": "رضا فعال",
+            "is_unassigned": false
+          },
+          {
+            "id": 2,
+            "title": "فیزیک دوکلاسه",
+            "code": "C-MULTI",
+            "grade_level": "متوسطه",
+            "is_admin_approved": true,
+            "is_suspended": false,
+            "students_preview": {
+              "length": 1,
+              "first_items": [
+                "<nested>"
+              ]
+            },
+            "bg_color": "#FFFFFF",
+            "total_debt": 1300000,
+            "debt_to_teacher": 0,
+            "debt_to_institute": 1300000,
+            "unpaid_sessions": 0,
+            "sessions_billed": 0,
+            "enrollment_id": null,
+            "course_id": 2,
+            "course_title": "فیزیک دوکلاسه",
+            "teacher_id": 1,
+            "teacher_name": "رضا فعال",
+            "is_unassigned": false
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -4057,16 +7305,28 @@
       "method": "GET",
       "path": "/teachers/{teacher_id}/collaboration_summary",
       "handler": "routers.teachers.get_teacher_collaboration_summary",
-      "role": "teacher",
-      "status": 403,
+      "role": "admin",
+      "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "period_days": 30,
+        "period_start": "2026/09/05",
+        "period_end": "2026/10/05",
+        "average_delay_minutes": 0.0,
+        "delay_samples_count": 2,
+        "live_sessions_last_30_days": 2,
+        "total_settlements_count": 0,
+        "total_settled_amount": 0,
+        "auto_ended_sessions_count": 1,
+        "auto_ended_last_30_days_count": 1
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
       "empty": null,
       "invalid": {
-        "status": 403,
+        "status": 422,
         "json": true,
         "shape": "object",
         "status_500": false
@@ -4080,6 +7340,10 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 0,
+        "first_items": []
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -4099,6 +7363,22 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 1,
+        "first_items": [
+          {
+            "id": 5,
+            "title": "کلاس در انتظار",
+            "code": "C-PEND",
+            "grade_level": "ابتدایی",
+            "bg_color": "#FFFFFF",
+            "students_preview": {
+              "length": 0,
+              "first_items": []
+            }
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -4118,6 +7398,22 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 1,
+        "first_items": [
+          {
+            "id": 5,
+            "title": "کلاس در انتظار",
+            "code": "C-PEND",
+            "days_of_week": "شنبه,دوشنبه",
+            "class_time": "16:00",
+            "capacity": 20,
+            "rejection_reason": "ظرفیت تکمیل",
+            "status": "rejected",
+            "pending_since": "2026-09-28T09:00:00"
+          }
+        ]
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -4137,6 +7433,27 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "teacher_id": 1,
+        "teacher_name": "رضا فعال",
+        "total_amount": 300000,
+        "session_count": 1,
+        "settled_total_amount": 0,
+        "earned_total_amount": 300000,
+        "pending_sessions": {
+          "length": 1,
+          "first_items": [
+            {
+              "session_id": "<nested>",
+              "date": "<nested>",
+              "class_title": "<nested>",
+              "amount": "<nested>",
+              "present_count": "<nested>",
+              "penalty_only": "<nested>"
+            }
+          ]
+        }
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -4152,16 +7469,19 @@
       "method": "POST",
       "path": "/teachers/{teacher_id}/settle",
       "handler": "routers.teachers.settle_teacher_sessions",
-      "role": "teacher",
-      "status": 403,
+      "role": "admin",
+      "status": 400,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": "جلسه(های) [1] قبلاً تسویه شده‌اند؛ لطفاً آن‌ها را از لیست حذف کنید"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
       "empty": null,
       "invalid": {
-        "status": 403,
+        "status": 422,
         "json": true,
         "shape": "object",
         "status_500": false
@@ -4175,6 +7495,10 @@
       "status": 200,
       "json": true,
       "shape": "list",
+      "sample_value": {
+        "length": 0,
+        "first_items": []
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -4190,16 +7514,19 @@
       "method": "PUT",
       "path": "/teachers/{teacher_id}/settlements/{settlement_id}/edit",
       "handler": "routers.teachers.edit_teacher_settlement",
-      "role": "teacher",
-      "status": 403,
+      "role": "admin",
+      "status": 404,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": "تسویه یافت نشد"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
       "empty": null,
       "invalid": {
-        "status": 403,
+        "status": 422,
         "json": true,
         "shape": "object",
         "status_500": false
@@ -4209,16 +7536,19 @@
       "method": "POST",
       "path": "/teachers/{teacher_id}/settlements/{settlement_id}/reverse",
       "handler": "routers.teachers.reverse_teacher_settlement",
-      "role": "teacher",
-      "status": 403,
+      "role": "admin",
+      "status": 404,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": "تسویه یافت نشد"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
       "empty": null,
       "invalid": {
-        "status": 403,
+        "status": 422,
         "json": true,
         "shape": "object",
         "status_500": false
@@ -4232,6 +7562,17 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "student_id": 1,
+        "student_name": "دانش‌آموز تست 1",
+        "wallet_teacher": -10000,
+        "wallet_institute": 5000,
+        "wallet_balance": -5000,
+        "calculated_debt_teacher": 10000,
+        "calculated_debt_institute": 0,
+        "calculated_total_debt": 2000000,
+        "note": "Debt is discounted tuition minus recorded payments; wallets are an unpriced legacy fallback."
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -4251,6 +7592,22 @@
       "status": 200,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "test_passed": true,
+        "initial_wallets": {
+          "teacher": -10000,
+          "institute": 5000,
+          "balance": -5000
+        },
+        "final_wallets": {
+          "teacher": -10000,
+          "institute": 5000,
+          "balance": -5000
+        },
+        "test_description": "ایجاد → ویرایش (+5000) → حذف تراکنش",
+        "expected_result": "کیف پول باید به مقدار اولیه برگردد",
+        "actual_result": "برگشت به مقدار اولیه"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,
@@ -4270,6 +7627,9 @@
       "status": 404,
       "json": true,
       "shape": "object",
+      "sample_value": {
+        "detail": "فایل یافت نشد"
+      },
       "error": null,
       "invalid_target": true,
       "status_500": false,

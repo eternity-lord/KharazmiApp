@@ -75,7 +75,7 @@ def test_admin_dashboard_and_finance_reads_have_exact_seed_values(client, auth_h
     assert debt_body["calculated_total_debt"] == 2_000_000
     assert [row["id"] for row in transactions.json()] == [6, 4, 3, 2, 1]
     assert transactions.json()[0]["course_name"] == "فیزیک دوکلاسه"
-    assert students.json() == [{"id": 1, "name": "دانش‌آموز تست 1", "national_code": "0020000001", "mobile": "093500000001", "role": "student", "is_suspended": False}]
+    assert students.json() == [{"id": 1, "name": "دانش‌آموز تست 1", "national_code": "0020000001", "mobile": "09350000001", "role": "student", "is_suspended": False}]
     assert teachers.json()[0]["name"] == "رضا فعال"
 
 
@@ -117,7 +117,7 @@ def test_admin_settings_search_and_history_shapes(client, auth_headers):
     assert restored_settings.status_code == 200
 
 
-def test_admin_profiles_archive_and_today_contracts(client, auth_headers):
+def test_admin_profiles_archive_and_today_contracts(client, auth_headers, frozen_server_clock):
     headers = auth_headers["admin"]
     profile = client.get("/admin/students/1/full_profile", headers=headers)
     deleted = client.get("/admin/deleted_classes", headers=headers)
@@ -134,16 +134,13 @@ def test_admin_profiles_archive_and_today_contracts(client, auth_headers):
     assert deleted_detail.json()["id"] == 4
     assert deleted_detail.json()["archived_enrollments_count"] == 1
     assert {"date", "day_name", "scheduled_classes", "today_payments", "installment_alerts"} <= today.json().keys()
-    # FIX(test-date-rot): «امروز» در این تست هاردکد بود (انتظارِ روزِ نوشتنِ تست) و با گذشت روز
-    # قرمز می‌شد؛ حالا date/day_name با همان تقویمِ مرکزی پروژه و تعدادِ کلاس‌های برنامه‌ریزی‌شده
-    # با همان هلپرِ `schedule_matches_date` (روزهای seed = «شنبه,دوشنبه») انتظارِ درست را می‌سازد.
-    import datetime as _datetime
-
+    # The suite freezes server wall-clock reads at FIXED_NOW; derive expectations
+    # from that shared fixture and the project's central Jalali/schedule helpers.
     from today_summary import PERSIAN_DAY_NAMES as _PERSIAN_DAY_NAMES
     from today_summary import jalali_date_string as _jalali_date_string
     from today_summary import schedule_matches_date as _schedule_matches_date
 
-    _today = _datetime.date.today()
+    _today = frozen_server_clock
     assert today.json()["date"] == _jalali_date_string(_today)
     assert today.json()["day_name"] == _PERSIAN_DAY_NAMES[_today.weekday()]
     _expected_scheduled = 3 if _schedule_matches_date("شنبه,دوشنبه", _today) else 0

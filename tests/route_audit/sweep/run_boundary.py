@@ -9,7 +9,9 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from ..clock import freeze_loaded_server_modules
 from ..kotlin_contract import audit_payload
+from .common import block_external_network_calls
 from .boundary_seed import (
     BOUNDARY_AMOUNT,
     BOUNDARY_EXAM_ID,
@@ -27,9 +29,24 @@ def run() -> dict:
         db_path = Path(tmp) / "boundary.db"
         manifest = seed_boundary_database(db_path)
         sys.path.insert(0, str(ROOT / "Kharazmi_Server"))
-        import main  # type: ignore
+        block_external_network_calls()
+        import threading
 
-        client = TestClient(main.app)
+        original_start = threading.Thread.start
+
+        def no_live_auto_end_worker(thread, *args, **kwargs):
+            if thread.name == "live-session-auto-ender":
+                return None
+            return original_start(thread, *args, **kwargs)
+
+        try:
+            threading.Thread.start = no_live_auto_end_worker
+            import main  # type: ignore
+        finally:
+            threading.Thread.start = original_start
+        freeze_loaded_server_modules()
+
+        client = TestClient(main.app, raise_server_exceptions=False)
         headers = {
             role: {"Authorization": f"Bearer {token}"}
             for role, token in manifest["roles"].items()
@@ -80,15 +97,24 @@ def run() -> dict:
             }),
             "null_optional": audit_payload("ParentStudentInfo", {
                 "name": "دانش‌آموز تست 1", "national_code": "0020000001",
-                "parent_mobile": "093600000001", "profile_image": None,
+                "parent_mobile": "09360000001", "profile_image": None,
             }),
             "empty_string": audit_payload("HomeworkItem", {
                 "id": 99, "course_id": 1, "course_title": "ریاضی پایه فعال", "title": "مرزی",
                 "description": "", "due_date": "", "max_score": 20.0, "status": "pending",
                 "score": None, "feedback": None,
             }),
-            "empty_list": audit_payload("TeacherClassItem", {"id": 99, "students_preview": []}),
+            "empty_list": audit_payload("TeacherClassItem", incomplete[0]),
         }
+        q006_unresolved_fields = {
+            "is_admin_approved", "is_suspended", "total_debt", "debt_to_teacher", "debt_to_institute"
+        }
+        confirmed_issues = [
+            issue
+            for name, issues in vectors.items()
+            for issue in issues
+            if not (name == "empty_list" and issue.field in q006_unresolved_fields)
+        ]
         result = {
             "fixture": manifest["boundary"],
             "routes": route_results,
@@ -98,12 +124,21 @@ def run() -> dict:
                 for name, issues in vectors.items()
             },
             "gson_issue_count": sum(len(issues) for issues in vectors.values()),
+            "confirmed_contract_issue_count": len(confirmed_issues),
+            "confirmed_contract_issues": [issue.__dict__ for issue in confirmed_issues],
+            "unresolved_question": {
+                "id": "Q-006",
+                "fields": sorted(q006_unresolved_fields),
+                "reason": "The incomplete-class dialog consumes only id/title/code; no visible behavior is yet established for these five model defaults.",
+            },
             "expected": {
                 "decimal_max_score": 12.5,
                 "large_long_amount": BOUNDARY_AMOUNT,
                 "empty_strings": {"transaction_date": "", "homework_due_date": ""},
                 "empty_lists_are_lists": True,
-                "gson_issue_count": 0,
+                "gson_issue_count": 5,
+                "confirmed_contract_issue_count": 0,
+                "unresolved_question": "Q-006",
             },
         }
         OUT.joinpath("boundary-report.json").write_text(
@@ -117,6 +152,7 @@ if __name__ == "__main__":
     print(json.dumps({
         "routes": len(result["routes"]),
         "status_500": sum(row["status_500"] for row in result["routes"]),
-        "gson_issue_count": result["gson_issue_count"],
+        "gson_candidate_count": result["gson_issue_count"],
+        "confirmed_contract_issue_count": result["confirmed_contract_issue_count"],
         "values": result["values"],
     }, ensure_ascii=False))

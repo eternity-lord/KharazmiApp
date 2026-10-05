@@ -1,0 +1,57 @@
+from scripts.generate_route_audit_docs import END, REPORT_DIR, START, cell
+
+
+def _unescaped_pipe_count(line: str) -> int:
+    count = 0
+    for index, char in enumerate(line):
+        if char != "|":
+            continue
+        backslashes = 0
+        cursor = index - 1
+        while cursor >= 0 and line[cursor] == "\\":
+            backslashes += 1
+            cursor -= 1
+        if backslashes % 2 == 0:
+            count += 1
+    return count
+
+
+def test_cell_escapes_literal_pipe_once_and_breaks_openapi_separators():
+    assert cell("left|right") == r"left\|right"
+    assert cell("query:a | query:b") == "query:a<br>query:b"
+
+
+def _split_markdown_cells(line: str) -> list[str]:
+    cells = []
+    start = 1
+    for index in range(1, len(line) - 1):
+        if line[index] != "|":
+            continue
+        backslashes = 0
+        cursor = index - 1
+        while cursor >= 0 and line[cursor] == "\\":
+            backslashes += 1
+            cursor -= 1
+        if backslashes % 2 == 0:
+            cells.append(line[start:index])
+            start = index + 1
+    cells.append(line[start:-1])
+    return cells
+
+
+def test_generated_route_ledgers_keep_markdown_table_columns_intact():
+    reports = sorted(REPORT_DIR.glob("*.md"))
+    assert len(reports) == 25
+    for report in reports:
+        text = report.read_text(encoding="utf-8")
+        assert START in text and END in text, report.name
+        ledger = text.split(START, 1)[1].split(END, 1)[0]
+        rows = [line for line in ledger.splitlines() if line.startswith("|")]
+        assert rows, report.name
+        for row in rows:
+            assert _unescaped_pipe_count(row) == 9, f"{report.name}: malformed table row: {row}"
+            longest_unbroken_cell = max(
+                (len(segment) for cell_text in _split_markdown_cells(row) for segment in cell_text.split("<br>")),
+                default=0,
+            )
+            assert longest_unbroken_cell <= 300, f"{report.name}: unwrapped table cell: {row}"

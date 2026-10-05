@@ -1,87 +1,69 @@
-# خلاصهٔ ممیزی تست‌محور routeها
+# خلاصهٔ ممیزی تست‌محور routeها و قرارداد Android
 
-**snapshot:** 2026-09-28 — **branch:** `arena/01a0c9b8-kharazmiapp`
+**Snapshot:** 2026-10-05 · **Branch:** `arena/01a10aa8-kharazmiapp` · **Application code:** بدون تغییر. این سند وضعیت آزمون‌های همین checkout را گزارش می‌کند؛ اجرای smoke روی هر route معادل deep audit همهٔ branchها نیست.
 
-**checksum واقعی دیتابیس اصلی:** `md5sum Kharazmi_Server/gaj_db.db` → `f048f8d11833c4eaa944490594121d7` (دیتابیس اصلی تغییر نکرده است).
+**پایگاه اصلی:** MD5 قبل و بعد از اجرای pytest و runnerهای ایزوله `f048f8d118b33c4eaa944490594121d7` است. همهٔ seedها در DB موقت ساخته شده‌اند؛ SMS/push/network واقعی فراخوانی نشده است.
 
-## شمارش
+## دامنه و مرحلهٔ صفر
 
-| شاخص | مقدار | توضیح |
-|---|---:|---|
-| کل routeهای inventory | 221 | از `docs/app-map/server-routes.csv` |
-| route دارای registry تست | 221 | meta-test اجباری است و missing route را fail می‌کند |
-| route با functional assertion مقداری در این نوبت | **72** | finance: 11؛ attendance: **12**؛ classes: 8؛ admin: 41 route با read، state، ledger، export، conflict و guard؛ mutation validation در [`mutation-validation.md`](mutation-validation.md) |
-| route از همین سه router بدون assertion مستقل | 33 | فهرست کامل و دلیل هر مورد در `blockers.md` آمده است؛ sweep جای assertion کسب‌وکار را نگرفته است |
-| route functional باقی‌ماندهٔ سایر routerها | 151 | 86 تست route-audit اکنون شامل deep audit teachers/students/dashboard/reports/analytics/exports/exams/homework/parent و fixtureهای مرزی/حجیم است؛ همهٔ routeها هنوز deep نشده‌اند |
-| router پردازش‌شده | 13 | finance، attendance، classes، admin و deep sliceهای teachers/students/dashboard/reports/analytics/exports/exams/homework/parent؛ calendar/branches/timeline/audit فقط sweep |
-| تست‌های pass | **86** | آخرین اجرای `pytest tests/route_audit -q` پس از mutation oracleها |
-| تست‌های strict xfail | 3 | فقط O-02، O-12 و O-19؛ O-14، RA-sweep-01..04 و RA-admin-01 سبز و assertion عادی هستند |
-| باگ‌های contract/deep audit | 0 issue باز | هر 4 sweep، RA-admin-01 و RA-parent-01 اصلاح شدند؛ contract post-fix هیچ issue ندارد |
-| باگ‌های status 500 در sweep | 0 | در 221 اجرای معتبر و 220 payload نامعتبر، status 500 مشاهده نشد |
+- ورودی اصلی نگاشت، `docs/app-map/*` است و دست‌نخورده مانده. server map، 221 route در 25 router را inventory می‌کند.
+- مقایسهٔ Android جاری با نگاشت تاریخی در `android-api-current.csv` و `android-route-diff.md`: 169 declaration در Kotlin جاری، 162 در map تاریخی، 158 زوج یکتای method/path، 156 مسیر static یکتا، 1 `@Url` پویا، 65 server-only و 0 Android-only.
+- این map، retrofit caller/screen، response data class/field، handler/source، ورودی OpenAPI، DB read/write استاتیک و side effect را کنار هم قرار می‌دهد. 25 ledger در `routes/*.md`، 221 route را پوشش می‌دهند.
+- seed canonical پایدار و مستقل است: 30 دانش‌آموز، 7 کلاس، 7 enrollment، 6 transaction، 3 session، 4 attendance، 4 installment، 2 grade، 1 homework و 2 exam؛ timestamp/JWT/hash deterministic هستند. fixture حجیم مستقل 300 دانش‌آموز، 30 کلاس، 300 transaction و 300 session دارد.
+- زمان seed روی `2026-09-28 09:00:00` freeze است. guard از اتصال به `Kharazmi_Server/gaj_db.db` جلوگیری می‌کند؛ فقط temporary DB استفاده می‌شود. `requests`, `urllib`, `socket` در pytest و runnerهای مستقل fail-closed هستند؛ subprocess regression در `test_sweep_network_guard.py` این مسدودسازی را بررسی می‌کند و worker زمان‌بندی‌شده نیز در test اجرا نمی‌شود.
 
-## پوشش این نوبت
+## نتایج واقعی آخرین sweep / runnerها
 
-- مقدار response و متن فارسی در مسیرهای read finance بررسی شد.
-- جزئیات session، history حضور، live start/status/cancel، roster و اثر صفر مالی بررسی شد.
-- کلاس‌ها: list/detail/full report/students، pending/deletion، suspend و Excel با openpyxl بررسی شد.
-- oracle مستقل برای tuition/discount/payment/due و wallet سهم‌ها استفاده شد.
-- atomic update و retry برای پرداخت مستقیم، پرداخت قسط و شارژ جلسه بررسی شد؛ retry تسویه در این سه router route ندارد.
-- mutation validation: هر ۱۰ mutation مالی/وضعیتی در کپی مستقل `/tmp` گرفته شد؛ ۶ oracle مستقل برای mutationهای escaped اولیه اضافه شد و مجموع routeهای دارای assertion مقداری به 72/221 رسید.
-- invalid amount بررسی شد و عدم ایجاد transaction assert شد.
-- پاسخ خالی installments به‌صورت `[]` بررسی شد.
-- dynamic URL، امنیت token و نفوذ خارج از scope باقی ماندند.
+| Probe | نتیجه |
+|---|---|
+| Route smoke | 221/221 route اجرا شد؛ status 500 = 0 |
+| Status اصلی | `200:182`, `400:17`, `422:8`, `404:7`, `409:5`, `403:1`, `401:1` |
+| Actor probe | admin=168، teacher=21، student=18، public=9، parent=5؛ این نقش‌ها probe هستند، نه اثبات کامل مجوز route |
+| Invalid-input | 220/221 route هدف invalid-target دارند؛ invalid status 500 = 0 |
+| Empty probes | 11؛ null-list مشاهده‌شده = 0 |
+| Non-JSON | 14 پاسخ در sweep؛ endpointهایی که HTML/file/empty response دارند باید با contract خودشان تفسیر شوند |
+| Boundary | 4 route، 500=0؛ `Exam.max_score=12.5`, transaction=`2147483649`, empty string/null/list بررسی شد؛ 5 خام Gson-candidate، 0 مورد تأییدشده |
+| Large | هر 8 check مربوط به limit/order/filter/count/debtors/session سبز؛ تمام statusها 200 |
 
-## نتیجهٔ صریح برای ۶۲ route سه router اول
+تنها 403 اجرای اصلی، `GET /finance/parent/dashboard` با parent session معتبر است (`RA-finance-02`). Handler در `routers/finance.py`، `get_student_financial_dashboard(...)` را مستقیم صدا می‌زند و `_role` را منتقل نمی‌کند. این باگ ثبت و strict-xfail است؛ application code تغییر نکرده.
 
-| آزمون/موضوع | نتیجهٔ عددی | تفسیر |
-|---|---:|---|
-| payload نامعتبر تولیدشده از OpenAPI | 220 route دارای body/parameter؛ 0 status 500 | sweep در `report.json` ثبت شده؛ assertion معنایی 29 route سه router اول و 33 route admin جداگانه ثبت شده است |
-| retry پرداخت مستقیم/قسط | 2 سناریوی صریح، `/finance/pay` و `/finance/installments/{id}/pay` | پرداخت مستقیم دوباره همان `transaction_id` را می‌دهد و فقط 1 transaction ساخته می‌شود؛ retry قسط 400 و receipt دوم ندارد |
-| retry شارژ جلسه | 1 سناریوی صریح، `/attendance/submit_session` | retry همان تاریخ 409؛ فقط یک SessionLog/Attendance/ledger جدید و wallet به‌صورت snapshot بازگردانده شد؛ این guard جای value audit کامل route نیست |
-| retry تسویهٔ معلم | 1 سناریوی صریح | settle مبلغ 300,000، retry=400، reversal مبلغ 300,000، retry reversal=409 و wallet بدون تغییر assert شد |
-| تعارض شروع جلسهٔ زنده | 1 | شروع دوبارهٔ live، 409 و بدون جلسهٔ دوم |
-| تعارض پایان/لغو جلسه | 1 replay cancel | cancel دوباره idempotent است؛ پایان دوباره در blockers است |
-| truncation/limit لیست | 8 assertion scale | seed مستقل 300 دانش‌آموز/30 کلاس + 300 transaction/session؛ limit/order/filter دانش‌آموز، کلاس، transaction، بدهکار و session سبز شد |
-| تومان/ریال | 0 assertion قطعی | Q-003 باز است؛ فقط متن source/مبلغ عددی بررسی شده و تبدیل حدس زده نشده است |
-| باگ جدید server/financial در 29 route | 0 | تست‌های مقداری finance/attendance/classes و oracle مستقل سبز بودند |
-| باگ contract در همین scope sweep | 0 post-fix issue | `RA-sweep-01..04` با responseهای server صریح سبز هستند؛ `bugs.md` status هر مورد را ثبت می‌کند |
+## Retrofit ↔ Kotlin/Gson simulator
 
-## نتیجهٔ deep audit admin و بخش‌های پرریسک
+اسکریپت شبیه‌ساز، declarationها و data classهای Kotlin فعلی را با payloadهای واقعی route مقایسه می‌کند؛ **Gradle/Gson runtime یا گوشی اجرا نشده است**.
 
-- **41/41 route** admin حداقل یک assertion مقداری، state، conflict، export یا negative guard دارند؛ route بدون assertion باقی نمانده است.
-- `/dashboard/stats` در RA-admin-01 اصلاح شد: transaction دارای `student_id` ولی بدون `enrollment_id` اکنون نام مستقیم دانش‌آموز را برمی‌گرداند؛ dashboard audit سبز است.
-- settings/share/pricing، transaction delta، metadata-only restore، session reopen، bulk state، SMS log محلی، role redaction، credentials و XLSX بررسی شدند؛ SMS/network واقعی ارسال نشد.
-- teachers: تسویهٔ 300,000، payout منفی، retry، reversal، بازگشت attendance و عدم تغییر wallet assert شد.
-- students: profile/grade oracle، دسترسی parent، empty search و optimistic conflict/version assert شد.
-- dashboard/analytics/reports/exports: KPI، date/filter/limit، debt oracle و CSV header/rows assert شد.
-- exams/homework/parent: response shape، attempt retry، IDOR، empty defaults و child portal values assert شد.
+```text
+169 declarations; 158 unique calls; 156 unique static method/path routes
+ dynamic=1; unmatched=0; route_non_success=28; successful_non_json=4
+ empty_json_body=0; parse=4; npe=5; silent_zero=8
+ missing_key=0; simulation_gap=0
+```
 
-## جاروب ۲۲۱ route و ۱۵۱ تماس Retrofit
+این شمارنده‌ها candidate detector هستند، نه تعداد باگ قطعی. یافته‌های مصرف‌شده/نامطمئن در Q-006..Q-008 طبقه‌بندی شده‌اند: incomplete-class fields با caller مصرف‌کنندهٔ فقط `id/title/code`؛ نبود `parent_mobile` در screen دانش‌آموز؛ و فیلدهای اختیاری/غایب transaction که screen فعلی از آنها استفاده نمی‌کند. `max_score` غایب در حالت homework نمره‌دار جداگانه به `RA-homework-01` ارتقا یافته است.
 
-جزئیات کامل در [`sweep-report.md`](sweep-report.md) و artifactهای `tests/route_audit/sweep/` است:
+## پوشش رفتاری و مالی
 
-- route smoke: **221/221**؛ status 500 برابر **0**؛ پاسخ‌های non-JSON مورد انتظار **13**.
-- invalid OpenAPI probes: **220/220 target**؛ status 500 برابر **0**.
-- empty probes: **11**؛ list=`null` برابر **0**.
-- Retrofit contract: **151 unique call**، dynamic=`1`، unmatched=`0`.
-- contract post-fix: parse/overflow=`0`، NPE بالقوه=`0`، missing-list=`0`، silent-zero=`0`؛ 4 assertion عادی sweep و 1 assertion عادی O-14 سبز هستند.
+- 13 router دارای testهای متمرکز هستند: finance, attendance, classes, admin, teachers, students, dashboard, reports, analytics, exports, exams, homework, parent. پوشش این 172 route **partial** است و تمام transitionها/branchهایشان عمیق نشده‌اند.
+- 102 route در test sourceها literal client request reference دارند؛ این شمارش، عمق assertion را ثابت نمی‌کند. 119 مسیر literal match ندارند. ledger هر route test-reference یا smoke-only را مشخص می‌کند.
+- finance دارای oracle مستقل tuition/discount/payment/due، split wallet، FIFO installment allocation و receipt/reversal است. invariantهای retry شامل direct payment، installment payment، session charge و teacher settlement/reversal بررسی شده‌اند؛ `target_wallet=both`، معنای income، واحد مبلغ، بی‌تاریخی و restore در questions ثبت‌اند.
+- attendance: history/detail، snapshot هزینه، same-day QR check-in، stale QR، live start/status/cancel، conflict/retry و بی‌اثری مالی cancellation تست شده‌اند. مبلغ 260,000 در oracle جلسه با DB assert می‌شود.
+- علاوه بر آن KPIهای dashboard، date/filter/order/limit subset، CSV، exam-attempt retry، homework scope، parent/child access و student optimistic version conflict آزمون شده‌اند.
 
-## سؤال‌های باز
+## باگ‌ها و xfailها
 
-تعداد سؤال‌ها: **5**. متن کوتاه هرکدام:
+آخرین اجرای کامل pytest بعد از افزودن socket-level blocking:
 
-1. **Q-001:** «درآمد» وصول نقدی است، تعهد شهریه است، یا هر دو با نام جدا؟
-2. **Q-002:** برای `target_wallet=both` کل receipt در statement بیاید یا سهم‌های explicit؟
-3. **Q-003:** واحد مبلغ تومان است، ریال است، یا ذخیره بدون تبدیل با label مستقل؟
-4. **Q-004:** پرداخت بی‌تاریخ خارج از بازه باشد، سبد بی‌تاریخ داشته باشد، یا رد شود؟
-5. **Q-005:** restore کلاس metadata-only، full ledger، یا فقط با snapshot ledger باشد؟
+```text
+98 passed, 9 xfailed, 4 warnings
+```
 
-جزئیات گزینه‌ها در `questions.md` است.
+این اجرای کامل شامل regressionهای generator و oracle دقیق invoice enrollment 2 است.
 
-## موارد ناتمام
+۹ strict xfail فعلی: O-02/RA-auth-02، O-12/RA-exams-02، O-19/RA-admin-19، RA-finance-02، RA-homework-01، RA-attendance-01/02/03 و RA-teachers-01. O-14 در این checkout بسته/سبز است و xfail نشده است. فهرست و reproduction در `bugs.md` است؛ هیچ باگی در application code اصلاح نشده.
 
-- ۱۵۱ route functional سایر routerها باید طبق ترتیب `progress.md` تکمیل شوند؛ admin اکنون assertion پایه برای هر 41 route دارد.
-- ۳۳ route سه router اول در `blockers.md` assertion مستقل ندارند.
-- exports هنوز به openpyxl/PDF value audit عمیق نشده است؛ sweep فقط response/shape را ثبت کرده است.
-- device checklist عددهای screenهای مهم را دارد، اما اجرای گوشی/compile انجام نشده است.
-- CI mutation branch سبز است: [run 36413712720](https://github.com/eternity-lord/KharazmiApp/actions/runs/36413712720)؛ Android compile عمداً اجرا نشده است.
+## ناتمام‌ها و مراجع
+
+- 49 route از 12 router هنوز deep value/DB/state-machine suite ندارند: `ai(1)`, `audit(1)`, `audit_trail(1)`, `auth(12)`, `automation(5)`, `branches(9)`, `calendar(4)`, `crm(5)`, `dunning(2)`, `messages(7)`, `serve_upload(1)`, `timeline(1)`؛ blockerها در `blockers.md`.
+- 8 تصمیم محصول همچنان باز است: Q-001..Q-008 در `questions.md`؛ تست‌ها rule مبهمی را حدس نمی‌زنند.
+- Android compile/runtime و device execution انجام نشده. Checklist دستی با seed values در `device-checklist.md` آمده است.
+- شمارش و فایل‌های خام: `sweep/report.json`, `contract-report.json`, `boundary-report.json`, `large-report.json`; runnerهای مستقل در `tests/route_audit/sweep/`.
+- تست کامل: `PYTHONPATH=. /tmp/kharazmi-route-audit-venv/bin/pytest -q tests/route_audit`.

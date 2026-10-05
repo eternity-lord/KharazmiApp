@@ -6,9 +6,10 @@ set DATABASE_URL. It never opens, writes, or migrates the repository database.
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
+import hmac
 import json
 import os
-import secrets
 import sys
 from pathlib import Path
 from typing import Any
@@ -32,10 +33,48 @@ def _guard_path(path: Path) -> Path:
 
 def _imports():
     # Environment must be set before models/dependencies are imported.
+    import dependencies  # type: ignore
     import models  # type: ignore
-    from dependencies import create_jwt_token, hash_password  # type: ignore
 
-    return models, create_jwt_token, hash_password
+    return models, dependencies
+
+
+def _stable_password_hash(dependencies, password: str, identity: str) -> str:
+    """Passlib PBKDF2 hash with a fixture-only, identity-scoped salt."""
+    salt = hashlib.sha256(f"route-audit-seed-v1:{identity}".encode("utf-8")).digest()[:16]
+    return dependencies.pbkdf2_sha256.using(salt=salt, rounds=29_000).hash(password)
+
+
+def _stable_jwt(dependencies, user_id: int, role: str, now: dt.datetime) -> str:
+    """Sign a reproducible JWT that remains valid independently of wall time."""
+    header = {"alg": dependencies.JWT_ALGORITHM, "typ": "JWT"}
+    issued = int(now.replace(tzinfo=dt.timezone.utc).timestamp())
+    payload = {
+        "user_id": user_id,
+        "sub_role": role,
+        "exp": issued + 10 * 365 * 24 * 60 * 60,
+        "iat": issued,
+        "jti": f"route-audit-seed-v1-{user_id}-{role}",
+    }
+    header_b64 = dependencies._b64url_encode(json.dumps(header, separators=(",", ":")).encode())
+    payload_b64 = dependencies._b64url_encode(json.dumps(payload, separators=(",", ":")).encode())
+    signing_input = f"{header_b64}.{payload_b64}".encode("ascii")
+    signature = hmac.new(dependencies.JWT_SECRET_KEY.encode(), signing_input, hashlib.sha256).digest()
+    return f"{header_b64}.{payload_b64}.{dependencies._b64url_encode(signature)}"
+
+
+def _freeze_model_timestamp_defaults(models, now: dt.datetime) -> None:
+    """Pin Python-side ORM timestamp defaults for a byte-reproducible fixture."""
+    for table in models.Base.metadata.tables.values():
+        for column in table.columns:
+            default = column.default
+            callback = getattr(default, "arg", None)
+            if (
+                isinstance(column.type, models.DateTime)
+                and callable(callback)
+                and getattr(callback, "__name__", "") in {"now", "utcnow"}
+            ):
+                default.arg = lambda _context=None, fixed=now: fixed
 
 
 def seed_database(path: str | Path, *, large: bool = False) -> dict[str, Any]:
@@ -43,7 +82,9 @@ def seed_database(path: str | Path, *, large: bool = False) -> dict[str, Any]:
     target = _guard_path(Path(path))
     os.environ["DATABASE_URL"] = f"sqlite:///{target}"
     os.environ.setdefault("JWT_SECRET_KEY", "route-audit-test-secret-" + "x" * 48)
-    models, create_jwt_token, hash_password = _imports()
+    models, dependencies = _imports()
+    now = dt.datetime(2026, 9, 28, 9, 0, 0)
+    _freeze_model_timestamp_defaults(models, now)
 
     # A fresh target is safer than trying to make the fixture idempotent by
     # deleting rows in a shared database.
@@ -51,7 +92,6 @@ def seed_database(path: str | Path, *, large: bool = False) -> dict[str, Any]:
         target.unlink()
     models.Base.metadata.create_all(bind=models.engine)
     db = models.SessionLocal()
-    now = dt.datetime(2026, 9, 28, 9, 0, 0)
     manifest: dict[str, Any] = {"database": str(target), "seed_version": 1, "roles": {}, "ids": {}}
     try:
         Branch = models.Branch
@@ -61,11 +101,11 @@ def seed_database(path: str | Path, *, large: bool = False) -> dict[str, Any]:
 
         User = models.User
         users = [
-            User(id=1, username="audit-admin", password=hash_password("Admin-Route-1405!"), full_name="ادمین ممیزی", role="admin", sub_role="admin", branch_id=None),
-            User(id=2, username="audit-secretary", password=hash_password("Secretary-Route-1405!"), full_name="منشی ممیزی", role="secretary", sub_role="secretary", branch_id=1),
-            User(id=3, username="audit-teacher-1", password=hash_password("Teacher-Route-1405!"), full_name="معلم فعال", role="teacher", sub_role="teacher", branch_id=1),
-            User(id=4, username="audit-student", password=hash_password("Student-Route-1405!"), full_name="دانش‌آموز تست", role="student", sub_role="student", branch_id=1),
-            User(id=5, username="audit-parent", password=hash_password("Parent-Route-1405!"), full_name="ولی تست", role="parent", sub_role="parent", branch_id=1),
+            User(id=1, username="audit-admin", password=_stable_password_hash(dependencies, "Admin-Route-1405!", "user:1"), full_name="ادمین ممیزی", role="admin", sub_role="admin", branch_id=None),
+            User(id=2, username="audit-secretary", password=_stable_password_hash(dependencies, "Secretary-Route-1405!", "user:2"), full_name="منشی ممیزی", role="secretary", sub_role="secretary", branch_id=1),
+            User(id=3, username="09120000001", password=_stable_password_hash(dependencies, "Teacher-Route-1405!", "user:3"), full_name="معلم فعال", role="teacher", sub_role="teacher", branch_id=1),
+            User(id=4, username="audit-student", password=_stable_password_hash(dependencies, "Student-Route-1405!", "user:4"), full_name="دانش‌آموز تست", role="student", sub_role="student", branch_id=1),
+            User(id=5, username="audit-parent", password=_stable_password_hash(dependencies, "Parent-Route-1405!", "user:5"), full_name="ولی تست", role="parent", sub_role="parent", branch_id=1),
         ]
         db.add_all(users)
 
@@ -113,7 +153,7 @@ def seed_database(path: str | Path, *, large: bool = False) -> dict[str, Any]:
             else:
                 state = (False, False, 1 if sid % 2 else 2, sid % 3)
             is_suspended, is_deleted, bid, _ = state
-            students.append(Student(id=sid, student_code=2000 + sid, branch_id=bid, first_name="دانش‌آموز", last_name=f"تست {sid}", father_name="پدر تست", national_code=f"002000{sid:04d}", birth_date="1390/01/01", wallet_teacher=-10000 if sid == 1 else 0, wallet_institute=5000 if sid == 1 else 0, student_mobile=f"0935000{sid:05d}", parent_mobile=f"0936000{sid:05d}", home_phone="02100000000", address="آدرس تست", study_status="active", gender="mixed", is_suspended=is_suspended, is_deleted=is_deleted, wallet_balance=-5000 if sid == 1 else 0, profile_image=None, user_id=4 if sid == 1 else None, parent_user_id=5 if sid == 1 else None))
+            students.append(Student(id=sid, student_code=2000 + sid, branch_id=bid, first_name="دانش‌آموز", last_name=f"تست {sid}", father_name="پدر تست", national_code=f"002000{sid:04d}", birth_date="1390/01/01", wallet_teacher=-10000 if sid == 1 else 0, wallet_institute=5000 if sid == 1 else 0, student_mobile=f"093500{sid:05d}", parent_mobile=f"093600{sid:05d}", home_phone="02100000000", address="آدرس تست", study_status="active", gender="mixed", is_suspended=is_suspended, is_deleted=is_deleted, wallet_balance=-5000 if sid == 1 else 0, profile_image=None, user_id=4 if sid == 1 else None, parent_user_id=5 if sid == 1 else None))
         db.add_all(students)
         db.flush()
 
@@ -162,11 +202,11 @@ def seed_database(path: str | Path, *, large: bool = False) -> dict[str, Any]:
         ])
 
         LiveSession = models.LiveSession
-        # Keep the fixture's active live session fresh enough that the app's real auto-end
-        # worker cannot race the read-contract tests when the suite runs later in the day.
-        live_started = dt.datetime.now()
+        # Wall-clock dependent routes use tests.route_audit.clock.FIXED_NOW. Keep
+        # the live payload deterministic and fractional to exercise Gson Long parsing.
+        live_started = now
         db.add_all([
-            LiveSession(id=1, course_id=2, teacher_id=1, status="LIVE", start_time=live_started.strftime("%Y-%m-%dT%H:%M:%S"), started_at_ts=live_started.timestamp(), live_roster=json.dumps({"1": {"status": "Present", "excused": False}}, ensure_ascii=False)),
+            LiveSession(id=1, course_id=2, teacher_id=1, status="LIVE", start_time=live_started.strftime("%Y-%m-%dT%H:%M:%S"), started_at_ts=live_started.timestamp() + 0.25, live_roster=json.dumps({"1": {"status": "Present", "excused": False}}, ensure_ascii=False)),
             LiveSession(id=2, course_id=1, teacher_id=1, status="ENDED", start_time="2026-09-27T08:00:00", end_time="2026-09-27T09:00:00", ended_automatically=True),
         ])
 
@@ -193,13 +233,18 @@ def seed_database(path: str | Path, *, large: bool = False) -> dict[str, Any]:
         db.add_all([models.InstituteShare(id=1, **{f"count_{i}": 10_000 * i for i in range(1, 16)}), models.PricingTable(id=1, category="elementary", count_1=100, count_2=200, count_3=300, count_4=400, count_5=500)])
         db.add_all([models.Lead(id=1, name="سرنخ تست", mobile="09120000999", interested_course="ریاضی", source="Demo", status="NEW", notes="seed", branch_id=1), models.AutomationRule(id=1, name="قسط معوق", condition_type="installment_overdue", threshold=1, action_type="parent_alert", active=True), models.AutomationLog(id=1, rule_id=1, triggered_at=now, details="seed")])
         db.add_all([models.ActivityLog(id=1, admin_username="audit-admin", action="seed", target_id=1, target_name="demo", details="route audit seed", timestamp=now)])
+        # One staff-owned conversation makes history/send/pin list smoke routes
+        # exercise a valid participant state without contacting a real provider.
+        conversation = models.Conversation(id=1, title="گفتگوی ممیزی", type="group", created_at=now)
+        db.add(conversation)
+        db.add(models.ConversationParticipant(id=1, conversation_id=1, user_id=1, role="admin"))
+        db.add(models.Message(id=1, conversation_id=1, sender_id=1, sender_role="admin", body="پیام seed", created_at=now, is_deleted=False))
         db.flush()
 
-        # Session tokens are deterministic for the manifest only in role/user mapping;
-        # JWT jti is intentionally fresh, while the seed database remains reproducible
-        # in all business data.
+        # Fixed claims and identity-specific jti make the entire SQLite fixture
+        # byte-for-byte reproducible; the token signing secret is test-only.
         for user, role in [(users[0], "admin"), (users[1], "secretary"), (users[2], "teacher"), (users[3], "student"), (users[4], "parent")]:
-            token = create_jwt_token(user.id, role)
+            token = _stable_jwt(dependencies, user.id, role, now)
             db.add(models.UserSession(user_id=user.id, teacher_id=1 if role == "teacher" else None, sub_role=role, token=token, created_at=now))
             manifest["roles"][role] = token
         manifest["ids"].update({"branch": 1, "active_course": 1, "second_course": 2, "student": 1, "multi_course_student": 1, "enrollment": 1, "session": 1, "installment": 1, "exam": 1})

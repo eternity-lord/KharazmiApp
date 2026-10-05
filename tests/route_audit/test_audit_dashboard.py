@@ -24,7 +24,7 @@ def test_dashboard_kpis_have_independent_seed_values_and_push_is_local(client, a
         "overdue_installments_count": 2,
         "active_students_count": 29,
         "suspicious_alerts_count": 0,
-        "dunning_pending_count": 0,
+        "dunning_pending_count": 2,
     }
     push = client.get("/dashboard/push_status", headers=auth_headers["admin"])
     assert push.status_code == 200

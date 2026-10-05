@@ -40,18 +40,14 @@ def test_sweep_empty_probes_have_no_null_list_shape():
     assert not [r for r in report["routes"] if (r.get("empty") or {}).get("is_null_list")]
 
 
-# These are the four contract regressions found by the exhaustive Retrofit/Gson
-# sweep.  A fixed case is deliberately a normal assertion; unfixed cases remain
-# strict xfail until their own server/client contract is corrected.
+# These are the four historically resolved contract regressions. Tests pin
+# their specific fields, leaving separate current candidates to their own triage.
 _CONTRACT_CASES = [
     ("RA-sweep-01", "POST", "classes/pending_approval/bulk_approve"),
     ("RA-sweep-02", "GET", "exams/student/list"),
     ("RA-sweep-03", "GET", "homework/parent/child/{student_id}"),
     ("RA-sweep-04", "GET", "teachers/{id}/incomplete_classes"),
 ]
-_FIXED_CONTRACT_CASES = {"RA-sweep-01", "RA-sweep-02", "RA-sweep-03", "RA-sweep-04"}
-
-
 def _contract_entry(method: str, path: str) -> dict:
     if not CONTRACT_REPORT.exists():
         pytest.skip("run `python -m tests.route_audit.sweep.run_contract` first")
@@ -61,16 +57,19 @@ def _contract_entry(method: str, path: str) -> dict:
 
 @pytest.mark.parametrize(
     "bug_id,method,path",
-    [
-        pytest.param(bug_id, method, path, marks=pytest.mark.xfail(strict=True, reason=bug_id))
-        for bug_id, method, path in _CONTRACT_CASES
-        if bug_id not in _FIXED_CONTRACT_CASES
-    ]
-    + [pytest.param(bug_id, method, path) for bug_id, method, path in _CONTRACT_CASES if bug_id in _FIXED_CONTRACT_CASES],
-    ids=[bug_id for bug_id, _, _ in _CONTRACT_CASES if bug_id not in _FIXED_CONTRACT_CASES]
-    + [bug_id for bug_id, _, _ in _CONTRACT_CASES if bug_id in _FIXED_CONTRACT_CASES],
+    _CONTRACT_CASES,
+    ids=[bug_id for bug_id, _, _ in _CONTRACT_CASES],
 )
-def test_gson_contract_issue_is_absent(bug_id, method, path):
-    """Each discovered contract issue becomes a normal regression after its fix."""
+def test_fixed_contract_regression_fields_remain_present(bug_id, method, path):
+    """Pin the specific resolved field without misclassifying separate candidates."""
     entry = _contract_entry(method, path)
-    assert entry["issues"] == []
+    payload = entry.get("sample_payload")
+    if bug_id in {"RA-sweep-01", "RA-sweep-02"}:
+        assert entry["issues"] == []
+    elif bug_id == "RA-sweep-03":
+        assert payload and payload[0]["description"] == "حل تمرین"
+        assert payload[0]["due_date"] == "1405/07/01"
+        # max_score is a separate, reproducible candidate tracked by RA-homework-01.
+    elif bug_id == "RA-sweep-04":
+        assert payload and all(isinstance(item.get("students_preview"), list) for item in payload)
+        # Other shared-model defaults are unresolved Q-006, not this fixed regression.

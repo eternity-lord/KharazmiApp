@@ -192,9 +192,58 @@
     "large_long_amount": [],
     "null_optional": [],
     "empty_string": [],
-    "empty_list": []
+    "empty_list": [
+      {
+        "field": "is_admin_approved",
+        "kind": "silent-zero",
+        "detail": "Gson leaves the non-null Boolean at False; a missing/null wire value can display a false default",
+        "line": 27,
+        "source": "KharazmiAdmin/app/src/main/java/com/example/kharazmiadmin/TeacherDashboardActivity.kt"
+      },
+      {
+        "field": "is_suspended",
+        "kind": "silent-zero",
+        "detail": "Gson leaves the non-null Boolean at False; a missing/null wire value can display a false default",
+        "line": 28,
+        "source": "KharazmiAdmin/app/src/main/java/com/example/kharazmiadmin/TeacherDashboardActivity.kt"
+      },
+      {
+        "field": "total_debt",
+        "kind": "silent-zero",
+        "detail": "Gson leaves the non-null Long at 0; a missing/null wire value can display a false default",
+        "line": 31,
+        "source": "KharazmiAdmin/app/src/main/java/com/example/kharazmiadmin/TeacherDashboardActivity.kt"
+      },
+      {
+        "field": "debt_to_teacher",
+        "kind": "silent-zero",
+        "detail": "Gson leaves the non-null Long at 0; a missing/null wire value can display a false default",
+        "line": 32,
+        "source": "KharazmiAdmin/app/src/main/java/com/example/kharazmiadmin/TeacherDashboardActivity.kt"
+      },
+      {
+        "field": "debt_to_institute",
+        "kind": "silent-zero",
+        "detail": "Gson leaves the non-null Long at 0; a missing/null wire value can display a false default",
+        "line": 33,
+        "source": "KharazmiAdmin/app/src/main/java/com/example/kharazmiadmin/TeacherDashboardActivity.kt"
+      }
+    ]
   },
-  "gson_issue_count": 0,
+  "gson_issue_count": 5,
+  "confirmed_contract_issue_count": 0,
+  "confirmed_contract_issues": [],
+  "unresolved_question": {
+    "id": "Q-006",
+    "fields": [
+      "debt_to_institute",
+      "debt_to_teacher",
+      "is_admin_approved",
+      "is_suspended",
+      "total_debt"
+    ],
+    "reason": "The incomplete-class dialog consumes only id/title/code; no visible behavior is yet established for these five model defaults."
+  },
   "expected": {
     "decimal_max_score": 12.5,
     "large_long_amount": 2147483649,
@@ -203,6 +252,8 @@
       "homework_due_date": ""
     },
     "empty_lists_are_lists": true,
-    "gson_issue_count": 0
+    "gson_issue_count": 5,
+    "confirmed_contract_issue_count": 0,
+    "unresolved_question": "Q-006"
   }
 }

@@ -1,25 +1,44 @@
-# فهرست باگ‌های route audit
+# Bug registry — route/API response audit
 
-قانون این پرونده: باگ ثبت می‌شود و در این مرحله fix نمی‌شود. هر reproduction رفتار درست را assert می‌کند و برای باگ شناخته‌شده `xfail(strict=True)` دارد.
+**Scope:** tests record behavior; no application-code fix is made by this audit. Every open, reproducible issue has a strict `xfail`. Findings that do not reach a screen or depend on an undecided contract are kept in `questions.md`, not promoted to product bugs.
 
-| شناسه | سمت | دسته | شدت | تست تکثیرکننده | انتظار | رفتار واقعی/وضعیت | علت احتمالی | صفحه‌های متأثر |
-|---|---|---|---|---|---|---|---|---|
-| RA-auth-02 (O-02) | اندروید | نمایش/قابلیت | بالا | `test_O02_android_push_client_registers_FCM_token` | Android باید FCM client و registration قابل اتصال داشته باشد | در source Kotlin نماد `FirebaseMessaging` و registration قابل اثبات پیدا نشد؛ xfail | محدودهٔ source بررسی‌شده `KharazmiAdmin/app/src/main/AndroidManifest.xml:1-223` و `KharazmiAdmin/app/src/main/java/com/example/kharazmiadmin/LiveApi.kt:1-66`؛ route ثبت token در `Kharazmi_Server/routers/auth.py:597` | اعلان‌ها و هر صفحهٔ وابسته به push |
-| RA-exams-02 (O-12) | سرور/محصول | منطق | متوسط | `test_O12_unpublished_exam_is_hidden_from_student` | شاگرد فقط آزمون `status=published` را ببیند | `/exams/student/list` آزمون pending را هم برمی‌گرداند؛ xfail | `Kharazmi_Server/routers/exams.py:132-158`، فیلتر status ندارد | `ParentPortalActivity` / screenهای آزمون |
-| RA-parent-01 (O-14) | اندروید | قرارداد | پایین | `test_O14_parent_exam_decimal_max_score_is_not_parsed_as_Int` | `max_score=12.5` بدون parse failure در مدل Android خوانده شود | نوع حداقلی `ParentExamItem.max_score` از `Int` به `Float` تغییر کرد؛ تست عادی سبز است؛ Android compile عمداً اجرا نشد | `ParentPortalActivity.kt:66` در برابر مدل/response آزمون | `ParentPortalActivity` |
-| RA-admin-19 (O-19) | هر دو/طراحی | یکپارچگی داده/مالی | متوسط | `test_O19_restore_class_restores_financial_history_atomically` | restore کامل باید ledger و ثبت‌نام‌ها را اتمیک بازیابی کند یا قرارداد کامل دیگری داشته باشد | endpoint فعلی عمدی `metadata_only` است و history مالی را restore نمی‌کند؛ xfail | `Kharazmi_Server/routers/admin.py:1915-2036` | صفحهٔ deleted classes و گزارش‌های مالی |
+## Confirmed/reproducible open findings
 
-| RA-sweep-01 | اندروید/سرور | قرارداد، نمایش | بالا | `test_gson_contract_issue_is_absent[RA-sweep-01]` | پاسخ bulk approve باید `message` غیرnull سازگار با `SimpleResponse` داشته باشد | با افزودن `message` ثابت به پاسخ سرور، contract simulator سبز شد؛ test عادی است | `ApiInterfaces.kt:82`؛ handler `Kharazmi_Server/routers/classes.py:1330` | PendingClassesActivity |
-| RA-sweep-02 | اندروید/سرور | قرارداد، نمایش | بالا | `test_gson_contract_issue_is_absent[RA-sweep-02]` | هر item آزمون باید فیلدهای لازم مدل Android را داشته باشد یا مدل درست آزمون مصرف شود | سرور اکنون `description` و `due_date` را به‌صورت رشتهٔ خالی صریح برمی‌گرداند؛ contract simulator سبز شد؛ test عادی است | `ExamNetworkApi`/`HomeworkItem`؛ `Kharazmi_Server/routers/exams.py:132-162` | ExamActivity و ParentPortalActivity |
-| RA-sweep-03 | اندروید/سرور | قرارداد، نمایش | بالا | `test_gson_contract_issue_is_absent[RA-sweep-03]` | `HomeworkItem.description` باید در response وجود داشته باشد یا nullable باشد | سرور اکنون `description` را برای homework والد با مقدار پیش‌فرض رشتهٔ خالی برمی‌گرداند؛ contract simulator سبز شد؛ test عادی است | `HomeworkActivity.kt:45-55,86-87`؛ `Kharazmi_Server/routers/homework.py:331-340` | HomeworkActivity / ParentPortalActivity |
-| RA-sweep-04 | اندروید/سرور | قرارداد، نمایش | متوسط | `test_gson_contract_issue_is_absent[RA-sweep-04]` | `students_preview` در پاسخ باشد یا UI نبودنش را به‌صورت صریح مدیریت کند | سرور اکنون برای کلاس ناقص بدون ثبت‌نام `students_preview: []` را صریح برمی‌گرداند؛ contract simulator سبز شد؛ test عادی است | `TeacherDashboardActivity.kt:23-35,48`؛ `Kharazmi_Server/routers/teachers.py:343-375` | TeacherDashboardActivity |
-| RA-admin-01 | سرور/داشبورد | مقدار/قرارداد | متوسط | `test_dashboard_last_transaction_uses_direct_student_link` | `last_transaction.student_name` باید با `Transaction.student_id` هم resolve شود، حتی اگر `enrollment_id` خالی باشد | fallback مستقیم به `student_id` اضافه شد؛ transaction id=6 اکنون نام `دانش‌آموز تست 8` را برمی‌گرداند؛ test عادی و dashboard audit سبز است | `Kharazmi_Server/routers/admin.py:51-99`؛ seed transaction id=6 | Dashboard و summary مالی |
+| ID | Area / severity | Strict reproduction | Expected | Observed | User-visible consumer / evidence |
+|---|---|---|---|---|---|
+| O-02 / `RA-auth-02` | Android push capability · high | `test_O02_android_push_client_registers_FCM_token` in `test_known_bugs.py` | Android registers a device token with the backend and has an FCM client. | Kotlin source scan finds neither `FirebaseMessaging` nor `device_token` registration; strict xfail remains. | No push delivery is available from the current Android client; backend device-token route is not a substitute for client registration. |
+| O-12 / `RA-exams-02` | Student exam state · medium | `test_O12_unpublished_exam_is_hidden_from_student` | Student list contains only published exams. | `/exams/student/list` includes seeded exam id 2 with `status=pending`; strict xfail remains. | `ExamActivity` / student exam list; source route `Kharazmi_Server/routers/exams.py`. |
+| `RA-finance-02` | Server parent-finance route · high | `test_parent_financial_dashboard_accepts_a_valid_parent_session` | A valid parent session resolves its linked child and returns the child finance dashboard. | The same parent's `/homework/parent/child/1` returns 200, but `/finance/parent/dashboard` returns 403. In `routers/finance.py`, the parent handler calls `get_student_financial_dashboard(...)` without forwarding `_role`; the nested handler therefore receives its default `Depends(...)` object in direct Python invocation and `check_student_access` rejects it. Strict xfail. | No matching current Retrofit declaration/screen was found; this is a confirmed broken server route, not an asserted visible Android screen. Source: `finance.py:2122-2129,2234-2255`. |
+| `RA-homework-01` | Android/server response contract · medium | `test_parent_homework_wire_items_match_android_display_model` | For a graded parent homework item, the response supplies `max_score` required by `HomeworkItem`. | With the seeded submission temporarily graded at 17, `/homework/parent/child/1` returns the score but omits `max_score`; Gson's non-null `Float` defaults to 0.0. Strict xfail. | `HomeworkNetworkApi.getParentChildHomeworks` → `HomeworkActivity`; the adapter displays `score / max_score` when score is non-null (`HomeworkActivity.kt:221,377-383`). |
+| `RA-attendance-01` | Live timestamp contract · high | parametrized strict xfail `teacher-current-live` | `started_at_ts` deserializes to Kotlin `Long`. | Seeded `started_at_ts=1790586000.25` is decimal JSON; simulator flags an `int-parse` against `LiveCurrentResponse.startedAtTs`. | `LiveApi.getCurrentLive` → `TeacherDashboardActivity` / `LiveClassActivity`; used for elapsed time. |
+| `RA-attendance-02` | Live timestamp contract · high | parametrized strict xfail `admin-live-list` | `started_at_ts` deserializes to Kotlin `Long`. | Same fractional timestamp fails Kotlin Long parsing in `LiveSessionItem`. | `LiveApi.getLiveSessions` → `LiveClassesActivity` and `MainActivity`. |
+| `RA-attendance-03` | Live timestamp contract · high | parametrized strict xfail `admin-live-roster` | `started_at_ts` deserializes to Kotlin `Long`. | Same fractional timestamp fails Kotlin Long parsing in `LiveRosterResponse`. | `LiveApi.getLiveRoster` → `LiveRosterActivity`. |
+| `RA-teachers-01` | Live timestamp contract · high | parametrized strict xfail `teacher-today-summary` | `live_class.started_at_ts` deserializes to Kotlin `Long`. | Same fractional timestamp fails Kotlin Long parsing in `TeacherTodayLiveClass`. | `TodaySummaryApi.getTeacherTodaySummary` → `TeacherDashboardActivity`; that value is passed to `LiveClassActivity`. |
+| O-19 / `RA-admin-19` | Archive restore semantics · medium; product decision pending | `test_O19_restore_class_restores_financial_history_atomically` | The test's proposed full restore expects active enrollments/history to return atomically. | Current implementation is explicitly `metadata_only`; it leaves financial history untouched. Strict xfail retained for traceability, not as permission to silently choose semantics. | Deleted-class restore / finance views. Decision Q-005 remains open. |
 
-## نتیجهٔ finance/attendance/classes در این نوبت
+## Previously known issue now fixed in this checkout
 
-در ۲۹ route دارای assertion مقداری finance/attendance/classes، failure جدید سمت سرور ثبت نشد. deep audit admin و sliceهای پرریسک نیز سبز هستند؛ RA-admin-01، RA-parent-01 و RA-sweep-01..04 بسته شده‌اند و فقط O-02/O-12/O-19 عمداً xfail باقی مانده‌اند.
+| ID | Current status | Verification |
+|---|---|---|
+| O-14 / `RA-parent-01` | **Closed here; not xfailed.** | `ParentExamItem.max_score` is `Float`; the normal test `test_O14_parent_exam_decimal_max_score_is_not_parsed_as_Int` verifies 12.5 without `int-parse`. Android compilation/device execution remains outside this audit. |
+| `RA-sweep-01` | Fixed before this audit; normal assertion | Bulk approve response contains non-null `message`; regression pins the specific key. |
+| `RA-sweep-02` | Fixed before this audit; normal assertion | Student exam items contain explicit `description` and `due_date`; regression pins those fields. |
+| `RA-sweep-03` | Earlier missing `description`/`due_date` issue fixed; normal assertion | Parent homework response contains both fields. A separate graded-state `max_score` omission is recorded as `RA-homework-01`, not mislabeled as the old fix. |
+| `RA-sweep-04` | Earlier `students_preview` missing-list issue fixed; normal assertion | Incomplete-class response contains `students_preview: []`. Five other fields of the shared model remain an unresolved Q-006 contract question, not this fixed bug. |
+| `RA-admin-01` | Fixed in the current server checkout; normal tests | Dashboard resolves a transaction's student from `Transaction.student_id` when `enrollment_id` is absent. See `test_audit_admin.py` and the admin report. |
 
-## نتیجهٔ sweep
+## Contract simulator candidates not counted as confirmed bugs
 
-- route sweep: ۲۲۱/۲۲۱، status 500 برابر صفر، invalid-input status 500 برابر صفر.
-- contract sweep post-fix: ۱۵۱ call یکتا، ۰ entry دارای issue؛ `RA-sweep-01` تا `RA-sweep-04` assertion عادی هستند.
+The fresh Kotlin/Gson report is intentionally a **candidate detector**, not a product-bug count. It reports `parse=4`, `npe=5`, and `silent_zero=8`; all candidates were reviewed against current Android call sites before registry classification.
+
+- `GET /finance/student/{id}/dashboard`: `recent_transactions` omits fields required by the broad `TransactionFullItem` model; current `StudentProfileActivity.showCreateInstallmentDialog()` reads only enrollments. **Q-008**; not an xfail.
+- `GET /students/my_profile`: `info.parent_mobile` is absent although a shared profile model declares it non-null; current `StudentPortalActivity` displays `name` and `national_code` only. **Q-007**; not an xfail.
+- `GET /teachers/{id}/incomplete_classes`: `is_admin_approved`, `is_suspended`, and debt fields are absent from the response while the shared model has defaults. The current incomplete-class dialog reads only `id/title/code`. **Q-006**; not an xfail.
+- `GET /homework/parent/child/{student_id}`: `max_score` becomes visible when an item has a score; a separate stateful test promotes that candidate to confirmed `RA-homework-01`.
+
+## Latest isolated route sweep
+
+- **221/221** routes executed; main-request **500 = 0**.
+- **220** invalid-target probes; invalid-request **500 = 0**; **11** empty probes, null-list results = 0.
+- After correcting probe roles and valid fixtures, the only main-request 403 is `GET /finance/parent/dashboard` with a valid parent session, tracked as `RA-finance-02`.
+- Latest full role/status/shape samples are in `tests/route_audit/sweep/report.json`; route-by-route caller/source/DB annotations are in `routes/*.md`.

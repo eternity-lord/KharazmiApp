@@ -1,6 +1,7 @@
 """Value and state-transition audit for routers.attendance."""
 from __future__ import annotations
 
+from .clock import FIXED_NOW
 from .oracle import build_oracle
 
 
@@ -46,6 +47,49 @@ def test_session_details_and_class_attendance_have_values(client, auth_headers):
     assert history.json()[0]["total_cost"] == 600_000
     assert student.json()["present_count"] == 1
     assert student.json()["attendance_history"][0]["status"] == "حاضر"
+
+
+def test_qr_checkin_rejects_stale_session_then_records_same_day_attendance(client, auth_headers, db, frozen_server_clock):
+    """Probe both stale-state rejection and a valid same-day QR check-in without external calls."""
+    import models
+    from today_summary import jalali_date_string
+
+    session = db.query(models.SessionLog).filter_by(session_code=5001).one()
+    attendance = db.query(models.Attendance).filter_by(session_id=session.id, student_id=1).one()
+    original_date = session.date
+    original_status = attendance.status
+    original_notification_ids = {row.id for row in db.query(models.Notification).all()}
+    payload = {
+        "session_code": 5001,
+        "token": "route-audit-qr-token",
+        "expires_at": FIXED_NOW.timestamp() + 600,
+        "salt": "route-audit-qr-salt",
+    }
+    try:
+        stale = client.post("/attendance/qr_check-in", json=payload, headers=auth_headers["student"])
+        assert stale.status_code == 403
+        db.expire_all()
+        assert db.query(models.Attendance).filter_by(session_id=session.id, student_id=1).one().status == original_status
+
+        session = db.query(models.SessionLog).filter_by(session_code=5001).one()
+        attendance = db.query(models.Attendance).filter_by(session_id=session.id, student_id=1).one()
+        session.date = jalali_date_string(FIXED_NOW.date())
+        attendance.status = "Absent"
+        db.commit()
+        accepted = client.post("/attendance/qr_check-in", json=payload, headers=auth_headers["student"])
+        assert accepted.status_code == 200, accepted.text
+        db.expire_all()
+        attendance = db.query(models.Attendance).filter_by(session_id=session.id, student_id=1).one()
+        assert attendance.status == "Present"
+        assert accepted.json()["message"] == "حضور شما با موفقیت با اسکن کد QR ثبت گردید"
+    finally:
+        db.expire_all()
+        session = db.query(models.SessionLog).filter_by(session_code=5001).one()
+        attendance = db.query(models.Attendance).filter_by(session_id=session.id, student_id=1).one()
+        session.date = original_date
+        attendance.status = original_status
+        db.query(models.Notification).filter(~models.Notification.id.in_(original_notification_ids)).delete(synchronize_session=False)
+        db.commit()
 
 
 def test_live_start_status_cancel_is_idempotent_without_financial_effect(client, auth_headers, db):

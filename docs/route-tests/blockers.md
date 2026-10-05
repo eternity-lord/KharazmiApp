@@ -1,19 +1,22 @@
 # Blockers و موارد مسدود
 
-این فایل وضعیت «نمی‌توانم بدون حدس/تغییر کد تست معتبر بنویسم» را از باگ جدا می‌کند.
+این فایل موارد «تست رفتاری هنوز تکمیل نشده» را از باگ‌های باز (`bugs.md`) و تصمیم‌های مبهم (`questions.md`) جدا می‌کند.
 
-| شناسه | scope | علت مسدودشدن | راه ادامه |
+**وضعیت 2026-10-05 روی branch `arena/01a10aa8-kharazmiapp`:** 221/221 route با DB موقت اجرا شد؛ request اصلی و 220 probe نامعتبر هر دو 0 پاسخ 500 داشتند؛ 11 empty probe هیچ `null`-list نداشت. آخرین checksum دیتابیس اصلی قبل/بعد یکسان است: `f048f8d118b33c4eaa944490594121d7`. این sweep، audit رفتاری کامل همهٔ routeها نیست.
+
+| شناسه | scope | وضعیت/مانع | گام بعدی |
 |---|---|---|---|
-| BLK-001 | 192 route غیر finance/attendance/classes | تست رفتاری هر route هنوز در نوبت router خودش ساخته نشده؛ فقط registry و route doc scaffold وجود دارد. | اجرای ترتیب progress و commit مستقل بعد از هر router. |
-| BLK-002 | Android UI | compile مجاز/درخواست‌شده نیست و قرارداد با شبیه‌ساز Python بررسی می‌شود؛ رفتار واقعی Gson سفارشی باید در source تأیید شود. | تکمیل parser و device-checklist؛ بدون ادعای runtime UI. |
-| BLK-003 | پیامک، push، gateway | باید network mock شود؛ seed فقط دادهٔ محلی می‌سازد و endpointهای side-effect در تست finance هنوز functional sweep نشده‌اند. | patch مرزی service در test fixture و assert DB log/rollback. |
-| BLK-004 | PDF/Excel | مسیرهای exports هنوز functional audit نشده‌اند؛ خروجی باید با openpyxl/reportlab خوانده شود، نه فقط status code. | router exports در اولویت بعدی reports/analytics. |
-| BLK-005 | business decisions | Q-001 تا Q-005 پاسخ قطعی ندارند. | تصمیم محصول ثبت شود؛ تا آن زمان تست فقط source-defined behavior را می‌سنجد. |
+| BLK-001 | 49 route از 12 router: `ai(1)`, `audit(1)`, `audit_trail(1)`, `auth(12)`, `automation(5)`, `branches(9)`, `calendar(4)`, `crm(5)`, `dunning(2)`, `messages(7)`, `serve_upload(1)`, `timeline(1)` | هنوز deep value/DB/state-machine suite ندارند؛ per-route smoke و منبع‌ها در `routes/*.md` ثبت شده‌اند. | هر router جداگانه طبق progress تکمیل و بعد از assertionها commit/push شود. |
+| BLK-002 | سایر 172 route در 13 router | برای این بخش suiteهای متمرکز وجود دارد، اما پوشش هر route/branch یکنواخت نیست؛ ledger برای هر route دقیقاً test-reference یا smoke-only را نشان می‌دهد. 102 route در فایل‌های test audit درخواست literal صریح دارند؛ این شمارش **اثبات عمق assertion نیست**. | routeهای marked smoke-only و requestهای بدون DB snapshot را اولویت‌بندی کنید. |
+| BLK-003 | نقش و actor contract | نقش probe از source/route helper انتخاب شده، اما برای مسیرهای admin/secretary/parent/teacher همهٔ مثبت/منفی‌های نقش هنوز برای هر route مقایسه نشده است. | در نوبت router نقش‌های مجاز/غیرمجاز را از source مستند و با token هر نقش تست کنید. |
+| BLK-004 | SMS/push/gateway/شبکه | در runner و pytest درخواست‌های `requests`, `urllib`, `socket` مسدود است؛ `FCM_SERVER_KEY` خالی است. رفتار سرویس واقعی/درگاه عمداً اجرا نشده و فقط DB log/mock در scope است. | mock/provider spy و assert دقیق log/rollback برای هر side-effect route. |
+| BLK-005 | PDF/XLSX/export | مسیرهای export باید bytes را با reader مناسب (openpyxl/reportlab/PDF parser) بررسی کنند؛ status/shape به‌تنهایی کافی نیست. CSV subset فعلی بررسی شده است. | تکمیل route-by-route workbook/PDF/parser assertions. |
+| BLK-006 | Android runtime | Python simulator روی Retrofit declarations و Gson data classes اجرا شده؛ Gradle compile و گوشی/Emulator اجرا نشده است. | اجرای device-checklist/compile جداگانه در محیط Android. |
+| BLK-007 | قواعد محصول | `Q-001` تا `Q-008` بازند؛ تست‌ها نباید بین گزینه‌های مالی/restore/contract حدس بزنند. | تصمیم صاحب محصول ثبت شود، بعد test expectation را update کنید. |
 
+## routeهایی با assertion مستقلِ ناقص در finance/attendance/classes
 
-## ۳۳ route بدون assertion مقداری مستقل در سه router انجام‌شده
-
-این‌ها صادقانه **مسدود** شده‌اند؛ status/JSON آن‌ها در sweep ثبت شده، اما sweep جای assertion کسب‌وکار/DB را نمی‌گیرد. برای هر ردیف دلیل و گام بعدی آمده است.
+این ردیف‌ها همچنان به testهای مقدار/DB/rollback جداگانه نیاز دارند؛ probe عمومی در `report.json` جایگزین آن نیست. موارد QR و داشبورد مالی والد در این فهرست نیستند: QR اکنون same-day success/stale-date را تست می‌کند؛ داشبورد مالی والد از تست معتبر باگ `RA-finance-02` است.
 
 | # | router | route | source | دلیل blocker |
 |---:|---|---|---|---|
@@ -23,7 +26,6 @@
 | 4 | `finance` | `PUT /finance/installments/{installment_id}` | `Kharazmi_Server/routers/finance.py:1698` | شاخه‌های تغییر قسط تسویه‌شده (`force`/`reason`)، تغییر سررسید و optimistic/concurrent conflict هنوز با pre/post row assertion پوشش داده نشده‌اند. |
 | 5 | `finance` | `POST /finance/installments/{installment_id}/remind` | `Kharazmi_Server/routers/finance.py:1960` | فقط شکل پاسخ sweep شده؛ ارسال mock باید recipient، ثبت `SmsLog` و رفتار retry/rate-limit را بدون gateway واقعی assert کند. |
 | 6 | `finance` | `GET /finance/mock_payment_page` | `Kharazmi_Server/routers/finance.py:1355` | این endpoint HTML تست‌شدهٔ معنایی ندارد؛ gateway/authority/amount و escape شدن callback باید بدون redirect واقعی بررسی شود. |
-| 7 | `finance` | `GET /finance/parent/dashboard` | `Kharazmi_Server/routers/finance.py:2189` | محدودهٔ دقیق فرزند، empty/full فهرست مالی و redaction نقش والد هنوز value assertion مستقل ندارد. |
 | 8 | `finance` | `GET /finance/payment/callback` | `Kharazmi_Server/routers/finance.py:879` | درگاه عمداً خاموش است؛ state machine کال‌بک، authority mismatch، transition و replay تا زمان mock gateway قابل ادعا نیست. |
 | 9 | `finance` | `POST /finance/payment/initiate` | `Kharazmi_Server/routers/finance.py:799` | initiate عمداً 400 برمی‌گرداند و هیچ Payment نمی‌سازد؛ قرارداد آیندهٔ gateway/idempotency باید با mock مستقل تعیین و تست شود. |
 | 10 | `finance` | `POST /finance/receipt/pdf` | `Kharazmi_Server/routers/finance.py:609` | status کافی نیست؛ بایت‌های PDF، مبلغ/نام/شناسهٔ حواله و IDOR باید با parser و fixture محلی بررسی شوند. |
@@ -32,7 +34,6 @@
 | 13 | `finance` | `GET /finance/reports/teacher_settlements_summary` | `Kharazmi_Server/routers/finance.py:2709` | جمع settled/pending و payoutهای معلم هنوز با session scope و reversal مستقل تطبیق داده نشده است. |
 | 14 | `finance` | `GET /finance/student/{student_id}/payments` | `Kharazmi_Server/routers/finance.py:2021` | ترتیب، filter دانش‌آموز/تاریخ، برگشتی‌ها و amountهای transaction هنوز row-by-row با oracle مستقل assert نشده‌اند. |
 | 15 | `finance` | `POST /finance/transaction/{transaction_id}/refund` | `Kharazmi_Server/routers/finance.py:1394` | refund باید reversal، مبلغ/کیف پول، allocation و retry را در DB نشان دهد؛ status تنها برای این مسیر کافی نیست. |
-| 16 | `attendance` | `POST /attendance/qr_check-in` | `Kharazmi_Server/routers/attendance.py:1353` | QR check-in به snapshot قبل/بعد Attendance/SessionLog و duplicate/conflict نیاز دارد؛ side effect فعلی جداگانه assert نشده است. |
 | 17 | `attendance` | `DELETE /attendance/session/{session_code}` | `Kharazmi_Server/routers/attendance.py:1288` | حذف session باید وضعیت archived، attendance/ledger مرتبط، restore/retry و تعارض state را در DB نشان دهد؛ فعلاً فقط route smoke است. |
 | 18 | `attendance` | `PUT /attendance/session/{session_code}` | `Kharazmi_Server/routers/attendance.py:1051` | ویرایش session باید تاریخ/زمان/حضور و اثر احتمالی مالی را با conflict و rollback بررسی کند؛ assertion مقداری مستقل ندارد. |
 | 19 | `attendance` | `POST /attendance/submit_session` | `Kharazmi_Server/routers/attendance.py:631` | guard retry موجود است، اما oracle مبلغ جلسه، سهم معلم/آموزشگاه، همهٔ attendance statusها و rollback کامل هنوز اجرا نشده است. |

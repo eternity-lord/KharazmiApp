@@ -75,7 +75,19 @@ def test_invoice_and_class_status_agree(client, auth_headers, db):
     assert inv["balance_due"] == cls["remaining_tuition"] == 700_000
     assert inv["student_name"] == "دانش‌آموز تست 1"
     assert len(inv["installments"]) == 2
-    assert build_oracle(db).enrollments[1].due == inv["balance_due"]
+    oracle = build_oracle(db)
+    assert oracle.enrollments[1].due == inv["balance_due"]
+
+    discounted = client.get("/finance/invoice/2", headers=_h(auth_headers))
+    assert discounted.status_code == 200, discounted.text
+    discounted_body = discounted.json()
+    assert discounted_body["base_tuition"] == oracle.enrollments[2].gross_tuition == 2_000_000
+    assert discounted_body["discount_type"] == "percentage"
+    assert discounted_body["discount_value"] == 10
+    assert discounted_body["discount_amount"] == oracle.enrollments[2].discount == 200_000
+    assert discounted_body["final_tuition"] == oracle.enrollments[2].net_tuition == 1_800_000
+    assert discounted_body["total_paid"] == oracle.enrollments[2].paid == 500_000
+    assert discounted_body["balance_due"] == oracle.enrollments[2].due == 1_300_000
 
 
 def test_installment_list_preserves_values_and_empty_filter(client, auth_headers):

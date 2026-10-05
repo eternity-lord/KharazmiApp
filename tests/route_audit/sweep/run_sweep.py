@@ -8,28 +8,60 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+import threading
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from ..clock import freeze_loaded_server_modules
 from ..seed import seed_database
-from .common import inventory, operation, request_parts, role_for, shape
+from .common import block_external_network_calls, inventory, operation, prepare_valid_route_fixture, request_parts, role_for, shape
 
 ROOT = Path(__file__).resolve().parents[3]
 OUT = Path(__file__).resolve().parent
+
+
+def _compact_json(value, *, depth: int = 0):
+    if depth >= 3:
+        return "<nested>"
+    if isinstance(value, dict):
+        rows = list(value.items())[:20]
+        result = {str(key): _compact_json(item, depth=depth + 1) for key, item in rows}
+        if len(value) > len(rows):
+            result["<omitted_keys>"] = len(value) - len(rows)
+        return result
+    if isinstance(value, list):
+        return {"length": len(value), "first_items": [_compact_json(item, depth=depth + 1) for item in value[:2]]}
+    if isinstance(value, str) and len(value) > 160:
+        return value[:157] + "..."
+    return value
 
 
 def run() -> dict:
     with tempfile.TemporaryDirectory(prefix="route-audit-sweep-") as tmp:
         db_path = Path(tmp) / "sweep.db"
         os.environ["JWT_SECRET_KEY"] = "route-audit-sweep-secret-" + "x" * 40
+        os.environ["FCM_SERVER_KEY"] = ""
         manifest = seed_database(db_path)
         import sys
         sys.path.insert(0, str(ROOT / "Kharazmi_Server"))
-        import main  # type: ignore
+        block_external_network_calls()
+        original_start = threading.Thread.start
+
+        def no_live_auto_end_worker(thread, *args, **kwargs):
+            if thread.name == "live-session-auto-ender":
+                return None
+            return original_start(thread, *args, **kwargs)
+
+        try:
+            threading.Thread.start = no_live_auto_end_worker
+            import main  # type: ignore
+        finally:
+            threading.Thread.start = original_start
+        freeze_loaded_server_modules()
         import models  # type: ignore
         from dependencies import create_jwt_token  # type: ignore
-        client = TestClient(main.app)
+        client = TestClient(main.app, raise_server_exceptions=False)
         openapi = client.get("/openapi.json").json()
         # Each route starts from the same post-startup seed snapshot. Without
         # this, DELETE/logout/suspend routes would poison later rows and make
@@ -42,7 +74,10 @@ def run() -> dict:
         report = {"seed": manifest["counts"], "route_count": len(rows), "routes": [], "contract": {}}
         role_users = {"admin": 1, "secretary": 2, "teacher": 3, "student": 4, "parent": 5}
         def fresh_headers(role: str):
-            # logout and other stateful auth routes must not poison later rows.
+            # Public routes are genuinely unauthenticated; each stateful session
+            # is still recreated for its own route after database reset.
+            if role == "public":
+                return {}
             token = create_jwt_token(role_users[role], role)
             session = models.SessionLocal()
             session.add(models.UserSession(user_id=role_users[role], teacher_id=1 if role == "teacher" else None, sub_role=role, token=token))
@@ -55,13 +90,14 @@ def run() -> dict:
             op = operation(openapi, row)
             invalid_target = bool(op.get("requestBody") or op.get("parameters"))
             url, params, _, body = request_parts(openapi, row)
+            prepare_valid_route_fixture(row, models)
             try:
                 response = client.request(row["method"], url, params=params, json=body, headers=headers)
                 json_ok, body_shape, value = shape(response)
                 error = None
             except Exception as exc:  # keep one broken route from hiding the rest
                 response = None; json_ok = False; body_shape = "client-exception"; value = None; error = repr(exc)
-            entry = {"method": row["method"], "path": row["path کامل"], "handler": row["handler"], "role": role, "status": response.status_code if response else None, "json": json_ok, "shape": body_shape, "error": error, "invalid_target": invalid_target, "status_500": bool(response and response.status_code == 500)}
+            entry = {"method": row["method"], "path": row["path کامل"], "handler": row["handler"], "role": role, "status": response.status_code if response else None, "json": json_ok, "shape": body_shape, "sample_value": _compact_json(value), "error": error, "invalid_target": invalid_target, "status_500": bool(response and response.status_code == 500)}
             # A second, non-mutating empty read where a query key allows it.
             empty = None
             if row["method"] == "GET" and params:

@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 from scripts.generate_route_audit_docs import END, REPORT_DIR, ROOT, START, cell, extract_calls
 
@@ -35,6 +36,22 @@ def test_route_call_evidence_includes_test_name_and_source_line():
     assert any(call[3] == "test_audit_pattern_c_uses_ten_latest_sessions_and_detects_new_absence" for call in matches)
     source_lines = source.read_text(encoding="utf-8").splitlines()
     assert all("_alerts_from(client.get(" in source_lines[call[4] - 1] for call in matches)
+
+
+def test_audit_trail_ledger_shows_one_line_reference_per_test():
+    source = ROOT / "tests/route_audit/test_audit_audit_trail.py"
+    calls = extract_calls(source)
+    expected = {
+        call[3] for call in calls
+        if call[0] == "GET" and call[1] == "/audit-trail/logs"
+    }
+    report = (REPORT_DIR / "audit_trail.md").read_text(encoding="utf-8")
+    ledger = report.split(START, 1)[1].split(END, 1)[0]
+    route_row = next(line for line in ledger.splitlines() if line.startswith("| `GET /audit-trail/logs`"))
+    actual = re.findall(r"`tests/route_audit/test_audit_audit_trail\.py:\d+` \(`([^`]+)`\)", route_row)
+    assert expected
+    assert set(actual) == expected
+    assert len(actual) == len(expected)
 
 
 def _split_markdown_cells(line: str) -> list[str]:

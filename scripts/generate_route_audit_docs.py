@@ -40,6 +40,7 @@ KNOWN_XFAILS = {
 # is a strict xfail; do not label the whole route as failing.
 PARTIAL_XFAILS = {
     ("POST", "/ai/chat"): "RA-ai-01",
+    ("GET", "/audit-trail/logs"): "RA-audit_trail-01",
 }
 
 
@@ -188,19 +189,23 @@ def main() -> None:
                 values += f"<br>Android model: {android_models}"
 
             direct_refs = []
+            seen_test_refs = set()
             for ref_method, literal, rel_file, test_name, line_number in calls_by_router["__all__"]:
                 if ref_method == method and literal_route_matches(row["path کامل"], literal):
+                    test_ref = (rel_file, test_name)
+                    if test_ref in seen_test_refs:
+                        continue
+                    seen_test_refs.add(test_ref)
                     direct_refs.append(f"`{rel_file}:{line_number}` (`{test_name}`)")
-            direct_refs = list(dict.fromkeys(direct_refs))
             xfail = KNOWN_XFAILS.get((method, path))
             issues = contract_by_key.get(key, {}).get("issues", [])
             issue_types = sorted({item.get("kind", "issue") for item in issues})
             if xfail:
                 audit = f"**strict xfail `{xfail}`**; reproduced, see `../bugs.md`."
             elif direct_refs:
-                audit = "Targeted request reference(s): " + ", ".join(direct_refs[:5])
-                if len(direct_refs) > 5:
-                    audit += f" (+{len(direct_refs)-5} more)"
+                audit = "Targeted request reference(s): " + ", ".join(direct_refs[:10])
+                if len(direct_refs) > 10:
+                    audit += f" (+{len(direct_refs)-10} more)"
                 audit += "; assertion depth is per linked test, not inferred here."
             else:
                 audit = "221-route smoke only; business values/DB effects need a focused test or an explicit blocker."

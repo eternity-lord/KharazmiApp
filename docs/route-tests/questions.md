@@ -1,4 +1,4 @@
-# پرسش‌های تصمیم‌گیری کسب‌وکار
+# پرسش‌های تصمیم‌گیری محصول و قرارداد
 
 این سند عمداً حدس نمی‌زند. تا پاسخ صاحب پروژه، تست‌ها فقط مقدارهای صریح seed و invariantهای source را assert می‌کنند.
 
@@ -12,3 +12,4 @@
 | Q-006 | `TeacherClassItem` در `GET /teachers/{id}/incomplete_classes` | (الف) route قرارداد محدودِ `id/title/code` دارد؛ (ب) باید فیلدهای کامل مدل shared شامل approval/suspension/debt را هم برگرداند | `TeacherDashboardActivity.showIncompleteClassesDialog()` فعلاً فقط `id/title/code` را می‌خواند؛ پنج فیلد دیگر در پاسخ نیستند و simulator آن‌ها را silent-zero می‌بیند، اما اکنون باگ قابل‌مشاهده محسوب نمی‌شوند. |
 | Q-007 | `ParentStudentInfo.parent_mobile` در `GET /students/my_profile` | (الف) فیلد اجباری در پاسخ باشد؛ (ب) برای پروفایل دانش‌آموز nullable/optional باشد؛ (ج) مدل response جدا از مدل پرتال والد باشد | پاسخ این route `parent_mobile` ندارد؛ `StudentPortalActivity` فقط name و national_code را نمایش می‌دهد. تست، همین فیلدهای مصرف‌شده را assert می‌کند. |
 | Q-008 | `recent_transactions` در `GET /finance/student/{id}/dashboard` | (الف) پاسخ باید با `TransactionFullItem` کامل باشد؛ (ب) فیلدهای unused از مدل جدا/حذف شوند؛ (ج) endpoint باید payload مختصر transaction تعریف کند | بعضی transaction itemها `student_id/student_name/course_name` ندارند؛ caller فعلی `StudentProfileActivity.showCreateInstallmentDialog()` فقط `enrollments` را می‌خواند، پس عدم‌تطابق هنوز user-visible ثابت نشده است. |
+| Q-009 | Unused `AuditTrailApi.exportLogsCsv` declaration | (الف) حذف declaration بی‌caller؛ (ب) حفظ آن به‌عنوان raw paginated JSON و نام‌گذاری روشن؛ (ج) در scope جداگانه افزودن endpoint واقعاً CSV | کد صفحهٔ جاری `AuditTrailActivity` برای نمایش و export از `getLogs` استفاده می‌کند و CSV را سمت Android می‌سازد؛ `exportLogsCsv` هم به همان مسیر JSON اشاره دارد و caller مستقیمی ندارد. Export client-side سقف 10×200=2,000 ردیف دارد. تا تصمیم، contract test فقط JSON route/model را assert می‌کند و CSV bytes را از این declaration ادعا نمی‌کند. |

@@ -8,7 +8,7 @@
 |---|---|---:|---|---|---|
 | `GET /audit-trail/logs` | handler `routers.audit_trail.list_audit_logs`؛ منبع `Kharazmi_Server/routers/audit_trail.py:754` | 11 | Android DTO/actor enrichments، entity/action/user/date/search filters، ISO/Jalali full-day bounds، empty/205-row pagination، orphan/deleted references، exact DB snapshot unchanged | 9 passed، 2 strict xfailed (`RA-audit_trail-01`) | `RA-audit_trail-01` |
 
-**Android use:** `AuditTrailActivity` uses `getLogs` for both viewing and client-side CSV creation; the separate `exportLogsCsv(): Response<ResponseBody>` declaration has no current caller and still points at this JSON endpoint (Q-009). CSV collection stops after 10 pages of 200 records.
+**Android use:** `AuditTrailActivity` uses `getLogs` for both viewing and client-side CSV creation; the separate `exportLogsCsv(): Response<ResponseBody>` declaration has no current caller and still points at this JSON endpoint (Q-009). CSV collection stops after 10 pages of 50 records (500 records maximum).
 
 <!-- GENERATED ROUTE LEDGER START -->
 ## Route ledger — map input + current isolated probes

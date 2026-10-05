@@ -26,6 +26,10 @@
 | `RA-branches-01` | Resource-booking conflict error handling · high | Strict xfail `test_resource_booking_conflict_returns_400_and_does_not_add_a_second_row` in `test_audit_branches.py` | A second booking for the same resource, weekday and time returns controlled HTTP 400 with the conflicting course name and adds no row. | The first booking persists exactly. A repeated conflicting request returns HTTP 500 `Internal Server Error` and adds no second row; the clash branch dereferences `clash.course.title`, but `ResourceBooking` has no `course` relationship. | `routers/branches.py:200-210`; `models.py:652-659`. The explicit conflict response indicates the intended 400 path; `Q-022` keeps the broader booking policy open. |
 | `RA-branches-02` | Resource serial uniqueness on update · medium | Strict xfail `test_resource_update_duplicate_serial_returns_validation_error_without_writes` in `test_audit_branches.py` | Updating a resource to another row's serial returns controlled HTTP 400 and leaves both rows unchanged, matching the create endpoint's duplicate validation. | Returns HTTP 500 `Internal Server Error` from the unhandled unique constraint; the full pre/post snapshot confirms neither resource row changed. | `routers/branches.py:125-131,149-170`; `models.py:643-650`. Branch/resource management has no current Android Retrofit caller. |
 
+## Observations not promoted to confirmed bugs
+
+- `Q-027` records dunning eligibility as an unresolved product rule, not a defect: `/dunning/drafts` excludes a deleted Student but includes a suspended one; direct `send_batch` logs selected installments for either state. The route has no SMS gateway effect; all tests inspect local `SmsLog`/`ActivityLog` rows. No xfail was manufactured without an agreed eligibility contract.
+
 ## Previously known issue now fixed in this checkout
 
 | ID | Current status | Verification |

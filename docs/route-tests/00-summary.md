@@ -42,8 +42,8 @@
 
 ## پوشش رفتاری و مالی
 
-- 21 router دارای testهای متمرکز هستند: ai, audit, audit_trail, auth, finance, attendance, classes, admin, teachers, students, dashboard, reports, analytics, exports, exams, homework, parent, crm, automation, branches, calendar. پوشش این 210 route **partial** است و تمام transitionها/branchهایشان عمیق نشده‌اند.
-- 140 route در test sourceها literal client request reference دارند؛ این شمارش، عمق assertion را ثابت نمی‌کند. 81 مسیر literal match ندارند. ledger هر route test-reference یا smoke-only را مشخص می‌کند.
+- 22 router دارای testهای متمرکز هستند: ai, audit, audit_trail, auth, finance, attendance, classes, admin, teachers, students, dashboard, reports, analytics, exports, exams, homework, parent, crm, automation, branches, calendar, dunning. پوشش این 212 route **partial** است و تمام transitionها/branchهایشان عمیق نشده‌اند.
+- 142 route در test sourceها literal client request reference دارند؛ این شمارش، عمق assertion را ثابت نمی‌کند. 79 مسیر literal match ندارند. ledger هر route test-reference یا smoke-only را مشخص می‌کند.
 - finance دارای oracle مستقل tuition/discount/payment/due، split wallet، FIFO installment allocation و receipt/reversal است. invariantهای retry شامل direct payment، installment payment، session charge و teacher settlement/reversal بررسی شده‌اند؛ `target_wallet=both`، معنای income، واحد مبلغ، بی‌تاریخی و restore در questions ثبت‌اند.
 - AI route برای admin/teacher/student/parent با actor fixture درست، tool-data دقیق، response contract و نبود DB side effect بررسی شد. `RA-ai-01` strict xfail نشان می‌دهد تاریخچهٔ in-memory بعد از 20 turn به 26 message entry می‌رسد، درحالی‌که کد برای آن bounded window در نظر گرفته است.
 - Audit route با seed خالی، خروجی read-only، early/delayed-session alerts، rapid-delete در پنجرهٔ 30 روز با حد <1h (رد دقیقاً 1h) و perfect-attendance روی ده session آخر؛ absent خارج از پنجره نادیده گرفته می‌شود بررسی شد؛ regressionهای read مسیر DB را تغییر ندادند.
@@ -53,25 +53,26 @@
 - Automation suite در `tests/route_audit/test_audit_automation.py` هر پنج server-only route را پوشش می‌دهد: rule create/update, logs filter/order/pagination, empty/no-active behavior و تمام هشت condition engine با side-effect rows، finance-safe snapshots، retry/idempotency و push/SMS isolation. 13 behavioral cases پاس، 3 strict-xfailed (`RA-automation-01/02/03`); action matrix, threshold units و mixed-calendar semantics در Q-016..Q-018 بازند.
 - Branch/resource suite در `tests/route_audit/test_audit_branches.py` هر نه route را تست می‌کند: branch/resource CRUD, filters, missing/duplicate inputs, toggle repeat, branch finance/count aggregates, booking time slots, exact DB snapshots. 6 behavioral cases پاس و دو strict-xfail (`RA-branches-01/02`) روی conflict-detail relationship و duplicate serial update؛ suspend retry, nullable update, stats semantics و reservation scope در Q-019..Q-022 بازند.
 - Calendar suite در `tests/route_audit/test_audit_calendar.py` هر چهار route و callerهای Android را با role-specific values، empty/full rooms، چهارنوع conflict، exact read/write snapshots و Kotlin/Gson source simulator می‌سنجد. سه behavioral cases پاس؛ nullable homework detail یک simulator candidate است، نه strict xfail/باگ تأییدشده (Q-023)؛ event visibility، conflict predicate و branch assignment در Q-024..Q-026 بازند.
+- Dunning suite در `tests/route_audit/test_audit_dunning.py` هر دو route را با clock ثابت، مرزهای 48ساعته/روزهای سررسید، order/category/message exact، missing/deleted/paid/no-mobile/suspended cases، role guard، Kotlin/Gson DTO، no-write read، local SmsLog/ActivityLog، batch dedupe و retry پوشش می‌دهد؛ **6 passed**. direct batch برای Student حذف‌شده و suspended فعلاً log می‌سازد؛ eligibility مبهم در Q-027 است، نه xfail. SMS gateway واقعی فراخوانی نمی‌شود.
 - attendance: history/detail، snapshot هزینه، same-day QR check-in، stale QR، live start/status/cancel، conflict/retry و بی‌اثری مالی cancellation تست شده‌اند. مبلغ 260,000 در oracle جلسه با DB assert می‌شود.
 - علاوه بر آن KPIهای dashboard، date/filter/order/limit subset، CSV، exam-attempt retry، homework scope، parent/child access و student optimistic version conflict آزمون شده‌اند.
 
 ## باگ‌ها و xfailها
 
-آخرین اجرای کامل `PYTHONPATH=. /tmp/kharazmi-route-audit-venv/bin/pytest -q tests/route_audit` شامل suiteهای قبلی، CRM، automation، branches، calendar، report generator و socket-level network blocking بود:
+آخرین اجرای کامل `PYTHONPATH=. /tmp/kharazmi-route-audit-venv/bin/pytest -q tests/route_audit` شامل suiteهای قبلی، CRM، automation، branches، calendar، dunning، report generator و socket-level network blocking بود:
 
 ```text
-166 passed, 25 xfailed, 4 warnings in 14.89s
+171 passed, 25 xfailed, 4 warnings in 15.61s
 ```
 
-این اجرا regressionهای generator، oracle دقیق invoice enrollment 2، per-role tool values/history reproduction، suite پنج-route CRM، suite پنج-route automation، suite 9-route branches/resources و suite چهار-route calendar/Gson را با DB موقت شامل می‌شود. Xfailها فقط open issues ثبت‌شده هستند؛ strict unexpected-pass نیز خطای suite می‌دهد.
+این اجرا regressionهای generator، oracle دقیق invoice enrollment 2، per-role tool values/history reproduction، suite پنج-route CRM، suite پنج-route automation، suite 9-route branches/resources، suite چهار-route calendar/Gson و suite دو-route dunning را با DB موقت شامل می‌شود. Xfailها فقط open issues ثبت‌شده هستند؛ strict unexpected-pass نیز خطای suite می‌دهد.
 
 ۱۹ strict xfail علت/ID فعلی: O-02/RA-auth-02، O-12/RA-exams-02، O-19/RA-admin-19، RA-ai-01، RA-audit_trail-01 (دو مورد parametrized ISO/Jalali)، RA-finance-02، RA-homework-01، RA-attendance-01/02/03، RA-teachers-01، RA-crm-01 (شش parametrized cases)، RA-crm-02/03، RA-automation-01/02/03 و RA-branches-01/02. در suite کامل انتظار 25 case xfailed است. O-14 در این checkout بسته/سبز است و xfail نشده است. فهرست و reproduction در `bugs.md` است؛ هیچ باگی در application code اصلاح نشده.
 
 ## ناتمام‌ها و مراجع
 
-- 11 route از 4 router هنوز deep value/DB/state-machine suite ندارند: `dunning(2)`, `messages(7)`, `serve_upload(1)`, `timeline(1)`؛ blockerها در `blockers.md`.
-- 26 تصمیم محصول/contract همچنان باز است: Q-001..Q-026 در `questions.md`؛ تست‌ها rule مبهمی را حدس نمی‌زنند.
+- 9 route از 3 router هنوز deep value/DB/state-machine suite ندارند: `messages(7)`, `serve_upload(1)`, `timeline(1)`؛ blockerها در `blockers.md`.
+- 27 تصمیم محصول/contract همچنان باز است: Q-001..Q-027 در `questions.md`؛ تست‌ها rule مبهمی را حدس نمی‌زنند.
 - Android compile/runtime و device execution انجام نشده. Checklist دستی با seed values در `device-checklist.md` آمده است.
 - شمارش و فایل‌های خام: `sweep/report.json`, `contract-report.json`, `boundary-report.json`, `large-report.json`; runnerهای مستقل در `tests/route_audit/sweep/`.
 - تست کامل: `PYTHONPATH=. /tmp/kharazmi-route-audit-venv/bin/pytest -q tests/route_audit`.

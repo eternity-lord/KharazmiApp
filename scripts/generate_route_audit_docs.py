@@ -48,6 +48,8 @@ PARTIAL_XFAILS = {
     ("POST", "/automation/rules"): "RA-automation-02",
     ("PUT", "/automation/rules/{rule_id}"): "RA-automation-01",
     ("POST", "/automation/run_rules"): "RA-automation-03",
+    ("POST", "/resources/bookings"): "RA-branches-01",
+    ("PUT", "/resources/{id}"): "RA-branches-02",
 }
 
 

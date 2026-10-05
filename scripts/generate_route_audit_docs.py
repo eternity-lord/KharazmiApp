@@ -87,10 +87,10 @@ def extract_calls(path: Path):
             else:
                 method = match.group(2).upper()
                 call_path = match.group(4)
-            before = text[:match.start()]
             prior_defs = [item for item in test_defs if item.start() < match.start()]
             test_name = prior_defs[-1].group(1) if prior_defs else "module-level"
-            calls.append((method, call_path, str(path.relative_to(ROOT)), test_name))
+            line_number = text.count("\n", 0, match.start()) + 1
+            calls.append((method, call_path, str(path.relative_to(ROOT)), test_name, line_number))
     return calls
 
 
@@ -138,7 +138,7 @@ def main() -> None:
     contract_by_key = {(row["method"].upper(), norm_path(row["path"])): row for row in contract.get("entries", [])}
 
     calls = [call for file in source_files() for call in extract_calls(file)]
-    calls_by_router: dict[str, list[tuple[str, str, str, str]]] = defaultdict(list)
+    calls_by_router: dict[str, list[tuple[str, str, str, str, int]]] = defaultdict(list)
     for call in calls:
         calls_by_router["__all__"].append(call)
 
@@ -188,9 +188,9 @@ def main() -> None:
                 values += f"<br>Android model: {android_models}"
 
             direct_refs = []
-            for ref_method, literal, rel_file, test_name in calls_by_router["__all__"]:
+            for ref_method, literal, rel_file, test_name, line_number in calls_by_router["__all__"]:
                 if ref_method == method and literal_route_matches(row["path کامل"], literal):
-                    direct_refs.append(f"`{rel_file}:{test_name}`")
+                    direct_refs.append(f"`{rel_file}:{line_number}` (`{test_name}`)")
             direct_refs = list(dict.fromkeys(direct_refs))
             xfail = KNOWN_XFAILS.get((method, path))
             issues = contract_by_key.get(key, {}).get("issues", [])

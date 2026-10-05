@@ -13,11 +13,12 @@
 
 ## routerها
 
-۱۴ router دارای suite متمرکز/مقداری هستند، اما پوشش هنوز **partial** است و تمام branchهای 173 route این گروه deep نشده‌اند:
+۱۵ router دارای suite متمرکز/مقداری هستند، اما پوشش هنوز **partial** است و تمام branchهای 174 route این گروه deep نشده‌اند:
 
 | router | routes | وضعیت فعلی |
 |---|---:|---|
 | ai | 1 | tool values برای admin/teacher/student/parent و no-write بررسی شد؛ cap مکالمه در `RA-ai-01` strict xfail است |
+| audit | 1 | empty/read-only، early/delayed attendance، <30-day and <1h rapid-delete (exactly 1h rejected)، last-10 perfect-attendance transition؛ باگ باز تأیید نشد |
 | finance | 26 | oracle مالی/پرداخت و invoice، retry/FIFO؛ route والد معتبر باگ `RA-finance-02` را بازتولید می‌کند؛ side-effect/gateway و چند CRUD هنوز blocker دارند |
 | attendance | 15 | read/history، live start/status/cancel، retry مالی، suspended guard و QR stale/same-day success با DB restore |
 | classes | 21 | list/detail/debt/export و subset state/approval؛ create/bulk/delete/enrollment transitionها هنوز عمیق نیستند |
@@ -32,13 +33,13 @@
 | homework | 6 | scope/optional defaults؛ graded parent row با `max_score` غایب در strict xfail |
 | parent | 5 | profile/portal values و role slice؛ OTP/select-child transitionها هنوز deep نشده‌اند |
 
-۱۱ router باقی‌مانده و **48 route** هنوز deep suite ندارند: `audit(1)`, `audit_trail(1)`, `auth(12)`, `automation(5)`, `branches(9)`, `calendar(4)`, `crm(5)`, `dunning(2)`, `messages(7)`, `serve_upload(1)`, `timeline(1)`. گزارش‌هایشان smoke و map را دارند؛ این معادل audit رفتاری نیست.
+۱۰ router باقی‌مانده و **47 route** هنوز deep suite ندارند: `audit_trail(1)`, `auth(12)`, `automation(5)`, `branches(9)`, `calendar(4)`, `crm(5)`, `dunning(2)`, `messages(7)`, `serve_upload(1)`, `timeline(1)`. گزارش‌هایشان smoke و map را دارند؛ این معادل audit رفتاری نیست.
 
 ## آخرین اجراهای واقعی
 
 ```text
 PYTHONPATH=. /tmp/kharazmi-route-audit-venv/bin/pytest -q tests/route_audit
-103 passed, 10 xfailed, 4 warnings
+109 passed, 10 xfailed, 4 warnings
 
 route sweep: 221/221; main 500=0; 220/221 invalid-target probes; invalid 500=0
 invalid observations: 422=146, 200=70, 400=3, 403=1, 404=1
@@ -58,8 +59,8 @@ Markdown generator: 25 ledgers, every generated row has 8 intact cells and no un
 
 ۱۰ strict xfail فعلی: O-02/RA-auth-02, O-12/RA-exams-02, O-19/RA-admin-19, RA-ai-01, RA-finance-02, RA-homework-01, RA-attendance-01/02/03 و RA-teachers-01. O-14 xfail نیست. contract simulator خام candidate ثبت می‌کند؛ `bugs.md`/Q-006..008 آن را از باگ قابل‌مشاهده جدا می‌کنند.
 
-`docs/route-tests/routes/*.md` برای هر route: یک جملهٔ purpose/handler، actor و status probe، caller/screen جاری، ورودی و response schema، DB read/write statically extracted، side effect و test-reference یا smoke-only status دارد. 103 route test source literal request reference دارند؛ این شمارش به‌تنهایی عمق assertion را اثبات نمی‌کند. 118 مسیر literal match ندارند؛ ledger per-route قید هر مورد را نشان می‌دهد.
+`docs/route-tests/routes/*.md` برای هر route: یک جملهٔ purpose/handler، actor و status probe، caller/screen جاری، ورودی و response schema، DB read/write statically extracted، side effect و test-reference یا smoke-only status دارد. 104 route test source literal request reference دارند؛ این شمارش به‌تنهایی عمق assertion را اثبات نمی‌کند. 117 مسیر literal match ندارند؛ ledger per-route قید هر مورد را نشان می‌دهد.
 
 ## دیتابیس اصلی و commit
 
-در اجرای نهایی، `md5sum Kharazmi_Server/gaj_db.db` قبل و بعد از pytest برابر `f048f8d118b33c4eaa944490594121d7` ثبت شد؛ sweep/contract/boundary/large نیز هرکدام DB موقت داشتند. این snapshot شامل زیرساخت deterministic seed، audit QR، socket blocking، oracle invoice و ledgerهای جاری است. این checkpoint روی branch ثابت نشست نگهداری می‌شود؛ 48 route هنوز به deep behavioral audit نیاز دارند و باگ application code عمداً اصلاح نشده است.
+در اجرای نهایی، `md5sum Kharazmi_Server/gaj_db.db` قبل و بعد از pytest برابر `f048f8d118b33c4eaa944490594121d7` ثبت شد؛ sweep/contract/boundary/large نیز هرکدام DB موقت داشتند. این snapshot شامل زیرساخت deterministic seed، audit QR، socket blocking، oracle invoice و ledgerهای جاری است. این checkpoint روی branch ثابت نشست نگهداری می‌شود؛ 47 route هنوز به deep behavioral audit نیاز دارند و باگ application code عمداً اصلاح نشده است.

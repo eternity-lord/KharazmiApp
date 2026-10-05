@@ -1,4 +1,6 @@
-from scripts.generate_route_audit_docs import END, REPORT_DIR, START, cell
+from pathlib import Path
+
+from scripts.generate_route_audit_docs import END, REPORT_DIR, ROOT, START, cell, extract_calls
 
 
 def _unescaped_pipe_count(line: str) -> int:
@@ -19,6 +21,20 @@ def _unescaped_pipe_count(line: str) -> int:
 def test_cell_escapes_literal_pipe_once_and_breaks_openapi_separators():
     assert cell("left|right") == r"left\|right"
     assert cell("query:a | query:b") == "query:a<br>query:b"
+
+
+def test_route_call_evidence_includes_test_name_and_source_line():
+    source = ROOT / "tests/route_audit/test_audit_audit.py"
+    calls = extract_calls(source)
+    matches = [
+        call for call in calls
+        if call[0] == "GET" and call[1] == "/audit/suspicious_patterns"
+    ]
+    assert matches
+    assert all(call[3].startswith("test_audit_") and call[4] > 0 for call in matches)
+    assert any(call[3] == "test_audit_pattern_c_uses_ten_latest_sessions_and_detects_new_absence" for call in matches)
+    source_lines = source.read_text(encoding="utf-8").splitlines()
+    assert all("_alerts_from(client.get(" in source_lines[call[4] - 1] for call in matches)
 
 
 def _split_markdown_cells(line: str) -> list[str]:

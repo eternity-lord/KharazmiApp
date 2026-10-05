@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from .clock import FIXED_NOW
 from .route_registry import route_id, routes
@@ -13,13 +13,17 @@ ROUTE_IDS = [
 ]
 
 
-def _table_counts(db):
+def _database_snapshot(db):
     import models
 
-    return {
-        table.name: db.execute(select(func.count()).select_from(table)).scalar_one()
-        for table in models.Base.metadata.sorted_tables
-    }
+    snapshot = {}
+    for table in models.Base.metadata.sorted_tables:
+        statement = select(table)
+        primary_key = list(table.primary_key.columns)
+        if primary_key:
+            statement = statement.order_by(*primary_key)
+        snapshot[table.name] = [tuple(row) for row in db.execute(statement).all()]
+    return snapshot
 
 
 ALERT_KEYS = {
@@ -58,11 +62,11 @@ def test_audit_route_inventory_is_explicit():
 
 
 def test_audit_seed_response_has_exact_alert_shape_and_is_read_only(client, auth_headers, db):
-    before = _table_counts(db)
+    before = _database_snapshot(db)
     alerts = _alerts_from(client.get("/audit/suspicious_patterns", headers=auth_headers["admin"]))
     db.expire_all()
     assert alerts == []
-    assert _table_counts(db) == before
+    assert _database_snapshot(db) == before
 
 
 def test_audit_pattern_a_reports_night_and_delayed_sessions_with_frozen_time(client, auth_headers, db):
@@ -81,7 +85,7 @@ def test_audit_pattern_a_reports_night_and_delayed_sessions_with_frozen_time(cli
     db.add_all(rows)
     db.commit()
     try:
-        before = _table_counts(db)
+        before = _database_snapshot(db)
         alerts = _alerts_from(client.get("/audit/suspicious_patterns", headers=auth_headers["admin"]))
         relevant = {row["entity_id"]: row for row in alerts if row["entity_id"] in {item.id for item in rows}}
         assert set(relevant) == {item.id for item in rows}
@@ -94,7 +98,7 @@ def test_audit_pattern_a_reports_night_and_delayed_sessions_with_frozen_time(cli
         assert "اختلاف 7 ساعت" in delay["description"]
         assert night["detected_at"] == delay["detected_at"] == FIXED_NOW.strftime("%Y-%m-%d %H:%M:%S")
         db.expire_all()
-        assert _table_counts(db) == before
+        assert _database_snapshot(db) == before
     finally:
         db.query(models.SessionLog).filter(models.SessionLog.session_code.in_([87_001, 87_002])).delete(synchronize_session=False)
         db.commit()
@@ -145,7 +149,7 @@ def test_audit_pattern_b_flags_only_recent_rapid_deleted_transaction(client, aut
     ])
     db.commit()
     try:
-        before = _table_counts(db)
+        before = _database_snapshot(db)
         alerts = _alerts_from(client.get("/audit/suspicious_patterns", headers=auth_headers["admin"]))
         matches = [row for row in alerts if row["type"] == "rapid_deletion" and row["entity_id"] == transaction_id]
         assert len(matches) == 1
@@ -159,7 +163,7 @@ def test_audit_pattern_b_flags_only_recent_rapid_deleted_transaction(client, aut
             for row in alerts
         )  # exactly one hour is not <1h
         db.expire_all()
-        assert _table_counts(db) == before
+        assert _database_snapshot(db) == before
     finally:
         _cleanup_transaction_probe(db, transaction_id)
         _cleanup_transaction_probe(db, boundary_transaction_id)
@@ -192,11 +196,11 @@ def test_audit_pattern_b_ignores_deleted_rows_with_logs_older_than_thirty_days(c
     ])
     db.commit()
     try:
-        before = _table_counts(db)
+        before = _database_snapshot(db)
         alerts = _alerts_from(client.get("/audit/suspicious_patterns", headers=auth_headers["admin"]))
         assert not any(row["type"] == "rapid_deletion" and row["entity_id"] == transaction_id for row in alerts)
         db.expire_all()
-        assert _table_counts(db) == before
+        assert _database_snapshot(db) == before
     finally:
         _cleanup_transaction_probe(db, transaction_id)
 
@@ -235,22 +239,22 @@ def test_audit_pattern_c_uses_ten_latest_sessions_and_detects_new_absence(client
     ])
     db.commit()
     try:
-        before = _table_counts(db)
+        before = _database_snapshot(db)
         alerts = _alerts_from(client.get("/audit/suspicious_patterns", headers=auth_headers["admin"]))
         perfect = [row for row in alerts if row["type"] == "perfect_attendance" and row["entity_id"] == 1]
         assert len(perfect) == 1
         assert "۱۰ جلسه اخیر" in perfect[0]["description"]
         assert "10 رکورد حضور" in perfect[0]["description"]
         db.expire_all()
-        assert _table_counts(db) == before
+        assert _database_snapshot(db) == before
 
         db.query(models.Attendance).filter(models.Attendance.session_id == sessions[0].id).one().status = "Absent"
         db.commit()
-        before_absence_probe = _table_counts(db)
+        before_absence_probe = _database_snapshot(db)
         after_absence = _alerts_from(client.get("/audit/suspicious_patterns", headers=auth_headers["admin"]))
         assert not any(row["type"] == "perfect_attendance" and row["entity_id"] == 1 for row in after_absence)
         db.expire_all()
-        assert _table_counts(db) == before_absence_probe
+        assert _database_snapshot(db) == before_absence_probe
     finally:
         db.query(models.Attendance).filter(models.Attendance.session_id.in_(session_ids)).delete(synchronize_session=False)
         db.query(models.SessionLog).filter(models.SessionLog.id.in_(session_ids)).delete(synchronize_session=False)

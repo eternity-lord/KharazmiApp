@@ -41,6 +41,10 @@ KNOWN_XFAILS = {
 PARTIAL_XFAILS = {
     ("POST", "/ai/chat"): "RA-ai-01",
     ("GET", "/audit-trail/logs"): "RA-audit_trail-01",
+    ("POST", "/crm/leads/create"): "RA-crm-01",
+    ("POST", "/crm/leads/{id}/convert"): "RA-crm-02",
+    ("POST", "/crm/leads/{id}/notes"): "RA-crm-01",
+    ("POST", "/crm/register_online"): "RA-crm-01, RA-crm-03",
 }
 
 
@@ -211,7 +215,12 @@ def main() -> None:
                 audit = "221-route smoke only; business values/DB effects need a focused test or an explicit blocker."
             partial_xfail = PARTIAL_XFAILS.get((method, path))
             if partial_xfail:
-                audit += f" Open behavior xfail `{partial_xfail}` (route also has passing assertions); see `../bugs.md`."
+                issue_ids = partial_xfail.split(", ")
+                if len(issue_ids) == 1:
+                    audit += f" Open behavior xfail `{issue_ids[0]}` (route also has passing assertions); see `../bugs.md`."
+                else:
+                    issue_refs = ", ".join(f"`{issue}`" for issue in issue_ids)
+                    audit += f" Open behavior xfails {issue_refs} (route also has passing assertions); see `../bugs.md`."
             if issues and not xfail:
                 audit += f" Contract candidates: {len(issues)} ({', '.join(issue_types)}); triage in `../questions.md`/`../bugs.md`."
             if row.get("verification"):

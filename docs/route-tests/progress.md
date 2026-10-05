@@ -13,7 +13,7 @@
 
 ## routerها
 
-۱۷ router دارای suite متمرکز/مقداری هستند، اما پوشش هنوز **partial** است و تمام branchهای 187 route این گروه deep نشده‌اند:
+۱۸ router دارای suite متمرکز/مقداری هستند، اما پوشش هنوز **partial** است و تمام branchهای 192 route این گروه deep نشده‌اند:
 
 | router | routes | وضعیت فعلی |
 |---|---:|---|
@@ -34,14 +34,19 @@
 | exams | 7 | list/attempt subset؛ O-12 strict xfail؛ O-14 در این checkout fixed/سبز |
 | homework | 6 | scope/optional defaults؛ graded parent row با `max_score` غایب در strict xfail |
 | parent | 5 | profile/portal values و role slice؛ OTP/select-child transitionها هنوز deep نشده‌اند |
+| crm | 5 | create/list/notes/convert/online registration; exact row/response, 206-row/null-safe list, conversion/idempotency, independent finance oracle, audit/SMS/notification mock, rollback; `RA-crm-01` (six cases), `RA-crm-02`, `RA-crm-03` (8 xfail cases total); Q-010..Q-015 unresolved |
 
-۸ router باقی‌مانده و **34 route** هنوز deep suite ندارند: `automation(5)`, `branches(9)`, `calendar(4)`, `crm(5)`, `dunning(2)`, `messages(7)`, `serve_upload(1)`, `timeline(1)`. گزارش‌هایشان smoke و map را دارند؛ این معادل audit رفتاری نیست.
+۷ router باقی‌مانده و **29 route** هنوز deep suite ندارند: `automation(5)`, `branches(9)`, `calendar(4)`, `dunning(2)`, `messages(7)`, `serve_upload(1)`, `timeline(1)`. گزارش‌هایشان smoke و map را دارند؛ این معادل audit رفتاری نیست.
 
 ## آخرین اجراهای واقعی
 
 ```text
 PYTHONPATH=. /tmp/kharazmi-route-audit-venv/bin/pytest -q tests/route_audit
-131 passed, 12 xfailed, 4 warnings
+144 passed, 20 xfailed, 4 warnings in 11.52s
+
+focused CRM + report generator: 18 passed, 8 xfailed
+CRM behavioral routes: 13 passed, 8 strict-xfailed; all five CRM routes have targeted references
+main DB md5 before/after full suite: f048f8d118b33c4eaa944490594121d7
 
 route sweep: 221/221; main 500=0; 220/221 invalid-target probes; invalid 500=0
 invalid observations: 422=146, 200=70, 400=3, 403=1, 404=1
@@ -59,10 +64,10 @@ large seed: 300 students/30 classes + 300 transaction/session rows; 8/8 limit/or
 Markdown generator: 25 ledgers, every generated row has 8 intact cells and no unwrapped segment >300 chars
 ```
 
-۱۱ strict xfail علت/ID فعلی: O-02/RA-auth-02, O-12/RA-exams-02, O-19/RA-admin-19, RA-ai-01, RA-audit_trail-01 (دو قالب ISO/Jalali), RA-finance-02, RA-homework-01, RA-attendance-01/02/03 و RA-teachers-01؛ در pytest دوازده مورد xfailed دیده می‌شود. O-14 xfail نیست. contract simulator خام candidate ثبت می‌کند؛ `bugs.md`/Q-006..008 آن را از باگ قابل‌مشاهده جدا می‌کنند.
+۱۴ strict xfail علت/ID فعلی: O-02/RA-auth-02, O-12/RA-exams-02, O-19/RA-admin-19, RA-ai-01, RA-audit_trail-01 (دو قالب ISO/Jalali), RA-finance-02, RA-homework-01, RA-attendance-01/02/03, RA-teachers-01, RA-crm-01 (شش پارامتری), RA-crm-02 و RA-crm-03؛ در pytest بیست case xfailed دیده می‌شود. O-14 xfail نیست. contract simulator خام candidate ثبت می‌کند؛ `bugs.md`/Q-006..008 آن را از باگ قابل‌مشاهده جدا می‌کنند.
 
-`docs/route-tests/routes/*.md` برای هر route: یک جملهٔ purpose/handler، actor و status probe، caller/screen جاری، ورودی و response schema، DB read/write statically extracted، side effect و test-reference یا smoke-only status دارد. 117 route test source literal request reference دارند؛ این شمارش به‌تنهایی عمق assertion را اثبات نمی‌کند. 104 مسیر literal match ندارند؛ ledger per-route قید هر مورد را نشان می‌دهد.
+`docs/route-tests/routes/*.md` برای هر route: یک جملهٔ purpose/handler، actor و status probe، caller/screen جاری، ورودی و response schema، DB read/write statically extracted، side effect و test-reference یا smoke-only status دارد. 122 route test source literal request reference دارند؛ این شمارش به‌تنهایی عمق assertion را اثبات نمی‌کند. 99 مسیر literal match ندارند؛ ledger per-route قید هر مورد را نشان می‌دهد.
 
 ## دیتابیس اصلی و commit
 
-در اجرای نهایی، `md5sum Kharazmi_Server/gaj_db.db` قبل و بعد از pytest برابر `f048f8d118b33c4eaa944490594121d7` ثبت شد؛ sweep/contract/boundary/large نیز هرکدام DB موقت داشتند. این snapshot شامل زیرساخت deterministic seed، audit QR، socket blocking، oracle invoice و ledgerهای جاری است. این checkpoint روی branch ثابت نشست نگهداری می‌شود؛ 34 route هنوز به deep behavioral audit نیاز دارند و باگ application code عمداً اصلاح نشده است.
+در اجرای کامل 2026-10-05، `md5sum Kharazmi_Server/gaj_db.db` قبل و بعد از pytest برابر `f048f8d118b33c4eaa944490594121d7` ثبت شد؛ sweep/contract/boundary/large و CRM testها نیز DB موقت داشتند. این snapshot شامل زیرساخت deterministic seed، audit QR، socket blocking، oracle invoice، CRM audit/log assertions و ledgerهای جاری است. این checkpoint روی branch ثابت نشست نگهداری می‌شود؛ 29 route هنوز به deep behavioral audit نیاز دارند و باگ application code عمداً اصلاح نشده است.

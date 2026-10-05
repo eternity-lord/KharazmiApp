@@ -45,6 +45,9 @@ PARTIAL_XFAILS = {
     ("POST", "/crm/leads/{id}/convert"): "RA-crm-02",
     ("POST", "/crm/leads/{id}/notes"): "RA-crm-01",
     ("POST", "/crm/register_online"): "RA-crm-01, RA-crm-03",
+    ("POST", "/automation/rules"): "RA-automation-02",
+    ("PUT", "/automation/rules/{rule_id}"): "RA-automation-01",
+    ("POST", "/automation/run_rules"): "RA-automation-03",
 }
 
 

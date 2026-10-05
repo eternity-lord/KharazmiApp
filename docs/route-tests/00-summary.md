@@ -42,21 +42,22 @@
 
 ## پوشش رفتاری و مالی
 
-- 16 router دارای testهای متمرکز هستند: ai, audit, audit_trail, finance, attendance, classes, admin, teachers, students, dashboard, reports, analytics, exports, exams, homework, parent. پوشش این 175 route **partial** است و تمام transitionها/branchهایشان عمیق نشده‌اند.
-- 105 route در test sourceها literal client request reference دارند؛ این شمارش، عمق assertion را ثابت نمی‌کند. 116 مسیر literal match ندارند. ledger هر route test-reference یا smoke-only را مشخص می‌کند.
+- 17 router دارای testهای متمرکز هستند: ai, audit, audit_trail, auth, finance, attendance, classes, admin, teachers, students, dashboard, reports, analytics, exports, exams, homework, parent. پوشش این 187 route **partial** است و تمام transitionها/branchهایشان عمیق نشده‌اند.
+- 117 route در test sourceها literal client request reference دارند؛ این شمارش، عمق assertion را ثابت نمی‌کند. 104 مسیر literal match ندارند. ledger هر route test-reference یا smoke-only را مشخص می‌کند.
 - finance دارای oracle مستقل tuition/discount/payment/due، split wallet، FIFO installment allocation و receipt/reversal است. invariantهای retry شامل direct payment، installment payment، session charge و teacher settlement/reversal بررسی شده‌اند؛ `target_wallet=both`، معنای income، واحد مبلغ، بی‌تاریخی و restore در questions ثبت‌اند.
 - AI route برای admin/teacher/student/parent با actor fixture درست، tool-data دقیق، response contract و نبود DB side effect بررسی شد. `RA-ai-01` strict xfail نشان می‌دهد تاریخچهٔ in-memory بعد از 20 turn به 26 message entry می‌رسد، درحالی‌که کد برای آن bounded window در نظر گرفته است.
 - Audit route با seed خالی، خروجی read-only، early/delayed-session alerts، rapid-delete در پنجرهٔ 30 روز با حد <1h (رد دقیقاً 1h) و perfect-attendance روی ده session آخر؛ absent خارج از پنجره نادیده گرفته می‌شود بررسی شد؛ regressionهای read مسیر DB را تغییر ندادند.
 - Audit-trail route با فیلتر/جست‌وجوی transaction و installment، خروجی دقیق Android DTO، تاریخ ISO/Jalali، صفحه‌بندی و ردیف‌های یتیم/soft-deleted بررسی شد. Rollback یک update مالی، هم مقدار تراکنش و هم لاگ ممیزی را برمی‌گرداند. `RA-audit_trail-01` نشان می‌دهد بازهٔ تاریخ-only وارونه به‌جای 400، 200 با لیست خالی می‌دهد (ISO و Jalali).
+- Auth/notification routes با ورود مثبت admin/secretary/teacher، `me`، تغییر رمز و موبایل، OTP دانش‌آموز، session logout، token registration و inbox/unread/read transitions بررسی شدند؛ SMS فقط با SmsLog موقت mock شد. تست O-02 همچنان نشان می‌دهد Android فعلی device-token registration caller ندارد. آزمون امنیتی (credential guessing، token forgery و auth bypass) خارج از scope است.
 - attendance: history/detail، snapshot هزینه، same-day QR check-in، stale QR، live start/status/cancel، conflict/retry و بی‌اثری مالی cancellation تست شده‌اند. مبلغ 260,000 در oracle جلسه با DB assert می‌شود.
 - علاوه بر آن KPIهای dashboard، date/filter/order/limit subset، CSV، exam-attempt retry، homework scope، parent/child access و student optimistic version conflict آزمون شده‌اند.
 
 ## باگ‌ها و xfailها
 
-آخرین اجرای کامل pytest شامل suiteهای AI و audit، generator و socket-level blocking:
+آخرین اجرای کامل pytest شامل suiteهای AI، audit، audit_trail و auth، generator و socket-level blocking:
 
 ```text
-118 passed, 12 xfailed, 4 warnings
+131 passed, 12 xfailed, 4 warnings
 ```
 
 این اجرا regressionهای generator، oracle دقیق invoice enrollment 2، per-role tool values و history reproduction را نیز شامل می‌شود.
@@ -65,7 +66,7 @@
 
 ## ناتمام‌ها و مراجع
 
-- 46 route از 9 router هنوز deep value/DB/state-machine suite ندارند: `auth(12)`, `automation(5)`, `branches(9)`, `calendar(4)`, `crm(5)`, `dunning(2)`, `messages(7)`, `serve_upload(1)`, `timeline(1)`؛ blockerها در `blockers.md`.
+- 34 route از 8 router هنوز deep value/DB/state-machine suite ندارند: `automation(5)`, `branches(9)`, `calendar(4)`, `crm(5)`, `dunning(2)`, `messages(7)`, `serve_upload(1)`, `timeline(1)`؛ blockerها در `blockers.md`.
 - 9 تصمیم محصول/contract همچنان باز است: Q-001..Q-009 در `questions.md`؛ تست‌ها rule مبهمی را حدس نمی‌زنند.
 - Android compile/runtime و device execution انجام نشده. Checklist دستی با seed values در `device-checklist.md` آمده است.
 - شمارش و فایل‌های خام: `sweep/report.json`, `contract-report.json`, `boundary-report.json`, `large-report.json`; runnerهای مستقل در `tests/route_audit/sweep/`.

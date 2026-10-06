@@ -226,14 +226,20 @@ def test_crm_create_lead_rejects_invalid_mobile_branch_and_inactive_branch_witho
         _restore_tables(db, before, "Lead", "Branch")
 
 
-@pytest.mark.parametrize("field", ["name", "interested_course"])
-@pytest.mark.xfail(strict=True, reason="RA-crm-01")
-def test_crm_create_lead_rejects_empty_required_text_fields(client, auth_headers, db, field):
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        (field, value)
+        for field in ("name", "mobile", "interested_course", "notes")
+        for value in ("", "   \t")
+    ],
+)
+def test_crm_create_lead_rejects_empty_required_text_fields(client, auth_headers, db, field, value):
     before = _database_snapshot(db)
     try:
         response = client.post(
             "/crm/leads/create",
-            json=_lead_payload(**{field: ""}),
+            json=_lead_payload(**{field: value}),
             headers=auth_headers["secretary"],
         )
         assert _database_snapshot(db) == before
@@ -374,13 +380,13 @@ def test_crm_add_notes_missing_lead_and_missing_body_field_have_controlled_4xx(c
     assert _database_snapshot(db) == before
 
 
-@pytest.mark.xfail(strict=True, reason="RA-crm-01")
-def test_crm_add_notes_rejects_blank_required_note(client, auth_headers, db):
+@pytest.mark.parametrize("note", ["", "  \t  "], ids=["empty", "whitespace"])
+def test_crm_add_notes_rejects_blank_required_note(client, auth_headers, db, note):
     before = _database_snapshot(db)
     try:
         response = client.post(
             "/crm/leads/1/notes",
-            json={"notes": "", "next_follow_up": None, "status": "CONTACTED"},
+            json={"notes": note, "next_follow_up": None, "status": "CONTACTED"},
             headers=auth_headers["secretary"],
         )
         assert _database_snapshot(db) == before
@@ -523,7 +529,6 @@ def test_crm_convert_returns_404_for_missing_lead_and_400_for_invalid_or_duplica
         _restore_tables(db, before, "Lead", "Enrollment", "Student", "SequenceCounter")
 
 
-@pytest.mark.xfail(strict=True, reason="RA-crm-02")
 def test_crm_convert_rejects_nonexistent_course_without_partial_student(client, auth_headers, db):
     import models
 
@@ -542,7 +547,7 @@ def test_crm_convert_rejects_nonexistent_course_without_partial_student(client, 
         )
         assert _database_snapshot(db) == before_convert
         assert response.status_code == 404, response.text
-        assert response.json() == {"detail": "کلاس انتخابی یافت نشد"}
+        assert response.json() == {"detail": "کلاس انتخابی یافت نشد؛ لطفاً یک دورهٔ معتبر انتخاب کنید"}
     finally:
         _restore_tables(db, before, "Lead", "Transaction", "Enrollment", "Student", "SequenceCounter")
 
@@ -806,13 +811,19 @@ def test_crm_online_registration_invalid_identity_mobile_payment_and_missing_cou
         )
 
 
-@pytest.mark.parametrize("field", ["first_name", "last_name", "father_name"])
-@pytest.mark.xfail(strict=True, reason="RA-crm-01")
-def test_crm_online_registration_rejects_empty_required_name_fields(client, db, field):
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        (field, value)
+        for field in ("first_name", "last_name", "father_name", "national_code", "student_mobile", "parent_mobile")
+        for value in ("", "   \t")
+    ],
+)
+def test_crm_online_registration_rejects_empty_required_name_fields(client, db, field, value):
     before = _database_snapshot(db)
     try:
         response = client.post(
-            "/crm/register_online", json=_online_payload(**{field: "", "paid_amount": 0}),
+            "/crm/register_online", json=_online_payload(**{field: value, "paid_amount": 0}),
         )
         assert _database_snapshot(db) == before
         assert response.status_code in (400, 422), (field, response.status_code, response.text)
@@ -822,13 +833,12 @@ def test_crm_online_registration_rejects_empty_required_name_fields(client, db, 
         )
 
 
-@pytest.mark.xfail(strict=True, reason="RA-crm-03")
 def test_crm_online_registration_rejects_amount_above_database_integer_range(client, db):
     before = _database_snapshot(db)
     try:
         response = client.post("/crm/register_online", json=_online_payload(paid_amount=2**63))
         assert _database_snapshot(db) == before  # failed request must roll back student, enrollment, wallet, and receipt
-        assert response.status_code in (400, 422), (response.status_code, response.text)
+        assert response.status_code == 422, response.text
     finally:
         _restore_tables(
             db, before, "Notification", "SmsLog", "FinancialAuditLog", "Transaction", "Enrollment", "Student", "User", "SequenceCounter",

@@ -1,8 +1,8 @@
 import os
 import datetime
-from typing import List, Optional
+from typing import Annotated, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Header
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 # FIX: Bug 22 - public registration uses the same identity validation as staff registration.
 from validation import NationalCodeRequest
 from sqlalchemy.orm import Session
@@ -16,12 +16,17 @@ from dependencies import get_db, check_user_login, require_permission, Notificat
 router = APIRouter()
 
 # Pydantic Schemas
+# Required human-entered text is trimmed and must contain at least one non-whitespace character.
+RequiredText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+MAX_DATABASE_INTEGER = (1 << 63) - 1
+
+
 class LeadCreateRequest(BaseModel):
-    name: str
-    mobile: str
-    interested_course: str
+    name: RequiredText
+    mobile: RequiredText
+    interested_course: RequiredText
     source: str = "Web"
-    notes: Optional[str] = None
+    notes: Optional[RequiredText] = None
     next_follow_up: Optional[str] = None
     branch_id: Optional[int] = None
 
@@ -37,7 +42,7 @@ class LeadResponseModel(BaseModel):
     created_at: str
 
 class LeadNoteRequest(BaseModel):
-    notes: str
+    notes: RequiredText
     next_follow_up: Optional[str] = None
     status: Optional[str] = None
 
@@ -78,14 +83,14 @@ def _generate_unique_temp_national_code(db: Session) -> str:
 
 # FIX: Bug 22 - validate the public registration payload before creating any records.
 class OnlineRegisterRequest(NationalCodeRequest):
-    first_name: str
-    last_name: str
-    father_name: str
+    first_name: RequiredText
+    last_name: RequiredText
+    father_name: RequiredText
     national_code: str
-    student_mobile: str
-    parent_mobile: str
+    student_mobile: RequiredText
+    parent_mobile: RequiredText
     course_id: int
-    paid_amount: int = Field(ge=0)  # FIX: Bug 22 - unpaid registration is valid; negative credits are not.
+    paid_amount: int = Field(ge=0, le=MAX_DATABASE_INTEGER)  # BigInteger/SQLite INTEGER bound; negative credits are not.
     payment_method: str = "کارتخوان"
 
 # --- 1. Admin/Secretary: Create CRM Lead ---
@@ -180,6 +185,12 @@ def convert_lead_to_student(
     if lead.converted_student_id is not None or lead.status == "REGISTERED":
         raise HTTPException(status_code=400, detail="این سرنخ قبلاً به دانش‌آموز تبدیل شده است")
 
+    course = None
+    if course_id is not None:
+        course = db.query(Course).filter(Course.id == course_id).first()
+        if not course:
+            raise HTTPException(status_code=404, detail="کلاس انتخابی یافت نشد؛ لطفاً یک دورهٔ معتبر انتخاب کنید")
+
     # FIX(crm): موبایل برای Student معتبر الزامی است — خالی یا نامعتبر قبل از ساخت Student
     # با 400 واضح متوقف می‌شود (قبلاً Student با موبایل خالی ساخته می‌شد).
     # FIX H20: نرمال‌سازی موبایل ذخیره‌شده‌ی سرنخ (legacy ممکن است خام باشد).
@@ -223,19 +234,17 @@ def convert_lead_to_student(
         # Enroll in course if course_id is supplied
         # FIX (F-C3): تک‌کامیت — ثبت‌نام قبل از کامیت ساخته می‌شود تا کرش وسط، سرنخِ REGISTEREDِ
         # بدون ثبت‌نام نسازد (پنجره‌ی کرش، نه ریس همزمانی؛ UPDATE مشروط به INSERT جدا نمی‌خورد).
-        if course_id:
-            course = db.query(Course).filter(Course.id == course_id).first()
-            if course:
-                enroll = Enrollment(
-                    student_id=new_student.id,
-                    course_id=course_id,
-                    branch_id=course.branch_id or lead.branch_id,
-                    register_date=datetime.datetime.now().strftime("%Y/%m/%d"),
-                    shift="عصر",
-                    total_tuition=1000000,
-                    total_paid=0
-                )
-                db.add(enroll)
+        if course is not None:
+            enroll = Enrollment(
+                student_id=new_student.id,
+                course_id=course.id,
+                branch_id=course.branch_id or lead.branch_id,
+                register_date=datetime.datetime.now().strftime("%Y/%m/%d"),
+                shift="عصر",
+                total_tuition=1000000,
+                total_paid=0
+            )
+            db.add(enroll)
         db.commit()
     except HTTPException:
         # خطای کنترل‌شده‌ی خود ما (مثل 503 کد ملی) — rollback و بازنمایی همان خطا

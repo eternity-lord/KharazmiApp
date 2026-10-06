@@ -186,7 +186,7 @@ def test_automation_create_rejects_unknown_condition_action_and_missing_fields_w
     before = _database_snapshot(db)
     requests = [
         ({"name": "invalid condition", "condition_type": "not-a-condition", "threshold": 1, "action_type": "sms"}, 400, {"detail": "نوع شرط نامعتبر است"}),
-        ({"name": "invalid action", "condition_type": "grade_low", "threshold": 10, "action_type": "not-an-action"}, 400, {"detail": "نوع عملیات نامعتبر است"}),
+        ({"name": "invalid action", "condition_type": "grade_low", "threshold": 10, "action_type": "not-an-action"}, 400, {"detail": {"code": "unknown_action", "message": "نوع عملیات نامعتبر است", "can_continue": True}}),
         ({"name": "missing threshold", "condition_type": "grade_low", "action_type": "parent_alert"}, 422, None),
         ({"name": "invalid threshold", "condition_type": "grade_low", "threshold": "not-a-number", "action_type": "parent_alert"}, 422, None),
     ]
@@ -201,13 +201,38 @@ def test_automation_create_rejects_unknown_condition_action_and_missing_fields_w
         _restore_tables(db, before, "AutomationRule")
 
 
-@pytest.mark.xfail(strict=True, reason="RA-automation-02")
-def test_automation_empty_rule_name_is_rejected_without_writes(client, auth_headers, db):
+def test_automation_create_allows_unknown_action_only_after_explicit_confirmation(client, auth_headers, db):
+    import models
+
     before = _database_snapshot(db)
     try:
         response = client.post(
             "/automation/rules",
-            json={"name": "", "condition_type": "grade_low", "threshold": 10, "action_type": "parent_alert"},
+            json={
+                "name": "عملیات سفارشی تأییدشده",
+                "condition_type": "grade_low",
+                "threshold": 10,
+                "action_type": "custom_action",
+                "confirm_unknown_action": True,
+            },
+            headers=auth_headers["admin"],
+        )
+        assert response.status_code == 200, response.text
+        created = db.get(models.AutomationRule, response.json()["rule_id"])
+        assert created.action_type == "custom_action"
+        after = _database_snapshot(db)
+        _assert_unchanged_except(before, after, "automation_rules")
+    finally:
+        _restore_tables(db, before, "AutomationRule")
+
+
+@pytest.mark.parametrize("name", ["", "  \t  "], ids=["empty", "whitespace"])
+def test_automation_empty_rule_name_is_rejected_without_writes(client, auth_headers, db, name):
+    before = _database_snapshot(db)
+    try:
+        response = client.post(
+            "/automation/rules",
+            json={"name": name, "condition_type": "grade_low", "threshold": 10, "action_type": "parent_alert"},
             headers=auth_headers["admin"],
         )
         assert _database_snapshot(db) == before
@@ -268,8 +293,9 @@ def test_automation_update_is_partial_supports_zero_and_false_and_missing_is_no_
         _restore_tables(db, before, "AutomationRule")
 
 
-@pytest.mark.xfail(strict=True, reason="RA-automation-01")
-def test_automation_update_rejects_unknown_action_type_without_mutating_rule(client, auth_headers, db):
+def test_automation_update_requires_confirmation_for_unknown_action_type(client, auth_headers, db):
+    import models
+
     before = _database_snapshot(db)
     try:
         response = client.put(
@@ -277,7 +303,23 @@ def test_automation_update_rejects_unknown_action_type_without_mutating_rule(cli
         )
         assert _database_snapshot(db) == before
         assert response.status_code == 400, response.text
-        assert response.json() == {"detail": "نوع عملیات نامعتبر است"}
+        assert response.json() == {
+            "detail": {
+                "code": "unknown_action",
+                "message": "نوع عملیات نامعتبر است",
+                "can_continue": True,
+            }
+        }
+
+        confirmed = client.put(
+            "/automation/rules/1",
+            json={"action_type": "not-an-action", "confirm_unknown_action": True},
+            headers=auth_headers["admin"],
+        )
+        assert confirmed.status_code == 200, confirmed.text
+        db.expire_all()
+        assert db.get(models.AutomationRule, 1).action_type == "not-an-action"
+        _assert_unchanged_except(before, _database_snapshot(db), "automation_rules")
     finally:
         _restore_tables(db, before, "AutomationRule")
 
@@ -482,7 +524,7 @@ def _prepare_engine_case(db, models, case):
     [
         "attendance_low", "absence_high", "installment_due", "installment_overdue",
         "homework_deadline", "grade_low",
-        pytest.param("student_inactive", marks=pytest.mark.xfail(strict=True, reason="RA-automation-03")),
+        "student_inactive",
         "lead_uncontacted",
     ],
 )

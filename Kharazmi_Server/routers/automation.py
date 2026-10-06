@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List, Optional
-from pydantic import BaseModel
+from typing import Annotated, List, Optional
+from pydantic import BaseModel, StringConstraints
 import datetime
 
 import models
@@ -11,17 +11,39 @@ from dependencies import get_db, check_admin_access, check_user_login, ensure_st
 router = APIRouter()
 
 # Pydantic schema
+RequiredText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+
+
 class RuleCreateRequest(BaseModel):
-    name: str
+    name: RequiredText
     condition_type: str
     threshold: float
-    action_type: str
+    action_type: RequiredText
+    confirm_unknown_action: bool = False
 
 class RuleUpdateRequest(BaseModel):
-    name: Optional[str] = None
+    name: Optional[RequiredText] = None
     threshold: Optional[float] = None
-    action_type: Optional[str] = None
+    action_type: Optional[RequiredText] = None
     active: Optional[bool] = None
+    confirm_unknown_action: bool = False
+
+
+VALID_ACTIONS = {
+    "parent_notification", "parent_alert", "student_notification",
+    "teacher_alert", "crm_reminder", "sms",
+}
+
+
+def _unknown_action_error() -> HTTPException:
+    return HTTPException(
+        status_code=400,
+        detail={
+            "code": "unknown_action",
+            "message": "نوع عملیات نامعتبر است",
+            "can_continue": True,
+        },
+    )
 
 
 # Helper function to trigger notification action
@@ -70,12 +92,11 @@ def create_automation_rule(
     _: str = Depends(check_admin_access)
 ):
     valid_conditions = ["attendance_low", "absence_high", "installment_due", "installment_overdue", "homework_deadline", "grade_low", "student_inactive", "lead_uncontacted"]
-    valid_actions = ["parent_notification", "parent_alert", "student_notification", "teacher_alert", "crm_reminder", "sms"]
     
     if req.condition_type not in valid_conditions:
         raise HTTPException(status_code=400, detail="نوع شرط نامعتبر است")
-    if req.action_type not in valid_actions:
-        raise HTTPException(status_code=400, detail="نوع عملیات نامعتبر است")
+    if req.action_type not in VALID_ACTIONS and not req.confirm_unknown_action:
+        raise _unknown_action_error()
         
     new_rule = AutomationRule(
         name=req.name,
@@ -106,6 +127,8 @@ def update_automation_rule(
     if req.threshold is not None:
         rule.threshold = req.threshold
     if req.action_type is not None:
+        if req.action_type not in VALID_ACTIONS and not req.confirm_unknown_action:
+            raise _unknown_action_error()
         rule.action_type = req.action_type
     if req.active is not None:
         rule.active = req.active
@@ -325,7 +348,7 @@ def run_automation_engine(
                 ).order_by(SessionLog.date.desc()).first()
                 if last_attendance:
                     try:
-                        session_dt = datetime.datetime.strptime(last_attendance.session_log.date, "%Y/%m/%d")
+                        session_dt = datetime.datetime.strptime(last_attendance.session.date, "%Y/%m/%d")
                         days_diff = (datetime.datetime.now() - session_dt).days
                         if days_diff > rule.threshold:
                             title = "👤 پیگیری وضعیت دانش‌آموز غیرفعال"

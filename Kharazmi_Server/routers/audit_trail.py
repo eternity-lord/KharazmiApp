@@ -773,7 +773,11 @@ def list_audit_logs(
 
     start_dt, start_inclusive = _parse_bound(start_date, is_end=False)
     end_dt, end_inclusive = _parse_bound(end_date, is_end=True)
-    if start_dt and end_dt and start_dt > end_dt:
+    if start_dt and end_dt and (
+        start_dt > end_dt or (start_dt == end_dt and not end_inclusive)
+    ):
+        # Date-only end bounds are exclusive midnight of the following day; equality
+        # therefore means a reversed/empty range (e.g. 29th through the 28th).
         raise HTTPException(status_code=400, detail="start_date بعد از end_date است")
 
     query = db.query(FinancialAuditLog)

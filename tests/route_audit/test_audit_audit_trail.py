@@ -326,7 +326,6 @@ def test_audit_trail_rejects_invalid_filters_without_database_changes(client, au
     [("2026-09-29", "2026-09-28"), ("1405/07/07", "1405/07/06")],
     ids=["iso", "jalali"],
 )
-@pytest.mark.xfail(strict=True, reason="RA-audit_trail-01")
 def test_audit_trail_rejects_reversed_date_only_range(client, auth_headers, start_date, end_date):
     response = client.get(
         "/audit-trail/logs", headers=auth_headers["admin"],

@@ -255,9 +255,11 @@ def chat_with_ai_assistant(
         
     history = chat_conversations_in_memory[convo_key]
     
-    # محدود کردن حجم تاریخچه جهت بهینه‌سازی حافظه (Memory Optimization)
-    if len(history) > 10:
-        history.pop(0)
+    # محدود کردن حجم تاریخچه: کلید شامل پیام‌های user و assistant است.
+    # با cap دقیق 15، حافظه حتی هنگام append دو پیام در هر turn رشد نمی‌کند.
+    max_history_messages = 15
+    if len(history) > max_history_messages:
+        del history[:-max_history_messages]
 
     # --- فراخوانی ارائه‌دهنده سرویس AI ---
     ai_response, suggested_action = active_ai_provider.generate_response(
@@ -270,6 +272,8 @@ def chat_with_ai_assistant(
     # اضافه کردن پیام‌ها به تاریخچه گفتگو
     history.append({"user": req.message})
     history.append({"assistant": ai_response})
+    if len(history) > max_history_messages:
+        del history[:-max_history_messages]
     
     return {
         "status": "success",

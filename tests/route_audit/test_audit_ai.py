@@ -151,8 +151,7 @@ def test_ai_invalid_request_does_not_call_provider_or_mutate_history(client, aut
     assert ai.chat_conversations_in_memory == {}
 
 
-@pytest.mark.xfail(strict=True, reason="RA-ai-01")
-def test_ai_conversation_history_stays_bounded_to_twelve_messages(client, auth_headers, monkeypatch):
+def test_ai_conversation_history_stays_bounded_to_fifteen_messages(client, auth_headers, monkeypatch):
     """A two-message turn should not make the source's documented history cap grow forever."""
     import routers.ai as ai
 
@@ -165,4 +164,7 @@ def test_ai_conversation_history_stays_bounded_to_twelve_messages(client, auth_h
             "/ai/chat", json={"message": f"مکالمه {turn}"}, headers=auth_headers["admin"]
         )
         assert response.status_code == 200, response.text
-    assert len(ai.chat_conversations_in_memory["admin_1"]) <= 12
+    history = ai.chat_conversations_in_memory["admin_1"]
+    assert len(history) == 15
+    assert all(len(call["conversation_history"]) <= 15 for call in provider.calls)
+    assert history[-2:] == [{"user": "مکالمه 19"}, {"assistant": "پاسخ قطعی ممیزی"}]

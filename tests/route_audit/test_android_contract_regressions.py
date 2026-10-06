@@ -5,7 +5,6 @@ import pytest
 from .kotlin_contract import audit_payload, discover_models
 
 
-@pytest.mark.xfail(strict=True, reason="RA-finance-02")
 def test_parent_financial_dashboard_accepts_a_valid_parent_session(client, auth_headers):
     # This call proves the selected parent role/session maps to student 1 before
     # testing the parallel parent-finance dashboard response.
@@ -26,7 +25,6 @@ def test_student_financial_dashboard_screen_fields_are_present(client, auth_head
     assert all(row.get("course_title") for row in body["enrollments"])
 
 
-@pytest.mark.xfail(strict=True, reason="RA-homework-01")
 def test_parent_homework_wire_items_match_android_display_model(client, auth_headers, db):
     """A graded item displays score/max_score; the model contract must carry both."""
     import models
@@ -40,6 +38,7 @@ def test_parent_homework_wire_items_match_android_display_model(client, auth_hea
         assert response.status_code == 200
         item = next(row for row in response.json() if row["id"] == 1)
         assert item["score"] == 17.0
+        assert item["max_score"] == pytest.approx(20.0)
         issues = audit_payload("HomeworkItem", item, discover_models())
         assert issues == []
     finally:
@@ -50,10 +49,10 @@ def test_parent_homework_wire_items_match_android_display_model(client, auth_hea
 @pytest.mark.parametrize(
     "path,role,model",
     [
-        pytest.param("/attendance/live/current", "teacher", "LiveCurrentResponse", marks=pytest.mark.xfail(strict=True, reason="RA-attendance-01"), id="teacher-current-live"),
-        pytest.param("/admin/live_sessions", "admin", "LiveSessionItem", marks=pytest.mark.xfail(strict=True, reason="RA-attendance-02"), id="admin-live-list"),
-        pytest.param("/admin/live_sessions/1/roster", "admin", "LiveRosterResponse", marks=pytest.mark.xfail(strict=True, reason="RA-attendance-03"), id="admin-live-roster"),
-        pytest.param("/teachers/1/today_summary", "teacher", "TeacherTodaySummary", marks=pytest.mark.xfail(strict=True, reason="RA-teachers-01"), id="teacher-today-summary"),
+        pytest.param("/attendance/live/current", "teacher", "LiveCurrentResponse", id="teacher-current-live"),
+        pytest.param("/admin/live_sessions", "admin", "LiveSessionItem", id="admin-live-list"),
+        pytest.param("/admin/live_sessions/1/roster", "admin", "LiveRosterResponse", id="admin-live-roster"),
+        pytest.param("/teachers/1/today_summary", "teacher", "TeacherTodaySummary", id="teacher-today-summary"),
     ],
 )
 def test_live_timestamp_values_deserialize_as_android_long(client, auth_headers, path, role, model):
@@ -66,6 +65,11 @@ def test_live_timestamp_values_deserialize_as_android_long(client, auth_headers,
     else:
         assert payload is not None
         payloads = [payload]
+    for item in payloads:
+        timestamp = item.get("started_at_ts")
+        if model == "TeacherTodaySummary":
+            timestamp = (item.get("live_class") or {}).get("started_at_ts")
+        assert isinstance(timestamp, int) and not isinstance(timestamp, bool), (model, item)
     issues = [
         issue
         for item in payloads

@@ -2252,7 +2252,12 @@ def get_parent_financial_dashboard(
     if not own:
         raise HTTPException(status_code=401, detail="نشست معتبر نیست؛ لطفاً دوباره وارد شوید")
     student_id = own.id # شناسه فرزند امن استخراج می‌شود
-    return get_student_financial_dashboard(student_id=student_id, db=db, authorization=authorization)
+    return get_student_financial_dashboard(
+        student_id=student_id,
+        db=db,
+        authorization=authorization,
+        _role=_role,
+    )
 
 
 # --- ۱۲. اطلاعات کامل رسید تراکنش (Receipt Details - مجهز به IDOR) ---

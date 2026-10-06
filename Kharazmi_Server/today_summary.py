@@ -625,7 +625,7 @@ def build_teacher_today_summary(
             "live_session_id": live.id,
             "course_id": live.course_id,
             "class_name": live_course.title if live_course else "کلاس",
-            "started_at_ts": live.started_at_ts,
+            "started_at_ts": int(live.started_at_ts) if live.started_at_ts is not None else None,
             "elapsed_minutes": elapsed,
         }
 

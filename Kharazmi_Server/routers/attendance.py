@@ -361,7 +361,7 @@ def start_live_session(
         "course_id": course.id,
         "status": live.status,
         "start_time": live.start_time,
-        "started_at_ts": live.started_at_ts,
+        "started_at_ts": int(live.started_at_ts) if live.started_at_ts is not None else None,
         "max_minutes": _get_live_max_minutes(db),
     }
 
@@ -577,7 +577,7 @@ def get_current_live_session(
         "course_code": course.code if course else "",
         "status": live.status,
         "start_time": live.start_time,
-        "started_at_ts": live.started_at_ts,
+        "started_at_ts": int(live.started_at_ts) if live.started_at_ts is not None else None,
         "max_minutes": _get_live_max_minutes(db),
     }
 
@@ -1479,7 +1479,7 @@ def get_admin_live_sessions(
             "course_code": course.code if course else "",
             "teacher_name": display_name(teacher, "نامشخص"),
             "start_time": live.start_time,
-            "started_at_ts": live.started_at_ts,
+            "started_at_ts": int(live.started_at_ts) if live.started_at_ts is not None else None,
             "elapsed_minutes": elapsed_min,
             "total_enrolled": total_enrolled,
             "present": present,
@@ -1551,7 +1551,7 @@ def get_admin_live_session_roster(
         "course_code": course.code if course else "",
         "teacher_name": display_name(teacher, "نامشخص"),
         "start_time": live.start_time,
-        "started_at_ts": live.started_at_ts,
+        "started_at_ts": int(live.started_at_ts) if live.started_at_ts is not None else None,
         "elapsed_minutes": max(0, elapsed_min),
         "total_enrolled": len(students_list),
         "present": sum(1 for s in students_list if s["status"] in ("Present", "Late")),

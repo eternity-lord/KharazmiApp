@@ -335,6 +335,7 @@ def get_parent_child_homework(
                 "description": hw.description or "",
                 "due_date": hw.due_date,
                 "status": status_text,
+                "max_score": hw.max_score,
             "score": submission.score if submission else None,
             "feedback": submission.feedback if submission else None
         })

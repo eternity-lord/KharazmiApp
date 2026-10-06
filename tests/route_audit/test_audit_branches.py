@@ -419,7 +419,6 @@ def test_resource_update_replaces_fields_and_missing_is_no_write(client, auth_he
         _restore_tables(db, before, "Resource")
 
 
-@pytest.mark.xfail(strict=True, reason="RA-branches-02")
 def test_resource_update_duplicate_serial_returns_validation_error_without_writes(
     client, auth_headers, db,
 ):
@@ -449,13 +448,12 @@ def test_resource_update_duplicate_serial_returns_validation_error_without_write
         db.expire_all()
         assert _database_snapshot(db) == before_request
         assert response.status_code == 400, response.text
-        assert response.json() == {"detail": "منبعی با این کد سریال قبلاً ثبت شده است"}
+        assert response.json() == {"detail": "کد سریال واردشده متعلق به منبع دیگری است؛ کد یکتا وارد کنید"}
     finally:
         _restore_tables(db, before, "Resource")
 
 
-@pytest.mark.xfail(strict=True, reason="RA-branches-01")
-def test_resource_booking_conflict_returns_400_and_does_not_add_a_second_row(
+def test_resource_duplicate_booking_is_allowed_and_adds_a_second_row(
     client, auth_headers, db,
 ):
     import models
@@ -490,12 +488,20 @@ def test_resource_booking_conflict_returns_400_and_does_not_add_a_second_row(
         _assert_unchanged_except(before_booking, after_first, "resource_bookings")
 
         duplicate = safe_client.post("/resources/bookings", json=body, headers=auth_headers["admin"])
+        assert duplicate.status_code == 200, duplicate.text
+        payload = duplicate.json()
+        assert set(payload) == {"status", "message", "booking_id"}
+        assert payload["status"] == "success"
+        assert payload["message"] == "رزرو منبع با موفقیت انجام شد"
+        assert payload["booking_id"] != first_id
         db.expire_all()
-        assert _database_snapshot(db) == after_first
-        assert duplicate.status_code == 400, duplicate.text
-        assert duplicate.json() == {
-            "detail": "تداخل رزرو: منبع در همین زمان به کلاس 'ریاضی پایه فعال' اختصاص داده شده است",
-        }
+        after_duplicate = _database_snapshot(db)
+        _assert_unchanged_except(after_first, after_duplicate, "resource_bookings")
+        rows = db.query(models.ResourceBooking).filter_by(resource_id=resource.id).order_by(models.ResourceBooking.id).all()
+        assert len(rows) == 2
+        assert [(row.course_id, row.days_of_week, row.class_time) for row in rows] == [
+            (1, "شنبه", "16:00"), (1, "شنبه", "16:00"),
+        ]
     finally:
         _restore_tables(db, before, "ResourceBooking", "Resource")
 

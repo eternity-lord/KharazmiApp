@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel
 from sqlalchemy import func, or_
+from sqlalchemy.exc import IntegrityError
 import datetime
 
 import models
@@ -157,6 +158,13 @@ def update_resource(
     res = db.query(Resource).filter(Resource.id == id).first()
     if not res:
         raise HTTPException(status_code=404, detail="منبع یافت نشد")
+
+    duplicate = db.query(Resource.id).filter(
+        Resource.serial_code == req.serial_code,
+        Resource.id != id,
+    ).first()
+    if duplicate:
+        raise HTTPException(status_code=400, detail="کد سریال واردشده متعلق به منبع دیگری است؛ کد یکتا وارد کنید")
         
     res.name = req.name
     res.type = req.type
@@ -164,7 +172,11 @@ def update_resource(
     res.branch_id = req.branch_id
     res.active = req.active
     
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="کد سریال واردشده متعلق به منبع دیگری است؛ کد یکتا وارد کنید")
     return {"status": "success", "message": "منبع با موفقیت بروزرسانی شد"}
 
 
@@ -196,20 +208,7 @@ def book_resource(
     if not course:
         raise HTTPException(status_code=404, detail="کلاس یافت نشد")
         
-    # بررسی تداخل همزمان رزرو منبع
-    clash = db.query(ResourceBooking).join(Course, ResourceBooking.course_id == Course.id).filter(
-        ResourceBooking.resource_id == req.resource_id,
-        ResourceBooking.days_of_week == req.days_of_week,
-        ResourceBooking.class_time == req.class_time,
-        Course.is_deleted == False,
-        Course.is_suspended == False
-    ).first()
-    if clash:
-        raise HTTPException(
-            status_code=400,
-            detail=f"تداخل رزرو: منبع در همین زمان به کلاس '{clash.course.title}' اختصاص داده شده است"
-        )
-        
+    # Duplicate bookings are an explicit product decision; preserve each submitted booking as a row.
     new_booking = ResourceBooking(
         resource_id=req.resource_id,
         course_id=req.course_id,

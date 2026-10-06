@@ -23,7 +23,7 @@ def test_exam_list_shape_and_attempt_retry_state(client, auth_headers, db):
     listed = client.get("/exams/student/list", headers=auth_headers["student"])
     assert listed.status_code == 200, listed.text
     rows = listed.json()
-    assert {row["id"] for row in rows} == {1, 2}  # O-12 remains intentionally unchanged.
+    assert {row["id"] for row in rows} == {1}  # Only published exams are student-visible (O-12 fixed).
     assert all(row["description"] == "" and row["due_date"] == "" for row in rows)
     assert next(row for row in rows if row["id"] == 1)["status"] == "attempted"
 

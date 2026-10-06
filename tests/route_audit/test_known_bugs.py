@@ -18,7 +18,6 @@ def test_O02_android_push_client_registers_FCM_token():
     assert "FirebaseMessaging" in source and "device_token" in source
 
 
-@pytest.mark.xfail(strict=True, reason="RA-exams-02")
 def test_O12_unpublished_exam_is_hidden_from_student(client, auth_headers):
     response = client.get("/exams/student/list", headers=auth_headers["student"])
     assert response.status_code == 200, response.text

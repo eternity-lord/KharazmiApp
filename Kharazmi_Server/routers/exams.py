@@ -138,7 +138,10 @@ def get_student_exams_list(
                                          Enrollment.is_deleted == False).all()  # O-04: لیست آزمون/کارنامه فقط از ثبت‌نام‌های فعال
     course_ids = [en.course_id for en in enrolls if en.course]
 
-    exams = db.query(Exam).filter(Exam.course_id.in_(course_ids)).all()
+    exams = db.query(Exam).filter(
+        Exam.course_id.in_(course_ids),
+        Exam.status == "published",
+    ).all()
     
     result = []
     for ex in exams:

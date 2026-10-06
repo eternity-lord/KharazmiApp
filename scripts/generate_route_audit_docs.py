@@ -24,36 +24,13 @@ REPORT_DIR = ROOT / "docs/route-tests/routes"
 START = "<!-- GENERATED ROUTE LEDGER START -->"
 END = "<!-- GENERATED ROUTE LEDGER END -->"
 
-# Reproductions that have a strict, expected-failure test today. O-02 is an
+# Strict xfails that still reproduce an open issue today. O-02 is an
 # Android-only push-registration question and is tracked in bugs/device checklist.
 KNOWN_XFAILS = {
-    ("GET", "/finance/parent/dashboard"): "RA-finance-02",
-    ("GET", "/homework/parent/child/{student_id}"): "RA-homework-01",
-    ("GET", "/attendance/live/current"): "RA-attendance-01",
-    ("GET", "/admin/live_sessions"): "RA-attendance-02",
-    ("GET", "/admin/live_sessions/{session_id}/roster"): "RA-attendance-03",
-    ("GET", "/teachers/{id}/today_summary"): "RA-teachers-01",
-    ("GET", "/exams/student/list"): "O-12",
     ("POST", "/admin/deleted_classes/{course_id}/restore"): "O-19",
 }
-# The route has passing response/tool cases, but this specific state invariant
-# is a strict xfail; do not label the whole route as failing.
-PARTIAL_XFAILS = {
-    ("POST", "/ai/chat"): "RA-ai-01",
-    ("GET", "/audit-trail/logs"): "RA-audit_trail-01",
-    ("POST", "/crm/leads/create"): "RA-crm-01",
-    ("POST", "/crm/leads/{id}/convert"): "RA-crm-02",
-    ("POST", "/crm/leads/{id}/notes"): "RA-crm-01",
-    ("POST", "/crm/register_online"): "RA-crm-01, RA-crm-03",
-    ("POST", "/automation/rules"): "RA-automation-02",
-    ("PUT", "/automation/rules/{rule_id}"): "RA-automation-01",
-    ("POST", "/automation/run_rules"): "RA-automation-03",
-    ("POST", "/resources/bookings"): "RA-branches-01",
-    ("PUT", "/resources/{id}"): "RA-branches-02",
-    ("POST", "/messages/conversations/create"): "RA-messages-02",
-    ("POST", "/messages/conversations/{id}/send"): "RA-messages-01",
-    ("POST", "/messages/broadcast"): "RA-messages-03",
-}
+# No partial-response route invariants currently remain as strict xfails.
+PARTIAL_XFAILS = {}
 
 # Direct file/image consumers do not appear in the Retrofit-only Android map.
 DIRECT_ANDROID_CALLERS = {

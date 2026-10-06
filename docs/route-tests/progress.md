@@ -1,6 +1,6 @@
 # پیشرفت ممیزی routeها
 
-**شروع پروژهٔ ممیزی:** 2026-09-28 — **snapshot فعلی:** 2026-10-05 — **branch ثابت این نشست:** `arena/01a10aa8-kharazmiapp` (از branch ارائه‌شدهٔ اولیه متفاوت است؛ branch عوض نشده است).
+**شروع پروژهٔ ممیزی:** 2026-09-28 — **snapshot فعلی:** 2026-10-06 — **branch ثابت این نشست:** `arena/01a10aa8-kharazmiapp`. این snapshot شامل fixهای تأییدشدهٔ audit/تصمیم‌های explicit و regressionهایشان است.
 
 ## زیرساخت و مرحلهٔ صفر
 
@@ -17,30 +17,30 @@
 
 | router | routes | وضعیت فعلی |
 |---|---:|---|
-| ai | 1 | tool values برای admin/teacher/student/parent و no-write بررسی شد؛ cap مکالمه در `RA-ai-01` strict xfail است |
+| ai | 1 | tool values برای admin/teacher/student/parent و no-write بررسی شد؛ `RA-ai-01` بسته است و history به حداکثر 15 پیام محدود می‌شود |
 | audit | 1 | empty/read-only، early/delayed attendance، <30-day and <1h rapid-delete (exactly 1h rejected)، last-10 perfect-attendance transition؛ باگ باز تأیید نشد |
-| audit_trail | 1 | Android response/display values، filters/search، ISO/Jalali bounds، pagination 205-row، orphan/deleted refs، rollback; reversed date-only range strict xfail `RA-audit_trail-01` |
+| audit_trail | 1 | Android response/display values، filters/search، ISO/Jalali bounds، pagination 205-row، orphan/deleted refs، rollback؛ `RA-audit_trail-01` بسته است و reversed date-only range با 400 رد می‌شود |
 | auth | 12 | ورود موفق admin/secretary/teacher، me، تغییر رمز/موبایل، OTP، logout/device token و اعلان‌ها؛ invalid credential/abuse از scope امنیتی خارج است؛ O-02 اندروید باز می‌ماند |
-| finance | 26 | oracle مالی/پرداخت و invoice، retry/FIFO؛ route والد معتبر باگ `RA-finance-02` را بازتولید می‌کند؛ side-effect/gateway و چند CRUD هنوز blocker دارند |
+| finance | 26 | oracle مالی/پرداخت و invoice، retry/FIFO؛ `RA-finance-02` (دسترسی parent dashboard) در این checkout بسته است؛ side-effect/gateway و چند CRUD هنوز blocker دارند |
 | attendance | 15 | read/history، live start/status/cancel، retry مالی، suspended guard و QR stale/same-day success با DB restore |
 | classes | 21 | list/detail/debt/export و subset state/approval؛ create/bulk/delete/enrollment transitionها هنوز عمیق نیستند |
 | admin | 41 | مقدار/KPI/state/export/guard، coverage مقداری پیشین؛ `RA-admin-01` فعلی سبز است |
-| teachers | 18 | settlement/wallet slice، incomplete-class minimum fields؛ fractional live timestamp strict xfail |
+| teachers | 18 | settlement/wallet slice، incomplete-class minimum fields؛ timestampهای live در JSON عدد integer/Long هستند (`RA-teachers-01` بسته) |
 | students | 13 | profile/grade/access/version conflict؛ `parent_mobile` در StudentPortal فعلاً فقط Q-007 است |
 | dashboard | 2 | KPI exact values و local push status؛ fixed clock overdue/dunning values asserted |
 | dunning | 2 | due-bucket boundaries/order/messages، 48h ActivityLog/SmsLog idempotency، missing/deleted/paid/no-mobile/suspended, admin-only roles, exact local logs/retry و Kotlin/Gson DTO؛ Q-027 برای deleted/suspended direct-ID eligibility |
-| messages | 7 | list/history role/order/filter, conversation create, send/retry, broadcast fanout, soft-delete, per-role pin، exact Notification/push spy و Kotlin/Gson DTO؛ `RA-messages-01/02/03` چهار strict-xfail case و Q-028..Q-031 policyها |
+| messages | 7 | list/history role/order/filter, conversation create, send/retry, broadcast fanout, soft-delete, per-role pin، exact Notification/push spy و Kotlin/Gson DTO؛ latest suite **14 passed**; `RA-messages-01/02/03` بسته‌اند. API برای recipient arrays ناقص 422 می‌دهد، ولی Android prompt/continuation UI پیاده نشده. Q-028 حل شد؛ Q-029..Q-031 بازند |
 | serve_upload | 1 | temp file bytes/MIME/length, five authenticated roles, auth/missing/path-validation responses, exact DB no-write; Glide screen source/Authorization header and placeholder |
 | timeline | 1 | all four exact event DTOs, Persian/Gregorian timestamp normalization, empty/read-only, five-role access scopes, missing/deleted/suspended states, per-source 20, merged 50, Gson/Android display; Q-032..Q-034 keep visibility/order/format unconfirmed |
 | reports | 9 | debtor/statement/chart subset و date/order assertions |
 | analytics | 6 | filter/date/limit/funnel subset |
 | exports | 3 | CSV header/rows subset؛ PDF/XLSX کامل هنوز مانع دارد |
-| exams | 7 | list/attempt subset؛ O-12 strict xfail؛ O-14 در این checkout fixed/سبز |
-| homework | 6 | scope/optional defaults؛ graded parent row با `max_score` غایب در strict xfail |
+| exams | 7 | list/attempt subset؛ O-12/`RA-exams-02` و O-14/`RA-parent-01` در این checkout fixed/سبز هستند |
+| homework | 6 | scope/optional defaults؛ graded parent row اکنون `max_score` را برمی‌گرداند (`RA-homework-01` بسته) |
 | parent | 5 | profile/portal values و role slice؛ OTP/select-child transitionها هنوز deep نشده‌اند |
-| crm | 5 | create/list/notes/convert/online registration; exact row/response, 206-row/null-safe list, conversion/idempotency, independent finance oracle, audit/SMS/notification mock, rollback; `RA-crm-01` (six cases), `RA-crm-02`, `RA-crm-03` (8 xfail cases total); Q-010..Q-015 unresolved |
-| automation | 5 | rule CRUD/list/log filtering, all eight trigger conditions, exact notification/SMS/log effects, retry/idempotency, no network/push; `RA-automation-01/02/03` strict xfail; action, threshold and date-format questions Q-016..Q-018 |
-| branches | 9 | branch/resource CRUD and filters, exact branch-stat financial/count oracle, slot/no-conflict bookings; `RA-branches-01/02` strict xfail for duplicate-slot 500 and duplicate-serial update 500; toggle/update/stat/booking-policy questions Q-019..Q-022 |
+| crm | 5 | create/list/notes/convert/online registration; exact row/response, 206-row/null-safe list, conversion/idempotency, independent finance oracle, audit/SMS/notification mock, rollback; `RA-crm-01/02/03` fixes complete; Q-010..Q-015 remain unresolved |
+| automation | 5 | rule CRUD/list/log filtering, all eight trigger conditions, exact notification/SMS/log effects, retry/idempotency, no network/push; `RA-automation-01/02/03` fixes complete; action, threshold and date-format questions Q-016..Q-018 remain open |
+| branches | 9 | branch/resource CRUD and filters, exact branch-stat financial/count oracle, booking tests; `RA-branches-01` closed per decision (duplicate bookings allowed), `RA-branches-02` closed (duplicate serial update returns clear error before writes); toggle/update/stat/resource-scope questions Q-019..Q-022 remain open |
 | calendar | 4 | room CRUD/list and empty/full, teacher/room/student/resource conflict matrix, role-scoped exact calendar events, Kotlin/Gson contract; null-description candidate (Q-023), event/conflict/branch policies Q-024..Q-026 |
 
 هیچ routerِ بدون suite متمرکز باقی نمانده است؛ هر 221 route در inventory/ledger ثبت است، اما 70 route literal test-reference ندارند و پوشش branchها همچنان **partial** است. ledgerها smoke-only gaps را نشان می‌دهند.
@@ -48,28 +48,16 @@
 ## آخرین اجراهای واقعی
 
 ```text
-PYTHONPATH=. /tmp/kharazmi-route-audit-venv/bin/pytest -q tests/route_audit
-198 passed, 29 xfailed, 4 warnings in 24.32s
+PYTHONPATH=. /tmp/kharazmi-route-audit-venv/bin/pytest -q -rx tests/route_audit
+243 passed, 2 xfailed, 4 warnings in 26.52s (2026-10-06)
+focused messages suite (2026-10-06): 14 passed, 0 xfailed; all seven routes have targeted references
+main DB MD5 before/after full suite: f048f8d118b33c4eaa944490594121d7
 
-focused CRM + report generator: 18 passed, 8 xfailed
-focused automation route suite: 14 passed, 3 strict-xfailed
-focused branches route suite: 7 passed, 2 strict-xfailed
-focused calendar route suite: 4 passed
-focused dunning route suite: 6 passed; both routes have targeted references
-focused messages route suite: 10 passed, 4 strict-xfailed; all seven routes have targeted references
-focused serve_upload route suite: 11 passed; exact temp-file and Android Glide source contract
-focused timeline route suite: 9 passed; all event sources, role/state guards, 20/50 limits and Kotlin display contract
-CRM behavioral routes: 13 passed, 8 strict-xfailed; all five CRM routes have targeted references
-automation behavior: 13 passed, 3 strict-xfailed; all five routes have targeted references
-branches behavior: 6 passed, 2 strict-xfailed; all nine routes have targeted references
-calendar behavior: 3 passed; all four routes have targeted references
-main DB md5 before/after full suite: f048f8d118b33c4eaa944490594121d7
-
-route sweep: 221/221; main 500=0; 220/221 invalid-target probes; invalid 500=0
+Broad route sweep (2026-10-05; not rerun after the latest fixes): 221/221; main 500=0; 220/221 invalid-target probes; invalid 500=0
 invalid observations: 422=146, 200=70, 400=3, 403=1, 404=1
 empty probes: 11; null-list observations=0; non-JSON responses=14
 status: 200=182, 400=17, 422=8, 404=7, 409=5, 403=1, 401=1
-403 با role/fixture معتبر: فقط GET /finance/parent/dashboard (RA-finance-02)
+403 در همان sweep: GET /finance/parent/dashboard (RA-finance-02, later fixed)
 
 roles: admin=168, teacher=21, student=18, public=9, parent=5
 contract: declarations=169, unique_calls=158, unique_static_routes=156,
@@ -81,10 +69,10 @@ large seed: 300 students/30 classes + 300 transaction/session rows; 8/8 limit/or
 Markdown generator: 25 ledgers, every generated row has 8 intact cells and no unwrapped segment >300 chars
 ```
 
-۲۲ strict xfail ID فعلی: O-02/RA-auth-02, O-12/RA-exams-02, O-19/RA-admin-19, RA-ai-01, RA-audit_trail-01 (دو قالب ISO/Jalali), RA-finance-02, RA-homework-01, RA-attendance-01/02/03, RA-teachers-01, RA-crm-01 (شش پارامتری), RA-crm-02/03، RA-automation-01/02/03، RA-branches-01/02 و RA-messages-01/02/03 (چهار case در مجموع)؛ در pytest کامل 29 case xfailed دیده می‌شود. O-14 xfail نیست. contract simulator خام candidate ثبت می‌کند؛ `bugs.md`/Q-006..008 آن را از باگ قابل‌مشاهده جدا می‌کنند.
+در آخرین اجرای کامل دو strict xfail باقی ماند: O-02/`RA-auth-02` (Android FCM token registration) و O-19/`RA-admin-19` (پیاده‌سازی restore کامل کلاس طبق تصمیم Q-005: checkbox برای افزودن/حذف تاریخچهٔ مالی). `RA-messages-01/02/03` و سایر fixهای تأییدشده در `bugs.md` بسته و بدون xfail هستند. contract simulator همچنان candidate خام ثبت می‌کند؛ `bugs.md` و Q-006..008 آن را از باگ قابل‌مشاهده جدا می‌کنند.
 
 `docs/route-tests/routes/*.md` برای هر route: یک جملهٔ purpose/handler، actor و status probe، caller/screen جاری، ورودی و response schema، DB read/write statically extracted، side effect و test-reference یا smoke-only status دارد. 151 route test source literal request reference دارند؛ این شمارش به‌تنهایی عمق assertion را اثبات نمی‌کند. 70 مسیر literal match ندارند؛ ledger per-route قید هر مورد را نشان می‌دهد.
 
 ## دیتابیس اصلی و commit
 
-در اجرای کامل 2026-10-05، `md5sum Kharazmi_Server/gaj_db.db` قبل و بعد از pytest برابر `f048f8d118b33c4eaa944490594121d7` ثبت شد؛ sweep/contract/boundary/large و تمام route testها از DB موقت استفاده کردند. این snapshot شامل زیرساخت deterministic seed، audit QR، socket blocking، oracle invoice، CRM، automation، branch/resource، calendar، dunning، messages، serve_upload و timeline audit/log/file/event assertions و ledgerهای جاری است. هر 25 router اکنون suite هدفمند با DB موقت دارند و تمام 221 route در inventory/ledger هستند؛ 70 route literal request-reference ندارند و branchها deep نشده‌اند. باگ application code عمداً اصلاح نشده است.
+در اجرای کامل 2026-10-06، `md5sum Kharazmi_Server/gaj_db.db` قبل و بعد از pytest برابر `f048f8d118b33c4eaa944490594121d7` ثبت شد؛ route tests از DB موقت استفاده کردند. این snapshot شامل زیرساخت deterministic seed، audit QR، socket blocking، oracle invoice، CRM، automation، branch/resource، calendar، dunning، messages، serve_upload و timeline audit/log/file/event assertions و ledgerهای جاری است. هر 25 router suite متمرکز دارند و تمام 221 route در inventory/ledger هستند؛ 70 route literal request-reference ندارند و branchها deep نشده‌اند. Fixهای پذیرفته‌شده در `bugs.md` ثبت شده‌اند؛ Android build/device و UI follow-upهای لازم انجام نشده‌اند.

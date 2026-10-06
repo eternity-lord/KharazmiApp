@@ -1,6 +1,6 @@
 # خلاصهٔ ممیزی تست‌محور routeها و قرارداد Android
 
-**Snapshot:** 2026-10-05 · **Branch:** `arena/01a10aa8-kharazmiapp` · **Application code:** بدون تغییر. این سند وضعیت آزمون‌های همین checkout را گزارش می‌کند؛ اجرای smoke روی هر route معادل deep audit همهٔ branchها نیست.
+**Snapshot:** 2026-10-06 · **Branch:** `arena/01a10aa8-kharazmiapp` · **Application code:** شامل fixهای تأییدشدهٔ audit و تصمیم‌های صریح محصول است. این سند وضعیت آزمون‌های همین checkout را گزارش می‌کند؛ اجرای smoke روی هر route معادل deep audit همهٔ branchها نیست.
 
 **پایگاه اصلی:** MD5 قبل و بعد از اجرای pytest و runnerهای ایزوله `f048f8d118b33c4eaa944490594121d7` است. همهٔ seedها در DB موقت ساخته شده‌اند؛ SMS/push/network واقعی فراخوانی نشده است.
 
@@ -25,7 +25,7 @@
 | Boundary | 4 route، 500=0؛ `Exam.max_score=12.5`, transaction=`2147483649`, empty string/null/list بررسی شد؛ 5 خام Gson-candidate، 0 مورد تأییدشده |
 | Large | هر 8 check مربوط به limit/order/filter/count/debtors/session سبز؛ تمام statusها 200 |
 
-تنها 403 اجرای اصلی، `GET /finance/parent/dashboard` با parent session معتبر است (`RA-finance-02`). Handler در `routers/finance.py`، `get_student_financial_dashboard(...)` را مستقیم صدا می‌زند و `_role` را منتقل نمی‌کند. این باگ ثبت و strict-xfail است؛ application code تغییر نکرده.
+در sweep مورخ 2026-10-05 تنها 403 اجرای اصلی، `GET /finance/parent/dashboard` با parent session معتبر بود (`RA-finance-02`). این defect از آن زمان در checkout بسته شده است؛ وضعیت fix و regression آن در `bugs.md` است. آمار sweep بالا snapshot تاریخی است، نه اجرای مجدد پس از fix.
 
 ## Retrofit ↔ Kotlin/Gson simulator
 
@@ -38,23 +38,23 @@
  missing_key=0; simulation_gap=0
 ```
 
-این شمارنده‌ها candidate detector هستند، نه تعداد باگ قطعی. یافته‌های مصرف‌شده/نامطمئن در Q-006..Q-008 طبقه‌بندی شده‌اند: incomplete-class fields با caller مصرف‌کنندهٔ فقط `id/title/code`؛ نبود `parent_mobile` در screen دانش‌آموز؛ و فیلدهای اختیاری/غایب transaction که screen فعلی از آنها استفاده نمی‌کند. `max_score` غایب در حالت homework نمره‌دار جداگانه به `RA-homework-01` ارتقا یافته است.
+این شمارنده‌ها candidate detector هستند، نه تعداد باگ قطعی. یافته‌های مصرف‌شده/نامطمئن در Q-006..Q-008 طبقه‌بندی شده‌اند: incomplete-class fields با caller مصرف‌کنندهٔ فقط `id/title/code`؛ نبود `parent_mobile` در screen دانش‌آموز؛ و فیلدهای اختیاری/غایب transaction که screen فعلی از آنها استفاده نمی‌کند. `RA-homework-01` برای `max_score` در حالت homework نمره‌دار در این checkout بسته و regression آن سبز است.
 
 ## پوشش رفتاری و مالی
 
 - تمام 25 router دارای testهای متمرکز هستند: ai, audit, audit_trail, auth, finance, attendance, classes, admin, teachers, students, dashboard, reports, analytics, exports, exams, homework, parent, crm, automation, branches, calendar, dunning, messages, serve_upload, timeline. پوشش این 221 route **partial** است و تمام transitionها/branchهایشان عمیق نشده‌اند.
 - 151 route در test sourceها literal client request reference دارند؛ این شمارش، عمق assertion را ثابت نمی‌کند. 70 مسیر literal match ندارند. ledger هر route test-reference یا smoke-only را مشخص می‌کند.
 - finance دارای oracle مستقل tuition/discount/payment/due، split wallet، FIFO installment allocation و receipt/reversal است. invariantهای retry شامل direct payment، installment payment، session charge و teacher settlement/reversal بررسی شده‌اند؛ `target_wallet=both`، معنای income، واحد مبلغ، بی‌تاریخی و restore در questions ثبت‌اند.
-- AI route برای admin/teacher/student/parent با actor fixture درست، tool-data دقیق، response contract و نبود DB side effect بررسی شد. `RA-ai-01` strict xfail نشان می‌دهد تاریخچهٔ in-memory بعد از 20 turn به 26 message entry می‌رسد، درحالی‌که کد برای آن bounded window در نظر گرفته است.
+- AI route برای admin/teacher/student/parent با actor fixture درست، tool-data دقیق، response contract و نبود DB side effect بررسی شد. `RA-ai-01` بسته است؛ history بعد از append نیز به حداکثر 15 پیام محدود می‌شود.
 - Audit route با seed خالی، خروجی read-only، early/delayed-session alerts، rapid-delete در پنجرهٔ 30 روز با حد <1h (رد دقیقاً 1h) و perfect-attendance روی ده session آخر؛ absent خارج از پنجره نادیده گرفته می‌شود بررسی شد؛ regressionهای read مسیر DB را تغییر ندادند.
-- Audit-trail route با فیلتر/جست‌وجوی transaction و installment، خروجی دقیق Android DTO، تاریخ ISO/Jalali، صفحه‌بندی و ردیف‌های یتیم/soft-deleted بررسی شد. Rollback یک update مالی، هم مقدار تراکنش و هم لاگ ممیزی را برمی‌گرداند. `RA-audit_trail-01` نشان می‌دهد بازهٔ تاریخ-only وارونه به‌جای 400، 200 با لیست خالی می‌دهد (ISO و Jalali).
+- Audit-trail route با فیلتر/جست‌وجوی transaction و installment، خروجی دقیق Android DTO، تاریخ ISO/Jalali، صفحه‌بندی و ردیف‌های یتیم/soft-deleted بررسی شد. Rollback یک update مالی، هم مقدار تراکنش و هم لاگ ممیزی را برمی‌گرداند. `RA-audit_trail-01` بسته است؛ بازهٔ تاریخ-only وارونه در هر دو قالب ISO و Jalali با 400 رد می‌شود.
 - Auth/notification routes با ورود مثبت admin/secretary/teacher، `me`، تغییر رمز و موبایل، OTP دانش‌آموز، session logout، token registration و inbox/unread/read transitions بررسی شدند؛ SMS فقط با SmsLog موقت mock شد. تست O-02 همچنان نشان می‌دهد Android فعلی device-token registration caller ندارد. آزمون امنیتی (credential guessing، token forgery و auth bypass) خارج از scope است.
-- suite رفتاری CRM در `tests/route_audit/test_audit_crm.py` هر پنج route را با DB موقت پوشش می‌دهد: create/list/notes/conversion و public online registration، exact Kotlin response contract، ترتیب/legacy-null/Gson list، duplicate/retry و row snapshots، independent finance oracle، `FinancialAuditLog`، wallet/enrollment invariants، SMS/notification mock و rollback. 13 behavioral cases پاس و 8 strict-xfailed؛ `RA-crm-01/02/03` در `bugs.md` ثبت شده‌اند. Tuition, branch ownership, class eligibility, nullable follow-up, empty-mobile و overpayment rules در Q-010..Q-015 هستند.
-- Automation suite در `tests/route_audit/test_audit_automation.py` هر پنج server-only route را پوشش می‌دهد: rule create/update, logs filter/order/pagination, empty/no-active behavior و تمام هشت condition engine با side-effect rows، finance-safe snapshots، retry/idempotency و push/SMS isolation. 13 behavioral cases پاس، 3 strict-xfailed (`RA-automation-01/02/03`); action matrix, threshold units و mixed-calendar semantics در Q-016..Q-018 بازند.
-- Branch/resource suite در `tests/route_audit/test_audit_branches.py` هر نه route را تست می‌کند: branch/resource CRUD, filters, missing/duplicate inputs, toggle repeat, branch finance/count aggregates, booking time slots, exact DB snapshots. 6 behavioral cases پاس و دو strict-xfail (`RA-branches-01/02`) روی conflict-detail relationship و duplicate serial update؛ suspend retry, nullable update, stats semantics و reservation scope در Q-019..Q-022 بازند.
+- suite رفتاری CRM در `tests/route_audit/test_audit_crm.py` هر پنج route را با DB موقت پوشش می‌دهد: create/list/notes/conversion و public online registration، exact Kotlin response contract، ترتیب/legacy-null/Gson list، duplicate/retry و row snapshots، independent finance oracle، `FinancialAuditLog`، wallet/enrollment invariants، SMS/notification mock و rollback. `RA-crm-01/02/03` در این checkout بسته‌اند؛ انتخاب tuition، branch ownership، class eligibility، nullable follow-up، empty-mobile و overpayment همچنان در Q-010..Q-015 باز است.
+- Automation suite در `tests/route_audit/test_audit_automation.py` هر پنج server-only route را پوشش می‌دهد: rule create/update, logs filter/order/pagination, empty/no-active behavior و تمام هشت condition engine با side-effect rows، finance-safe snapshots، retry/idempotency و push/SMS isolation. `RA-automation-01/02/03` بسته‌اند؛ action matrix, threshold units و mixed-calendar semantics در Q-016..Q-018 همچنان بازند.
+- Branch/resource suite در `tests/route_audit/test_audit_branches.py` هر نه route را تست می‌کند: branch/resource CRUD, filters, missing/duplicate inputs, toggle repeat, branch finance/count aggregates, booking time slots, exact DB snapshots. `RA-branches-01` بسته per decision است (رزرو تکراری مجاز) و `RA-branches-02` duplicate serial را پیش از write با خطای روشن رد می‌کند؛ suspend retry, nullable update, stats semantics و reservation scope در Q-019..Q-022 بازند.
 - Calendar suite در `tests/route_audit/test_audit_calendar.py` هر چهار route و callerهای Android را با role-specific values، empty/full rooms، چهارنوع conflict، exact read/write snapshots و Kotlin/Gson source simulator می‌سنجد. سه behavioral cases پاس؛ nullable homework detail یک simulator candidate است، نه strict xfail/باگ تأییدشده (Q-023)؛ event visibility، conflict predicate و branch assignment در Q-024..Q-026 بازند.
 - Dunning suite در `tests/route_audit/test_audit_dunning.py` هر دو route را با clock ثابت، مرزهای 48ساعته/روزهای سررسید، order/category/message exact، missing/deleted/paid/no-mobile/suspended cases، role guard، Kotlin/Gson DTO، no-write read، local SmsLog/ActivityLog، batch dedupe و retry پوشش می‌دهد؛ **6 passed**. direct batch برای Student حذف‌شده و suspended فعلاً log می‌سازد؛ eligibility مبهم در Q-027 است، نه xfail. SMS gateway واقعی فراخوانی نمی‌شود.
-- Messages suite در `tests/route_audit/test_audit_messages.py` هر 7 route را با role-filtered empty/full conversation lists، history ordering/soft-delete, conversation creation, send/broadcast Notification rows, pinned preference, delete own-message, exact rollback, permission checks, push spy و Kotlin/Gson DTO می‌سنجد؛ **10 passed, 4 strict-xfailed**. `RA-messages-01/02/03` خطای notification role-ID match، mismatch parallel arrays و unknown broadcast target را ثبت می‌کنند؛ Q-028..Q-031، target `role`, fanout eligibility, retry semantics و suspended participants را policy‌گذاری‌نشده نگه می‌دارند.
+- Messages suite در `tests/route_audit/test_audit_messages.py` هر 7 route را با role-filtered empty/full conversation lists، history ordering/soft-delete, conversation creation, send/broadcast Notification rows, pinned preference, delete own-message, exact rollback, permission checks, push spy و Kotlin/Gson DTO می‌سنجد؛ آخرین اجرا **14 passed, 0 xfailed**. `RA-messages-01/02/03` بسته‌اند: recipient identity برابر `(user_id, role)` است؛ آرایه‌های ناقص 422 ساخت‌یافته و no-write دارند؛ و فقط `everyone`/`class` معتبرند. UI prompt مربوط به تکمیل recipient در Android هنوز پیاده نشده؛ fanout eligibility, retry semantics و suspended participants در Q-029..Q-031 بازند.
 - `serve_upload` suite در `tests/route_audit/test_audit_serve_upload.py` فایل واقعی را فقط از temporary upload root برمی‌گرداند، همهٔ پنج نقش authenticated، exact bytes/MIME/length، 401/404 و filename validation را می‌سنجد و snapshot کامل DB را برای no-write مقایسه می‌کند؛ **11 passed**. سه Android screen از Glide با bearer token استفاده می‌کنند و source-contract test این display/header/error-placeholder flow را check می‌کند؛ Gradle/device اجرا نشده.
 - Timeline suite در `tests/route_audit/test_audit_timeline.py` هر چهار type را با row-by-row payload/order, Persian/Gregorian normalized timestamps, amount/score color, due-today/overdue/paid installments, absent/present and soft-delete filters, empty/full, 20-per-source/50-global boundaries و full read-only snapshots بررسی می‌کند؛ **9 passed**. Admin/secretary/teacher/parent/student scope، 401/403/404/422، deleted/suspended state و `TimelineEvent` Gson + StudentProfile/TimelineAdapter display نیز چک می‌شوند. Soft-deleted attendance/deleted-session visibility، ID-vs-time limit و timestamp format در Q-032..Q-034 هستند؛ device/Gradle اجرا نشده، xfail/bug ادعایی ایجاد نشده.
 - attendance: history/detail، snapshot هزینه، same-day QR check-in، stale QR، live start/status/cancel، conflict/retry و بی‌اثری مالی cancellation تست شده‌اند. مبلغ 260,000 در oracle جلسه با DB assert می‌شود.
@@ -62,20 +62,20 @@
 
 ## باگ‌ها و xfailها
 
-آخرین اجرای کامل `PYTHONPATH=. /tmp/kharazmi-route-audit-venv/bin/pytest -q tests/route_audit` شامل suiteهای قبلی، CRM، automation، branches، calendar، dunning، messages، serve_upload، timeline، report generator و socket-level network blocking بود:
+آخرین اجرای کامل `PYTHONPATH=. /tmp/kharazmi-route-audit-venv/bin/pytest -q -rx tests/route_audit` در 2026-10-06:
 
 ```text
-198 passed, 29 xfailed, 4 warnings in 24.32s
+243 passed, 2 xfailed, 4 warnings in 26.52s
 ```
 
-این اجرا regressionهای generator، oracle دقیق invoice enrollment 2، per-role tool values/history reproduction، suite پنج-route CRM، suite پنج-route automation، suite 9-route branches/resources، suite چهار-route calendar/Gson، suite دو-route dunning، suite هفت-route messages، suite فایل/Android-display برای `serve_upload` و suite رویدادها/DTO/حدود برای `timeline` را با DB موقت شامل می‌شود. Xfailها فقط open issues ثبت‌شده هستند؛ strict unexpected-pass نیز خطای suite می‌دهد.
+Messages suite جداگانه: **14 passed**, شامل no-write HTTP 400 برای `target_type="role"` و ناشناخته و no-write HTTP 422 برای participant arrays ناقص. دیتابیس اصلی پیش/پس از اجرای suite بدون تغییر بود (`f048f8d118b33c4eaa944490594121d7`); route tests از DB موقت استفاده می‌کنند.
 
-۲۲ strict xfail ID فعلی: O-02/RA-auth-02، O-12/RA-exams-02، O-19/RA-admin-19، RA-ai-01، RA-audit_trail-01 (دو مورد parametrized ISO/Jalali)، RA-finance-02، RA-homework-01، RA-attendance-01/02/03، RA-teachers-01، RA-crm-01 (شش parametrized cases)، RA-crm-02/03، RA-automation-01/02/03، RA-branches-01/02 و RA-messages-01/02/03 (`RA-messages-02` دو case). در suite کامل 29 case xfailed است. O-14 در این checkout بسته/سبز است و xfail نشده است. فهرست و reproduction در `bugs.md` است؛ هیچ باگی در application code اصلاح نشده.
+تنها strict xfailهای suite کامل: O-02/`RA-auth-02` (Android FCM registration) و O-19/`RA-admin-19` (پیاده‌سازی restore کامل کلاس با checkbox مالی؛ تصمیم Q-005 ثبت شده است). سایر fixهای تأییدشده و reproductionها در `bugs.md` هستند؛ RA-messages-01/02/03 بسته‌اند. Unexpected-pass همچنان خطای suite است.
 
 ## ناتمام‌ها و مراجع
 
 - هیچ routerِ بدون suite متمرکز باقی نمانده و هر 221 route در inventory/ledger ثبت است؛ عمق branchها هنوز partial است و 70 route literal test-reference ندارند (جزئیات در ledger و `blockers.md`).
-- 34 تصمیم محصول/contract همچنان باز است: Q-001..Q-034 در `questions.md`؛ تست‌ها rule مبهمی را حدس نمی‌زنند.
+- 32 تصمیم محصول/contract همچنان باز است: Q-001..Q-004, Q-006..Q-027, Q-029..Q-034 در `questions.md`; Q-005 restore policy و Q-028 broadcast targets حل‌شده‌اند. تست‌ها rule مبهم دیگری را حدس نمی‌زنند.
 - Android compile/runtime و device execution انجام نشده. Checklist دستی با seed values در `device-checklist.md` آمده است.
 - شمارش و فایل‌های خام: `sweep/report.json`, `contract-report.json`, `boundary-report.json`, `large-report.json`; runnerهای مستقل در `tests/route_audit/sweep/`.
 - تست کامل: `PYTHONPATH=. /tmp/kharazmi-route-audit-venv/bin/pytest -q tests/route_audit`.

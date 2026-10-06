@@ -1,17 +1,15 @@
 # ممیزی routeهای `calendar`
 
-> The generated route ledger below is the audit snapshot; this header records behavioral and Android wire-contract probes.
+> The route ledger below is the current generated audit snapshot and supersedes any older status/count matrix above.
 
-این چهار route در `CalendarActivity` caller دارند. تست‌ها با admin، secretary، teacher، student و parent actorهای seed، DB موقت و Kotlin/Gson source simulator اجرا می‌شوند؛ تست security/role bypass خارج از scope است.
+این جدول از `docs/app-map/server-routes.csv` تولید شده است. هر claim تستی باید به نام تست و `file:line` ارجاع دهد.
 
-| route | چه کاری می‌کند | تعداد تست | دسته‌های پوشش | نتیجه | باگ/پرسش |
+| route | چه کاری می‌کند | تعداد تست | دسته‌های پوشش | نتیجه | باگ |
 |---|---|---:|---|---|---|
-| `POST /calendar/check_conflicts` | تداخل‌های زمان‌بندی معلم، اتاق، دانش‌آموز و منبع را گزارش می‌کند. | 1 | هر چهار conflict هم‌زمان با detail دقیق؛ حالت آزاد، class حذف‌شده/معلق، no-write و Kotlin DTO | 1 passed؛ قواعد دامنه در Q-025 | — |
-| `GET /calendar/events` | رویدادهای تقویم را بر اساس نقش برمی‌گرداند. | 1 | admin/secretary/teacher/student/parent، class/exam/homework/payment values، exact list response و Gson contract | 1 passed؛ null `detail` candidate در Q-023، event scope در Q-024 | — |
-| `POST /rooms/create` | اتاق فیزیکی جدید می‌سازد. | 1 | exact row/response، duplicate name 400/no-write، invalid schema 422، Kotlin `RoomItem` compatibility | 1 passed؛ branch default در Q-026 | — |
-| `GET /rooms/list` | اتاق‌ها را بدون pagination برمی‌گرداند. | 1 | empty/full rows، inactive row، nullable equipment، response no-write و Gson DTO | 1 passed؛ visibility در Q-026 | — |
-
-Suite شامل inventory است: 4 passed؛ سه route test رفتاری‌اند. `RoomResponseModel.branch_id` در Kotlin `RoomItem` اضافه است و Gson آن را نادیده می‌گیرد؛ درخواست فعلی Android نیز `branch_id` نمی‌فرستد و server default=1 اعمال می‌شود. Q-023..Q-026 ابهام‌های نمایش nullable، event policy، conflict scope و branch assignment را باز نگه می‌دارند.
+| `POST /calendar/check_conflicts` | handler `routers.calendar.check_scheduling_conflicts`؛ منبع `Kharazmi_Server/routers/calendar.py:76` | 0 | inventory/fixture | مسدود: تست رفتاری این route در نوبت router آن نوشته می‌شود | — |
+| `GET /calendar/events` | handler `routers.calendar.get_calendar_events`؛ منبع `Kharazmi_Server/routers/calendar.py:153` | 0 | inventory/fixture | مسدود: تست رفتاری این route در نوبت router آن نوشته می‌شود | — |
+| `POST /rooms/create` | handler `routers.calendar.create_physical_room`؛ منبع `Kharazmi_Server/routers/calendar.py:46` | 0 | inventory/fixture | مسدود: تست رفتاری این route در نوبت router آن نوشته می‌شود | — |
+| `GET /rooms/list` | handler `routers.calendar.get_all_rooms`؛ منبع `Kharazmi_Server/routers/calendar.py:71` | 0 | inventory/fixture | مسدود: تست رفتاری این route در نوبت router آن نوشته می‌شود | — |
 
 <!-- GENERATED ROUTE LEDGER START -->
 ## Route ledger — map input + current isolated probes

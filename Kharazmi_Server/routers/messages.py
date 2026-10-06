@@ -6,7 +6,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Header
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, or_
+from sqlalchemy import and_, desc, or_
 
 import models
 from models import Conversation, ConversationParticipant, Message, Course, Student, Teacher, Enrollment, User
@@ -45,7 +45,7 @@ class MessageSendRequest(BaseModel):
     body: str
 
 class BroadcastMessageRequest(BaseModel):
-    target_type: str  # "class", "role", "everyone"
+    target_type: str  # "class", "everyone"
     target_id: Optional[int] = None  # e.g., class_id if target_type == "class"
     body: str
 
@@ -101,6 +101,15 @@ def create_conversation(
     keys = resolve_participant_keys(db, session, role)
     if not keys:
         raise HTTPException(status_code=401, detail="نشست معتبر نیست؛ لطفاً دوباره وارد شوید")
+
+    if len(req.participant_ids) != len(req.participant_roles):
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "recipient_information_incomplete",
+                "message": "اطلاعات را تکمیل کنید",
+            },
+        )
 
     # 1. Create Conversation
     new_conv = Conversation(
@@ -207,7 +216,13 @@ def send_message(
     db.commit()
     
     # Notification integration: notify other participants
-    other_parts = db.query(ConversationParticipant).filter(ConversationParticipant.conversation_id == id, ~ConversationParticipant.user_id.in_(keys)).all()
+    other_parts = db.query(ConversationParticipant).filter(
+        ConversationParticipant.conversation_id == id,
+        ~and_(
+            ConversationParticipant.user_id.in_(keys),
+            ConversationParticipant.role == role,
+        ),
+    ).all()
     for p in other_parts:
         rid = resolve_notification_recipient(db, p.user_id, p.role)
         if rid is None:
@@ -255,6 +270,8 @@ def send_broadcast_message(
 ):
     if not req.body or not req.body.strip():
         raise HTTPException(status_code=400, detail="متن پیام نمی‌تواند خالی باشد")
+    if req.target_type not in {"everyone", "class"}:
+        raise HTTPException(status_code=400, detail="نوع گیرنده پیام گروهی نامعتبر است")
     if not authorization or len(authorization.split()) != 2:
         raise HTTPException(status_code=401, detail="نشست معتبر نیست؛ لطفاً دوباره وارد شوید")
     session = db.query(models.UserSession).filter(models.UserSession.token == authorization.split()[1]).first()

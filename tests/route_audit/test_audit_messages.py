@@ -298,7 +298,6 @@ def test_conversation_create_has_exact_participants_and_rolls_back_missing_targe
     [([1, 2], ["student"]), ([1], ["student", "teacher"])],
     ids=["roles-shorter-than-ids", "roles-longer-than-ids"],
 )
-@pytest.mark.xfail(strict=True, reason="RA-messages-02")
 def test_conversation_create_rejects_mismatched_participant_arrays(
     client, auth_headers, db, participant_ids, participant_roles,
 ):
@@ -314,7 +313,29 @@ def test_conversation_create_rejects_mismatched_participant_arrays(
             "/messages/conversations/create", json=request, headers=auth_headers["admin"],
         )
         assert response.status_code == 422, response.text
+        assert response.json() == {
+            "detail": {
+                "code": "recipient_information_incomplete",
+                "message": "اطلاعات را تکمیل کنید",
+            }
+        }
         assert _database_snapshot(db) == before
+
+        # After the user completes the missing recipient information, the same flow can continue.
+        completed = client.post(
+            "/messages/conversations/create",
+            json={
+                "title": "اطلاعات تکمیل‌شده",
+                "type": "group",
+                "participant_ids": [1],
+                "participant_roles": ["student"],
+            },
+            headers=auth_headers["admin"],
+        )
+        assert completed.status_code == 200, completed.text
+        created_rows = _database_snapshot(db)
+        _assert_unchanged_except(before, created_rows, "conversations", "conversation_participants")
+        assert completed.json()["conversation_id"] > 0
     finally:
         _restore_tables(db, before)
 
@@ -436,7 +457,6 @@ def test_message_send_empty_body_missing_body_and_nonparticipant_are_no_write(
     assert _database_snapshot(db) == before
 
 
-@pytest.mark.xfail(strict=True, reason="RA-messages-01")
 def test_message_send_notifies_other_role_when_numeric_participant_ids_collide(
     client, auth_headers, db, monkeypatch,
 ):
@@ -468,8 +488,8 @@ def test_message_send_notifies_other_role_when_numeric_participant_ids_collide(
         assert response.status_code == 200, response.text
         assert response.json() == {"message": "پیام با موفقیت ارسال شد"}
         assert len(_new_rows(db, models.Message, before_send, "messages")) == 1
-        # Intended: a student-role Notification and mocked push; current route's
-        # `user_id NOT IN keys` drops it because both subject IDs equal 1.
+        # Recipient identity is the pair (subject ID, role), so the student's
+        # numeric ID collision with the sender's teacher ID does not suppress it.
         notifications = _new_rows(db, models.Notification, before_send, "notifications")
         assert len(notifications) == 1
         assert (
@@ -836,48 +856,30 @@ def test_broadcast_validations_and_teacher_course_ownership_are_no_write(
     assert _database_snapshot(db) == before
 
 
-def test_broadcast_role_target_currently_creates_sender_only_conversation_pending_policy(
-    client, auth_headers, db,
-):
-    import models
-
+def test_broadcast_role_target_remains_unsupported_without_writes(client, auth_headers, db):
     before = _database_snapshot(db)
-    try:
-        response = client.post(
-            "/messages/broadcast",
-            json={"target_type": "role", "target_id": None, "body": "پیام برای یک نقش"},
-            headers=auth_headers["admin"],
-        )
-        assert response.status_code == 200
-        assert response.json() == {"message": "پیام گروهی با موفقیت ارسال شد"}
-        conversations = _new_rows(db, models.Conversation, before, "conversations")
-        participants = _new_rows(db, models.ConversationParticipant, before, "conversation_participants")
-        messages = _new_rows(db, models.Message, before, "messages")
-        assert len(conversations) == len(messages) == 1
-        assert len(participants) == 1
-        assert (conversations[0].title, conversations[0].type) == ("اعلان عمومی", "broadcast")
-        assert (participants[0].conversation_id, participants[0].user_id, participants[0].role) == (
-            conversations[0].id, 1, "admin",
-        )
-        assert (messages[0].conversation_id, messages[0].sender_id, messages[0].body) == (
-            conversations[0].id, 1, "پیام برای یک نقش",
-        )
-        assert _new_rows(db, models.Notification, before, "notifications") == []
-    finally:
-        _restore_tables(db, before)
+    response = client.post(
+        "/messages/broadcast",
+        json={"target_type": "role", "target_id": None, "body": "پیام برای یک نقش"},
+        headers=auth_headers["admin"],
+    )
+    assert response.status_code == 400
+    assert response.json() == {"detail": "نوع گیرنده پیام گروهی نامعتبر است"}
+    assert _database_snapshot(db) == before
 
 
-@pytest.mark.xfail(strict=True, reason="RA-messages-03")
-def test_broadcast_rejects_unknown_target_type_without_writes(client, auth_headers, db):
+@pytest.mark.parametrize("target_type", ["not-a-target"])
+def test_broadcast_rejects_unknown_target_type_without_writes(client, auth_headers, db, target_type):
     before = _database_snapshot(db)
     safe_client = TestClient(client.app, raise_server_exceptions=False)
     try:
         response = safe_client.post(
             "/messages/broadcast",
-            json={"target_type": "not-a-target", "target_id": None, "body": "پیام نامعتبر"},
+            json={"target_type": target_type, "target_id": None, "body": "پیام نامعتبر"},
             headers=auth_headers["admin"],
         )
         assert response.status_code == 400, response.text
+        assert response.json() == {"detail": "نوع گیرنده پیام گروهی نامعتبر است"}
         assert _database_snapshot(db) == before
     finally:
         _restore_tables(db, before)

@@ -65,7 +65,7 @@
 آخرین اجرای کامل `PYTHONPATH=. /tmp/kharazmi-route-audit-venv/bin/pytest -q -rx tests/route_audit` در 2026-10-06:
 
 ```text
-243 passed, 2 xfailed, 4 warnings in 26.52s
+243 passed, 2 xfailed, 4 warnings in 27.46s
 ```
 
 Messages suite جداگانه: **14 passed**, شامل no-write HTTP 400 برای `target_type="role"` و ناشناخته و no-write HTTP 422 برای participant arrays ناقص. دیتابیس اصلی پیش/پس از اجرای suite بدون تغییر بود (`f048f8d118b33c4eaa944490594121d7`); route tests از DB موقت استفاده می‌کنند.

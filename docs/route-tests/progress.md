@@ -49,7 +49,7 @@
 
 ```text
 PYTHONPATH=. /tmp/kharazmi-route-audit-venv/bin/pytest -q -rx tests/route_audit
-243 passed, 2 xfailed, 4 warnings in 26.52s (2026-10-06)
+243 passed, 2 xfailed, 4 warnings in 27.46s (2026-10-06)
 focused messages suite (2026-10-06): 14 passed, 0 xfailed; all seven routes have targeted references
 main DB MD5 before/after full suite: f048f8d118b33c4eaa944490594121d7
 

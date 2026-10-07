@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.CheckBox
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -18,6 +19,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import retrofit2.HttpException
 
 /**
  * گزارش کامل یک کلاس حذف‌شده (صفحهٔ کامل با ظاهر پاپ‌آپ).
@@ -341,36 +344,61 @@ class ArchivedClassDetailActivity : BaseActivity() {
     }
 
     // ------------------------------------------------------------------
-    // بازیابی (همان قرارداد قبلی: فقط متادیتا + تأیید صریح؛ از دیالوگ MainActivity به اینجا منتقل شد)
-    // ------------------------------------------------------------------
-    // FIX(D1): تأیید دوم برای بازیابی کلاس — حذف/بازیابی مالی برگشت‌ناپذیر است،
-    // پس یک مرحله تأیید صریح با توضیح اثر واقعی (فقط پوسته‌ی کلاس برمی‌گردد) گرفته می‌شود.
+    // بازیابی کامل؛ سوابق مالی با چک‌باکس اختیاری و پیش‌فرض خاموش است.
     private fun confirmRestoreArchivedClass(courseId: Int) {
+        val financialRestoreAvailable = detail?.financialRestoreAvailable == true
+        val includeFinancialHistory = CheckBox(this).apply {
+            text = getString(R.string.arch_restore_include_financial)
+            isChecked = false
+            isEnabled = financialRestoreAvailable
+            val verticalPadding = (8 * resources.displayMetrics.density).toInt()
+            setPadding(0, verticalPadding, 0, verticalPadding)
+        }
+        val padding = (24 * resources.displayMetrics.density).toInt()
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(padding, padding, padding, 0)
+            addView(TextView(this@ArchivedClassDetailActivity).apply {
+                text = getString(R.string.main_trash_restore_confirm_msg)
+                setTextColor(UiColors.resolve(this@ArchivedClassDetailActivity, R.color.ds_text_primary))
+            })
+            addView(includeFinancialHistory)
+            if (!financialRestoreAvailable) {
+                addView(TextView(this@ArchivedClassDetailActivity).apply {
+                    text = getString(R.string.arch_restore_financial_unavailable)
+                    textSize = 13f
+                    setTextColor(UiColors.resolve(this@ArchivedClassDetailActivity, R.color.ds_text_secondary))
+                })
+            }
+        }
+
         AlertDialog.Builder(this)
             .setTitle(getString(R.string.main_trash_restore_confirm_title))
-            .setMessage(getString(R.string.main_trash_restore_confirm_msg))
+            .setView(content)
             .setPositiveButton(getString(R.string.main_trash_restore)) { _, _ ->
-                restoreArchivedClass(courseId)
+                restoreArchivedClass(courseId, includeFinancialHistory.isChecked)
             }
             .setNegativeButton(getString(R.string.btn_cancel), null)
             .show()
     }
 
-    private fun restoreArchivedClass(courseId: Int) {
+    private fun restoreArchivedClass(courseId: Int, includeFinancialHistory: Boolean) {
         btnRestore.isEnabled = false
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                val result = api.restoreArchivedClass(courseId, ClassRestoreRequest())
+                val result = api.restoreArchivedClass(
+                    courseId,
+                    ClassRestoreRequest(includeFinancialHistory = includeFinancialHistory)
+                )
                 withContext(Dispatchers.Main) {
-                    // O-13: هشدارهای سرور (مثل «معلم این کلاس آرشیو شده است؛ کلاس بدون معلم فعال
-                    // برمی‌گردد») باید در دیالوگ دیده شوند، نه فقط Toast موفقیت.
+                    // هشدارهای سرور (معلم آرشیوشده یا provenance قدیمی) در دیالوگ دیده شوند.
                     val warnings = result.warnings.orEmpty().filter { it.isNotBlank() }
                     if (warnings.isNotEmpty()) {
                         AlertDialog.Builder(this@ArchivedClassDetailActivity)
                             .setTitle(R.string.main_trash_restore_warnings_title)
                             .setMessage(warnings.joinToString("\n\n") { "• $it" })
                             .setPositiveButton(R.string.common_ok, null)
-                            .setOnDismissListener { finish() }   // کلاس دیگر در آرشیو نیست
+                            .setOnDismissListener { finish() }
                             .show()
                     } else {
                         val msg = result.message?.takeIf { it.isNotBlank() }
@@ -380,15 +408,24 @@ class ArchivedClassDetailActivity : BaseActivity() {
                     }
                 }
             } catch (e: Exception) {
-                // FIX: Bug 19 - cancellation is not a network/UI error.
                 if (e is CancellationException) throw e
-                // خطاهای 400/404/409 سرور (بازیابی کامل، کلاس ناموجود، از قبل فعال) به همین
-                // catch می‌رسند؛ پیام کاربردی به ادمین نشان داده می‌شود.
                 withContext(Dispatchers.Main) {
                     btnRestore.isEnabled = true
-                    Toast.makeText(this@ArchivedClassDetailActivity, getString(R.string.main_trash_restore_fail), Toast.LENGTH_LONG).show()
+                    Toast.makeText(
+                        this@ArchivedClassDetailActivity,
+                        restoreErrorMessage(e),
+                        Toast.LENGTH_LONG
+                    ).show()
                 }
             }
         }
     }
+
+    private fun restoreErrorMessage(error: Throwable): String {
+        val body = (error as? HttpException)?.response()?.errorBody()?.string()
+        val detail = runCatching { JSONObject(body.orEmpty()).optString("detail") }.getOrNull()
+        return detail?.takeIf { it.isNotBlank() }
+            ?: getString(R.string.main_trash_restore_fail)
+    }
+
 }

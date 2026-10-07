@@ -7,6 +7,7 @@ labeling unmapped role/DB facts as static or probe-only evidence.
 """
 from __future__ import annotations
 
+import ast
 import csv
 import json
 import re
@@ -25,9 +26,7 @@ START = "<!-- GENERATED ROUTE LEDGER START -->"
 END = "<!-- GENERATED ROUTE LEDGER END -->"
 
 # Strict xfails that still reproduce an open issue today.
-KNOWN_XFAILS = {
-    ("POST", "/admin/deleted_classes/{course_id}/restore"): "O-19",
-}
+KNOWN_XFAILS = {}
 # No partial-response route invariants currently remain as strict xfails.
 PARTIAL_XFAILS = {}
 
@@ -75,9 +74,31 @@ def source_files() -> list[Path]:
 
 
 def extract_calls(path: Path):
-    """Collect literal client calls as evidence references, not assertion proof."""
+    """Collect literal client calls as evidence references, not assertion proof.
+
+    Use the enclosing Python function, rather than the last test definition in
+    the file: request helpers between tests must not be attributed to an
+    unrelated preceding test.
+    """
     text = path.read_text(encoding="utf-8")
-    test_defs = list(re.finditer(r"^\s*def\s+(test_[A-Za-z0-9_]+)\s*\(", text, re.M))
+    try:
+        tree = ast.parse(text)
+        function_defs = sorted(
+            [
+                node for node in ast.walk(tree)
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            ],
+            key=lambda node: node.lineno,
+        )
+    except SyntaxError:
+        function_defs = []
+    callers_by_helper: dict[str, list[str]] = defaultdict(list)
+    for test_node in (node for node in function_defs if node.name.startswith("test_")):
+        for call_node in ast.walk(test_node):
+            if isinstance(call_node, ast.Call) and isinstance(call_node.func, ast.Name):
+                helper_name = call_node.func.id
+                if any(node.name == helper_name for node in function_defs):
+                    callers_by_helper[helper_name].append(test_node.name)
     patterns = [
         re.compile(r"\bclient\.(get|post|put|delete|patch|options|head)\(\s*(?:f)?([\"'])(.*?)(?<!\\)\2", re.S),
         re.compile(r"\bclient\.request\(\s*([\"'])(GET|POST|PUT|DELETE|PATCH)\1\s*,\s*(?:f)?([\"'])(.*?)(?<!\\)\3", re.S),
@@ -91,10 +112,21 @@ def extract_calls(path: Path):
             else:
                 method = match.group(2).upper()
                 call_path = match.group(4)
-            prior_defs = [item for item in test_defs if item.start() < match.start()]
-            test_name = prior_defs[-1].group(1) if prior_defs else "module-level"
             line_number = text.count("\n", 0, match.start()) + 1
-            calls.append((method, call_path, str(path.relative_to(ROOT)), test_name, line_number))
+            enclosing = [
+                node for node in function_defs
+                if node.lineno <= line_number <= (node.end_lineno or node.lineno)
+            ]
+            if enclosing:
+                owner = min(enclosing, key=lambda node: (node.end_lineno or node.lineno) - node.lineno)
+                if owner.name.startswith("test_"):
+                    test_names = [owner.name]
+                else:
+                    test_names = callers_by_helper.get(owner.name) or [f"helper:{owner.name}"]
+            else:
+                test_names = ["module-level"]
+            for test_name in dict.fromkeys(test_names):
+                calls.append((method, call_path, str(path.relative_to(ROOT)), test_name, line_number))
     return calls
 
 

@@ -940,13 +940,13 @@ class ClassRestoreLog(Base):
 
     چرا جدول جدا (نه تغییر وضعیت ClassDeletionRequest): وضعیت آن رکورد معنای «تصمیم حذف»
     دارد (pending/approved/rejected) و بازنویسی‌اش تاریخچهٔ تصمیم را از بین می‌برد.
-    دامنهٔ فاز ۱ فقط متادیتا است؛ `pre_state_json` برای حسابرسی نگه داشته می‌شود که
-    وضعیت پیش از بازیابی (کلاس/شمارش ردیف‌های آرشیوی) قابل بازبینی باشد.
+    `pre_state_json` برای حسابرسی نگه داشته می‌شود که وضعیت پیش از بازیابی
+    (کلاس/شمارش ردیف‌های آرشیوی و میزان اثر مالی) قابل بازبینی باشد.
     """
     __tablename__ = "class_restore_logs"
     id = Column(Integer, primary_key=True, index=True)
     course_id = Column(Integer, ForeignKey("courses.id"), nullable=False, index=True)
-    mode = Column(String, default="metadata_only")  # فاز ۱ فقط metadata_only
+    mode = Column(String, default="full")  # full or legacy metadata_only
     reason = Column(String, nullable=True)
     actor_user_id = Column(Integer, nullable=True)
     actor_name = Column(String, nullable=True)

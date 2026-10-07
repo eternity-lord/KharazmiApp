@@ -435,20 +435,33 @@ def resolve_creation_branch(
 
 
 def perform_delete_enrollment(enrollment, db: Session, forgive_session_charges: bool = True):
+    """Archive one enrollment and return the exact changes made by this call.
+
+    The effect payload is used by class deletion to create deletion-scoped restore
+    provenance. Existing callers may ignore the return value.
+    """
     # FIX: Bug 13 - archive once; never detach or delete historical enrollment links.
-    # تصمیم محصولی (آموزشگاه): حذف ثبت‌نام/رد کلاس، پول واقعی دریافت‌شده را از بین نمی‌برد؛
-    # وجه به‌صورت اعتبار عمومی نزد شاگرد می‌ماند و استرداد نقدی فقط از مسیر refund انجام می‌شود.
+    # پول واقعی دریافت‌شده از بین نمی‌رود؛ فقط session_chargeهای مشمول بخشودگی به کیف پول برمی‌گردند.
     from sqlalchemy import and_, or_, func
-    # FIX B3 (الگوی H8-P4): تسخیر اتمیک ثبت‌نام — اولین کار تابع؛ فقط enrollment.id لازم است (بدون refresh).
-    # rowcount≠۱ یعنی قبلاً حذف شده (یا نبود) ← خروج زودهنگام بی‌صدا؛ کل تابع idempotent است.
+
+    effects = {
+        "enrollment_id": enrollment.id,
+        "enrollment_archived": False,
+        "transaction_rows": [],
+        "installment_rows": [],
+        "wallet_credits": {},
+    }
+    # FIX B3 (الگوی H8-P4): تسخیر اتمیک ثبت‌نام — اولین کار تابع؛ فقط enrollment.id لازم است.
     claimed_rows = (
         db.query(Enrollment)
         .filter(Enrollment.id == enrollment.id, Enrollment.is_deleted == False)
         .update({Enrollment.is_deleted: True}, synchronize_session=False)
     )
     if claimed_rows != 1:
-        return
-    # FIX B3: کشف کاندیداها بدون قفل — گیت واقعی، claim سطری داخل حلقه است (الگوی reverse_session بچ ۲).
+        return effects
+    effects["enrollment_archived"] = True
+
+    # FIX B3: کشف کاندیداها بدون قفل — گیت واقعی، claim سطری داخل حلقه است.
     transactions = db.query(Transaction).filter(
         or_(
             Transaction.enrollment_id == enrollment.id,
@@ -464,14 +477,11 @@ def perform_delete_enrollment(enrollment, db: Session, forgive_session_charges: 
     credited_student_ids = set()
     for t in transactions:
         if t.type in ["tuition", "enrollment_payment", "deposit", "reversal"]:
-            # وجه واقعی: کیف پول دست نمی‌خورد و سابقه با همان لینک تاریخی فعال می‌ماند
-            # تا حسابرسی کامل باشد و استرداد بعدی (refund) همچنان ممکن بماند.
+            # وجه واقعی: کیف پول دست نمی‌خورد و سابقه با همان لینک تاریخی فعال می‌ماند.
             continue
         if t.type == "session_charge" and not forgive_session_charges:
-            # تیک نخورده: هزینه جلسات برگزارشده سر جایش می‌ماند (شاگرد داده، معلم می‌گیرد)
             continue
         # FIX B3: تسخیر اتمیک هر تراکنش — فقط اگر هنوز فعال باشد آرشیو می‌شود.
-        # rowcount صفر یعنی کال موازی/تکراری همین‌الان آن را برگرداند ← بدون اعتباردهی رد شو.
         t_claimed = (
             db.query(Transaction)
             .filter(Transaction.id == t.id, Transaction.is_deleted == False, Transaction.is_reversed == False)
@@ -479,8 +489,22 @@ def perform_delete_enrollment(enrollment, db: Session, forgive_session_charges: 
         )
         if t_claimed != 1:
             continue
+
+        transaction_effect = {
+            "id": t.id,
+            "student_id": t.student_id,
+            "course_id": t.course_id,
+            "enrollment_id": t.enrollment_id,
+            "session_id": t.session_id,
+            "type": t.type,
+            "amount": t.amount,
+            "share_teacher": t.share_teacher or 0,
+            "share_institute": t.share_institute or 0,
+            "is_reversed": bool(t.is_reversed),
+            "wallet_credited": False,
+        }
+        effects["transaction_rows"].append(transaction_effect)
         if t.type == "session_charge":
-            # FIX B3: اعتبار اتمیک کیف‌پول — جمع در SQL (COALESCE رفتار None→0 قبلی را حفظ می‌کند).
             share_t = t.share_teacher or 0
             share_i = t.share_institute or 0
             if share_t or share_i:
@@ -496,24 +520,45 @@ def perform_delete_enrollment(enrollment, db: Session, forgive_session_charges: 
                     )
                 )
                 if wallet_rows == 1:
+                    transaction_effect["wallet_credited"] = True
                     credited_student_ids.add(t.student_id)
-                # rowcount صفر = دانش‌آموز هم‌زمان حذف سخت شده؛ مثل رفتار قبلی (if student) رد شو.
-        # (تایپ‌های ناشناخته: مثل قبل فقط آرشیو می‌شوند، بدون اعتباردهی.)
-    # ترتیب سینک (مثل reverse_session): بعد از همه‌ی UPDATEهای خام، به‌ازای هر شاگرد متأثر یک refresh بعد sync.
+                    credit = effects["wallet_credits"].setdefault(
+                        t.student_id, {"teacher": 0, "institute": 0}
+                    )
+                    credit["teacher"] += int(share_t)
+                    credit["institute"] += int(share_i)
+        # تایپ‌های ناشناخته نیز مانند رفتار قبلی آرشیو می‌شوند، بدون اعتباردهی.
+
+    # ترتیب سینک: پس از UPDATEهای خام، هر کیف‌پول متأثر یک بار refresh و sync می‌شود.
     for sid in credited_student_ids:
         st = db.query(Student).filter(Student.id == sid).first()
         if st is not None:
             db.refresh(st)
-            # FIX: Bug 18 - derive the total only through the shared wallet helper.
             st.sync_wallet_balance()
-    # FIX: Bug 13 - close paid and unpaid installments without erasing payment evidence.
-    # (دست‌نخورده — از قبل bulk و idempotent بود و قفلی نداشت.)
-    db.query(Installment).filter(Installment.enrollment_id == enrollment.id).update(
-        {Installment.is_deleted: True}, synchronize_session="fetch"
-    )
-    # NOTE B3: سطر در دیتابیس از ابتدای تابع (claim) آرشیو شده؛ این خط فقط state داخل-session را
-    # برای کالرها همگام نگه می‌دارد (مثل قبل) — فلاش مجددش یک no-op بی‌اثر است.
+
+    # ثبت دقیق اقساطی که این عملیات از فعال به آرشیو تغییر می‌دهد.
+    installments = db.query(Installment).filter(
+        Installment.enrollment_id == enrollment.id,
+        Installment.is_deleted == False,
+    ).all()
+    effects["installment_rows"] = [
+        {
+            "id": item.id,
+            "enrollment_id": item.enrollment_id,
+            "amount": item.amount,
+            "due_date": item.due_date,
+            "is_paid": bool(item.is_paid),
+            "paid_at": item.paid_at,
+            "paid_amount": item.paid_amount,
+        }
+        for item in installments
+    ]
+    db.query(Installment).filter(
+        Installment.enrollment_id == enrollment.id,
+        Installment.is_deleted == False,
+    ).update({Installment.is_deleted: True}, synchronize_session="fetch")
     enrollment.is_deleted = True
+    return effects
 
 def reverse_session_financial_impacts(session_id: int, db: Session, commit: bool = True):  # FIX (audit-v2/critical-8-قدم۲): الگوی H4 (send_notification) — کالر اتمیک commit=False می‌دهد
     # FIX B2 (الگوی H8-P4): بدون with_for_update — این SELECT فقط کشف کاندیداست؛ گیت واقعی، UPDATE مشروط داخل حلقه است.

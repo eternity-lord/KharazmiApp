@@ -370,12 +370,14 @@
     <string name="main_trash_d_deleted_at">تاریخ حذف: %1$s</string>
     <string name="main_trash_d_forgive">ابطال هزینه‌ی جلسات در زمان حذف: %1$s</string>
     <string name="main_trash_detail_error">خطا در دریافت جزئیات کلاس آرشیوشده</string>
-    <!-- FIX(D1): بازیابی «فقط متادیتا» کلاس آرشیوشده از پنل ادمین -->
+    <!-- بازیابی کامل کلاس؛ سوابق مالی به‌صورت اختیاری و با provenance قابل‌اعتماد -->
     <string name="main_trash_restore">بازیابی</string>
     <string name="main_trash_restore_confirm_title">بازیابی کلاس حذف‌شده؟</string>
-    <string name="main_trash_restore_confirm_msg">کلاس به لیست کلاس‌ها برمی‌گردد؛ اما ثبت‌نام‌ها و سابقه‌ی مالی (پرداخت‌ها، بدهی و طلب معلم) بازیابی نمی‌شود. برای ادامه‌ی کلاس، ثبت‌نام‌های جدید بسازید.</string>
-    <string name="main_trash_restore_ok">کلاس بازیابی شد (بدون بازگرداندن سابقه‌ی مالی)</string>
-    <string name="main_trash_restore_fail">بازیابی انجام نشد؛ کلاس از قبل فعال است یا دسترسی مجاز نیست</string>
+    <string name="main_trash_restore_confirm_msg">کلاس، ثبت‌نام‌ها و تاریخچهٔ عملیاتی آن بازمی‌گردند. با گزینهٔ مالی خاموش، تراکنش‌ها و موجودی کیف‌پول تغییر نمی‌کنند؛ بازیابی مالی فقط با سابقهٔ قابل‌اعتماد و موجودی کافی انجام می‌شود.</string>
+    <string name="arch_restore_include_financial">همراه با سوابق مالی؛ بازگرداندن تراکنش‌ها و برگشت اعتبارهای ایجادشده هنگام حذف</string>
+    <string name="arch_restore_financial_unavailable">برای این حذف قدیمی سابقهٔ کافی جهت بازیابی مالی ذخیره نشده است؛ گزینهٔ مالی غیرفعال است.</string>
+    <string name="main_trash_restore_ok">کلاس و تاریخچهٔ عملیاتی بازیابی شد</string>
+    <string name="main_trash_restore_fail">بازیابی انجام نشد؛ وضعیت فعلی را بررسی کنید و دوباره تلاش کنید.</string>
     <string name="main_trash_restore_warnings_title">کلاس بازیابی شد — نکته‌های مهم</string>
     <string name="main_session_code_hint">کد ۶ رقمی جلسه (مثال: 100001)</string>
     <string name="main_edit_session_title">اصلاح جلسه قبلی</string>

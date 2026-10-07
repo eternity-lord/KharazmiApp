@@ -1,7 +1,7 @@
 {
-  "declarations": 169,
-  "unique_calls": 158,
-  "unique_static_routes": 156,
+  "declarations": 170,
+  "unique_calls": 159,
+  "unique_static_routes": 157,
   "duplicate_method_path_declarations": 11,
   "entries": [
     {
@@ -924,42 +924,42 @@
           "field": "recentTransactions[0].student_id",
           "kind": "silent-zero",
           "detail": "Gson leaves the non-null Int at 0; a missing/null wire value can display a false default",
-          "line": 449,
+          "line": 457,
           "source": "KharazmiAdmin/app/src/main/java/com/example/kharazmiadmin/AppModels.kt"
         },
         {
           "field": "recentTransactions[0].student_name",
           "kind": "missing-non-null",
           "detail": "Gson leaves the non-null reference field as null; later Kotlin use can throw NPE",
-          "line": 450,
+          "line": 458,
           "source": "KharazmiAdmin/app/src/main/java/com/example/kharazmiadmin/AppModels.kt"
         },
         {
           "field": "recentTransactions[0].course_name",
           "kind": "missing-non-null",
           "detail": "Gson leaves the non-null reference field as null; later Kotlin use can throw NPE",
-          "line": 452,
+          "line": 460,
           "source": "KharazmiAdmin/app/src/main/java/com/example/kharazmiadmin/AppModels.kt"
         },
         {
           "field": "recentTransactions[1].student_id",
           "kind": "silent-zero",
           "detail": "Gson leaves the non-null Int at 0; a missing/null wire value can display a false default",
-          "line": 449,
+          "line": 457,
           "source": "KharazmiAdmin/app/src/main/java/com/example/kharazmiadmin/AppModels.kt"
         },
         {
           "field": "recentTransactions[1].student_name",
           "kind": "missing-non-null",
           "detail": "Gson leaves the non-null reference field as null; later Kotlin use can throw NPE",
-          "line": 450,
+          "line": 458,
           "source": "KharazmiAdmin/app/src/main/java/com/example/kharazmiadmin/AppModels.kt"
         },
         {
           "field": "recentTransactions[1].course_name",
           "kind": "missing-non-null",
           "detail": "Gson leaves the non-null reference field as null; later Kotlin use can throw NPE",
-          "line": 452,
+          "line": 460,
           "source": "KharazmiAdmin/app/src/main/java/com/example/kharazmiadmin/AppModels.kt"
         }
       ],
@@ -1307,7 +1307,89 @@
         "logs": [
           {
             "id": 5,
-            "timestamp": "2026-10-05 07:02:19.948306",
+            "timestamp": "2026-10-07 15:39:01.288170",
+            "username": null,
+            "action": "update",
+            "entity_type": "transaction",
+            "entity_id": 4,
+            "old_values": {
+              "id": "<nested>",
+              "remittance_number": "<nested>",
+              "branch_id": "<nested>",
+              "session_id": "<nested>",
+              "settlement_id": "<nested>",
+              "student_id": "<nested>",
+              "enrollment_id": "<nested>",
+              "course_id": "<nested>",
+              "amount": "<nested>",
+              "payment_method": "<nested>",
+              "tracking_code": "<nested>",
+              "date": "<nested>",
+              "receiver": "<nested>",
+              "description": "<nested>",
+              "type": "<nested>",
+              "share_teacher": "<nested>",
+              "share_institute": "<nested>",
+              "target_wallet": "<nested>",
+              "idempotency_key": "<nested>",
+              "sessions_covered": "<nested>",
+              "is_deleted": "<nested>",
+              "is_reversed": "<nested>"
+            },
+            "new_values": {
+              "id": "<nested>",
+              "remittance_number": "<nested>",
+              "branch_id": "<nested>",
+              "session_id": "<nested>",
+              "settlement_id": "<nested>",
+              "student_id": "<nested>",
+              "enrollment_id": "<nested>",
+              "course_id": "<nested>",
+              "amount": "<nested>",
+              "payment_method": "<nested>",
+              "tracking_code": "<nested>",
+              "date": "<nested>",
+              "receiver": "<nested>",
+              "description": "<nested>",
+              "type": "<nested>",
+              "share_teacher": "<nested>",
+              "share_institute": "<nested>",
+              "target_wallet": "<nested>",
+              "idempotency_key": "<nested>",
+              "sessions_covered": "<nested>",
+              "is_deleted": "<nested>",
+              "is_reversed": "<nested>"
+            },
+            "ip_address": null,
+            "changed_fields": [
+              "<nested>"
+            ],
+            "labels": {
+              "remittance_number": "<nested>"
+            },
+            "changed_labels": [
+              "<nested>"
+            ],
+            "change_summary": "تغییر کرد: شمارهٔ حواله: خالی ← 100003",
+            "action_label": "ویرایش",
+            "change_type": "edited",
+            "action_color": "#FB8C00",
+            "icon_color": "#FB8C00",
+            "entity_refs": {
+              "student": "<nested>",
+              "teacher": "<nested>"
+            },
+            "student_id": 6,
+            "student_name": "دانش‌آموز تست 6",
+            "student_statement_path": "/reports/student_statement?student_id=6",
+            "actor_username": "",
+            "actor_source": "none",
+            "actor_action": null,
+            "actor_action_key": null
+          },
+          {
+            "id": 4,
+            "timestamp": "2026-10-07 15:39:01.288170",
             "username": null,
             "action": "update",
             "entity_type": "transaction",
@@ -1390,90 +1472,8 @@
             "actor_action_key": null
           },
           {
-            "id": 4,
-            "timestamp": "2026-10-05 07:02:19.948306",
-            "username": null,
-            "action": "update",
-            "entity_type": "transaction",
-            "entity_id": 4,
-            "old_values": {
-              "id": "<nested>",
-              "remittance_number": "<nested>",
-              "branch_id": "<nested>",
-              "session_id": "<nested>",
-              "settlement_id": "<nested>",
-              "student_id": "<nested>",
-              "enrollment_id": "<nested>",
-              "course_id": "<nested>",
-              "amount": "<nested>",
-              "payment_method": "<nested>",
-              "tracking_code": "<nested>",
-              "date": "<nested>",
-              "receiver": "<nested>",
-              "description": "<nested>",
-              "type": "<nested>",
-              "share_teacher": "<nested>",
-              "share_institute": "<nested>",
-              "target_wallet": "<nested>",
-              "idempotency_key": "<nested>",
-              "sessions_covered": "<nested>",
-              "is_deleted": "<nested>",
-              "is_reversed": "<nested>"
-            },
-            "new_values": {
-              "id": "<nested>",
-              "remittance_number": "<nested>",
-              "branch_id": "<nested>",
-              "session_id": "<nested>",
-              "settlement_id": "<nested>",
-              "student_id": "<nested>",
-              "enrollment_id": "<nested>",
-              "course_id": "<nested>",
-              "amount": "<nested>",
-              "payment_method": "<nested>",
-              "tracking_code": "<nested>",
-              "date": "<nested>",
-              "receiver": "<nested>",
-              "description": "<nested>",
-              "type": "<nested>",
-              "share_teacher": "<nested>",
-              "share_institute": "<nested>",
-              "target_wallet": "<nested>",
-              "idempotency_key": "<nested>",
-              "sessions_covered": "<nested>",
-              "is_deleted": "<nested>",
-              "is_reversed": "<nested>"
-            },
-            "ip_address": null,
-            "changed_fields": [
-              "<nested>"
-            ],
-            "labels": {
-              "remittance_number": "<nested>"
-            },
-            "changed_labels": [
-              "<nested>"
-            ],
-            "change_summary": "تغییر کرد: شمارهٔ حواله: خالی ← 100003",
-            "action_label": "ویرایش",
-            "change_type": "edited",
-            "action_color": "#FB8C00",
-            "icon_color": "#FB8C00",
-            "entity_refs": {
-              "student": "<nested>",
-              "teacher": "<nested>"
-            },
-            "student_id": 6,
-            "student_name": "دانش‌آموز تست 6",
-            "student_statement_path": "/reports/student_statement?student_id=6",
-            "actor_username": "",
-            "actor_source": "none",
-            "actor_action": null,
-            "actor_action_key": null
-          },
-          {
             "id": 3,
-            "timestamp": "2026-10-05 07:02:19.948306",
+            "timestamp": "2026-10-07 15:39:01.288170",
             "username": null,
             "action": "update",
             "entity_type": "transaction",
@@ -1588,7 +1588,89 @@
         "logs": [
           {
             "id": 5,
-            "timestamp": "2026-10-05 07:02:19.948306",
+            "timestamp": "2026-10-07 15:39:01.288170",
+            "username": null,
+            "action": "update",
+            "entity_type": "transaction",
+            "entity_id": 4,
+            "old_values": {
+              "id": "<nested>",
+              "remittance_number": "<nested>",
+              "branch_id": "<nested>",
+              "session_id": "<nested>",
+              "settlement_id": "<nested>",
+              "student_id": "<nested>",
+              "enrollment_id": "<nested>",
+              "course_id": "<nested>",
+              "amount": "<nested>",
+              "payment_method": "<nested>",
+              "tracking_code": "<nested>",
+              "date": "<nested>",
+              "receiver": "<nested>",
+              "description": "<nested>",
+              "type": "<nested>",
+              "share_teacher": "<nested>",
+              "share_institute": "<nested>",
+              "target_wallet": "<nested>",
+              "idempotency_key": "<nested>",
+              "sessions_covered": "<nested>",
+              "is_deleted": "<nested>",
+              "is_reversed": "<nested>"
+            },
+            "new_values": {
+              "id": "<nested>",
+              "remittance_number": "<nested>",
+              "branch_id": "<nested>",
+              "session_id": "<nested>",
+              "settlement_id": "<nested>",
+              "student_id": "<nested>",
+              "enrollment_id": "<nested>",
+              "course_id": "<nested>",
+              "amount": "<nested>",
+              "payment_method": "<nested>",
+              "tracking_code": "<nested>",
+              "date": "<nested>",
+              "receiver": "<nested>",
+              "description": "<nested>",
+              "type": "<nested>",
+              "share_teacher": "<nested>",
+              "share_institute": "<nested>",
+              "target_wallet": "<nested>",
+              "idempotency_key": "<nested>",
+              "sessions_covered": "<nested>",
+              "is_deleted": "<nested>",
+              "is_reversed": "<nested>"
+            },
+            "ip_address": null,
+            "changed_fields": [
+              "<nested>"
+            ],
+            "labels": {
+              "remittance_number": "<nested>"
+            },
+            "changed_labels": [
+              "<nested>"
+            ],
+            "change_summary": "تغییر کرد: شمارهٔ حواله: خالی ← 100003",
+            "action_label": "ویرایش",
+            "change_type": "edited",
+            "action_color": "#FB8C00",
+            "icon_color": "#FB8C00",
+            "entity_refs": {
+              "student": "<nested>",
+              "teacher": "<nested>"
+            },
+            "student_id": 6,
+            "student_name": "دانش‌آموز تست 6",
+            "student_statement_path": "/reports/student_statement?student_id=6",
+            "actor_username": "",
+            "actor_source": "none",
+            "actor_action": null,
+            "actor_action_key": null
+          },
+          {
+            "id": 4,
+            "timestamp": "2026-10-07 15:39:01.288170",
             "username": null,
             "action": "update",
             "entity_type": "transaction",
@@ -1671,90 +1753,8 @@
             "actor_action_key": null
           },
           {
-            "id": 4,
-            "timestamp": "2026-10-05 07:02:19.948306",
-            "username": null,
-            "action": "update",
-            "entity_type": "transaction",
-            "entity_id": 4,
-            "old_values": {
-              "id": "<nested>",
-              "remittance_number": "<nested>",
-              "branch_id": "<nested>",
-              "session_id": "<nested>",
-              "settlement_id": "<nested>",
-              "student_id": "<nested>",
-              "enrollment_id": "<nested>",
-              "course_id": "<nested>",
-              "amount": "<nested>",
-              "payment_method": "<nested>",
-              "tracking_code": "<nested>",
-              "date": "<nested>",
-              "receiver": "<nested>",
-              "description": "<nested>",
-              "type": "<nested>",
-              "share_teacher": "<nested>",
-              "share_institute": "<nested>",
-              "target_wallet": "<nested>",
-              "idempotency_key": "<nested>",
-              "sessions_covered": "<nested>",
-              "is_deleted": "<nested>",
-              "is_reversed": "<nested>"
-            },
-            "new_values": {
-              "id": "<nested>",
-              "remittance_number": "<nested>",
-              "branch_id": "<nested>",
-              "session_id": "<nested>",
-              "settlement_id": "<nested>",
-              "student_id": "<nested>",
-              "enrollment_id": "<nested>",
-              "course_id": "<nested>",
-              "amount": "<nested>",
-              "payment_method": "<nested>",
-              "tracking_code": "<nested>",
-              "date": "<nested>",
-              "receiver": "<nested>",
-              "description": "<nested>",
-              "type": "<nested>",
-              "share_teacher": "<nested>",
-              "share_institute": "<nested>",
-              "target_wallet": "<nested>",
-              "idempotency_key": "<nested>",
-              "sessions_covered": "<nested>",
-              "is_deleted": "<nested>",
-              "is_reversed": "<nested>"
-            },
-            "ip_address": null,
-            "changed_fields": [
-              "<nested>"
-            ],
-            "labels": {
-              "remittance_number": "<nested>"
-            },
-            "changed_labels": [
-              "<nested>"
-            ],
-            "change_summary": "تغییر کرد: شمارهٔ حواله: خالی ← 100003",
-            "action_label": "ویرایش",
-            "change_type": "edited",
-            "action_color": "#FB8C00",
-            "icon_color": "#FB8C00",
-            "entity_refs": {
-              "student": "<nested>",
-              "teacher": "<nested>"
-            },
-            "student_id": 6,
-            "student_name": "دانش‌آموز تست 6",
-            "student_statement_path": "/reports/student_statement?student_id=6",
-            "actor_username": "",
-            "actor_source": "none",
-            "actor_action": null,
-            "actor_action_key": null
-          },
-          {
             "id": 3,
-            "timestamp": "2026-10-05 07:02:19.948306",
+            "timestamp": "2026-10-07 15:39:01.288170",
             "username": null,
             "action": "update",
             "entity_type": "transaction",
@@ -3186,7 +3186,7 @@
       "model": "HomeworkItem",
       "wire_shape": {
         "kind": "array",
-        "length": 2,
+        "length": 1,
         "item_keys": [
           "id",
           "title",
@@ -3213,18 +3213,6 @@
           "max_score": 20.0,
           "status": "attempted",
           "score": 19.0
-        },
-        {
-          "id": 2,
-          "title": "آزمون پیش‌نویس",
-          "course_title": "فیزیک دوکلاسه",
-          "date": "1405/07/01",
-          "duration": 45,
-          "description": "",
-          "due_date": "",
-          "max_score": 20.0,
-          "status": "pending",
-          "score": null
         }
       ]
     },
@@ -3461,19 +3449,12 @@
           "description",
           "due_date",
           "status",
+          "max_score",
           "score",
           "feedback"
         ]
       },
-      "issues": [
-        {
-          "field": "max_score",
-          "kind": "silent-zero",
-          "detail": "Gson leaves the non-null Float at 0.0; a missing/null wire value can display a false default",
-          "line": 50,
-          "source": "KharazmiAdmin/app/src/main/java/com/example/kharazmiadmin/HomeworkActivity.kt"
-        }
-      ],
+      "issues": [],
       "sample_payload": [
         {
           "id": 1,
@@ -3482,6 +3463,7 @@
           "description": "حل تمرین",
           "due_date": "1405/07/01",
           "status": "submitted",
+          "max_score": 20.0,
           "score": null,
           "feedback": null
         }
@@ -3501,17 +3483,17 @@
       "wire_shape": {
         "kind": "object",
         "keys": [
+          "phone",
           "name",
           "logo_path",
-          "phone",
           "footer_text",
           "manager_mobile_1",
           "card_number_1",
           "card_number_2",
           "teachers_active",
           "teacher_settlement_alert_days",
-          "address",
           "id",
+          "address",
           "official_email",
           "card_number",
           "manager_mobile_2",
@@ -3522,17 +3504,17 @@
       },
       "issues": [],
       "sample_payload": {
+        "phone": "02100000000",
         "name": "آموزشگاه ممیزی",
         "logo_path": null,
-        "phone": "02100000000",
         "footer_text": "پاورقی تست",
         "manager_mobile_1": "09121112222",
         "card_number_1": "۶۰۳۷۹۹۷۹۷۹۷۹۷۹۷۹",
         "card_number_2": "۵۸۹۲۱۰۱۰۱۰۱۰۱۰۱۰",
         "teachers_active": true,
         "teacher_settlement_alert_days": 30,
-        "address": "تهران",
         "id": 1,
+        "address": "تهران",
         "official_email": "audit@example.test",
         "card_number": "6037000000000000",
         "manager_mobile_2": "09123334444",
@@ -3563,17 +3545,17 @@
       "sample_payload": {
         "message": "تنظیمات آموزشگاه با موفقیت بروزرسانی شد",
         "settings": {
+          "phone": "route-audit",
           "name": "route-audit",
           "logo_path": null,
-          "phone": "route-audit",
           "footer_text": "route-audit",
           "manager_mobile_1": "09120000001",
           "card_number_1": "route-audit",
           "card_number_2": "route-audit",
           "teachers_active": false,
           "teacher_settlement_alert_days": 30,
-          "address": "route-audit",
           "id": 1,
+          "address": "route-audit",
           "official_email": "audit@example.test",
           "card_number": "route-audit",
           "manager_mobile_2": "09120000001",
@@ -3913,15 +3895,7 @@
           "max_minutes"
         ]
       },
-      "issues": [
-        {
-          "field": "startedAtTs",
-          "kind": "int-parse",
-          "detail": "Gson cannot safely deserialize 1790586000.25 as Kotlin Long",
-          "line": 893,
-          "source": "KharazmiAdmin/app/src/main/java/com/example/kharazmiadmin/AppModels.kt"
-        }
-      ],
+      "issues": [],
       "sample_payload": {
         "live_session_id": 1,
         "course_id": 2,
@@ -3929,7 +3903,7 @@
         "course_code": "C-MULTI",
         "status": "LIVE",
         "start_time": "2026-09-28T09:00:00",
-        "started_at_ts": 1790586000.25,
+        "started_at_ts": 1790586000,
         "max_minutes": 180
       }
     },
@@ -3962,15 +3936,7 @@
           "undetermined"
         ]
       },
-      "issues": [
-        {
-          "field": "startedAtTs",
-          "kind": "int-parse",
-          "detail": "Gson cannot safely deserialize 1790586000.25 as Kotlin Long",
-          "line": 905,
-          "source": "KharazmiAdmin/app/src/main/java/com/example/kharazmiadmin/AppModels.kt"
-        }
-      ],
+      "issues": [],
       "sample_payload": [
         {
           "live_session_id": 1,
@@ -3979,7 +3945,7 @@
           "course_code": "C-MULTI",
           "teacher_name": "رضا فعال",
           "start_time": "2026-09-28T09:00:00",
-          "started_at_ts": 1790586000.25,
+          "started_at_ts": 1790586000,
           "elapsed_minutes": 0,
           "total_enrolled": 1,
           "present": 1,
@@ -4017,15 +3983,7 @@
           "students"
         ]
       },
-      "issues": [
-        {
-          "field": "startedAtTs",
-          "kind": "int-parse",
-          "detail": "Gson cannot safely deserialize 1790586000.25 as Kotlin Long",
-          "line": 931,
-          "source": "KharazmiAdmin/app/src/main/java/com/example/kharazmiadmin/AppModels.kt"
-        }
-      ],
+      "issues": [],
       "sample_payload": {
         "live_session_id": 1,
         "course_id": 2,
@@ -4033,7 +3991,7 @@
         "course_code": "C-MULTI",
         "teacher_name": "رضا فعال",
         "start_time": "2026-09-28T09:00:00",
-        "started_at_ts": 1790586000.25,
+        "started_at_ts": 1790586000,
         "elapsed_minutes": 0,
         "total_enrolled": 1,
         "present": 1,
@@ -4058,7 +4016,7 @@
       "server_path": "/auth/login",
       "handler": "routers.auth.login_user",
       "response_class": "LoginResponse",
-      "android_source": "KharazmiAdmin/app/src/main/java/com/example/kharazmiadmin/LoginActivity.kt:33",
+      "android_source": "KharazmiAdmin/app/src/main/java/com/example/kharazmiadmin/LoginActivity.kt:34",
       "role": "public",
       "status": 400,
       "model": "LoginResponse",
@@ -4107,17 +4065,17 @@
       "wire_shape": {
         "kind": "object",
         "keys": [
+          "phone",
           "name",
           "logo_path",
-          "phone",
           "footer_text",
           "manager_mobile_1",
           "card_number_1",
           "card_number_2",
           "teachers_active",
           "teacher_settlement_alert_days",
-          "address",
           "id",
+          "address",
           "official_email",
           "card_number",
           "manager_mobile_2",
@@ -4128,17 +4086,17 @@
       },
       "issues": [],
       "sample_payload": {
+        "phone": "02100000000",
         "name": "آموزشگاه ممیزی",
         "logo_path": null,
-        "phone": "02100000000",
         "footer_text": "پاورقی تست",
         "manager_mobile_1": "09121112222",
         "card_number_1": "۶۰۳۷۹۹۷۹۷۹۷۹۷۹۷۹",
         "card_number_2": "۵۸۹۲۱۰۱۰۱۰۱۰۱۰۱۰",
         "teachers_active": true,
         "teacher_settlement_alert_days": 30,
-        "address": "تهران",
         "id": 1,
+        "address": "تهران",
         "official_email": "audit@example.test",
         "card_number": "6037000000000000",
         "manager_mobile_2": "09123334444",
@@ -4245,6 +4203,7 @@
           "transactions_total",
           "deleted_at",
           "has_deletion_record",
+          "financial_restore_available",
           "forgive_session_charges",
           "requested_by_role",
           "admin_note",
@@ -4283,6 +4242,7 @@
         "transactions_total": 0,
         "deleted_at": "",
         "has_deletion_record": false,
+        "financial_restore_available": false,
         "forgive_session_charges": false,
         "requested_by_role": "",
         "admin_note": "",
@@ -4326,8 +4286,7 @@
           "debt_total": 0,
           "debtors": 0,
           "forgiven_total": 0
-        },
-        "sessions_held": 0
+        }
       }
     },
     {
@@ -4351,7 +4310,9 @@
           "is_deleted",
           "is_suspended",
           "mode",
+          "include_financial_history",
           "finances_untouched",
+          "financial_restore_available",
           "teacher_archived",
           "warnings",
           "note",
@@ -4361,17 +4322,21 @@
       },
       "issues": [],
       "sample_payload": {
-        "message": "کلاس بازیابی شد (فقط متادیتا) — ثبت‌نام‌ها و سابقهٔ مالی دست‌نخورده است",
+        "message": "کلاس و تاریخچهٔ عملیاتی بازیابی شد؛ تراکنش‌ها و موجودی کیف‌پول تغییر نکرد.",
         "id": 4,
         "title": "کلاس آرشیوی",
         "code": "C-ARCH",
         "is_deleted": false,
         "is_suspended": false,
-        "mode": "metadata_only",
+        "mode": "full",
+        "include_financial_history": false,
         "finances_untouched": true,
+        "financial_restore_available": false,
         "teacher_archived": false,
-        "warnings": [],
-        "note": "برای ادامهٔ کلاس، ثبت‌نام‌های جدید بسازید؛ سابقهٔ مالی قبلی عمداً بازیابی نشده است.",
+        "warnings": [
+          "این حذف قدیمی سابقهٔ ردیف‌به‌ردیف ندارد؛ اطلاعات عملیاتی بازیابی شد اما سوابق مالی دست‌نخورده ماند."
+        ],
+        "note": "تراکنش‌ها و موجودی کیف‌پول تغییر نکرد.",
         "deleted_at_was": "",
         "reason": ""
       }
@@ -4531,18 +4496,16 @@
       "response_class": "SimpleResponse",
       "android_source": "KharazmiAdmin/app/src/main/java/com/example/kharazmiadmin/MessageActivity.kt:81",
       "role": "admin",
-      "status": 200,
+      "status": 400,
       "model": "SimpleResponse",
       "wire_shape": {
         "kind": "object",
         "keys": [
-          "message"
+          "detail"
         ]
       },
       "issues": [],
-      "sample_payload": {
-        "message": "پیام گروهی با موفقیت ارسال شد"
-      }
+      "route_non_success": true
     },
     {
       "method": "POST",
@@ -4922,7 +4885,7 @@
             "type": "installment",
             "title": "💰 سررسید قسط شهریه فرزند شما",
             "body": "بدینوسیله به اطلاع می‌رساند قسط شهریه فرزند شما دانش‌آموز به مبلغ 350,000 تومان سررسید 1405/07/01 شده است. لطفاً جهت ...",
-            "date": "1405/07/13",
+            "date": "1405/07/15",
             "is_read": false
           },
           {
@@ -4930,7 +4893,7 @@
             "type": "installment",
             "title": "💰 سررسید قسط شهریه فرزند شما",
             "body": "بدینوسیله به اطلاع می‌رساند قسط شهریه فرزند شما دانش‌آموز به مبلغ 350,000 تومان سررسید 1405/06/01 شده است. لطفاً جهت ...",
-            "date": "1405/07/13",
+            "date": "1405/07/15",
             "is_read": false
           }
         ]
@@ -5218,6 +5181,28 @@
           "is_suspended": true
         }
       ]
+    },
+    {
+      "method": "POST",
+      "path": "auth/device_token",
+      "android_call": "DeviceTokenApi.registerDeviceToken",
+      "server_path": "/auth/device_token",
+      "handler": "routers.auth.register_device_token",
+      "response_class": "SimpleResponse",
+      "android_source": "KharazmiAdmin/app/src/main/java/com/example/kharazmiadmin/PushTokenRegistration.kt:17",
+      "role": "admin",
+      "status": 200,
+      "model": "SimpleResponse",
+      "wire_shape": {
+        "kind": "object",
+        "keys": [
+          "message"
+        ]
+      },
+      "issues": [],
+      "sample_payload": {
+        "message": "توکن دستگاه با موفقیت ثبت شد"
+      }
     },
     {
       "method": "GET",
@@ -5674,21 +5659,21 @@
           "target_group": "notif_student_4",
           "message_text": "🔔 💰 سررسید قسط شهریه شما\nبدینوسیله به اطلاع می‌رساند قسط شهریه شما به مبلغ 350,000 تومان سررسید ***/07/01 شده است. لط...",
           "sent_count": 1,
-          "date": "2026/10/05 07:02"
+          "date": "2026/10/07 15:39"
         },
         {
           "id": 6,
           "target_group": "notif_parent_5",
           "message_text": "🔔 💰 سررسید قسط شهریه فرزند شما\nبدینوسیله به اطلاع می‌رساند قسط شهریه فرزند شما دانش‌آموز به مبلغ 350,000 تومان سررسید...",
           "sent_count": 1,
-          "date": "2026/10/05 07:02"
+          "date": "2026/10/07 15:39"
         },
         {
           "id": 5,
           "target_group": "installment_2",
           "message_text": "سلام ولی محترم دانش‌آموز دانش‌آموز تست 1، بدینوسیله به اطلاع می‌رساند قسط شهریه فرزند شما به مبلغ 350,000 تومان سررسی...",
           "sent_count": 1,
-          "date": "2026/10/05 07:02"
+          "date": "2026/10/07 15:39"
         }
       ]
     },
@@ -5878,7 +5863,7 @@
             "type": "installment",
             "title": "💰 سررسید قسط شهریه شما",
             "body": "بدینوسیله به اطلاع می‌رساند قسط شهریه شما به مبلغ 350,000 تومان سررسید 1405/07/01 شده است. لطفاً اقدام فرمایید.",
-            "date": "1405/07/13",
+            "date": "1405/07/15",
             "is_read": false
           },
           {
@@ -5886,7 +5871,7 @@
             "type": "installment",
             "title": "💰 سررسید قسط شهریه شما",
             "body": "بدینوسیله به اطلاع می‌رساند قسط شهریه شما به مبلغ 350,000 تومان سررسید 1405/06/01 شده است. لطفاً اقدام فرمایید.",
-            "date": "1405/07/13",
+            "date": "1405/07/15",
             "is_read": false
           }
         ]
@@ -6503,7 +6488,7 @@
           "type": "sms",
           "type_label": "پیامک",
           "summary": "سلام ولی محترم دانش‌آموز دانش‌آموز تست 1، بدینوسیله به اطلاع می‌رساند قسط شهریه فرزند شما به مبلغ 350,000 تومان سررسی...",
-          "date": "2026/10/05 07:02",
+          "date": "2026/10/07 15:39",
           "sender": "آموزشگاه",
           "recipient": "ولی دانش‌آموز تست 1",
           "direction": "incoming",
@@ -6514,7 +6499,7 @@
           "type": "sms",
           "type_label": "پیامک",
           "summary": "سلام ولی محترم دانش‌آموز دانش‌آموز تست 1، بدینوسیله به اطلاع می‌رساند قسط شهریه فرزند شما به مبلغ 350,000 تومان سررسی...",
-          "date": "2026/10/05 07:02",
+          "date": "2026/10/07 15:39",
           "sender": "آموزشگاه",
           "recipient": "ولی دانش‌آموز تست 1",
           "direction": "incoming",
@@ -6592,8 +6577,8 @@
       "issues": [],
       "sample_payload": {
         "period_days": 30,
-        "period_start": "2026/09/05",
-        "period_end": "2026/10/05",
+        "period_start": "2026/09/07",
+        "period_end": "2026/10/07",
         "average_delay_minutes": 0.0,
         "delay_samples_count": 2,
         "live_sessions_last_30_days": 2,
@@ -6833,7 +6818,7 @@
         "national_code": "0010000001",
         "mobile": "09120000001",
         "teacher_code": 1001,
-        "password": "$pbkdf2-sha256$29000$yHkvZSzl3Lv3/p8zpvS.dw$vn.fBNpj4Qh/TEtGAa881Bd//qQ07Cnt/F0ASyN5eWU",
+        "password": "$pbkdf2-sha256$29000$NGZMqTWGsBaCMAaAsDbm3A$wwlQ0AKRhbuXO6JZtg9cpdhzqY5ggO9H9NjsWP48GMY",
         "card_number": "603700000001"
       }
     },
@@ -6858,7 +6843,7 @@
       "issues": [],
       "sample_payload": {
         "message": "رمز عبور جدید معلم با موفقیت صادر شد",
-        "new_password": "D7JZZcuC"
+        "new_password": "ceshL9AG"
       }
     },
     {
@@ -7330,15 +7315,7 @@
           "week_summary"
         ]
       },
-      "issues": [
-        {
-          "field": "liveClass.startedAtTs",
-          "kind": "int-parse",
-          "detail": "Gson cannot safely deserialize 1790586000.25 as Kotlin Long",
-          "line": 78,
-          "source": "KharazmiAdmin/app/src/main/java/com/example/kharazmiadmin/TodaySummaryApi.kt"
-        }
-      ],
+      "issues": [],
       "sample_payload": {
         "date": "1405/07/06",
         "day_name": "دوشنبه",
@@ -7346,7 +7323,7 @@
           "live_session_id": 1,
           "course_id": 2,
           "class_name": "فیزیک دوکلاسه",
-          "started_at_ts": 1790586000.25,
+          "started_at_ts": 1790586000,
           "elapsed_minutes": 0
         },
         "next_class": null,
@@ -7467,12 +7444,12 @@
   "counts": {
     "dynamic": 1,
     "unmatched": 0,
-    "route_non_success": 28,
+    "route_non_success": 29,
     "successful_non_json": 4,
     "empty_json_body": 0,
-    "parse": 4,
+    "parse": 0,
     "npe": 5,
-    "silent_zero": 8,
+    "silent_zero": 7,
     "missing_key": 0,
     "simulation_gap": 0
   }

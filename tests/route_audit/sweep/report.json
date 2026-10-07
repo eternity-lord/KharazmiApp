@@ -179,7 +179,7 @@
         "transactions_count": 0,
         "transactions_total": 0,
         "deleted_at": "",
-        "<omitted_keys>": 14
+        "<omitted_keys>": 15
       },
       "error": null,
       "invalid_target": true,
@@ -201,20 +201,24 @@
       "json": true,
       "shape": "object",
       "sample_value": {
-        "message": "کلاس بازیابی شد (فقط متادیتا) — ثبت‌نام‌ها و سابقهٔ مالی دست‌نخورده است",
+        "message": "کلاس و تاریخچهٔ عملیاتی بازیابی شد؛ تراکنش‌ها و موجودی کیف‌پول تغییر نکرد.",
         "id": 4,
         "title": "کلاس آرشیوی",
         "code": "C-ARCH",
         "is_deleted": false,
         "is_suspended": false,
-        "mode": "metadata_only",
+        "mode": "full",
+        "include_financial_history": false,
         "finances_untouched": true,
+        "financial_restore_available": false,
         "teacher_archived": false,
         "warnings": {
-          "length": 0,
-          "first_items": []
+          "length": 1,
+          "first_items": [
+            "این حذف قدیمی سابقهٔ ردیف‌به‌ردیف ندارد؛ اطلاعات عملیاتی بازیابی شد اما سوابق مالی دست‌نخورده ماند."
+          ]
         },
-        "note": "برای ادامهٔ کلاس، ثبت‌نام‌های جدید بسازید؛ سابقهٔ مالی قبلی عمداً بازیابی نشده است.",
+        "note": "تراکنش‌ها و موجودی کیف‌پول تغییر نکرد.",
         "deleted_at_was": "",
         "reason": ""
       },
@@ -358,7 +362,7 @@
             "course_code": "C-MULTI",
             "teacher_name": "رضا فعال",
             "start_time": "2026-09-28T09:00:00",
-            "started_at_ts": 1790586000.25,
+            "started_at_ts": 1790586000,
             "elapsed_minutes": 0,
             "total_enrolled": 1,
             "present": 1,
@@ -393,7 +397,7 @@
         "course_code": "C-MULTI",
         "teacher_name": "رضا فعال",
         "start_time": "2026-09-28T09:00:00",
-        "started_at_ts": 1790586000.25,
+        "started_at_ts": 1790586000,
         "elapsed_minutes": 0,
         "total_enrolled": 1,
         "present": 1,
@@ -1034,7 +1038,7 @@
         "national_code": "0010000001",
         "mobile": "09120000001",
         "teacher_code": 1001,
-        "password": "$pbkdf2-sha256$29000$hPC.VyqlVOp9DwEAYOw9hw$k4pFY4N8BjfSlD7a3ywiqumZwyJ70pPH4cS9ub25F7A",
+        "password": "$pbkdf2-sha256$29000$LmXs/V9rbe39H.Nc652z9g$lTR6/VQEktAz59jXiIaQxEYIyaVh7ChRTiSMKEkjhT4",
         "card_number": "603700000001"
       },
       "error": null,
@@ -1080,7 +1084,7 @@
       "shape": "object",
       "sample_value": {
         "message": "رمز عبور جدید معلم با موفقیت صادر شد",
-        "new_password": "8BBYATht"
+        "new_password": "h5Ggjv4H"
       },
       "error": null,
       "invalid_target": true,
@@ -1592,7 +1596,7 @@
         "course_code": "C-MULTI",
         "status": "LIVE",
         "start_time": "2026-09-28T09:00:00",
-        "started_at_ts": 1790586000.25,
+        "started_at_ts": 1790586000,
         "max_minutes": 180
       },
       "error": null,
@@ -2229,12 +2233,12 @@
         "length": 1,
         "first_items": [
           {
-            "id": 1,
             "threshold": 1.0,
+            "id": 1,
             "active": true,
-            "action_type": "parent_alert",
             "name": "قسط معوق",
-            "condition_type": "installment_overdue"
+            "condition_type": "installment_overdue",
+            "action_type": "parent_alert"
           }
         ]
       },
@@ -2329,19 +2333,19 @@
         "length": 2,
         "first_items": [
           {
-            "manager": "مدیر تست",
             "address": "تهران",
+            "manager": "مدیر تست",
             "name": "شعبه مرکزی تست",
-            "id": 1,
             "phone": "02100000000",
+            "id": 1,
             "active": true
           },
           {
-            "manager": "مدیر دوم",
             "address": "تهران غرب",
+            "manager": "مدیر دوم",
             "name": "شعبه غرب تست",
-            "id": 2,
             "phone": "02100000001",
+            "id": 2,
             "active": true
           }
         ]
@@ -3157,9 +3161,9 @@
       "json": true,
       "shape": "object",
       "sample_value": {
+        "count_4": 40000,
         "count_1": 10000,
         "count_2": 20000,
-        "count_4": 40000,
         "count_6": 60000,
         "count_8": 80000,
         "count_10": 100000,
@@ -3756,7 +3760,7 @@
       "json": true,
       "shape": "list",
       "sample_value": {
-        "length": 2,
+        "length": 1,
         "first_items": [
           {
             "id": 1,
@@ -3769,18 +3773,6 @@
             "max_score": 20.0,
             "status": "attempted",
             "score": 19.0
-          },
-          {
-            "id": 2,
-            "title": "آزمون پیش‌نویس",
-            "course_title": "فیزیک دوکلاسه",
-            "date": "1405/07/01",
-            "duration": 45,
-            "description": "",
-            "due_date": "",
-            "max_score": 20.0,
-            "status": "pending",
-            "score": null
           }
         ]
       },
@@ -4156,18 +4148,99 @@
       "path": "/finance/parent/dashboard",
       "handler": "routers.finance.get_parent_financial_dashboard",
       "role": "parent",
-      "status": 403,
+      "status": 200,
       "json": true,
       "shape": "object",
       "sample_value": {
-        "detail": "نقش کاربری برای این دسترسی معتبر نیست"
+        "wallet": {
+          "balance": -5000,
+          "wallet_teacher": -10000,
+          "wallet_institute": 5000,
+          "total_paid": 800000,
+          "total_debt": 2000000
+        },
+        "enrollments": {
+          "length": 2,
+          "first_items": [
+            {
+              "enrollment_id": "<nested>",
+              "course_id": "<nested>",
+              "course_title": "<nested>",
+              "teacher_id": "<nested>",
+              "teacher_name": "<nested>",
+              "is_unassigned": "<nested>",
+              "total_tuition": "<nested>",
+              "discount": "<nested>",
+              "final_tuition": "<nested>",
+              "total_paid": "<nested>",
+              "outstanding": "<nested>"
+            },
+            {
+              "enrollment_id": "<nested>",
+              "course_id": "<nested>",
+              "course_title": "<nested>",
+              "teacher_id": "<nested>",
+              "teacher_name": "<nested>",
+              "is_unassigned": "<nested>",
+              "total_tuition": "<nested>",
+              "discount": "<nested>",
+              "final_tuition": "<nested>",
+              "total_paid": "<nested>",
+              "outstanding": "<nested>"
+            }
+          ]
+        },
+        "installments": {
+          "length": 3,
+          "first_items": [
+            {
+              "id": "<nested>",
+              "course_title": "<nested>",
+              "amount": "<nested>",
+              "due_date": "<nested>",
+              "is_paid": "<nested>",
+              "status": "<nested>",
+              "paid_at": "<nested>"
+            },
+            {
+              "id": "<nested>",
+              "course_title": "<nested>",
+              "amount": "<nested>",
+              "due_date": "<nested>",
+              "is_paid": "<nested>",
+              "status": "<nested>",
+              "paid_at": "<nested>"
+            }
+          ]
+        },
+        "recent_transactions": {
+          "length": 2,
+          "first_items": [
+            {
+              "id": "<nested>",
+              "amount": "<nested>",
+              "date": "<nested>",
+              "description": "<nested>",
+              "type": "<nested>",
+              "target_wallet": "<nested>"
+            },
+            {
+              "id": "<nested>",
+              "amount": "<nested>",
+              "date": "<nested>",
+              "description": "<nested>",
+              "type": "<nested>",
+              "target_wallet": "<nested>"
+            }
+          ]
+        }
       },
       "error": null,
       "invalid_target": true,
       "status_500": false,
       "empty": null,
       "invalid": {
-        "status": 403,
+        "status": 200,
         "json": true,
         "shape": "object",
         "status_500": false
@@ -4990,6 +5063,7 @@
             "description": "حل تمرین",
             "due_date": "1405/07/01",
             "status": "submitted",
+            "max_score": 20.0,
             "score": null,
             "feedback": null
           }
@@ -5122,11 +5196,11 @@
       "path": "/messages/broadcast",
       "handler": "routers.messages.send_broadcast_message",
       "role": "admin",
-      "status": 200,
+      "status": 400,
       "json": true,
       "shape": "object",
       "sample_value": {
-        "message": "پیام گروهی با موفقیت ارسال شد"
+        "detail": "نوع گیرنده پیام گروهی نامعتبر است"
       },
       "error": null,
       "invalid_target": true,
@@ -6237,14 +6311,14 @@
             "target_group": "notif_student_4",
             "message_text": "🔔 💰 سررسید قسط شهریه شما\nبدینوسیله به اطلاع می‌رساند قسط شهریه شما به مبلغ 350,000 تومان سررسید ***/07/01 شده است. لطفاً اقدام فرمایید.",
             "sent_count": 1,
-            "date": "2026/10/05 07:02"
+            "date": "2026/10/07 15:39"
           },
           {
             "id": 6,
             "target_group": "notif_parent_5",
             "message_text": "🔔 💰 سررسید قسط شهریه فرزند شما\nبدینوسیله به اطلاع می‌رساند قسط شهریه فرزند شما دانش‌آموز به مبلغ 350,000 تومان سررسید ***/07/01 شده است. لطفاً جهت تسویه حساب...",
             "sent_count": 1,
-            "date": "2026/10/05 07:02"
+            "date": "2026/10/07 15:39"
           }
         ]
       },
@@ -6698,7 +6772,7 @@
             "type": "sms",
             "type_label": "پیامک",
             "summary": "سلام ولی محترم دانش‌آموز دانش‌آموز تست 1، بدینوسیله به اطلاع می‌رساند قسط شهریه فرزند شما به مبلغ 350,000 تومان سررسید 1405/07/01 شده است. لطفاً جهت واریز اق...",
-            "date": "2026/10/05 07:02",
+            "date": "2026/10/07 15:39",
             "sender": "آموزشگاه",
             "recipient": "ولی دانش‌آموز تست 1",
             "direction": "incoming",
@@ -6709,7 +6783,7 @@
             "type": "sms",
             "type_label": "پیامک",
             "summary": "سلام ولی محترم دانش‌آموز دانش‌آموز تست 1، بدینوسیله به اطلاع می‌رساند قسط شهریه فرزند شما به مبلغ 350,000 تومان سررسید 1405/06/01 شده است. لطفاً جهت واریز اق...",
-            "date": "2026/10/05 07:02",
+            "date": "2026/10/07 15:39",
             "sender": "آموزشگاه",
             "recipient": "ولی دانش‌آموز تست 1",
             "direction": "incoming",
@@ -7141,7 +7215,7 @@
           "live_session_id": 1,
           "course_id": 2,
           "class_name": "فیزیک دوکلاسه",
-          "started_at_ts": 1790586000.25,
+          "started_at_ts": 1790586000,
           "elapsed_minutes": 0
         },
         "next_class": null,
@@ -7311,8 +7385,8 @@
       "shape": "object",
       "sample_value": {
         "period_days": 30,
-        "period_start": "2026/09/05",
-        "period_end": "2026/10/05",
+        "period_start": "2026/09/07",
+        "period_end": "2026/10/07",
         "average_delay_minutes": 0.0,
         "delay_samples_count": 2,
         "live_sessions_last_30_days": 2,

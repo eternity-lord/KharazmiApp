@@ -38,6 +38,21 @@ def test_route_call_evidence_includes_test_name_and_source_line():
     assert all("_alerts_from(client.get(" in source_lines[call[4] - 1] for call in matches)
 
 
+def test_helper_request_is_not_misattributed_to_the_previous_test():
+    source = ROOT / "tests/route_audit/test_known_bugs.py"
+    calls = extract_calls(source)
+    deletion_calls = [
+        call for call in calls
+        if call[0] == "DELETE" and call[1].startswith("/classes/")
+    ]
+    assert {call[3] for call in deletion_calls} == {
+        "test_O19_restore_class_restores_operational_history_and_optional_finance",
+        "test_O19_financial_restore_blocks_spent_credit_atomically_but_allows_operational",
+        "test_O19_restore_conflict_does_not_partially_restore_class_or_history",
+    }
+    assert len({call[4] for call in deletion_calls}) == 1
+
+
 def test_audit_trail_ledger_shows_one_line_reference_per_test():
     source = ROOT / "tests/route_audit/test_audit_audit_trail.py"
     calls = extract_calls(source)

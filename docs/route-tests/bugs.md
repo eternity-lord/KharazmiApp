@@ -7,7 +7,6 @@
 | ID | Area / severity | Strict reproduction | Expected | Observed | User-visible consumer / evidence |
 |---|---|---|---|---|---|
 
-| O-19 / `RA-admin-19` | Class restore implementation · medium; product decision recorded | `test_O19_restore_class_restores_financial_history_atomically` | Restore full class information; a checkbox determines whether financial information/history is included or omitted. | Current implementation remains `metadata_only` and leaves financial history untouched; strict xfail tracks the unimplemented restore contract. | Deleted-class restore / finance views. Q-005 is resolved; implementation/UI follow-up remains. |
 
 
 
@@ -27,6 +26,7 @@
 
 | ID | Current status | Verification |
 |---|---|---|
+| O-19 / `RA-admin-19` | **Closed here; financial history is opt-in and fail-closed.** | Restore returns class/enrollments/sessions by default and exposes a financial-history checkbox for deletions with row-level provenance. Checked restore atomically reactivates deletion-scoped transactions/installments and reverses only recorded wallet credits; it rejects spent credits (409) and blocks finance for legacy deletions without provenance. Server/UI contract regressions cover success, no-finance restore, legacy data, wallet insufficiency and session conflict. Android build/device execution remains unrun by scope. |
 | O-02 / `RA-auth-02` | **Client integration complete; Firebase project configuration/device check pending.** | Android obtains/refreshes FCM tokens, registers them through `POST /auth/device_token` after successful admin/teacher/student/parent login, and sends the current token on logout so the server removes that device registration. Source-contract regressions verify the wiring; real token generation/delivery is not claimed until the four Firebase client settings are supplied and a device test is run. |
 | O-12 / `RA-exams-02` | **Closed here; not xfailed.** | `/exams/student/list` filters `Exam.status == "published"`; the audit seed's pending exam is omitted and the route regression passes. |
 | `RA-finance-02` | **Closed here; not xfailed.** | Parent handler forwards the authenticated `_role` into the child dashboard helper; valid parent now gets HTTP 200 and the seeded wallet balance. |
@@ -54,7 +54,7 @@
 
 ## Contract simulator candidates not counted as confirmed bugs
 
-The fresh Kotlin/Gson report is intentionally a **candidate detector**, not a product-bug count. It reports `parse=4`, `npe=5`, and `silent_zero=8`; all candidates were reviewed against current Android call sites before registry classification.
+The fresh Kotlin/Gson report is intentionally a **candidate detector**, not a product-bug count. It reports `parse=0`, `npe=5`, and `silent_zero=7`; the raw candidates were reviewed against current Android call sites before registry classification.
 
 - `GET /finance/student/{id}/dashboard`: `recent_transactions` omits fields required by the broad `TransactionFullItem` model; current `StudentProfileActivity.showCreateInstallmentDialog()` reads only enrollments. **Q-008**; not an xfail.
 - `GET /students/my_profile`: `info.parent_mobile` is absent although a shared profile model declares it non-null; current `StudentPortalActivity` displays `name` and `national_code` only. **Q-007**; not an xfail.
@@ -63,7 +63,7 @@ The fresh Kotlin/Gson report is intentionally a **candidate detector**, not a pr
 
 ## Latest isolated route sweep
 
-- **221/221** routes executed; main-request **500 = 0**.
-- **220** invalid-target probes; invalid-request **500 = 0**; **11** empty probes, null-list results = 0.
-- After correcting probe roles and valid fixtures, the only main-request 403 is `GET /finance/parent/dashboard` with a valid parent session, tracked as `RA-finance-02`.
-- Latest full role/status/shape samples are in `tests/route_audit/sweep/report.json`; route-by-route caller/source/DB annotations are in `routes/*.md`.
+- **221/221** routes executed in the 2026-10-07 isolated sweep; main-request **500 = 0**.
+- **220** invalid-target probes; invalid-request **500 = 0**; **11** empty probes, null-list results = 0; **14** non-JSON responses.
+- The current role/status probe has no 403 response; `GET /finance/parent/dashboard` now returns 200 for the valid parent session (`RA-finance-02` is closed).
+- Latest full role/status/shape samples are in `tests/route_audit/sweep/report.json`; route-by-route caller/source/DB annotations are in `routes/*.md`. The Kotlin/Gson simulator now reports 170 declarations, 159 unique calls and 157 static routes; `parse=0`, `npe=5`, `silent_zero=7`.

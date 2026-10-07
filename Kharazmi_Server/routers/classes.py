@@ -1038,7 +1038,7 @@ def delete_class_endpoint(
         raise HTTPException(status_code=404, detail="کلاس یافت نشد")
 
     snapshot = _build_class_deletion_snapshot(db, course)
-    _apply_class_deletion(db, course, forgive_session_charges)
+    snapshot["restore_provenance"] = _apply_class_deletion(db, course, forgive_session_charges)
     # ثبت ردیف تاییدشده برای یکدستی تاریخچه حسابرسی
     # FIX H9: شناسه‌ی تصمیم‌گیرنده باید کاربر واقعی همین درخواست باشد (الگوی H8-P2).
     # چون check_admin_access بالا توکن خراب را از قبل رد کرده، None عملاً نباید بماند (فقط safety net).
@@ -1131,17 +1131,62 @@ def _build_class_deletion_snapshot(db: Session, course) -> dict:
 
 
 def _apply_class_deletion(db: Session, course, forgive_session_charges: bool):
-    """اعمال حذف: آرشیو کلاس و ثبت‌نام‌ها + (در صورت تیک) ابطال مالی جلسات."""
+    """Archive a class and return deletion-scoped restore provenance.
+
+    Only rows actually transitioned by this deletion are recorded. Financial
+    row snapshots and wallet credits are stored with the approved deletion
+    request so later restores can be exact and fail closed on legacy records.
+    """
     from dependencies import perform_delete_enrollment
+
     course.is_deleted = True
-    enrollments = db.query(Enrollment).filter(Enrollment.is_deleted == False, Enrollment.course_id == course.id).all()
-    for en in enrollments:
-        perform_delete_enrollment(en, db, forgive_session_charges=forgive_session_charges)
-    if forgive_session_charges:
-        # جلسات از چرخه مالی خارج می‌شوند ولی سابقه‌شان برای تاریخچه می‌ماند
-        db.query(SessionLog).filter(SessionLog.is_deleted == False, SessionLog.course_id == course.id).update(
-            {SessionLog.is_deleted: True}, synchronize_session="fetch"
+    enrollment_ids = []
+    transaction_rows = []
+    installment_rows = []
+    wallet_credits = {}
+    enrollments = db.query(Enrollment).filter(
+        Enrollment.is_deleted == False,
+        Enrollment.course_id == course.id,
+    ).all()
+    for enrollment in enrollments:
+        effect = perform_delete_enrollment(
+            enrollment, db, forgive_session_charges=forgive_session_charges
         )
+        if not effect.get("enrollment_archived"):
+            continue
+        enrollment_ids.append(int(enrollment.id))
+        transaction_rows.extend(effect.get("transaction_rows") or [])
+        installment_rows.extend(effect.get("installment_rows") or [])
+        for raw_student_id, amounts in (effect.get("wallet_credits") or {}).items():
+            student_id = int(raw_student_id)
+            aggregate = wallet_credits.setdefault(student_id, {"teacher": 0, "institute": 0})
+            aggregate["teacher"] += int(amounts.get("teacher") or 0)
+            aggregate["institute"] += int(amounts.get("institute") or 0)
+
+    session_ids = []
+    if forgive_session_charges:
+        session_ids = [int(row[0]) for row in db.query(SessionLog.id).filter(
+            SessionLog.is_deleted == False,
+            SessionLog.course_id == course.id,
+        ).all()]
+        if session_ids:
+            db.query(SessionLog).filter(
+                SessionLog.id.in_(session_ids),
+                SessionLog.is_deleted == False,
+            ).update({SessionLog.is_deleted: True}, synchronize_session="fetch")
+
+    return {
+        "version": 1,
+        "enrollment_ids": sorted(set(enrollment_ids)),
+        "session_ids": sorted(set(session_ids)),
+        "transaction_rows": sorted(transaction_rows, key=lambda row: int(row["id"])),
+        "installment_rows": sorted(installment_rows, key=lambda row: int(row["id"])),
+        "wallet_credits": [
+            {"student_id": student_id, **amounts}
+            for student_id, amounts in sorted(wallet_credits.items())
+        ],
+    }
+
 
 
 @router.post("/classes/{course_id}/request_delete")
@@ -1247,7 +1292,15 @@ def approve_class_deletion(request_id: int, db: Session = Depends(get_db), _: st
         req.decided_by_user_id = _actor_user_id
         db.commit()
         raise HTTPException(status_code=400, detail="کلاس قبلاً حذف شده است؛ درخواست بسته شد")
-    _apply_class_deletion(db, course, req.forgive_session_charges)
+    provenance = _apply_class_deletion(db, course, req.forgive_session_charges)
+    try:
+        deletion_snapshot = json.loads(req.snapshot_json or "{}")
+        if not isinstance(deletion_snapshot, dict):
+            deletion_snapshot = {}
+    except (TypeError, ValueError):
+        deletion_snapshot = _build_class_deletion_snapshot(db, course)
+    deletion_snapshot["restore_provenance"] = provenance
+    req.snapshot_json = json.dumps(deletion_snapshot, ensure_ascii=False, default=str)
     req.status = "approved"
     req.decided_at = datetime.datetime.now()
     req.decided_by_user_id = _actor_user_id

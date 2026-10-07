@@ -6,7 +6,7 @@
 
 ## دامنه و مرحلهٔ صفر
 
-- ورودی اصلی نگاشت، `docs/app-map/*` است و دست‌نخورده مانده. server map، 221 route در 25 router را inventory می‌کند.
+- ورودی اصلی نگاشت، `docs/app-map/*` است و route path inventory آن حفظ شده است؛ metadata پنج route مربوط به حذف/تأیید حذف/جزئیات/بازیابی کلاس برای provenance و فیلدهای O-19 به‌روزرسانی شد. server map همچنان 221 route در 25 router دارد.
 - مقایسهٔ Android جاری با نگاشت تاریخی در `android-api-current.csv` و `android-route-diff.md`: 170 declaration در Kotlin جاری، 162 در map تاریخی، 159 زوج یکتای method/path، 157 مسیر static یکتا، 1 `@Url` پویا، 64 server-only و 0 Android-only؛ route جدید `/auth/device_token` اکنون caller مستقیم دارد.
 - این map، retrofit caller/screen، response data class/field، handler/source، ورودی OpenAPI، DB read/write استاتیک و side effect را کنار هم قرار می‌دهد. 25 ledger در `routes/*.md`، 221 route را پوشش می‌دهند.
 - seed canonical پایدار و مستقل است: 30 دانش‌آموز، 7 کلاس، 7 enrollment، 6 transaction، 3 session، 4 attendance، 4 installment، 2 grade، 1 homework و 2 exam؛ timestamp/JWT/hash deterministic هستند. fixture حجیم مستقل 300 دانش‌آموز، 30 کلاس، 300 transaction و 300 session دارد.
@@ -17,24 +17,24 @@
 | Probe | نتیجه |
 |---|---|
 | Route smoke | 221/221 route اجرا شد؛ status 500 = 0 |
-| Status اصلی | `200:182`, `400:17`, `422:8`, `404:7`, `409:5`, `403:1`, `401:1` |
+| Status اصلی | `200:182`, `400:18`, `401:1`, `404:7`, `409:5`, `422:8`; هیچ 403 مشاهده نشد |
 | Actor probe | admin=168، teacher=21، student=18، public=9، parent=5؛ این نقش‌ها probe هستند، نه اثبات کامل مجوز route |
-| Invalid-input | 220/221 route هدف invalid-target دارند؛ invalid status 500 = 0 |
+| Invalid-input | 220/221 route هدف invalid-target دارند؛ statusها `422:146`, `200:71`, `400:3`, `404:1`; invalid status 500 = 0 |
 | Empty probes | 11؛ null-list مشاهده‌شده = 0 |
 | Non-JSON | 14 پاسخ در sweep؛ endpointهایی که HTML/file/empty response دارند باید با contract خودشان تفسیر شوند |
 | Boundary | 4 route، 500=0؛ `Exam.max_score=12.5`, transaction=`2147483649`, empty string/null/list بررسی شد؛ 5 خام Gson-candidate، 0 مورد تأییدشده |
 | Large | هر 8 check مربوط به limit/order/filter/count/debtors/session سبز؛ تمام statusها 200 |
 
-در sweep مورخ 2026-10-05 تنها 403 اجرای اصلی، `GET /finance/parent/dashboard` با parent session معتبر بود (`RA-finance-02`). این defect از آن زمان در checkout بسته شده است؛ وضعیت fix و regression آن در `bugs.md` است. آمار sweep بالا snapshot تاریخی است، نه اجرای مجدد پس از fix.
+این آمار از اجرای مجدد runnerها در 2026-10-07 است. `GET /finance/parent/dashboard` با parent session معتبر اکنون 200 می‌دهد (`RA-finance-02` بسته)؛ هیچ 403 در route smoke جدید ثبت نشد.
 
 ## Retrofit ↔ Kotlin/Gson simulator
 
 اسکریپت شبیه‌ساز، declarationها و data classهای Kotlin فعلی را با payloadهای واقعی route مقایسه می‌کند؛ **Gradle/Gson runtime یا گوشی اجرا نشده است**.
 
 ```text
-169 declarations; 158 unique calls; 156 unique static method/path routes
- dynamic=1; unmatched=0; route_non_success=28; successful_non_json=4
- empty_json_body=0; parse=4; npe=5; silent_zero=8
+170 declarations; 159 unique calls; 157 unique static method/path routes
+ dynamic=1; unmatched=0; route_non_success=29; successful_non_json=4
+ empty_json_body=0; parse=0; npe=5; silent_zero=7
  missing_key=0; simulation_gap=0
 ```
 
@@ -44,7 +44,7 @@
 
 - تمام 25 router دارای testهای متمرکز هستند: ai, audit, audit_trail, auth, finance, attendance, classes, admin, teachers, students, dashboard, reports, analytics, exports, exams, homework, parent, crm, automation, branches, calendar, dunning, messages, serve_upload, timeline. پوشش این 221 route **partial** است و تمام transitionها/branchهایشان عمیق نشده‌اند.
 - 151 route در test sourceها literal client request reference دارند؛ این شمارش، عمق assertion را ثابت نمی‌کند. 70 مسیر literal match ندارند. ledger هر route test-reference یا smoke-only را مشخص می‌کند.
-- finance دارای oracle مستقل tuition/discount/payment/due، split wallet، FIFO installment allocation و receipt/reversal است. invariantهای retry شامل direct payment، installment payment، session charge و teacher settlement/reversal بررسی شده‌اند؛ `target_wallet=both`، معنای income، واحد مبلغ، بی‌تاریخی و restore در questions ثبت‌اند.
+- finance دارای oracle مستقل tuition/discount/payment/due، split wallet، FIFO installment allocation و receipt/reversal است. invariantهای retry شامل direct payment، installment payment، session charge و teacher settlement/reversal بررسی شده‌اند؛ `target_wallet=both`، معنای income، واحد مبلغ و بی‌تاریخی در questions ثبت‌اند. restore کلاس بر اساس Q-005 با checkbox اختیاری، provenance مالی و rollback اتمی پیاده‌سازی و تست شده است.
 - AI route برای admin/teacher/student/parent با actor fixture درست، tool-data دقیق، response contract و نبود DB side effect بررسی شد. `RA-ai-01` بسته است؛ history بعد از append نیز به حداکثر 15 پیام محدود می‌شود.
 - Audit route با seed خالی، خروجی read-only، early/delayed-session alerts، rapid-delete در پنجرهٔ 30 روز با حد <1h (رد دقیقاً 1h) و perfect-attendance روی ده session آخر؛ absent خارج از پنجره نادیده گرفته می‌شود بررسی شد؛ regressionهای read مسیر DB را تغییر ندادند.
 - Audit-trail route با فیلتر/جست‌وجوی transaction و installment، خروجی دقیق Android DTO، تاریخ ISO/Jalali، صفحه‌بندی و ردیف‌های یتیم/soft-deleted بررسی شد. Rollback یک update مالی، هم مقدار تراکنش و هم لاگ ممیزی را برمی‌گرداند. `RA-audit_trail-01` بسته است؛ بازهٔ تاریخ-only وارونه در هر دو قالب ISO و Jalali با 400 رد می‌شود.
@@ -62,15 +62,15 @@
 
 ## باگ‌ها و xfailها
 
-آخرین اجرای کامل `PYTHONPATH=. /tmp/kharazmi-route-audit-venv/bin/pytest -q -rx tests/route_audit` در 2026-10-07:
+آخرین اجرای کامل `PYTHONPATH=. /tmp/kharazmi-route-audit-venv/bin/pytest -q tests/route_audit --basetemp=/tmp/kharazmi-route-audit-final-o19-20261007` در 2026-10-07:
 
 ```text
-244 passed, 1 xfailed, 4 warnings in 20.40s
+249 passed, 0 xfailed, 4 warnings in 24.42s
 ```
 
-Messages suite جداگانه: **14 passed**, شامل no-write HTTP 400 برای `target_type="role"` و ناشناخته و no-write HTTP 422 برای participant arrays ناقص. دیتابیس اصلی پیش/پس از اجرای suite بدون تغییر بود (`f048f8d118b33c4eaa944490594121d7`); route tests از DB موقت استفاده می‌کنند.
+هم‌زمانی O-19 در `Kharazmi_Server/tests`: **1279 passed, 87 warnings in 132.30s**؛ targeted restore/archive tests نیز **27 passed**. `Kharazmi_Server/gaj_db.db` قبل و بعد همان `f048f8d118b33c4eaa944490594121d7` بود؛ تست‌ها و runnerها از DBهای موقت استفاده کردند.
 
-تنها strict xfail باقی‌مانده در suite کامل `O-19/RA-admin-19` است (پیاده‌سازی restore کامل کلاس با checkbox مالی؛ تصمیم Q-005 ثبت شده است). O-02 Android source wiring اکنون تست عادی و سبز دارد؛ Firebase runtime هنوز device-test نشده است. سایر fixهای تأییدشده و reproductionها در `bugs.md` هستند؛ RA-messages-01/02/03 بسته‌اند. Unexpected-pass همچنان خطای suite است.
+O-19 / `RA-admin-19` بسته است: کلاس و history عملیاتی به‌طور پیش‌فرض بازمی‌گردند؛ checkbox خاموش تراکنش‌ها، اقساط و wallet را دست‌نخورده می‌گذارد؛ checkbox روشن فقط اثرهای مالیِ دارای provenance همان حذف را اتمی برمی‌گرداند. اعتبار خرج‌شده یا حذف قدیمی بی‌provenance مالی با 409 و بدون تغییر رد می‌شود. Android source/contract wiring تست شده، اما full Android build و device QA اجرا نشده‌اند. O-02 Firebase runtime نیز تا دریافت تنظیمات پروژه و تست device تأیید نشده است؛ fixهای دیگر و reproductionها در `bugs.md` هستند.
 
 ## ناتمام‌ها و مراجع
 

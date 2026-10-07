@@ -14,7 +14,7 @@ import secrets  # FIX H12: پسورد تصادفی امن (الگوی C12)
 
 import models
 from models import (
-    Attendance, Course, Enrollment, Grade, InstituteShare, SessionLog, SmsLog, Student, Teacher, Transaction, User, UserSession, InstituteSettings, ActivityLog, Notification, DeviceToken, Room, Conversation, ConversationParticipant, Message, Exam, ExamQuestion, ExamAttempt, Lead, ClassRestoreLog
+    Attendance, Course, Enrollment, Grade, InstituteShare, SessionLog, SmsLog, Student, Teacher, Transaction, Installment, User, UserSession, InstituteSettings, ActivityLog, Notification, DeviceToken, Room, Conversation, ConversationParticipant, Message, Exam, ExamQuestion, ExamAttempt, Lead, ClassRestoreLog
 )
 from schemas import (
     HistoryRequest, LoginRequest, TeacherInfo, FullTeacherProfile, StudentCreate, TeacherCreate, CourseCreate, EnrollmentCreate, GradeCreate, GradeItem, AttendanceLogRequest, AttendanceItem, AttendanceSubmitData, SmsSendRequest, ChangePasswordRequest, StudentProfileInfo, FullStudentProfile, TeacherProfileInfo, FullTeacherProfile, ClassReportInfo, ClassStudentData, ClassSessionHistory, FullClassReport, ShareConfigModel, StudentUpdate, TeacherUpdate, PersonListItem, TransactionUpdate, StudentAttendanceHistoryRequest, AdvancedSearchItem, FinanceSubmitData, PrintReceiptRequest, TransactionTestData, BulkSmsRequest, BulkSuspendRequest, InstituteSettingsModel, PricingTableUpdateModel, TeacherListItem, SmsHistoryItem, PendingTeacherItem
@@ -370,34 +370,31 @@ def reject_class(
     c = db.query(Course).filter(Course.id == course_id).first()
     if not c:
         raise HTTPException(status_code=404, detail="کلاس یافت نشد")
+    if c.is_deleted is True:
+        # حفظ idempotency برای فراخوانی تکراری؛ حذف جدید پس از restore رکورد تازه می‌سازد.
+        return {"message": "کلاس قبلاً حذف و آرشیو شده است.", "reason": (reason or "").strip()}
 
     clean_reason = (reason or "").strip()
     if not clean_reason:
         clean_reason = "رد درخواست توسط مدیر"
     c.rejection_reason = clean_reason
     snapshot = _build_class_deletion_snapshot(db, c)
-    # idempotent: اعمال دوباره بی‌اثر است (حذف‌های نرم، claim اتمیک در perform_delete_enrollment)
-    _apply_class_deletion(db, c, True)
+    # همین مسیر نیز provenance دقیق همان حذف را در رکورد تاییدشده نگه می‌دارد.
+    snapshot["restore_provenance"] = _apply_class_deletion(db, c, True)
 
-    # FIX(A2): رکورد حسابرسی — فقط اگر قبلاً رکورد تاییدشده‌ای برای این کلاس نباشد
-    # (الگوی «بدون تکرار» تا فراخوانی دوباره، تاریخچه را شلوغ نکند).
-    existing = db.query(models.ClassDeletionRequest).filter(
-        models.ClassDeletionRequest.course_id == c.id,
-        models.ClassDeletionRequest.status == "approved",
-    ).first()
-    if existing is None:
-        from dependencies import resolve_actor_user_id
-        _actor_user_id = resolve_actor_user_id(db, authorization)
-        db.add(models.ClassDeletionRequest(
-            course_id=c.id,
-            requested_by_role="admin",
-            requested_by_user_id=_actor_user_id,
-            forgive_session_charges=True,
-            status="approved",
-            snapshot_json=json.dumps(snapshot, ensure_ascii=False, default=str),
-            decided_at=datetime.datetime.now(),
-            decided_by_user_id=_actor_user_id,
-        ))
+    # هر چرخهٔ حذف جدید پس از restore باید رکورد مستقل و provenance مستقل داشته باشد.
+    from dependencies import resolve_actor_user_id
+    _actor_user_id = resolve_actor_user_id(db, authorization)
+    db.add(models.ClassDeletionRequest(
+        course_id=c.id,
+        requested_by_role="admin",
+        requested_by_user_id=_actor_user_id,
+        forgive_session_charges=True,
+        status="approved",
+        snapshot_json=json.dumps(snapshot, ensure_ascii=False, default=str),
+        decided_at=datetime.datetime.now(),
+        decided_by_user_id=_actor_user_id,
+    ))
     db.add(ActivityLog(
         admin_username="group6", action="class_reject", target_id=c.id,
         target_name=c.title, details=clean_reason
@@ -1821,6 +1818,124 @@ def _archive_jalali(dt: Optional[datetime.datetime]) -> dict:
     }
 
 
+def _normalize_class_restore_provenance(value):
+    """Return a validated v1 deletion ledger, or None for legacy/incomplete snapshots."""
+    if not isinstance(value, dict) or type(value.get("version")) is not int or value["version"] != 1:
+        return None
+    list_keys = ("enrollment_ids", "session_ids", "transaction_rows", "installment_rows", "wallet_credits")
+    if any(not isinstance(value.get(key), list) for key in list_keys):
+        return None
+    for key in ("enrollment_ids", "session_ids"):
+        rows = value[key]
+        if any(not isinstance(row, int) or isinstance(row, bool) or row <= 0 for row in rows):
+            return None
+        if len(rows) != len(set(rows)):
+            return None
+
+    transaction_keys = {
+        "id", "student_id", "course_id", "enrollment_id", "session_id", "type",
+        "amount", "share_teacher", "share_institute", "is_reversed", "wallet_credited",
+    }
+    nullable_integer_fields = (
+        "student_id", "course_id", "enrollment_id", "session_id", "amount",
+        "share_teacher", "share_institute",
+    )
+    transaction_ids = []
+    for row in value["transaction_rows"]:
+        if not isinstance(row, dict) or not transaction_keys.issubset(row):
+            return None
+        if not isinstance(row.get("id"), int) or isinstance(row.get("id"), bool) or row["id"] <= 0:
+            return None
+        if any(field_value is not None and (not isinstance(field_value, int) or isinstance(field_value, bool))
+               for field_value in (row.get(field) for field in nullable_integer_fields)):
+            return None
+        if row.get("type") is not None and not isinstance(row.get("type"), str):
+            return None
+        if not isinstance(row.get("is_reversed"), bool) or row["is_reversed"]:
+            return None
+        if not isinstance(row.get("wallet_credited"), bool):
+            return None
+        if row["wallet_credited"] and (row.get("type") != "session_charge" or row.get("student_id") is None):
+            return None
+        transaction_ids.append(row["id"])
+    if len(transaction_ids) != len(set(transaction_ids)):
+        return None
+
+    installment_keys = {"id", "enrollment_id", "amount", "due_date", "is_paid", "paid_at", "paid_amount"}
+    installment_ids = []
+    for row in value["installment_rows"]:
+        if not isinstance(row, dict) or not installment_keys.issubset(row):
+            return None
+        if (not isinstance(row.get("id"), int) or isinstance(row.get("id"), bool) or row["id"] <= 0
+                or not isinstance(row.get("enrollment_id"), int)
+                or isinstance(row.get("enrollment_id"), bool)
+                or row["enrollment_id"] <= 0):
+            return None
+        for field in ("amount", "paid_amount"):
+            field_value = row.get(field)
+            if field_value is not None and (not isinstance(field_value, int) or isinstance(field_value, bool)):
+                return None
+        for field in ("due_date", "paid_at"):
+            field_value = row.get(field)
+            if field_value is not None and not isinstance(field_value, str):
+                return None
+        if not isinstance(row.get("is_paid"), bool):
+            return None
+        installment_ids.append(row["id"])
+    if len(installment_ids) != len(set(installment_ids)):
+        return None
+
+    credits_by_student = {}
+    for row in value["wallet_credits"]:
+        if not isinstance(row, dict) or not {"student_id", "teacher", "institute"}.issubset(row):
+            return None
+        student_id = row.get("student_id")
+        if not isinstance(student_id, int) or isinstance(student_id, bool) or student_id <= 0:
+            return None
+        if student_id in credits_by_student:
+            return None
+        if any(not isinstance(row.get(field), int) or isinstance(row.get(field), bool)
+               for field in ("teacher", "institute")):
+            return None
+        credits_by_student[student_id] = row
+
+    expected_credits = {}
+    for row in value["transaction_rows"]:
+        if row["wallet_credited"]:
+            amounts = expected_credits.setdefault(row["student_id"], {"teacher": 0, "institute": 0})
+            amounts["teacher"] += int(row.get("share_teacher") or 0)
+            amounts["institute"] += int(row.get("share_institute") or 0)
+    if set(credits_by_student) != set(expected_credits):
+        return None
+    for student_id, credit in credits_by_student.items():
+        expected = expected_credits[student_id]
+        if any(credit[field] != expected[field] for field in ("teacher", "institute")):
+            return None
+    return value
+
+
+def _latest_class_restore_provenance(db: Session, course_id: int):
+    record = (
+        db.query(models.ClassDeletionRequest)
+        .filter(
+            models.ClassDeletionRequest.course_id == course_id,
+            models.ClassDeletionRequest.status == "approved",
+            models.ClassDeletionRequest.snapshot_json.isnot(None),
+        )
+        .order_by(models.ClassDeletionRequest.id.desc())
+        .first()
+    )
+    if not record:
+        return None
+    try:
+        snapshot = json.loads(record.snapshot_json or "{}")
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(snapshot, dict):
+        return None
+    return _normalize_class_restore_provenance(snapshot.get("restore_provenance"))
+
+
 def _archived_snapshot_students(db: Session, course_id: int) -> dict:
     """اسنپ‌شات مالی لحظهٔ حذف/درخواست حذف (student_id → ردیف). خرابیِ JSON ⇒ خالی (بدون کرش)."""
     row = (
@@ -2006,8 +2121,9 @@ def _archived_class_people_report(db: Session, course, forgive_session_charges: 
 
 
 class ClassRestoreRequest(BaseModel):
-    """ورودی بازیابی کلاس آرشیوشده (فاز ۱ — فقط متادیتا)."""
-    mode: str
+    """Restore class and operational history; financial history is explicit opt-in."""
+    mode: str = "full"
+    include_financial_history: bool = False
     reason: Optional[str] = None
 
 
@@ -2144,6 +2260,7 @@ def get_deleted_class_detail(
         raise HTTPException(status_code=404, detail="کلاس آرشیوشده یافت نشد")
 
     meta = _archived_deletion_meta(db, [course.id]).get(course.id, {})
+    restore_provenance = _latest_class_restore_provenance(db, course.id)
     stats = _archived_class_aggregates(db, [course.id]).get(course.id, {})
     teacher = db.query(Teacher).filter(Teacher.id == course.teacher_id).first() if course.teacher_id else None
     branch = db.query(models.Branch).filter(models.Branch.id == course.branch_id).first() if course.branch_id else None
@@ -2180,6 +2297,7 @@ def get_deleted_class_detail(
         # اطلاعات حذف (از ClassDeletionRequest؛ بدون تاریخ حدسی)
         "deleted_at": _fmt_datetime(meta.get("deleted_at")),
         "has_deletion_record": bool(meta),
+        "financial_restore_available": restore_provenance is not None,
         "forgive_session_charges": bool(meta.get("forgive_session_charges", False)),
         "requested_by_role": meta.get("requested_by_role") or "",
         "admin_note": meta.get("admin_note") or "",
@@ -2197,33 +2315,18 @@ def restore_deleted_class(
     authorization: Optional[str] = Header(None),
     _: str = Depends(check_admin_access),
 ):
-    """FIX(D1) — بازیابی **فقط متادیتا** کلاس آرشیوشده (فاز ۱ طراحیِ ممیزی‌شده).
+    """Restore a deleted class and its operational history; finance is explicit opt-in.
 
-    چرا فقط متادیتا؟ در ممیزی `checkpoints/2026-09-20-archived-class-restore-audit.md`
-    ثابت شد restore کامل امروز **امن نیست**: هنگام حذف، پول جابه‌جا می‌شود (وجه جلسات از
-    کیف پول شاگرد کسر و طلب معلم باز می‌شود) ولی هیچ دفتر کلّی از آن حرکت وجود ندارد؛
-    فلپ کردن `is_deleted` ردیف‌های قدیمی ⇒ بستانکاری کیف پول + زنده‌شدن مجدد هزینه‌ها
-    (Double-count)، احیای ردیف‌های برگشت‌خورده، و تضاد ایندکس یکتای جلسه (`IntegrityError`)
-    را به همراه دارد. بنابراین فاز ۱ فقط پوستهٔ کلاس را برمی‌گرداند:
-
-      • `Course.is_deleted = False` (کلاس در `/classes/list` و لیست‌های ادمین برمی‌گردد)
-      • ثبت رد پای حسابرسی در جدول جدید `ClassRestoreLog` (actor/reason/pre_state)
-      • **صفر اثر مالی**: `Enrollment`، `SessionLog` و `Transaction` آرشیوشده دست‌نخورده
-        می‌مانند ⇒ بدهی، کیف پول و طلب معلم دقیقاً بی‌تغییر.
-
-    پیامد عمدی و مستندشده: کلاس بازیابی‌شده در ابتدا **بدون شاگرد فعال** دیده می‌شود
-    (`students_active_count = 0`) و ادمین برای ادامه، ثبت‌نام جدید می‌سازد — این تنها
-    گزینه‌ای است که «منطق مالی» را دست‌نخورده نگه می‌دارد (شرط صریح کاربر).
-
-    کدهای خطا (مطابق طراحی ممیزی‌شده): 400 (mode نامعتبر) · 404 (شناسه وجود ندارد **یا**
-    کلاس شعبه‌ی دیگر است — مثل نمای آرشیو، بدون نشت وجود رکورد) · 409 (کلاس از قبل فعال است؛
-    مثلاً دو ادمین هم‌زمان روی یک ردیف کلیک کنند ⇒ پیام دوستانه به‌جای خطا یا بازیابی دوباره).
+    New deletions persist exact row-level provenance in the approved deletion
+    request. Financial restore is rejected for legacy/unverifiable deletions and
+    when reversing deletion-created wallet credits would make a wallet negative.
     """
-    if (data.mode or "").strip() != "metadata_only":
-        raise HTTPException(
-            status_code=400,
-            detail="mode نامعتبر؛ در این نسخه فقط \"metadata_only\" پشتیبانی می‌شود (بازیابی کامل عمداً غیرفعال است)",
-        )
+    mode = (data.mode or "").strip()
+    include_finance = bool(data.include_financial_history)
+    if mode not in ("full", "metadata_only"):
+        raise HTTPException(status_code=400, detail="mode نامعتبر؛ مقادیر full و metadata_only پشتیبانی می‌شوند")
+    if mode == "metadata_only" and include_finance:
+        raise HTTPException(status_code=400, detail="بازیابی مالی فقط همراه mode=full مجاز است")
 
     from routers.analytics import get_user_branch_filter  # lazy: جلوگیری از import چرخه‌ای
     resolved_branch = get_user_branch_filter(db, authorization, None)
@@ -2231,16 +2334,135 @@ def restore_deleted_class(
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
         raise HTTPException(status_code=404, detail="کلاس آرشیوشده یافت نشد")
-
-    # همان سیاست نمای آرشیو: ردیف شعبه‌ی دیگر «ناموجود» است (بدون نشت وجود رکورد).
     if resolved_branch is not None and course.branch_id != resolved_branch:
         raise HTTPException(status_code=404, detail="کلاس آرشیوشده یافت نشد")
-
     if course.is_deleted is not True:  # noqa: E712 — فقط ردیف‌های صریحاً آرشیوشده
-        # 409 = «کاری برای انجام نیست»، نه خطای کاربر: کلاس زنده است (بدون تغییر داده).
         raise HTTPException(status_code=409, detail="این کلاس از قبل فعال است و نیازی به بازیابی ندارد")
 
-    # وضعیت پیش از بازیابی (حسابرسی) — بدون حدس زدن تاریخی که ثبت نشده.
+    provenance = _latest_class_restore_provenance(db, course.id)
+    if include_finance and provenance is None:
+        raise HTTPException(
+            status_code=409,
+            detail="برای این حذف قدیمی سابقهٔ مالی قابل‌اعتماد ثبت نشده است؛ بازیابی مالی انجام نشد. گزینهٔ مالی را خاموش کنید تا اطلاعات عملیاتی بازگردد.",
+        )
+
+    if mode == "full":
+        if provenance is not None:
+            enrollment_ids = list(provenance["enrollment_ids"])
+            session_ids = list(provenance["session_ids"])
+        else:
+            # Old snapshots lack row-level operational provenance. Per the approved
+            # policy, operational history can still be restored; finance stays closed.
+            enrollment_ids = [row[0] for row in db.query(Enrollment.id).filter(
+                Enrollment.course_id == course.id,
+                Enrollment.is_deleted == True,  # noqa: E712
+            ).all()]
+            session_ids = [row[0] for row in db.query(SessionLog.id).filter(
+                SessionLog.course_id == course.id,
+                SessionLog.is_deleted == True,  # noqa: E712
+            ).all()]
+    else:
+        enrollment_ids, session_ids = [], []
+
+    enrollment_ids = sorted(set(int(row_id) for row_id in enrollment_ids))
+    session_ids = sorted(set(int(row_id) for row_id in session_ids))
+    enrollments = db.query(Enrollment).filter(Enrollment.id.in_(enrollment_ids)).all() if enrollment_ids else []
+    sessions = db.query(SessionLog).filter(SessionLog.id.in_(session_ids)).all() if session_ids else []
+    if (len(enrollments) != len(enrollment_ids)
+            or any(row.course_id != course.id or row.is_deleted is not True for row in enrollments)):
+        db.rollback()
+        raise HTTPException(status_code=409, detail="وضعیت ثبت‌نام‌های کلاس با سابقهٔ حذف سازگار نیست؛ هیچ تغییری اعمال نشد")
+    if (len(sessions) != len(session_ids)
+            or any(row.course_id != course.id or row.is_deleted is not True for row in sessions)):
+        db.rollback()
+        raise HTTPException(status_code=409, detail="وضعیت جلسات کلاس با سابقهٔ حذف سازگار نیست؛ هیچ تغییری اعمال نشد")
+
+    # The active partial unique index on (course_id, date) must remain valid.
+    for archived_session in sessions:
+        collision = db.query(SessionLog.id).filter(
+            SessionLog.course_id == course.id,
+            SessionLog.date == archived_session.date,
+            SessionLog.is_deleted == False,  # noqa: E712
+            SessionLog.id != archived_session.id,
+        ).first()
+        if collision:
+            db.rollback()
+            raise HTTPException(
+                status_code=409,
+                detail="برای یکی از جلسات آرشیوشده، جلسهٔ فعال دیگری با همان تاریخ وجود دارد؛ هیچ تغییری اعمال نشد.",
+            )
+
+    transaction_rows = provenance["transaction_rows"] if include_finance else []
+    installment_rows = provenance["installment_rows"] if include_finance else []
+    wallet_credits = provenance["wallet_credits"] if include_finance else []
+    enrollment_id_set = set(enrollment_ids)
+    transactions = []
+    installments = []
+    if include_finance:
+        transaction_ids = [int(row["id"]) for row in transaction_rows]
+        transactions = db.query(Transaction).filter(Transaction.id.in_(transaction_ids)).all() if transaction_ids else []
+        if len(transactions) != len(transaction_ids):
+            db.rollback()
+            raise HTTPException(status_code=409, detail="یکی از تراکنش‌های ثبت‌شده در سابقهٔ حذف پیدا نشد؛ هیچ تغییری اعمال نشد")
+        transaction_by_id = {row.id: row for row in transactions}
+        transaction_fields = (
+            "student_id", "course_id", "enrollment_id", "session_id", "type", "amount",
+            "share_teacher", "share_institute",
+        )
+        for expected in transaction_rows:
+            current = transaction_by_id[int(expected["id"])]
+            if current.is_deleted is not True or bool(current.is_reversed):
+                db.rollback()
+                raise HTTPException(status_code=409, detail="وضعیت یکی از تراکنش‌ها پس از حذف تغییر کرده است؛ هیچ تغییری اعمال نشد")
+            if current.course_id != course.id and current.enrollment_id not in enrollment_id_set:
+                db.rollback()
+                raise HTTPException(status_code=409, detail="تراکنش ثبت‌شده به این کلاس تعلق ندارد؛ هیچ تغییری اعمال نشد")
+            def _same_transaction_value(field):
+                current_value = getattr(current, field)
+                expected_value = expected.get(field)
+                if field in ("share_teacher", "share_institute"):
+                    current_value = current_value or 0
+                return current_value == expected_value
+
+            if not all(_same_transaction_value(field) for field in transaction_fields):
+                db.rollback()
+                raise HTTPException(status_code=409, detail="اطلاعات یکی از تراکنش‌ها پس از حذف تغییر کرده است؛ هیچ تغییری اعمال نشد")
+
+        installment_ids = [int(row["id"]) for row in installment_rows]
+        installments = db.query(Installment).filter(Installment.id.in_(installment_ids)).all() if installment_ids else []
+        if len(installments) != len(installment_ids):
+            db.rollback()
+            raise HTTPException(status_code=409, detail="یکی از اقساط ثبت‌شده در سابقهٔ حذف پیدا نشد؛ هیچ تغییری اعمال نشد")
+        installment_by_id = {row.id: row for row in installments}
+        installment_fields = ("enrollment_id", "amount", "due_date", "is_paid", "paid_at", "paid_amount")
+        for expected in installment_rows:
+            current = installment_by_id[int(expected["id"])]
+            if (current.is_deleted is not True
+                    or current.enrollment_id not in enrollment_id_set
+                    or any(getattr(current, field) != expected.get(field) for field in installment_fields)):
+                db.rollback()
+                raise HTTPException(status_code=409, detail="وضعیت یکی از اقساط پس از حذف تغییر کرده است؛ هیچ تغییری اعمال نشد")
+
+        # Preflight the requested reversal; conditional UPDATEs below repeat this
+        # constraint so concurrent spending cannot produce a negative component.
+        for credit in wallet_credits:
+            student = db.query(Student).filter(Student.id == int(credit["student_id"])).first()
+            if not student:
+                db.rollback()
+                raise HTTPException(status_code=409, detail="دانش‌آموزِ دارای اعتبار مالی پیدا نشد؛ هیچ تغییری اعمال نشد")
+            current_teacher = int(student.wallet_teacher or 0)
+            current_institute = int(student.wallet_institute or 0)
+            delta_teacher = int(credit["teacher"])
+            delta_institute = int(credit["institute"])
+            if ((delta_teacher > 0 and current_teacher < delta_teacher)
+                    or (delta_institute > 0 and current_institute < delta_institute)):
+                db.rollback()
+                raise HTTPException(
+                    status_code=409,
+                    detail="اعتبار ایجادشده هنگام حذف خرج شده است و برگشت آن موجودی کیف‌پول را منفی می‌کند؛ بازیابی مالی انجام نشد.",
+                )
+
+    meta = _archived_deletion_meta(db, [course.id]).get(course.id, {})
     pre_state = {
         "is_deleted": True,
         "is_suspended": bool(course.is_suspended),
@@ -2253,9 +2475,9 @@ def restore_deleted_class(
         "archived_transactions": db.query(Transaction).filter(
             Transaction.course_id == course.id, Transaction.is_deleted == True  # noqa: E712
         ).count(),
-        "wallet_debit": 0,  # فاز ۱ به کیف پول دست نمی‌زند
+        "wallet_debit": sum(int(item["teacher"]) + int(item["institute"]) for item in wallet_credits),
+        "financial_restore_available": provenance is not None,
     }
-    meta = _archived_deletion_meta(db, [course.id]).get(course.id, {})
 
     actor_user_id, actor_name = None, ""
     try:
@@ -2267,8 +2489,6 @@ def restore_deleted_class(
     except Exception:
         actor_user_id, actor_name = None, ""
 
-    # FIX(D5): اگر معلمِ کلاس خودش آرشیو (حذف) شده باشد، بازیابی جواب می‌دهد ولی ادمین باید
-    # بداند کلاسِ برگشته **معلم فعال ندارد** (هشدار در پاسخ — بدون هیچ تغییر خودکارِ داده).
     teacher = db.query(Teacher).filter(Teacher.id == course.teacher_id).first() if course.teacher_id else None
     teacher_archived = bool(teacher is not None and teacher.is_deleted is True)
     warnings = []
@@ -2276,43 +2496,144 @@ def restore_deleted_class(
         warnings.append("معلم این کلاس آرشیو (حذف) شده است؛ کلاس بدون معلم فعال برمی‌گردد.")
     elif teacher is None:
         warnings.append("این کلاس معلم ثبت‌شده ندارد؛ پس از بازیابی بدون معلم فعال است.")
+    if mode == "full" and provenance is None:
+        warnings.append("این حذف قدیمی سابقهٔ ردیف‌به‌ردیف ندارد؛ اطلاعات عملیاتی بازیابی شد اما سوابق مالی دست‌نخورده ماند.")
 
-    course.is_deleted = False
-    db.add(ClassRestoreLog(
-        course_id=course.id,
-        mode="metadata_only",
-        reason=(data.reason or "").strip() or None,
-        actor_user_id=actor_user_id,
-        actor_name=actor_name or None,
-        pre_state_json=json.dumps(pre_state, ensure_ascii=False),
-        finance_touched=False,
-    ))
     try:
-        db.add(ActivityLog(
-            admin_username=actor_name or "admin",
-            action="restore_class_metadata",
-            target_id=course.id,
-            target_name=course.title or "",
-            details=f"restore metadata_only — دلیل: {(data.reason or '').strip() or 'ثبت نشده'}",
-        ))
-    except Exception:
-        pass  # رد پای اصلی در ClassRestoreLog است؛ نبود ActivityLog نباید بازیابی را بشکند
+        claimed = db.query(Course).filter(
+            Course.id == course.id,
+            Course.is_deleted == True,  # noqa: E712
+        ).update({Course.is_deleted: False}, synchronize_session=False)
+        if claimed != 1:
+            db.rollback()
+            raise HTTPException(status_code=409, detail="کلاس هم‌زمان بازیابی شده است؛ هیچ تغییری اعمال نشد")
 
-    db.commit()
+        if enrollment_ids:
+            restored = db.query(Enrollment).filter(
+                Enrollment.id.in_(enrollment_ids),
+                Enrollment.course_id == course.id,
+                Enrollment.is_deleted == True,  # noqa: E712
+            ).update({Enrollment.is_deleted: False}, synchronize_session=False)
+            if restored != len(enrollment_ids):
+                db.rollback()
+                raise HTTPException(status_code=409, detail="ثبت‌نام‌ها هم‌زمان تغییر کردند؛ هیچ تغییری اعمال نشد")
+        if session_ids:
+            restored = db.query(SessionLog).filter(
+                SessionLog.id.in_(session_ids),
+                SessionLog.course_id == course.id,
+                SessionLog.is_deleted == True,  # noqa: E712
+            ).update({SessionLog.is_deleted: False}, synchronize_session=False)
+            if restored != len(session_ids):
+                db.rollback()
+                raise HTTPException(status_code=409, detail="جلسات هم‌زمان تغییر کردند؛ هیچ تغییری اعمال نشد")
+
+        if include_finance:
+            transaction_ids = [int(row["id"]) for row in transaction_rows]
+            if transaction_ids:
+                restored = db.query(Transaction).filter(
+                    Transaction.id.in_(transaction_ids),
+                    Transaction.is_deleted == True,  # noqa: E712
+                    Transaction.is_reversed == False,  # noqa: E712
+                ).update({Transaction.is_deleted: False}, synchronize_session=False)
+                if restored != len(transaction_ids):
+                    db.rollback()
+                    raise HTTPException(status_code=409, detail="تراکنش‌ها هم‌زمان تغییر کردند؛ هیچ تغییری اعمال نشد")
+
+            installment_ids = [int(row["id"]) for row in installment_rows]
+            if installment_ids:
+                restored = db.query(Installment).filter(
+                    Installment.id.in_(installment_ids),
+                    Installment.is_deleted == True,  # noqa: E712
+                ).update({Installment.is_deleted: False}, synchronize_session=False)
+                if restored != len(installment_ids):
+                    db.rollback()
+                    raise HTTPException(status_code=409, detail="اقساط هم‌زمان تغییر کردند؛ هیچ تغییری اعمال نشد")
+
+            for credit in wallet_credits:
+                student_id = int(credit["student_id"])
+                delta_teacher = int(credit["teacher"])
+                delta_institute = int(credit["institute"])
+                if not delta_teacher and not delta_institute:
+                    continue
+                teacher_balance = func.coalesce(Student.wallet_teacher, 0) - delta_teacher
+                institute_balance = func.coalesce(Student.wallet_institute, 0) - delta_institute
+                criteria = [Student.id == student_id]
+                wallet_updates = {Student.wallet_balance: teacher_balance + institute_balance}
+                if delta_teacher != 0:
+                    wallet_updates[Student.wallet_teacher] = teacher_balance
+                if delta_institute != 0:
+                    wallet_updates[Student.wallet_institute] = institute_balance
+                if delta_teacher > 0:
+                    criteria.append(func.coalesce(Student.wallet_teacher, 0) >= delta_teacher)
+                if delta_institute > 0:
+                    criteria.append(func.coalesce(Student.wallet_institute, 0) >= delta_institute)
+                updated = db.query(Student).filter(*criteria).update(
+                    wallet_updates,
+                    synchronize_session=False,
+                )
+                if updated != 1:
+                    db.rollback()
+                    raise HTTPException(
+                        status_code=409,
+                        detail="اعتبار حذف‌شده دیگر قابل برگشت امن نیست؛ بازیابی مالی انجام نشد و هیچ تغییری اعمال نشد.",
+                    )
+
+        db.add(ClassRestoreLog(
+            course_id=course.id,
+            mode=mode,
+            reason=(data.reason or "").strip() or None,
+            actor_user_id=actor_user_id,
+            actor_name=actor_name or None,
+            pre_state_json=json.dumps(pre_state, ensure_ascii=False),
+            finance_touched=include_finance,
+        ))
+        try:
+            db.add(ActivityLog(
+                admin_username=actor_name or "admin",
+                action="restore_class_metadata" if mode == "metadata_only" else "restore_class_full",
+                target_id=course.id,
+                target_name=course.title or "",
+                details=f"restore {mode}; include_financial_history={include_finance} — دلیل: {(data.reason or '').strip() or 'ثبت نشده'}",
+            ))
+        except Exception:
+            pass  # دفتر اصلی بازیابی در ClassRestoreLog است؛ ActivityLog تکمیلی است.
+        db.commit()
+    except HTTPException:
+        raise
+    except Exception as error:
+        from sqlalchemy.exc import IntegrityError
+        db.rollback()
+        if isinstance(error, IntegrityError):
+            raise HTTPException(
+                status_code=409,
+                detail="بازیابی با یک دادهٔ فعالِ متعارض روبه‌رو شد؛ هیچ تغییری اعمال نشد.",
+            )
+        raise
+
     db.refresh(course)
+    finance_note = (
+        "سوابق مالی و اعتبارهای برگشتی نیز بازیابی شد."
+        if include_finance
+        else "تراکنش‌ها و موجودی کیف‌پول تغییر نکرد."
+    )
+    if mode == "metadata_only":
+        response_message = "کلاس بازیابی شد (فقط اطلاعات کلاس؛ تاریخچهٔ مرتبط دست‌نخورده ماند)."
+    else:
+        response_message = f"کلاس و تاریخچهٔ عملیاتی بازیابی شد؛ {finance_note}"
     return {
-        "message": "کلاس بازیابی شد (فقط متادیتا) — ثبت‌نام‌ها و سابقهٔ مالی دست‌نخورده است",
+        "message": response_message,
         "id": course.id,
         "title": course.title or "",
         "code": course.code or "",
         "is_deleted": bool(course.is_deleted),
         "is_suspended": bool(course.is_suspended),
-        "mode": "metadata_only",
-        "finances_untouched": True,
-        # FIX(D5): هشدارهای عملیاتی برای ادمین (مثلاً معلم آرشیوشده) — بدون تغییر در داده.
+        "mode": mode,
+        "include_financial_history": include_finance,
+        "finances_untouched": not include_finance,
+        "financial_restore_available": provenance is not None,
         "teacher_archived": teacher_archived,
         "warnings": warnings,
-        "note": "برای ادامهٔ کلاس، ثبت‌نام‌های جدید بسازید؛ سابقهٔ مالی قبلی عمداً بازیابی نشده است.",
+        "note": finance_note,
         "deleted_at_was": _fmt_datetime(meta.get("deleted_at")),
         "reason": (data.reason or "").strip() or "",
     }

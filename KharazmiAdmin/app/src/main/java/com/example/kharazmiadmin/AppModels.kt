@@ -194,6 +194,7 @@ data class ArchivedClassDetail(
     @SerializedName("transactions_total") val transactionsTotal: Long = 0,
     @SerializedName("deleted_at") val deletedAt: String? = null,
     @SerializedName("has_deletion_record") val hasDeletionRecord: Boolean = false,
+    @SerializedName("financial_restore_available") val financialRestoreAvailable: Boolean = false,
     @SerializedName("forgive_session_charges") val forgiveSessionCharges: Boolean = false,
     @SerializedName("requested_by_role") val requestedByRole: String? = null,
     @SerializedName("admin_note") val adminNote: String? = null,
@@ -260,10 +261,10 @@ data class ArchivedSessionRow(
     @SerializedName("absent_unexcused") val absentUnexcused: Int = 0
 )
 
-// FIX(D1): بازیابی «فقط متادیتا» کلاس آرشیوشده — درخواست/پاسخ پنل ادمین.
-// mode اجباری است (سرور فقط metadata_only را می‌پذیرد) و reason اختیاری برای حسابرسی.
+// بازیابی کامل کلاس و تاریخچهٔ عملیاتی؛ برگرداندن سوابق مالی انتخابی و پیش‌فرض خاموش است.
 data class ClassRestoreRequest(
-    @SerializedName("mode") val mode: String = "metadata_only",
+    @SerializedName("mode") val mode: String = "full",
+    @SerializedName("include_financial_history") val includeFinancialHistory: Boolean = false,
     @SerializedName("reason") val reason: String? = null
 )
 
@@ -272,6 +273,8 @@ data class ClassRestoreResponse(
     @SerializedName("id") val id: Int? = null,
     @SerializedName("title") val title: String? = null,
     @SerializedName("mode") val mode: String? = null,
+    @SerializedName("include_financial_history") val includeFinancialHistory: Boolean = false,
+    @SerializedName("financial_restore_available") val financialRestoreAvailable: Boolean = false,
     @SerializedName("finances_untouched") val financesUntouched: Boolean = false,
     @SerializedName("note") val note: String? = null,
     // O-13: هشدارهای سرور دربارهٔ بازیابی (مثلاً «معلم این کلاس آرشیو شده است») — nullable و

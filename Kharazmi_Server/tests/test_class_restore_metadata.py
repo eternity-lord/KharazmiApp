@@ -1,14 +1,10 @@
 # test_class_restore_metadata.py
-# تست‌های D1 — بازیابی «فقط متادیتا» کلاس آرشیوشده (فاز ۱ طراحی ممیزی‌شده):
-#   POST /admin/deleted_classes/{course_id}/restore   Body: {"mode":"metadata_only","reason":"..."}
-#
-# قرارداد فاز ۱ (checkpoints/2026-09-20-archived-class-restore-audit.md):
-#   • فقط Course.is_deleted=False می‌شود؛ Enrollment/SessionLog/Transaction آرشیوشده دست‌نخورده.
-#   • اثر مالی صفر: بدهی شاگرد، کیف پول‌ها و طلب معلم مطلقاً تغییر نمی‌کنند.
-#   • فقط ادمین (منشی/معلم/شاگرد ممنوع) + branch isolation.
-#   • 400 برای mode نامعتبر · 404 ناموجود/شعبه‌ی دیگر (بدون نشت وجود) · 409 برای کلاسِ ازقبلفعال.
-#   • ثبت رد پای حسابرسی (ClassRestoreLog: actor/reason/pre_state) + activity log.
-#   • بازیابی کامل (mode دیگر) عمداً غیرفعال است تا منطق مالی خراب نشود.
+# تست‌های سازگاری و branch/permission برای بازیابی کلاس آرشیوشده:
+#   POST /admin/deleted_classes/{course_id}/restore
+#   • mode=metadata_only رفتار قدیمی را حفظ می‌کند؛ mode=full تاریخچهٔ عملیاتی را هم برمی‌گرداند.
+#   • مالی با include_financial_history صریحاً انتخاب می‌شود؛ restore مالی فقط با provenance معتبر.
+#   • وضعیت مالیِ خاموش دست‌نخورده می‌ماند؛ ثبت ClassRestoreLog و ActivityLog حفظ می‌شود.
+#   • فقط ادمین + branch isolation؛ 400 ورودی نامعتبر، 404 ناموجود/شعبهٔ دیگر، 409 تعارض/کلاس فعال.
 #
 # اجرا (روی DB موقت — نه DB واقعی):
 #   DATABASE_URL=sqlite:////tmp/restore_metadata_test.db \
@@ -181,15 +177,27 @@ class TestClassRestoreMetadata(unittest.TestCase):
         self.assertEqual(self._restore(self.c_arch.id).status_code, 409)
 
     def test_4_invalid_mode_is_rejected(self):
-        for bad in ("full", "metadata", "", "METADATA_ONLY_FULL"):
+        for bad in ("metadata", "", "METADATA_ONLY_FULL"):
             resp = self._restore(self.c_arch.id, mode=bad)
             self.assertIn(resp.status_code, (400, 422), f"mode نامعتبر ({bad!r}) نباید پذیرفته شود")
             self.assertTrue(self.db.query(Course).filter(Course.id == self.c_arch.id).first().is_deleted,
                             "mode نامعتبر نباید کلاس را بازیابی کند")
-        # بازیابی کامل صریحاً رد می‌شود
+        # فقط full و metadata_only (سازگاری عقب‌رو) پشتیبانی می‌شوند.
         resp = self._restore(self.c_arch.id, mode="full_restore")
         self.assertEqual(resp.status_code, 400)
-        self.assertIn("metadata_only", resp.json()["detail"])
+        self.assertIn("full", resp.json()["detail"])
+
+    def test_4b_full_mode_restores_operational_history_without_finance(self):
+        resp = self._restore(self.c_arch.id, mode="full")
+        self.assertEqual(resp.status_code, 200, resp.text)
+        self.assertEqual(resp.json()["mode"], "full")
+        self.assertTrue(resp.json()["finances_untouched"])
+        enrollment = self.db.query(Enrollment).filter(Enrollment.id == self.en_arch.id).first()
+        session = self.db.query(SessionLog).filter(SessionLog.course_id == self.c_arch.id).first()
+        self.db.refresh(enrollment)
+        self.db.refresh(session)
+        self.assertFalse(enrollment.is_deleted)
+        self.assertFalse(session.is_deleted)
 
     # ------------------------------------------------------------------
     # ۵) رفتار موفق: کلاس برمی‌گردد، تاریخچه دست‌نخورده

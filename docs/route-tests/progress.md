@@ -4,7 +4,7 @@
 
 ## زیرساخت و مرحلهٔ صفر
 
-- `docs/app-map/*` به‌عنوان ورودی اصلی حفظ شده است؛ هیچ فایل آن تغییر نکرده.
+- `docs/app-map/*` به‌عنوان ورودی اصلی و route path inventory حفظ شده است؛ پنج ردیف مربوط به مسیرهای حذف/تأیید/جزئیات/restore کلاس در `server-routes.csv` برای provenance و فیلدهای O-19 همگام شدند.
 - بررسی map جاری: server inventory برابر 221/221 با routeهای runtime است؛ ورودی Retrofit تاریخی 162 declaration دارد، در برابر 170 declaration در Kotlin فعلی. مقایسهٔ جاری 159 زوج یکتای method/path، 157 route ثابت یکتا و 1 `@Url` پویا را نشان می‌دهد. 8 declaration جاری در map تاریخی نیستند (از جمله `/auth/device_token`); overlayهای `android-api-current.csv` و `android-route-diff.md` اختلاف را ثبت می‌کنند. 64 server-only و 0 Android-only route باقی است.
 - seed canonical فقط DB موقت را می‌سازد؛ salted password hash، JWT، timestampهای ORM و داده‌های business ثابت‌اند. `test_seed_reproducibility.py` دو DB را با schema/row canonical digest مقایسه می‌کند.
 - seed عادی 30 دانش‌آموز و seed حجیم 300 دانش‌آموز/30 کلاس دارد. role fixtures: admin, secretary, teacher, student, parent؛ شماره‌های دانش‌آموز/والد در seed با قالب 11 رقمی معتبرند.
@@ -48,28 +48,27 @@
 ## آخرین اجراهای واقعی
 
 ```text
-PYTHONPATH=. /tmp/kharazmi-route-audit-venv/bin/pytest -q -rx tests/route_audit
-244 passed, 1 xfailed, 4 warnings in 20.40s (2026-10-07)
-focused auth e2e (2026-10-07): 15 passed, 5 warnings; O-02 source/route regressions passed
-main DB MD5 before/after full suite: f048f8d118b33c4eaa944490594121d7
+Route audit: PYTHONPATH=. /tmp/kharazmi-route-audit-venv/bin/pytest -q tests/route_audit --basetemp=/tmp/kharazmi-route-audit-final-o19-20261007
+249 passed, 0 xfailed, 4 warnings in 24.42s (2026-10-07)
+Server suite: DATABASE_URL=sqlite:////tmp/... pytest -q Kharazmi_Server/tests
+1279 passed, 87 warnings in 132.30s; targeted archive/restore tests 27 passed
+main DB MD5 before/after: f048f8d118b33c4eaa944490594121d7
 
-Broad route sweep (2026-10-05; not rerun after the latest fixes): 221/221; main 500=0; 220/221 invalid-target probes; invalid 500=0
-invalid observations: 422=146, 200=70, 400=3, 403=1, 404=1
+Broad route sweep (2026-10-07): 221/221; main 500=0; 220 invalid-target probes; invalid 500=0
+invalid observations: 422=146, 200=71, 400=3, 404=1
 empty probes: 11; null-list observations=0; non-JSON responses=14
-status: 200=182, 400=17, 422=8, 404=7, 409=5, 403=1, 401=1
-403 در همان sweep: GET /finance/parent/dashboard (RA-finance-02, later fixed)
-
+status: 200=182, 400=18, 401=1, 404=7, 409=5, 422=8; no 403
 roles: admin=168, teacher=21, student=18, public=9, parent=5
-contract: declarations=169, unique_calls=158, unique_static_routes=156,
-          dynamic=1, unmatched=0, route_non_success=28, successful_non_json=4,
-          parse=4, NPE-candidates=5, silent-zero-candidates=8,
+contract: declarations=170, unique_calls=159, unique_static_routes=157,
+          dynamic=1, unmatched=0, route_non_success=29, successful_non_json=4,
+          empty_json_body=0, parse=0, NPE-candidates=5, silent-zero-candidates=7,
           missing_key=0, simulation_gap=0
 boundary: 4 routes, 500=0, raw candidates=5, confirmed contract bugs=0 (Q-006)
-large seed: 300 students/30 classes + 300 transaction/session rows; 8/8 limit/order/filter checks pass
-Markdown generator: 25 ledgers, every generated row has 8 intact cells and no unwrapped segment >300 chars
+large seed: 300 students/30 classes + 300 transaction/session rows; 8/8 checks pass, all statuses 200
+Markdown generator: 25 ledgers; table-column and unwrapped-cell regression tests pass
 ```
 
-تنها strict xfail اجرای کامل `O-19/RA-admin-19` است (restore کامل کلاس طبق تصمیم Q-005: checkbox برای افزودن/حذف تاریخچهٔ مالی). O-02 Android registration source/contract wiring بسته شده؛ برای token generation واقعی چهار Firebase client setting و device QA لازم است. `RA-messages-01/02/03` و سایر fixهای تأییدشده در `bugs.md` بسته و بدون xfail هستند. contract simulator همچنان candidate خام ثبت می‌کند؛ `bugs.md` و Q-006..008 آن را از باگ قابل‌مشاهده جدا می‌کنند.
+هیچ strict xfail باقی نمانده؛ O-19 / `RA-admin-19` اکنون با restore عملیاتی، checkbox مالی opt-in و provenance fail-closed پیاده‌سازی و تست شده است. O-02 Android registration source/contract wiring بسته است؛ token generation واقعی به چهار Firebase client setting و device QA نیاز دارد. `RA-messages-01/02/03` و سایر fixهای تأییدشده در `bugs.md` بسته‌اند. contract simulator همچنان candidateهای خام Q-006..Q-008 را ثبت می‌کند؛ آن‌ها باگ تأییدشده نیستند. Full Android build و device execution اجرا نشده‌اند.
 
 `docs/route-tests/routes/*.md` برای هر route: یک جملهٔ purpose/handler، actor و status probe، caller/screen جاری، ورودی و response schema، DB read/write statically extracted، side effect و test-reference یا smoke-only status دارد. 151 route test source literal request reference دارند؛ این شمارش به‌تنهایی عمق assertion را اثبات نمی‌کند. 70 مسیر literal match ندارند؛ ledger per-route قید هر مورد را نشان می‌دهد.
 

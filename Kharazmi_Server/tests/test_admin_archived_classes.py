@@ -2,8 +2,8 @@
 # Regression tests for «کلاس‌های حذف‌شده / آرشیو ادمین»:
 #   GET  /admin/deleted_classes           (لیست آرشیو: اطلاعات کامل + branch isolation + جست‌وجو)
 #   GET  /admin/deleted_classes/{id}      (جزئیات کنترول‌شده‌ی کلاس آرشیوشده)
-#   POST /admin/deleted_classes/{id}/restore = «فقط متادیتا» (FIX(D1))؛ تست‌های کامل آن در
-#        test_class_restore_metadata.py است و این فایل فقط قرارداد «هیچ restore دیگری نیست» را نگه می‌دارد.
+#   POST /admin/deleted_classes/{id}/restore = restore عملیاتی کامل با گزینهٔ مالی؛ جزئیات آن
+#        در test_class_restore_metadata.py است و این فایل فقط یکپارچگی route/آرشیو را می‌سنجد.
 # و تعامل آن با DELETE /classes/{id} (جریان واقعی حذف) و GET /classes/list (لیست عادی).
 #
 # اجرا (روی DB کپی — نه DB واقعی، مطابق قاعده‌ی پروژه):
@@ -233,7 +233,7 @@ class TestAdminArchivedClasses(unittest.TestCase):
              "bg_color", "teacher_id", "teacher_name", "branch_id", "branch_name", "students_count",
              "students_active_count", "archived_enrollments_count", "sessions_count",
              "archived_sessions_count", "transactions_count", "transactions_total", "deleted_at",
-             "has_deletion_record", "forgive_session_charges", "requested_by_role", "admin_note",
+             "has_deletion_record", "financial_restore_available", "forgive_session_charges", "requested_by_role", "admin_note",
              # گزارش کامل تاریخی (صفحهٔ جزئیات آرشیو): تاریخ جلالی، حضور/غیاب، فهرست شاگردان، مالی
              "deleted_at_jalali", "deleted_weekday", "students", "attendance_totals", "finance_totals",
              "sessions_held", "sessions_history", "first_session_date", "last_session_date", "has_snapshot"},
@@ -251,21 +251,18 @@ class TestAdminArchivedClasses(unittest.TestCase):
         self.assertEqual(self._detail(self.c_active.id, token="tok-global").status_code, 404)  # فعال
 
     # ------------------------------------------------------------------
-    # ۸) restore وجود ندارد (policy فعلی) — و آرشیو فقط-خواندنی است
+    # ۸) restore از همان endpoint کنترل‌شده انجام می‌شود و خواندن آرشیو فقط‌خواندنی است
     # ------------------------------------------------------------------
-    def test_8_restore_limited_to_metadata_and_archive_is_read_only(self):
-        # FIX(D1) — آپدیت **عمدی** این تست (همان‌طور که در ممیزی
-        # checkpoints/2026-09-20-archived-class-restore-audit.md پیش‌بینی شده بود): اکنون
-        # بازیابی «فقط متادیتا» اضافه شده است. سیاست جدید:
-        #   ۱) تنها مسیر restore مجاز = /admin/deleted_classes/{id}/restore با mode=metadata_only
-        #      (هیچ مسیر بازیابی ثبت‌نام/جلسه/تراکنش یا بازیابی کامل وجود ندارد)،
-        #   ۲) خواندن آرشیو هنوز هیچ چیزی را تغییر نمی‌دهد،
-        #   ۳) پوشش permission/branch isolation این مسیر در test_class_restore_metadata.py است.
+    def test_8_restore_uses_single_endpoint_and_archive_is_read_only(self):
+        # قرارداد بازیابی کامل/مالی در test_class_restore_metadata.py و route audit است:
+        #   ۱) تنها مسیر restore مجاز = /admin/deleted_classes/{id}/restore؛
+        #   ۲) خواندن آرشیو هیچ چیزی را تغییر نمی‌دهد،
+        #   ۳) هیچ مسیر جایگزین/بدون احراز هویت برای restore اضافه نشده است.
         restore_paths = sorted(p for p in app.openapi()["paths"] if "restore" in p.lower())
         self.assertEqual(restore_paths, ["/admin/deleted_classes/{course_id}/restore"])
         restore_op = app.openapi()["paths"]["/admin/deleted_classes/{course_id}/restore"]
         self.assertIn("post", restore_op)
-        # هیچ مسیر دیگری (enrollment/session/full restore) وجود ندارد
+        # تاریخچهٔ عملیاتی/مالی از همان endpoint کنترل‌شده بازمی‌گردد، نه مسیر جداگانه.
         self.assertEqual([p for p in restore_paths if "enrollment" in p or "session" in p.lower()], [])
         # خواندن آرشیو نباید وضعیت را تغییر دهد
         before = (self.db.query(Course).filter(Course.is_deleted == True).count(),  # noqa: E712

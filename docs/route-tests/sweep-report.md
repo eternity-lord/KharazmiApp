@@ -1,6 +1,6 @@
 # گزارش جاروب خودکار همهٔ routeها
 
-**snapshot:** 2026-09-28 — **branch:** `arena/01a0c9b8-kharazmiapp`
+**snapshot:** 2026-10-07 — **branch:** `arena/01a10aa8-kharazmiapp`
 
 **ابزارها:** `tests/route_audit/sweep/run_sweep.py`، `run_contract.py`، `run_boundary.py` و `run_large.py`
 
@@ -16,28 +16,32 @@
 | payload نامعتبر با status 500 | 0 |
 | empty probe | 11 |
 | empty probe با list=`null` | 0 |
-| پاسخ non-JSON مورد انتظار | 13 (Excel/PDF/HTML/ResponseBody) |
+| پاسخ non-JSON مشاهده‌شده | 14 (Excel/PDF/HTML/ResponseBody و پاسخ‌های خالی مطابق route) |
+| statusهای اصلی | `200:182`, `400:18`, `401:1`, `404:7`, `409:5`, `422:8`; 403=0 |
+| actorها | admin=168، teacher=21، student=18، public=9، parent=5 |
+| statusهای invalid | `422:146`, `200:71`, `400:3`, `404:1`; 500=0 |
 
-جزئیات status/shape در `tests/route_audit/sweep/report.json` و `report.csv` ثبت شده است. 4 مورد contract ثبت‌شده بعد از فیکس پاسخ server/client اکنون assertion عادی دارند و هیچ entry دارای issue باقی نمانده است.
+جزئیات status/shape در `tests/route_audit/sweep/report.json` و `report.csv` ثبت شده است. چهار assertion عادی `RA-sweep-01..04` باقی‌اند؛ current contract report سه route entry دارای 12 raw Kotlin/Gson candidate دارد که در Q-006..Q-008 طبقه‌بندی شده‌اند، نه به‌عنوان باگ قطعی.
 
 ## Retrofit/Gson contract sweep پس از فیکس‌ها
 
 | شاخص | مقدار |
 |---|---:|
-| declaration | 162 |
-| method/path یکتای خام | 151 |
+| declaration | 170 |
+| method/path یکتای خام | 159 |
+| route یکتای static | 157 |
 | `@Url` dynamic | 1 |
-| static call با route معادل | 150 |
 | static call بدون route معادل | 0 |
-| route response با status غیرموفق | 49 (پیش‌شرط/نقش/بدنهٔ generic؛ باگ 500 نیست) |
+| route response با status غیرموفق | 29 (پیش‌شرط/نقش/بدنهٔ generic؛ باگ 500 نیست) |
+| successful non-JSON | 4 |
 | parse/overflow | 0 |
-| NPE بالقوه از non-null missing | 0 |
+| NPE بالقوه از non-null missing | 5 raw candidates |
 | missing list key | 0 |
-| silent zero | 0 |
-| entry دارای issue | 0 |
+| silent zero | 7 raw candidates |
+| empty JSON body / missing key / simulation gap | 0 / 0 / 0 |
 | assertion عادی RA-sweep | 4 (`RA-sweep-01..04`) |
 
-`contract-report.json` آخرین بار پس از `RA-parent-01` تولید شده و `issues=[]` برای همهٔ entryها دارد؛ این فایل snapshot تاریخی sweep است. پس از آن O-02 Android token-registration wiring در source/contract tests اضافه شد؛ Firebase runtime هنوز device-test نشده است. وضعیت فعلی overlay در `android-api-current.csv` و `android-route-diff.md` ثبت می‌شود؛ O-12 بسته و O-19 همچنان باز است.
+`contract-report.json` در 2026-10-07 پس از O-19/O-02 بازتولید شد؛ عددهای simulator، candidateهای خام‌اند و سه route entry را پوشش می‌دهند (Q-006..Q-008)، نه باگ‌های تأییدشده. O-19 در server و Kotlin/source contract تست شده است؛ Firebase runtime، Android build و device اجرا نشده‌اند. `android-api-current.csv` و `android-route-diff.md` با 170 declaration جاری بازتولید شدند؛ ورودی تاریخی Retrofit 162 declaration و 8 declaration اختلاف دارد.
 
 ## seed مرزی مستقل
 
@@ -49,7 +53,7 @@
 - رشتهٔ خالی در تاریخ transaction و due_date homework؛
 - `students_preview=[]` به‌عنوان empty list.
 
-اجرای `run_boundary.py`: **4 route، status 500 برابر 0، Gson issue برابر 0**. مقادیر واقعی در `boundary-report.json` ثبت شده‌اند و `test_boundary_seed.py` آن‌ها را دقیق assert می‌کند.
+اجرای `run_boundary.py`: **4 route، status 500 برابر 0، 5 raw Gson-candidate و 0 مورد تأییدشده**. مقادیر واقعی در `boundary-report.json` ثبت شده‌اند و `test_boundary_seed.py` آن‌ها را دقیق assert می‌کند.
 
 ## seed حجیم و limit/order/filter
 

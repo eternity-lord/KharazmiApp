@@ -33,18 +33,6 @@
           "score": 19.0
         },
         {
-          "id": 2,
-          "title": "آزمون پیش‌نویس",
-          "course_title": "فیزیک دوکلاسه",
-          "date": "1405/07/01",
-          "duration": 45,
-          "description": "",
-          "due_date": "",
-          "max_score": 20.0,
-          "status": "pending",
-          "score": null
-        },
-        {
           "id": 99,
           "title": "آزمون مرزی اعشاری",
           "course_title": "ریاضی پایه فعال",
@@ -145,6 +133,7 @@
           "description": "حل تمرین",
           "due_date": "1405/07/01",
           "status": "submitted",
+          "max_score": 20.0,
           "score": null,
           "feedback": null
         },
@@ -155,6 +144,7 @@
           "description": "",
           "due_date": "",
           "status": "pending",
+          "max_score": 20.0,
           "score": null,
           "feedback": null
         }

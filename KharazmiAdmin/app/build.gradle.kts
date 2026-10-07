@@ -3,6 +3,14 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+private fun buildConfigString(value: String): String =
+    "\"${value.filter { it.isLetterOrDigit() || it in ":-_" }}\""
+
+private fun firebaseSetting(name: String): String =
+    providers.gradleProperty(name)
+        .orElse(providers.environmentVariable(name))
+        .getOrElse("")
+
 android {
     namespace = "com.example.kharazmiadmin"
     compileSdk = 34 // نسخه پایدار اندروید 14
@@ -15,6 +23,14 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "FIREBASE_API_KEY", buildConfigString(firebaseSetting("FIREBASE_API_KEY")))
+        buildConfigField("String", "FIREBASE_APP_ID", buildConfigString(firebaseSetting("FIREBASE_APP_ID")))
+        buildConfigField("String", "FIREBASE_PROJECT_ID", buildConfigString(firebaseSetting("FIREBASE_PROJECT_ID")))
+        buildConfigField("String", "FIREBASE_MESSAGING_SENDER_ID", buildConfigString(firebaseSetting("FIREBASE_MESSAGING_SENDER_ID")))
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     buildTypes {
@@ -51,6 +67,8 @@ dependencies {
     // --- شبکه (Retrofit) ---
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    // FCM client; Firebase project values are optional at build time and supplied outside Git.
+    implementation("com.google.firebase:firebase-messaging:24.1.0")
 
     // --- مدیریت تردها (Coroutines) ---
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")

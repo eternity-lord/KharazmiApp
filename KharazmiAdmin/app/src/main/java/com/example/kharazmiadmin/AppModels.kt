@@ -24,6 +24,11 @@ data class LoginResponse(
     val token: String? = null,
     val branch_id: Int? = null
 )
+
+data class DeviceTokenRequest(
+    @SerializedName("token") val token: String
+)
+
 data class ChangePasswordRequest(
     val mobile: String,
     val old_password: String,

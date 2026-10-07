@@ -21,6 +21,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import retrofit2.http.Body
 import retrofit2.http.POST
+import retrofit2.http.Query
 import java.util.concurrent.Executor
 
 // ==========================================
@@ -33,10 +34,9 @@ interface AuthApi {
     @POST("auth/login")
     suspend fun login(@Body req: LoginRequest): LoginResponse
 
-    // O-03: خروج واقعی از سرور؛ هدر Authorization را RetrofitClient خودکار تزریق می‌کند.
-    // بدون شناسهٔ دیوایس صدا زده می‌شود (اپ هنوز Push ندارد ⇒ توکن Push سرور عمداً پاک نمی‌شود).
+    // O-03: خروج سروری؛ توکن FCM اختیاری است تا فقط ثبت همین دستگاه هم‌زمان پاک شود.
     @POST("auth/logout")
-    suspend fun logout()
+    suspend fun logout(@Query("device_token") deviceToken: String? = null)
 }
 
 class LoginActivity : BaseActivity() {
@@ -271,6 +271,7 @@ class LoginActivity : BaseActivity() {
                         putInt("USER_BRANCH_ID", response.branch_id ?: 1)
                         apply()
                     }
+                    PushTokenRegistration.refreshAndRegister(applicationContext)
                     // ----------------------------------------
 
                     Toast.makeText(this@LoginActivity, getString(R.string.common_ok_msg, response.message), Toast.LENGTH_SHORT).show()

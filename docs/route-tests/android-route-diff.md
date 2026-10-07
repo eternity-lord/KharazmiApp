@@ -3,7 +3,7 @@
 Generated from the current Kotlin Retrofit annotations and the current server route CSV; placeholders are normalized to `{}`.
 The historical `docs/app-map/mismatches.md` includes seven routes that now have direct callers in `LiveApi.kt`; this overlay supersedes its old unmatched-route count.
 
-Current classification: **221** server routes; **156** unique static Retrofit calls; **65** server-only routes; **1** dynamic `@Url`; Android-only static calls: **0**.
+Current classification: **221** server routes; **157** unique static Retrofit calls; **64** server-only routes; **1** dynamic `@Url`; Android-only static calls: **0**.
 
 | method | route | handler/source | current category |
 |---|---|---|---|
@@ -50,7 +50,6 @@ Current classification: **221** server routes; **156** unique static Retrofit ca
 | POST | `ai/chat` | `Kharazmi_Server/routers/ai.py:153` (routers.ai.chat_with_ai_assistant)` | ابزار داخلی AI؛ declaration مستقیم ندارد |
 | POST | `attendance/get` | `Kharazmi_Server/routers/attendance.py:585` (routers.attendance.get_class_attendance)` | attendance/live؛ مسیر یا client متفاوت/قدیمی |
 | POST | `attendance/qr_check-in` | `Kharazmi_Server/routers/attendance.py:1353` (routers.attendance.qr_student_check_in)` | attendance/live؛ مسیر یا client متفاوت/قدیمی |
-| POST | `auth/device_token` | `Kharazmi_Server/routers/auth.py:597` (routers.auth.register_device_token)` | background/device integration؛ declaration مستقیم ندارد |
 | POST | `automation/rules` | `Kharazmi_Server/routers/automation.py:66` (routers.automation.create_automation_rule)` | ابزار داخلی/admin؛ declaration مستقیم ندارد |
 | POST | `automation/run_rules` | `Kharazmi_Server/routers/automation.py:143` (routers.automation.run_automation_engine)` | ابزار داخلی/admin؛ declaration مستقیم ندارد |
 | POST | `branches` | `Kharazmi_Server/routers/branches.py:52` (routers.branches.create_branch)` | ابزار داخلی/admin؛ declaration مستقیم ندارد |

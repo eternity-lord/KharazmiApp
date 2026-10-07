@@ -281,7 +281,7 @@ def _render_current_android_inventory(calls: list[dict[str, str]]) -> str:
     out = []
     import io
     stream = io.StringIO(newline="")
-    writer = csv.DictWriter(stream, fieldnames=fields)
+    writer = csv.DictWriter(stream, fieldnames=fields, lineterminator="\n")
     writer.writeheader()
     for call in calls:
         model = _model_name(call["response_type"])

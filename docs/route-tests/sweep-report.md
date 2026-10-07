@@ -37,7 +37,7 @@
 | entry دارای issue | 0 |
 | assertion عادی RA-sweep | 4 (`RA-sweep-01..04`) |
 
-`contract-report.json` آخرین بار پس از `RA-parent-01` تولید شده و `issues=[]` برای همهٔ entryها دارد. `O-02`، `O-12` و `O-19` عمداً تغییر نکرده‌اند.
+`contract-report.json` آخرین بار پس از `RA-parent-01` تولید شده و `issues=[]` برای همهٔ entryها دارد؛ این فایل snapshot تاریخی sweep است. پس از آن O-02 Android token-registration wiring در source/contract tests اضافه شد؛ Firebase runtime هنوز device-test نشده است. وضعیت فعلی overlay در `android-api-current.csv` و `android-route-diff.md` ثبت می‌شود؛ O-12 بسته و O-19 همچنان باز است.
 
 ## seed مرزی مستقل
 

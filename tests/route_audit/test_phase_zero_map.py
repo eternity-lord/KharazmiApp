@@ -36,7 +36,8 @@ interface ExampleApi {
 
 def test_current_android_inventory_is_source_grounded_and_complete():
     calls = parse_retrofit_calls()
-    assert len(calls) == 169
+    assert len(calls) == 170
+    assert any(call["method"] == "POST" and call["path"] == "auth/device_token" for call in calls)
     assert not [call for call in calls if call["path"] == "<missing-path>"]
     assert not [call for call in calls if call["function"] == "<unknown>"]
     assert sum(call["path"].startswith("dynamic ") for call in calls) == 1

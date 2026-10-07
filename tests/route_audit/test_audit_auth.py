@@ -366,7 +366,7 @@ def test_auth_change_mobile_rejects_an_existing_student_mobile_without_writes(cl
     assert _database_snapshot(db) == before
 
 
-def test_auth_logout_matches_android_call_and_removes_only_its_session(client, auth_headers, db):
+def test_auth_logout_matches_android_call_and_removes_only_its_session_and_device_token(client, auth_headers, db):
     import models
 
     token = auth_headers["admin"]["Authorization"].split(" ", 1)[1]
@@ -379,23 +379,25 @@ def test_auth_logout_matches_android_call_and_removes_only_its_session(client, a
         "sub_role": session.sub_role,
         "created_at": session.created_at,
     }
-    device_token_value = "audit-route-logout-kept-device"
+    device_token_value = "audit-route-logout-current-device"
     device_token = models.DeviceToken(user_id=1, role="admin", token=device_token_value)
     baseline = _database_snapshot(db)
     db.add(device_token)
     db.commit()
     before_logout = _database_snapshot(db)
     try:
-        # LoginActivity.AuthApi.logout() sends no device_token query parameter.
-        response = client.post("/auth/logout", headers=auth_headers["admin"])
+        # Android logout sends its stored FCM token; only that user/role/device is removed.
+        response = client.post(
+            "/auth/logout", headers=auth_headers["admin"], params={"device_token": device_token_value},
+        )
         assert response.status_code == 200, response.text
         assert response.json() == {"message": "خروج با موفقیت انجام شد و نشست باطل گردید"}
 
         db.expire_all()
         assert db.query(models.UserSession).filter(models.UserSession.token == token).first() is None
-        assert db.query(models.DeviceToken).filter(models.DeviceToken.token == device_token_value).one().role == "admin"
+        assert db.query(models.DeviceToken).filter(models.DeviceToken.token == device_token_value).first() is None
         after_logout = _database_snapshot(db)
-        _assert_unchanged_except(before_logout, after_logout, "user_sessions")
+        _assert_unchanged_except(before_logout, after_logout, "user_sessions", "device_tokens")
         token_index = list(models.UserSession.__table__.columns.keys()).index("token")
         assert after_logout["user_sessions"] == [
             row for row in before_logout["user_sessions"] if row[token_index] != token

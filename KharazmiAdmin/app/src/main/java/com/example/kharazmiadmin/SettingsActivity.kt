@@ -82,14 +82,14 @@ class SettingsActivity : BaseActivity() {
                 .setTitle(getString(R.string.set_logout_title))
                 .setMessage(getString(R.string.set_logout_msg))
                 .setPositiveButton(getString(R.string.common_yes)) { _, _ ->
-                    // O-03: خروج واقعی — ابتدا نشست سرور باطل می‌شود (تا انقضای JWT زنده نماند)،
-                    // بعد توکن ذخیره‌شده پاک و اپ بسته می‌شود. خروج به شبکه وابسته نیست:
-                    // اگر logout شکست بخورد یا کند باشد (سقف ۳ ثانیه) باز هم خارج می‌شویم.
+                    // O-03: نشست و ثبت Push همین دستگاه با هم باطل می‌شوند؛ سپس توکن ورود پاک است.
+                    // خروج به شبکه وابسته نیست: در خطا یا گذشت سقف ۳ ثانیه هم از اپ خارج می‌شویم.
                     lifecycleScope.launch {
                         try {
                             withTimeoutOrNull(3000) {
                                 RetrofitClient.getInstance(this@SettingsActivity)
-                                    .create(AuthApi::class.java).logout()
+                                    .create(AuthApi::class.java)
+                                    .logout(PushTokenRegistration.currentToken(this@SettingsActivity))
                             }
                         } catch (ignored: Exception) {
                         }

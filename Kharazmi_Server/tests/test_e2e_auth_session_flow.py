@@ -11,8 +11,8 @@
 #   • استفادهٔ اپ از پاسخ   → LoginActivity.kt:254-280 (token/role/sub_role/branch_id + TEACHER_ID)
 #   • پروفایل کاربر        → MainActivity.kt:53-62 (GET auth/me → MeResponse{user_id,name,role,permissions})
 #   • پورتال دانش‌آموز       → StudentPortalActivity.kt:35-41 (POST auth/student/request_otp و auth/student/login)
-#   • خروج                  → SettingsActivity.kt:79-88 (فقط finishAffinity — بدون فراخوانی سرور)
-#   • توکن دستگاه/Push      → ❗ هیچ ارجاعی در کل پروژهٔ اندروید وجود ندارد (تست ۹ همین را قفل می‌کند)
+#   • خروج                  → SettingsActivity.kt / AuthApi: POST auth/logout + device_token query
+#   • توکن دستگاه/Push      → PushTokenRegistration.kt: FCM token → POST auth/device_token (تست ۹ قرارداد را قفل می‌کند)
 #
 # مرجع سمت سرور: routers/auth.py (login:23 · logout:364 · me:389 · request_otp:455 ·
 #                                 student/login:525 · device_token:593)
@@ -21,8 +21,8 @@
 #   DATABASE_URL=sqlite:////tmp/e2e_auth.db JWT_SECRET_KEY=<hex> \
 #     python3 -m pytest Kharazmi_Server/tests/test_e2e_auth_session_flow.py -q
 #
-# ⚠ قاعدهٔ این فاز: **هیچ تغییر کدی** انجام نمی‌شود؛ تست‌ها فقط دیباگ/سند می‌کنند. باگ‌ها در
-#   گزارش دسته‌بندی می‌شوند (منطق کد / مالی / سمت اندروید / سمت سرور).
+# تست‌ها روی SQLite درون‌حافظه‌ای اجرا می‌شوند؛ Firebase/SMS/network واقعی و Android Gradle/device build در این suite اجرا نمی‌شوند.
+# source-contract بخش Android فقط wiring و API shape را نگه می‌دارد؛ token generation/delivery نیازمند device QA است.
 import datetime
 import os
 import re
@@ -400,17 +400,13 @@ class TestStudentOtpFlow(AuthFlowWorld):
 
 class TestAndroidClientGaps(AuthFlowWorld):
     # ------------------------------------------------------------------
-    # ۹) ⚠️ گارد سند: سرور آماده است ولی **اپ اندروید** از این قابلیت‌ها استفاده نمی‌کند
+    # ۹) قرارداد ثبت FCM: Android token را پس از login/rotation ثبت و هنگام logout لغو می‌کند.
     # ------------------------------------------------------------------
-    def test_9_android_client_logs_out_on_server_but_never_registers_device_token(self):
-        """وضعیت اپ اندروید پس از رفع O-03:
+    def test_9_android_client_registers_device_token_and_logs_out_device(self):
+        """Android FCM integration را با source-contract می‌سنجیم؛ Gradle/device اجرا نمی‌شود.
 
-        • **O-03 رفع شد:** دکمهٔ خروج در `SettingsActivity` هنگام تأیید، `POST /auth/logout` را
-          صدا می‌زند (سقف ۳ ثانیه) و سپس توکن ذخیره‌شده را با `SecureLoginStore.clearToken` پاک
-          می‌کند ⇒ نشست سرور دیگر تا انقضای JWT زنده نمی‌ماند و خروج هم به شبکه وابسته نیست.
-        • **Push همچنان مرده است (باز):** اپ نه Firebase دارد و نه `/auth/device_token` را صدا
-          می‌زند ⇒ `device_tokens` روی نصب واقعی خالی می‌ماند. اگر روزی به اپ اضافه شد، این
-          گارد باید آگاهانه به‌روزرسانی شود.
+        Firebase project values از بیرون Git وارد BuildConfig می‌شوند. بدون پیکربندی FCM،
+        login همچنان کار می‌کند و ثبت توکن به‌صورت best-effort رد می‌شود.
         """
         texts = {}
         kt_files = []
@@ -421,54 +417,35 @@ class TestAndroidClientGaps(AuthFlowWorld):
             with open(path, encoding="utf-8") as handle:
                 texts[os.path.basename(path)] = handle.read()
 
-        # ۱) خروج سروری واقعاً سیم‌کشی شده است (O-03)
         settings = texts.get("SettingsActivity.kt", "")
-        self.assertIn(".logout()", settings, "دکمهٔ خروج باید متد logout سرور را صدا بزند")
-        self.assertIn("SecureLoginStore.clearToken", settings,
-                      "خروج باید توکن ذخیره‌شده را پاک کند (clearToken، نه clear چه چیزی را پاک می‌کند)")
+        self.assertIn(".logout(PushTokenRegistration.currentToken", settings)
+        self.assertIn("SecureLoginStore.clearToken", settings)
         login_api = texts.get("LoginActivity.kt", "")
-        self.assertRegex(login_api, r'@POST\("auth/logout"\)',
-                         "قرارداد logout باید در AuthApi تعریف شده باشد")
+        self.assertRegex(login_api, r'@POST\("auth/logout"\)')
+        self.assertRegex(login_api, r'@Query\("device_token"\)')
 
-        # ۲) گارد Push: اپ هنوز نه Firebase دارد و نه ثبت توکن دستگاه
-        patterns = ("device_token", "firebase", "firebasemessaging", "gms.")
-        offenders = []
-        for name, text in texts.items():
-            lowered = text.lower()
-            for needle in patterns:
-                if needle in lowered:
-                    offenders.append(f"{name} ⇒ {needle}")
-        self.assertEqual(offenders, [],
-                         "❗ کد اندروید ثبت توکن دستگاه/فایربیس را شروع کرده است — "
-                         "این تست باید آگاهانه به‌روزرسانی شود:\n" + "\n".join(offenders))
+        push = texts.get("PushTokenRegistration.kt", "")
+        self.assertIn("FirebaseMessaging.getInstance(firebaseApp).token", push)
+        self.assertIn('@POST("auth/device_token")', push)
+        self.assertIn("DeviceTokenRequest(token)", push)
+        self.assertIn("override fun onNewToken(token: String)", push)
+        self.assertIn("PushTokenRegistration.onNewToken(applicationContext, token)", push)
+        for filename in ("LoginActivity.kt", "StudentPortalActivity.kt", "ParentPortalActivity.kt"):
+            self.assertIn("PushTokenRegistration.refreshAndRegister(applicationContext)", texts.get(filename, ""), filename)
 
-        gradle_text = ""
-        for name in ("build.gradle.kts", os.path.join("app", "build.gradle.kts")):
-            path = os.path.join(REPO_ROOT, "KharazmiAdmin", name)
-            if os.path.isfile(path):
-                with open(path, encoding="utf-8") as handle:
-                    gradle_text += handle.read().lower()
-        self.assertNotIn("firebase", gradle_text, "❗ وابستگی Firebase به اپ اضافه شده است")
+        manifest_path = os.path.join(REPO_ROOT, "KharazmiAdmin", "app", "src", "main", "AndroidManifest.xml")
+        with open(manifest_path, encoding="utf-8") as handle:
+            manifest = handle.read()
+        self.assertIn('android:name=".PushMessagingService"', manifest)
+        self.assertIn("com.google.firebase.MESSAGING_EVENT", manifest)
 
-        # ۳) سرور طرفِ دیگر قرارداد آماده است (مشکل کلاینت بود، نه سرور)
-        paths = app.openapi()["paths"]
-        for endpoint in ("/auth/device_token", "/auth/logout", "/auth/student/request_otp",
-                         "/auth/student/login"):
-            self.assertIn(endpoint, paths, f"اندپوینت {endpoint} روی سرور باید موجود باشد")
+        gradle_path = os.path.join(REPO_ROOT, "KharazmiAdmin", "app", "build.gradle.kts")
+        with open(gradle_path, encoding="utf-8") as handle:
+            gradle = handle.read()
+        self.assertIn("com.google.firebase:firebase-messaging", gradle)
+        self.assertIn('"FIREBASE_API_KEY"', gradle)
+        self.assertNotIn("FCM_SERVER_KEY", push, "FCM server credentials must remain server-side")
 
-        self.assertEqual(offenders, [],
-                         "❗ کد اندروید شروع به استفاده از ثبت توکن/خروج سرور کرده است — "
-                         "این تست باید آگاهانه به‌روزرسانی شود:\n" + "\n".join(offenders))
-
-        gradle_text = ""
-        for name in ("build.gradle.kts", os.path.join("app", "build.gradle.kts")):
-            path = os.path.join(REPO_ROOT, "KharazmiAdmin", name)
-            if os.path.isfile(path):
-                with open(path, encoding="utf-8") as handle:
-                    gradle_text += handle.read().lower()
-        self.assertNotIn("firebase", gradle_text, "❗ وابستگی Firebase به اپ اضافه شده است")
-
-        # سرور طرفِ دیگر قرارداد آماده است (پس مشکل سمت کلاینت است، نه سرور)
         paths = app.openapi()["paths"]
         for endpoint in ("/auth/device_token", "/auth/logout", "/auth/student/request_otp",
                          "/auth/student/login"):

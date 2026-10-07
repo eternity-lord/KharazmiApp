@@ -1,13 +1,13 @@
 # خلاصهٔ ممیزی تست‌محور routeها و قرارداد Android
 
-**Snapshot:** 2026-10-06 · **Branch:** `arena/01a10aa8-kharazmiapp` · **Application code:** شامل fixهای تأییدشدهٔ audit و تصمیم‌های صریح محصول است. این سند وضعیت آزمون‌های همین checkout را گزارش می‌کند؛ اجرای smoke روی هر route معادل deep audit همهٔ branchها نیست.
+**Snapshot:** 2026-10-07 · **Branch:** `arena/01a10aa8-kharazmiapp` · **Application code:** شامل fixهای تأییدشدهٔ audit و تصمیم‌های صریح محصول است. این سند وضعیت آزمون‌های همین checkout را گزارش می‌کند؛ اجرای smoke روی هر route معادل deep audit همهٔ branchها نیست.
 
 **پایگاه اصلی:** MD5 قبل و بعد از اجرای pytest و runnerهای ایزوله `f048f8d118b33c4eaa944490594121d7` است. همهٔ seedها در DB موقت ساخته شده‌اند؛ SMS/push/network واقعی فراخوانی نشده است.
 
 ## دامنه و مرحلهٔ صفر
 
 - ورودی اصلی نگاشت، `docs/app-map/*` است و دست‌نخورده مانده. server map، 221 route در 25 router را inventory می‌کند.
-- مقایسهٔ Android جاری با نگاشت تاریخی در `android-api-current.csv` و `android-route-diff.md`: 169 declaration در Kotlin جاری، 162 در map تاریخی، 158 زوج یکتای method/path، 156 مسیر static یکتا، 1 `@Url` پویا، 65 server-only و 0 Android-only.
+- مقایسهٔ Android جاری با نگاشت تاریخی در `android-api-current.csv` و `android-route-diff.md`: 170 declaration در Kotlin جاری، 162 در map تاریخی، 159 زوج یکتای method/path، 157 مسیر static یکتا، 1 `@Url` پویا، 64 server-only و 0 Android-only؛ route جدید `/auth/device_token` اکنون caller مستقیم دارد.
 - این map، retrofit caller/screen، response data class/field، handler/source، ورودی OpenAPI، DB read/write استاتیک و side effect را کنار هم قرار می‌دهد. 25 ledger در `routes/*.md`، 221 route را پوشش می‌دهند.
 - seed canonical پایدار و مستقل است: 30 دانش‌آموز، 7 کلاس، 7 enrollment، 6 transaction، 3 session، 4 attendance، 4 installment، 2 grade، 1 homework و 2 exam؛ timestamp/JWT/hash deterministic هستند. fixture حجیم مستقل 300 دانش‌آموز، 30 کلاس، 300 transaction و 300 session دارد.
 - زمان seed روی `2026-09-28 09:00:00` freeze است. guard از اتصال به `Kharazmi_Server/gaj_db.db` جلوگیری می‌کند؛ فقط temporary DB استفاده می‌شود. `requests`, `urllib`, `socket` در pytest و runnerهای مستقل fail-closed هستند؛ subprocess regression در `test_sweep_network_guard.py` این مسدودسازی را بررسی می‌کند و worker زمان‌بندی‌شده نیز در test اجرا نمی‌شود.
@@ -48,7 +48,7 @@
 - AI route برای admin/teacher/student/parent با actor fixture درست، tool-data دقیق، response contract و نبود DB side effect بررسی شد. `RA-ai-01` بسته است؛ history بعد از append نیز به حداکثر 15 پیام محدود می‌شود.
 - Audit route با seed خالی، خروجی read-only، early/delayed-session alerts، rapid-delete در پنجرهٔ 30 روز با حد <1h (رد دقیقاً 1h) و perfect-attendance روی ده session آخر؛ absent خارج از پنجره نادیده گرفته می‌شود بررسی شد؛ regressionهای read مسیر DB را تغییر ندادند.
 - Audit-trail route با فیلتر/جست‌وجوی transaction و installment، خروجی دقیق Android DTO، تاریخ ISO/Jalali، صفحه‌بندی و ردیف‌های یتیم/soft-deleted بررسی شد. Rollback یک update مالی، هم مقدار تراکنش و هم لاگ ممیزی را برمی‌گرداند. `RA-audit_trail-01` بسته است؛ بازهٔ تاریخ-only وارونه در هر دو قالب ISO و Jalali با 400 رد می‌شود.
-- Auth/notification routes با ورود مثبت admin/secretary/teacher، `me`، تغییر رمز و موبایل، OTP دانش‌آموز، session logout، token registration و inbox/unread/read transitions بررسی شدند؛ SMS فقط با SmsLog موقت mock شد. تست O-02 همچنان نشان می‌دهد Android فعلی device-token registration caller ندارد. آزمون امنیتی (credential guessing، token forgery و auth bypass) خارج از scope است.
+- Auth/notification routes با ورود مثبت admin/secretary/teacher، `me`، تغییر رمز و موبایل، OTP دانش‌آموز، session logout، token registration و inbox/unread/read transitions بررسی شدند؛ SMS فقط با SmsLog موقت mock شد. O-02 client wiring اکنون FCM token را پس از ورود/چرخش ثبت و هنگام logout همان device token را حذف می‌کند؛ Firebase project values و device runtime هنوز نیازمند تنظیم/آزمون‌اند. آزمون امنیتی (credential guessing، token forgery و auth bypass) خارج از scope است.
 - suite رفتاری CRM در `tests/route_audit/test_audit_crm.py` هر پنج route را با DB موقت پوشش می‌دهد: create/list/notes/conversion و public online registration، exact Kotlin response contract، ترتیب/legacy-null/Gson list، duplicate/retry و row snapshots، independent finance oracle، `FinancialAuditLog`، wallet/enrollment invariants، SMS/notification mock و rollback. `RA-crm-01/02/03` در این checkout بسته‌اند؛ انتخاب tuition، branch ownership، class eligibility، nullable follow-up، empty-mobile و overpayment همچنان در Q-010..Q-015 باز است.
 - Automation suite در `tests/route_audit/test_audit_automation.py` هر پنج server-only route را پوشش می‌دهد: rule create/update, logs filter/order/pagination, empty/no-active behavior و تمام هشت condition engine با side-effect rows، finance-safe snapshots، retry/idempotency و push/SMS isolation. `RA-automation-01/02/03` بسته‌اند؛ action matrix, threshold units و mixed-calendar semantics در Q-016..Q-018 همچنان بازند.
 - Branch/resource suite در `tests/route_audit/test_audit_branches.py` هر نه route را تست می‌کند: branch/resource CRUD, filters, missing/duplicate inputs, toggle repeat, branch finance/count aggregates, booking time slots, exact DB snapshots. `RA-branches-01` بسته per decision است (رزرو تکراری مجاز) و `RA-branches-02` duplicate serial را پیش از write با خطای روشن رد می‌کند؛ suspend retry, nullable update, stats semantics و reservation scope در Q-019..Q-022 بازند.
@@ -62,15 +62,15 @@
 
 ## باگ‌ها و xfailها
 
-آخرین اجرای کامل `PYTHONPATH=. /tmp/kharazmi-route-audit-venv/bin/pytest -q -rx tests/route_audit` در 2026-10-06:
+آخرین اجرای کامل `PYTHONPATH=. /tmp/kharazmi-route-audit-venv/bin/pytest -q -rx tests/route_audit` در 2026-10-07:
 
 ```text
-243 passed, 2 xfailed, 4 warnings in 27.46s
+244 passed, 1 xfailed, 4 warnings in 20.40s
 ```
 
 Messages suite جداگانه: **14 passed**, شامل no-write HTTP 400 برای `target_type="role"` و ناشناخته و no-write HTTP 422 برای participant arrays ناقص. دیتابیس اصلی پیش/پس از اجرای suite بدون تغییر بود (`f048f8d118b33c4eaa944490594121d7`); route tests از DB موقت استفاده می‌کنند.
 
-تنها strict xfailهای suite کامل: O-02/`RA-auth-02` (Android FCM registration) و O-19/`RA-admin-19` (پیاده‌سازی restore کامل کلاس با checkbox مالی؛ تصمیم Q-005 ثبت شده است). سایر fixهای تأییدشده و reproductionها در `bugs.md` هستند؛ RA-messages-01/02/03 بسته‌اند. Unexpected-pass همچنان خطای suite است.
+تنها strict xfail باقی‌مانده در suite کامل `O-19/RA-admin-19` است (پیاده‌سازی restore کامل کلاس با checkbox مالی؛ تصمیم Q-005 ثبت شده است). O-02 Android source wiring اکنون تست عادی و سبز دارد؛ Firebase runtime هنوز device-test نشده است. سایر fixهای تأییدشده و reproductionها در `bugs.md` هستند؛ RA-messages-01/02/03 بسته‌اند. Unexpected-pass همچنان خطای suite است.
 
 ## ناتمام‌ها و مراجع
 

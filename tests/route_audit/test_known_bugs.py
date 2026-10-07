@@ -12,10 +12,20 @@ import pytest
 from .kotlin_contract import audit_payload
 
 
-@pytest.mark.xfail(strict=True, reason="RA-auth-02")
 def test_O02_android_push_client_registers_FCM_token():
-    source = "\n".join(path.read_text(encoding="utf-8") for path in (Path(__file__).parents[2] / "KharazmiAdmin/app/src/main/java").rglob("*.kt"))
-    assert "FirebaseMessaging" in source and "device_token" in source
+    root = Path(__file__).parents[2] / "KharazmiAdmin/app/src/main"
+    source = "\n".join(path.read_text(encoding="utf-8") for path in (root / "java").rglob("*.kt"))
+    model_source = (root / "java/com/example/kharazmiadmin/AppModels.kt").read_text(encoding="utf-8")
+    manifest = (root / "AndroidManifest.xml").read_text(encoding="utf-8")
+    gradle = (root.parents[1] / "build.gradle.kts").read_text(encoding="utf-8")
+    assert "FirebaseMessaging.getInstance" in source
+    assert '@POST("auth/device_token")' in source
+    assert '@SerializedName("token") val token: String' in model_source
+    assert "override fun onNewToken(token: String)" in source
+    assert "PushTokenRegistration.refreshAndRegister(applicationContext)" in source
+    assert 'android:name=".PushMessagingService"' in manifest
+    assert "firebase-messaging" in gradle
+    assert "FCM_SERVER_KEY" not in source, "FCM server credentials must stay on the backend"
 
 
 def test_O12_unpublished_exam_is_hidden_from_student(client, auth_headers):

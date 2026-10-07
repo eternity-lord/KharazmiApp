@@ -1,11 +1,11 @@
 # پیشرفت ممیزی routeها
 
-**شروع پروژهٔ ممیزی:** 2026-09-28 — **snapshot فعلی:** 2026-10-06 — **branch ثابت این نشست:** `arena/01a10aa8-kharazmiapp`. این snapshot شامل fixهای تأییدشدهٔ audit/تصمیم‌های explicit و regressionهایشان است.
+**شروع پروژهٔ ممیزی:** 2026-09-28 — **snapshot فعلی:** 2026-10-07 — **branch ثابت این نشست:** `arena/01a10aa8-kharazmiapp`. این snapshot شامل fixهای تأییدشدهٔ audit/تصمیم‌های explicit و regressionهایشان است.
 
 ## زیرساخت و مرحلهٔ صفر
 
 - `docs/app-map/*` به‌عنوان ورودی اصلی حفظ شده است؛ هیچ فایل آن تغییر نکرده.
-- بررسی map جاری: server inventory برابر 221/221 با routeهای runtime است؛ ورودی Retrofit تاریخی 162 declaration دارد، در برابر 169 declaration در Kotlin فعلی. مقایسهٔ جاری 158 زوج یکتای method/path، 156 route ثابت یکتا و 1 `@Url` پویا را نشان می‌دهد. 7 declaration جاری در map تاریخی نیستند؛ overlayهای `android-api-current.csv` و `android-route-diff.md` اختلاف را ثبت می‌کنند. 65 server-only و 0 Android-only route باقی است.
+- بررسی map جاری: server inventory برابر 221/221 با routeهای runtime است؛ ورودی Retrofit تاریخی 162 declaration دارد، در برابر 170 declaration در Kotlin فعلی. مقایسهٔ جاری 159 زوج یکتای method/path، 157 route ثابت یکتا و 1 `@Url` پویا را نشان می‌دهد. 8 declaration جاری در map تاریخی نیستند (از جمله `/auth/device_token`); overlayهای `android-api-current.csv` و `android-route-diff.md` اختلاف را ثبت می‌کنند. 64 server-only و 0 Android-only route باقی است.
 - seed canonical فقط DB موقت را می‌سازد؛ salted password hash، JWT، timestampهای ORM و داده‌های business ثابت‌اند. `test_seed_reproducibility.py` دو DB را با schema/row canonical digest مقایسه می‌کند.
 - seed عادی 30 دانش‌آموز و seed حجیم 300 دانش‌آموز/30 کلاس دارد. role fixtures: admin, secretary, teacher, student, parent؛ شماره‌های دانش‌آموز/والد در seed با قالب 11 رقمی معتبرند.
 - ساعت سرور در `clock.py` روی `2026-09-28 09:00:00` ثابت است. sweep، contract، boundary، large و pytest هرکدام DB موقت استفاده می‌کنند؛ `requests`, `urllib` و اتصال socket خروجی مسدود است (subprocess regression در `test_sweep_network_guard.py`)، FCM key خالی است و worker زنده برای runnerهای مستقل start نمی‌شود.
@@ -20,7 +20,7 @@
 | ai | 1 | tool values برای admin/teacher/student/parent و no-write بررسی شد؛ `RA-ai-01` بسته است و history به حداکثر 15 پیام محدود می‌شود |
 | audit | 1 | empty/read-only، early/delayed attendance، <30-day and <1h rapid-delete (exactly 1h rejected)، last-10 perfect-attendance transition؛ باگ باز تأیید نشد |
 | audit_trail | 1 | Android response/display values، filters/search، ISO/Jalali bounds، pagination 205-row، orphan/deleted refs، rollback؛ `RA-audit_trail-01` بسته است و reversed date-only range با 400 رد می‌شود |
-| auth | 12 | ورود موفق admin/secretary/teacher، me، تغییر رمز/موبایل، OTP، logout/device token و اعلان‌ها؛ invalid credential/abuse از scope امنیتی خارج است؛ O-02 اندروید باز می‌ماند |
+| auth | 12 | ورود موفق admin/secretary/teacher، me، تغییر رمز/موبایل، OTP، logout/device token و اعلان‌ها؛ Android FCM registration wiring بسته شد؛ project config/device run pending؛ invalid credential/abuse از scope امنیتی خارج است |
 | finance | 26 | oracle مالی/پرداخت و invoice، retry/FIFO؛ `RA-finance-02` (دسترسی parent dashboard) در این checkout بسته است؛ side-effect/gateway و چند CRUD هنوز blocker دارند |
 | attendance | 15 | read/history، live start/status/cancel، retry مالی، suspended guard و QR stale/same-day success با DB restore |
 | classes | 21 | list/detail/debt/export و subset state/approval؛ create/bulk/delete/enrollment transitionها هنوز عمیق نیستند |
@@ -49,8 +49,8 @@
 
 ```text
 PYTHONPATH=. /tmp/kharazmi-route-audit-venv/bin/pytest -q -rx tests/route_audit
-243 passed, 2 xfailed, 4 warnings in 27.46s (2026-10-06)
-focused messages suite (2026-10-06): 14 passed, 0 xfailed; all seven routes have targeted references
+244 passed, 1 xfailed, 4 warnings in 20.40s (2026-10-07)
+focused auth e2e (2026-10-07): 15 passed, 5 warnings; O-02 source/route regressions passed
 main DB MD5 before/after full suite: f048f8d118b33c4eaa944490594121d7
 
 Broad route sweep (2026-10-05; not rerun after the latest fixes): 221/221; main 500=0; 220/221 invalid-target probes; invalid 500=0
@@ -69,7 +69,7 @@ large seed: 300 students/30 classes + 300 transaction/session rows; 8/8 limit/or
 Markdown generator: 25 ledgers, every generated row has 8 intact cells and no unwrapped segment >300 chars
 ```
 
-در آخرین اجرای کامل دو strict xfail باقی ماند: O-02/`RA-auth-02` (Android FCM token registration) و O-19/`RA-admin-19` (پیاده‌سازی restore کامل کلاس طبق تصمیم Q-005: checkbox برای افزودن/حذف تاریخچهٔ مالی). `RA-messages-01/02/03` و سایر fixهای تأییدشده در `bugs.md` بسته و بدون xfail هستند. contract simulator همچنان candidate خام ثبت می‌کند؛ `bugs.md` و Q-006..008 آن را از باگ قابل‌مشاهده جدا می‌کنند.
+تنها strict xfail اجرای کامل `O-19/RA-admin-19` است (restore کامل کلاس طبق تصمیم Q-005: checkbox برای افزودن/حذف تاریخچهٔ مالی). O-02 Android registration source/contract wiring بسته شده؛ برای token generation واقعی چهار Firebase client setting و device QA لازم است. `RA-messages-01/02/03` و سایر fixهای تأییدشده در `bugs.md` بسته و بدون xfail هستند. contract simulator همچنان candidate خام ثبت می‌کند؛ `bugs.md` و Q-006..008 آن را از باگ قابل‌مشاهده جدا می‌کنند.
 
 `docs/route-tests/routes/*.md` برای هر route: یک جملهٔ purpose/handler، actor و status probe، caller/screen جاری، ورودی و response schema، DB read/write statically extracted، side effect و test-reference یا smoke-only status دارد. 151 route test source literal request reference دارند؛ این شمارش به‌تنهایی عمق assertion را اثبات نمی‌کند. 70 مسیر literal match ندارند؛ ledger per-route قید هر مورد را نشان می‌دهد.
 

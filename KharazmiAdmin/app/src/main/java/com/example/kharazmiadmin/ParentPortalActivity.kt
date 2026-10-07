@@ -274,6 +274,7 @@ class ParentPortalActivity : BaseActivity() {
         getSharedPreferences("UserCreds", Context.MODE_PRIVATE).edit()
             .putString("USER_SUB_ROLE", "parent")
             .apply()
+        PushTokenRegistration.refreshAndRegister(applicationContext)
         // FIX M21: توکن در هر ریکوئست تازه خوانده می‌شود؛ نیازی به reset نیست.
         RetrofitClient.getInstance(this)
         return true

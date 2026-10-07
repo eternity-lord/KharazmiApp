@@ -24,8 +24,7 @@ REPORT_DIR = ROOT / "docs/route-tests/routes"
 START = "<!-- GENERATED ROUTE LEDGER START -->"
 END = "<!-- GENERATED ROUTE LEDGER END -->"
 
-# Strict xfails that still reproduce an open issue today. O-02 is an
-# Android-only push-registration question and is tracked in bugs/device checklist.
+# Strict xfails that still reproduce an open issue today.
 KNOWN_XFAILS = {
     ("POST", "/admin/deleted_classes/{course_id}/restore"): "O-19",
 }
